@@ -20,6 +20,7 @@ use tonic::{Request, Response, Status};
 
 use prost::Message;
 
+use cyrene_agent_runtime::adapter::tool_catalog::ToolCatalogSource;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::{MockModelProvider, MockToolProvider};
 use cyrene_agent_runtime::CancellationToken;
@@ -55,6 +56,38 @@ pub struct DirectPluginRuntimeServiceImpl {
     computer: Arc<ComputerRuntimeService>,
     mcp: Option<Arc<McpToolProvider>>,
     simulated_agent_dependencies: bool,
+}
+
+/// Host-side `ToolCatalogSource` over the configured MCP tool provider.
+///
+/// This is the agent-runtime host path: the package assembles the runtime
+/// with a provider that actually speaks `tool.provider.v1`.
+pub struct McpCatalogSource {
+    provider: Arc<McpToolProvider>,
+}
+
+impl McpCatalogSource {
+    /// Wrap one configured MCP tool provider.
+    pub fn new(provider: Arc<McpToolProvider>) -> Self {
+        Self { provider }
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolCatalogSource for McpCatalogSource {
+    async fn list_tools(
+        &self,
+        binding_id: Option<&str>,
+    ) -> cyrene_plugin_contracts::tool_provider_v1::ListToolsResponse {
+        self.provider.list_tools(binding_id).await
+    }
+
+    async fn call_tool(
+        &self,
+        request: &CallToolRequest,
+    ) -> cyrene_plugin_contracts::tool_provider_v1::CallToolResponse {
+        self.provider.call_tool(request).await
+    }
 }
 
 impl Default for DirectPluginRuntimeServiceImpl {

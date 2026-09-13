@@ -185,8 +185,8 @@ Evidence / 证据:
 - [x] W3-0d Gate hardening：protected surface 可见性（`--accept-protected-changes` 时打印 old → new digest；CI/review 可见）。
 - [x] W3-1 `tool.provider.v1` 契约：proto 载荷、method id、interface version、TCK 骨架。
 - [x] W3-2 MCP stdio provider：`tools/list` / `tools/call` / schema 转换 / 超时 / 取消 / 类型化错误（按 §8.1 A-D）。
-- [ ] W3-3 MCP HTTP/SSE transport。
-- [ ] W3-4 agent runtime 接入真实 `ToolProvider` 主机路径 + TCK。
+- [ ] W3-3 MCP HTTP/SSE transport（**owner 同意 defer 至 Wave 6**：尚无远程 MCP server 需求，先不扩大传输与验证面；出现首个远程场景时启动，见 W6-5）。
+- [x] W3-4 agent runtime 接入真实 `ToolProvider` 主机路径 + TCK。
 
 Evidence / 证据:
 
@@ -195,6 +195,7 @@ Evidence / 证据:
 - W3-0b：`python3 tools/ci/validate_manifests.py --root .` → `MANIFEST_SCHEMA: PASS manifests=7`；`jsonschema==4.23.0` 为 pinned CI/dev 依赖，catalog 生成前强制校验（生产 runtime 无新依赖）。
 - W3-0c1：Rust 既有 `structured_chat_v2_round_trip_preserves_tools_history_and_usage` 覆盖七字段；C# TCK `dotnet run --project contracts/tck/model-provider-v1/dotnet/ModelProviderContractTck.csproj` → `PASS`；Python TCK `bash contracts/tck/model-provider-v1/generate-bindings.sh` → `model.provider.v1 generated Python payload TCK: PASS` 且四语言生成 PASS。
 - W3-0d：实测 updater `--accept-protected-changes` 输出 `SOURCE_MANIFEST_PROTECTED: plugins/connectors/onebot-v11/README.md c0c1691bcd72... -> a3c0f3345c41...`；verifier 现在每次 PASS 打印 pinned protected surface（path + sha256）。
+- W3-4：agent runtime 新增 `adapter/tool_catalog.rs`：per-run `ToolCatalogSnapshot`、deterministic 平面名投影（`[A-Za-z0-9_-]`，冲突按 binding 前缀 + 序号去重）与 inverse map、`ToolCatalogSource` trait、`SnapshotToolProvider`（快照外工具 fail closed，不触达 provider）；turn loop 现在把 run 的 tool declarations 广告给模型。证据：`cargo test --manifest-path runtime/rust/cyrene-agent-runtime/Cargo.toml` → 14 passed（含新 TCK vector 6 在 native loop 与 rig adapter 上运行、投影/截断/广告断言）；`cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml` → 10 passed（含真实 agent loop × MCP provider 端到端）；clippy/fmt 干净。
 - W3-2：新增 crate `runtime/rust/cyrene-mcp-provider`（每操作一次短生命周期 MCP session；`kill_on_drop`；快照强制；`catalog_version` 为 sha256 摘要）；plugin server 增加 `with_mcp_servers` 与 `tool.provider.v1` 分派（未配置 bindings 时 fail closed）。证据：`cargo test --manifest-path runtime/rust/cyrene-mcp-provider/Cargo.toml` → `6 passed`（含超时回收与取消杀子进程）；`cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml` → `9 passed`（含 dispatch 与 fail-closed）；fmt/clippy 干净；catalog → `capabilities=11 implementations=12`，tool.provider.v1 记 `DISPATCH_VERIFIED / SIMULATED`。
 - W3-1：新增 `contracts/proto/cyrene/tool/provider/v1/tool_provider.proto` + Rust 投影/标识 + `contracts/tck/tool-provider-v1/`（含 `tool_provider_contract_tck.rs`）；buf 1.45.0（与 CI 同版本）`lint` / `format --diff --exit-code` / `build` 全通过；`cargo test --manifest-path contracts/rust/cyrene-plugin-contracts/Cargo.toml` → 3 个 tool_provider 契约测试通过，fmt/clippy 干净；catalog → `capabilities=11`，`tool.provider.v1` 以 contract-only 形式出现。
 
@@ -232,6 +233,7 @@ Evidence / 证据:
 - [ ] W6-2 Gemini native provider（`model.provider.v1` 的又一实现，无新契约）。
 - [ ] W6-3 capability 命名统一，含 `speech.provider.v1` / `rerank.provider.v1` 无契约声明的处理，以及 contract/dispatch 大小写差异。
 - [ ] W6-4 memory hybrid search（运行时特性，非新插件）。
+- [ ] W6-5 MCP HTTP/SSE transport（原 W3-3；首个远程 MCP server 场景出现时启动）。
 
 Evidence / 证据:
 
@@ -265,6 +267,8 @@ Evidence / 证据:
 | 2026-09-13 (v1.1) | manifest schema validation 前移为 Wave 3 gate；使用 pinned dev/CI validator | catalog 输入必须先通过 schema 校验 |
 | 2026-09-13 (v1.1) | 后续优先级：Wave 3 MCP → Wave 4 Evaluation Pack → Wave 5 Connector → Wave 6 Provider/Retrieval Backlog | owner 排序 |
 | 2026-09-13 (v1.1) | 新 capability 的 dispatch method 使用契约标识符原文（`tool.provider.v1` 为 `list_tools` / `call_tool`）；legacy PascalCase 分支保留到 Wave 6 命名统一 | 避免制造新的不一致 |
+| 2026-09-13 (v1.1) | W3-3 移入 W6-5：stdio 已覆盖本地/agent 路径，无远程 MCP 需求，暂不扩大传输面 | owner 同意 |
+| 2026-09-13 (v1.1) | 平面工具名字母表取 `[A-Za-z0-9_-]`（各厂商 tool-name 语法的交集）；点号/斜杠/空格折叠为 `_`，冲突按 binding 前缀与序号确定性去重 | 模型侧名称约束 + 决策 A |
 
 ## 14. v1.0 → v1.1 修订记录 / Revision Notes
 

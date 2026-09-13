@@ -14,6 +14,12 @@
           "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
           "result": "7 passed; Run and RunStream dispatch exercised through DirectPluginRuntime",
           "notes": "Production host fails closed for agent calls until the launcher injects real capability bindings; packaged-runtime acceptance not performed."
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / per-run tool catalog snapshot with flat-name projection, exercised on the native loop and the rig adapter",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-agent-runtime/Cargo.toml",
+          "result": "14 passed; TCK vector 6 covers snapshot routing, snapshot-miss fail-closed, and tool advertisement to the model"
         }
       ]
     },
@@ -158,6 +164,12 @@
           "environment": "linux / cargo test / in-process gRPC server dispatching tool.provider.v1 to the MCP provider",
           "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
           "result": "9 passed; list_tools and call_tool dispatched through DirectPluginRuntime and fail closed without bindings"
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / real agent loop in cyrene-plugin-server calling the MCP provider against the fake MCP server fixture",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "10 passed; the agent loop completes a tool turn end to end through tool.provider.v1 and the MCP child process"
         }
       ]
     }

@@ -248,6 +248,7 @@ dependencies = [
 name = "cyrene-plugin-server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "cyrene-agent-runtime",
  "cyrene-computer-runtime",
  "cyrene-mcp-provider",

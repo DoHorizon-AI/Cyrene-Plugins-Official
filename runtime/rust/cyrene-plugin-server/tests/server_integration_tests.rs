@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -24,7 +25,11 @@ use proto::direct_plugin_runtime_server::DirectPluginRuntimeServer;
 use proto::{health_response, DirectInvocationRequest, DirectStreamMode, HealthRequest};
 
 // Contract types
-use cyrene_mcp_provider::McpServerConfig;
+use cyrene_agent_runtime::adapter::{snapshot_tool_catalog, SnapshotToolProvider};
+use cyrene_agent_runtime::engine::cancel::CancellationToken;
+use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
+use cyrene_agent_runtime::tck::MockModelProvider;
+use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse,
 };
@@ -47,7 +52,7 @@ use cyrene_plugin_contracts::tool_provider_v1::{
 #[path = "../src/service.rs"]
 mod service;
 
-use service::DirectPluginRuntimeServiceImpl;
+use service::{DirectPluginRuntimeServiceImpl, McpCatalogSource};
 
 /// Helper to spin up an in-process server instance listening on an ephemeral port.
 async fn start_test_server() -> (DirectPluginRuntimeClient<Channel>, SocketAddr) {
@@ -634,6 +639,40 @@ async fn test_w3_mcp_tool_provider_dispatch() {
         call_tool_response::Result::Outcome(_) => {
             panic!("a tool outside the snapshot must not dispatch")
         }
+    }
+}
+
+#[tokio::test]
+async fn test_w3_agent_loop_runs_with_mcp_backed_tool_provider() {
+    let provider = Arc::new(McpToolProvider::new(vec![fake_mcp_server_config()]));
+    let source = Arc::new(McpCatalogSource::new(provider));
+    let snapshot = snapshot_tool_catalog(source.as_ref(), None)
+        .await
+        .expect("catalog snapshot");
+    assert_eq!(snapshot.tool_count(), 3);
+
+    let tool_provider = SnapshotToolProvider::new(snapshot.clone(), source.clone());
+    let model = MockModelProvider::with_tool_call("echo", "{\"text\":\"hello from agent\"}", 1);
+    let request = AgentRunRequest {
+        run_id: "run-mcp-agent".to_string(),
+        session_id: "session-mcp".to_string(),
+        prompt: "Please echo".to_string(),
+        messages: Vec::new(),
+        available_tools: snapshot.declarations().to_vec(),
+        config: None,
+    };
+    let response = CyreneNativeAgentLoop::new()
+        .execute_run(
+            request,
+            &model,
+            Some(&tool_provider),
+            CancellationToken::new(),
+        )
+        .await
+        .expect("agent run");
+    match response.result.unwrap() {
+        agent_run_response::Result::Success(success) => assert_eq!(success.total_turns, 2),
+        agent_run_response::Result::Error(error) => panic!("agent run failed: {error:?}"),
     }
 }
 
