@@ -1,0 +1,81 @@
+{
+  "schemaVersion": "cyrene.runtime-implementations.v1",
+  "description": "Runtime packages that serve capability contracts without publishing a Plugin manifest package. tools/ci/capability_catalog.py merges these records with plugins/**/plugin.manifest.json.",
+  "declaredWithoutContract": [
+    {
+      "id": "speech.provider.v1",
+      "declaredBy": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
+      "notes": "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."
+    },
+    {
+      "id": "rerank.provider.v1",
+      "declaredBy": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
+      "notes": "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."
+    }
+  ],
+  "implementations": [
+    {
+      "id": "cyrene.runtime.rust-native-host",
+      "package": "runtime/rust/cyrene-plugin-server",
+      "language": "rust",
+      "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+      "publication": "in-repo-unpublished",
+      "notes": "Serves agent and memory over gRPC. Dispatch identifiers follow the host's PascalCase convention. Agent and memory calls fail closed until the package launcher injects real capability bindings; Prune, ExportBatch, and ImportBatch are not dispatched, and computer.runtime.v1 is published separately as plugins/tools/computer-runtime.",
+      "capabilities": [
+        {
+          "id": "agent.runtime.v1",
+          "interfaceVersion": "1",
+          "methods": [
+            "Run",
+            "RunStream"
+          ]
+        },
+        {
+          "id": "memory.provider.v1",
+          "interfaceVersion": "1",
+          "methods": [
+            "StoreMemory",
+            "GetMemory",
+            "RecallMemory",
+            "DeleteMemory"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cyrene.runtime.dotnet-native-aot-openai",
+      "package": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi",
+      "language": "csharp",
+      "protocol": "cyrene.plugin.cabi.v1",
+      "publication": "in-repo-unpublished",
+      "notes": "Native AOT provider adapter; DirectPluginRuntime host wiring is not published as a Plugin package.",
+      "capabilities": [
+        {
+          "id": "model.provider.v1",
+          "interfaceVersion": "1",
+          "methods": [
+            "chat_completion",
+            "embeddings"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "cyrene.runtime.dotnet-native-aot-anthropic",
+      "package": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic",
+      "language": "csharp",
+      "protocol": "cyrene.plugin.cabi.v1",
+      "publication": "in-repo-unpublished",
+      "notes": "Native AOT provider adapter; DirectPluginRuntime host wiring is not published as a Plugin package.",
+      "capabilities": [
+        {
+          "id": "model.provider.v1",
+          "interfaceVersion": "1",
+          "methods": [
+            "chat_completion"
+          ]
+        }
+      ]
+    }
+  ]
+}

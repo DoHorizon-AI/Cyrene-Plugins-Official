@@ -40,6 +40,8 @@ jobs:
           python3 tools/ci/verify_source_manifest.py
           --root .
           --allow-git-metadata
+      - name: Verify the capability index is current
+        run: python3 tools/ci/capability_catalog.py --root . --check
       - name: Verify public repository metadata and hygiene
         run: python3 tools/ci/check_public_repository.py
       - name: Scan the exported source for credentials
@@ -104,6 +106,8 @@ jobs:
             plugins/policy/compat-rules \
             plugins/tools/dataset-preparation \
             plugins/tools/dataset-validator \
+            tools/ci/capability_catalog.py \
+            tools/ci/update_source_manifest.py \
             tools/ci/verify_source_manifest.py
       - name: Run Python runtime and official Plugin tests
         run: |

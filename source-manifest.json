@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "618ca45abc002ecca264ba1105c66816d1e5525b5b1da335226ecf01221e3a1a",
-      "size_bytes": 14696
+      "sha256": "fa5b8103ef0462da6b6db3624fd1ad41ff094c488cf3ba3d9dd390c253332063",
+      "size_bytes": 14912
     },
     {
       "kind": "file",
@@ -46,8 +46,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "README.md",
-      "sha256": "209a4662aed911728f65eeb7e3c03aa24bf964cc8767bdb8f75e7cc70f912589",
-      "size_bytes": 3144
+      "sha256": "8d84b68354656e4ff678f26a5f782e09f46bade47a47409cbdb164248c1936c5",
+      "size_bytes": 3418
     },
     {
       "kind": "file",
@@ -67,8 +67,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/README.md",
-      "sha256": "886c6336d6e38e6aff295a37563f7ab26d0c72613ef93adff949a20c4b5cc212",
-      "size_bytes": 4042
+      "sha256": "e70bbb86b2ae61320df29f911910e26621733bb357afb509c48536e6bdf17acf",
+      "size_bytes": 4277
     },
     {
       "kind": "file",
@@ -126,6 +126,13 @@
       "path": "contracts/cabi/v1/cyrene_plugin_abi_v1.h",
       "sha256": "33617626ad416f7ce566bee1cd8497347e3ec67194c0c6ac029833cfd5891f27",
       "size_bytes": 17539
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/capabilities.yaml",
+      "sha256": "bc4dbdcb6ec4d32f3d229b89e1fe644129e81f799250d592c39ceaf624d0e8ca",
+      "size_bytes": 7280
     },
     {
       "kind": "file",
@@ -243,8 +250,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/legacy-spi-disposition.yaml",
-      "sha256": "66f944ed4b8c0c3994208a988e3b5734a46ec2a7e774792390de96d785bf05ff",
-      "size_bytes": 1886
+      "sha256": "1a2ab03477d315b2042663d7546d2699131231ff6885b662cd87cbc0c7fb75df",
+      "size_bytes": 2177
     },
     {
       "kind": "file",
@@ -287,6 +294,13 @@
       "path": "contracts/proto/cyrene/plugin/runtime/v1/direct_plugin_runtime.proto",
       "sha256": "84d6a186e972e5d80372ed3600557aff457055a7930e967acfc91ccaf08be68e",
       "size_bytes": 2614
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/runtime-implementations.json",
+      "sha256": "783b0a8b0e29d1b150f2f0bf7c8e0460225f8c89007b4645d908ea3435d07eb7",
+      "size_bytes": 3007
     },
     {
       "kind": "file",
@@ -539,6 +553,13 @@
       "path": "contracts/tck/model-provider-v1/run-jvm-tck.sh",
       "sha256": "c7eb3a539e90897b97153e5f05a2ff1c3d71b2a08160bcf9133244d95bca4c4e",
       "size_bytes": 900
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
+      "sha256": "1e1a1a7b112e030cdc375a7db82020cbec7d1cb372f69b3235e1af77c3165075",
+      "size_bytes": 8741
     },
     {
       "kind": "file",
@@ -3315,6 +3336,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tools/ci/capability_catalog.py",
+      "sha256": "8a5d4b65fa0eb950965209310483e465e87c3e49c718a5aa4af205800ed16e84",
+      "size_bytes": 19103
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tools/ci/check_public_repository.py",
       "sha256": "ddbcc71deef416cac3f94895ec8cfefef982aac0363b6454ea1115d4c3fbc4b6",
       "size_bytes": 3655
@@ -3332,6 +3360,13 @@
       "path": "tools/ci/publish_native_aot.py",
       "sha256": "a826832c7b5e2ec68be15548b0616635c9a290b1927cb025c7643e7e378f8a44",
       "size_bytes": 9684
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/update_source_manifest.py",
+      "sha256": "d0bf3a0ba9638462418820de5a55871255c72bc390a40bf5f299af8a15e802e4",
+      "size_bytes": 7704
     },
     {
       "kind": "file",
