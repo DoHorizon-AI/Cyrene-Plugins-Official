@@ -1,0 +1,167 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/evaluation.runner.v1.evaluator-pack/schema.json",
+  "title": "evaluation.runner.v1 deterministic evaluator pack (owner-scoped)",
+  "description": "Owner-scoped payload contract for the deterministic evaluator pack. Each evaluator keeps its own request definition with a stable evaluator id and its own params; the response shape is shared inside this plugin only.",
+  "$ref": "#/$defs/EvaluateRequest",
+  "$defs": {
+    "EvaluatorId": {
+      "type": "string",
+      "enum": [
+        "contains.v1",
+        "regex.v1",
+        "json_structural.v1",
+        "json_schema.v1",
+        "numeric_tolerance.v1"
+      ]
+    },
+    "Record": {
+      "type": "object",
+      "required": ["sample_index", "record"],
+      "properties": {
+        "sample_index": {"type": "integer", "minimum": 1},
+        "record": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "Records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {"$ref": "#/$defs/Record"}
+    },
+    "ContainsParams": {
+      "type": "object",
+      "properties": {
+        "case_sensitive": {"type": "boolean", "default": true}
+      },
+      "additionalProperties": false
+    },
+    "RegexParams": {
+      "type": "object",
+      "required": ["pattern"],
+      "properties": {
+        "pattern": {"type": "string", "minLength": 1},
+        "mode": {"type": "string", "enum": ["search", "fullmatch"], "default": "search"},
+        "flags": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {"type": "string", "enum": ["ignorecase", "multiline", "dotall"]},
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "JsonStructuralParams": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    },
+    "JsonSchemaParams": {
+      "type": "object",
+      "required": ["schema"],
+      "properties": {
+        "schema": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "NumericToleranceParams": {
+      "type": "object",
+      "properties": {
+        "abs_tolerance": {"type": "number", "minimum": 0, "default": 0},
+        "rel_tolerance": {"type": "number", "minimum": 0, "default": 0}
+      },
+      "additionalProperties": false
+    },
+    "ContainsRequest": {
+      "type": "object",
+      "required": ["evaluator", "records", "expected_field", "actual_field"],
+      "properties": {
+        "evaluator": {"const": "contains.v1"},
+        "records": {"$ref": "#/$defs/Records"},
+        "expected_field": {"type": "string", "minLength": 1},
+        "actual_field": {"type": "string", "minLength": 1},
+        "params": {"$ref": "#/$defs/ContainsParams"}
+      },
+      "additionalProperties": false
+    },
+    "RegexRequest": {
+      "type": "object",
+      "required": ["evaluator", "records", "expected_field", "actual_field", "params"],
+      "properties": {
+        "evaluator": {"const": "regex.v1"},
+        "records": {"$ref": "#/$defs/Records"},
+        "expected_field": {"type": "string", "minLength": 1},
+        "actual_field": {"type": "string", "minLength": 1},
+        "params": {"$ref": "#/$defs/RegexParams"}
+      },
+      "additionalProperties": false
+    },
+    "JsonStructuralRequest": {
+      "type": "object",
+      "required": ["evaluator", "records", "expected_field", "actual_field"],
+      "properties": {
+        "evaluator": {"const": "json_structural.v1"},
+        "records": {"$ref": "#/$defs/Records"},
+        "expected_field": {"type": "string", "minLength": 1},
+        "actual_field": {"type": "string", "minLength": 1},
+        "params": {"$ref": "#/$defs/JsonStructuralParams"}
+      },
+      "additionalProperties": false
+    },
+    "JsonSchemaRequest": {
+      "type": "object",
+      "required": ["evaluator", "records", "actual_field", "params"],
+      "properties": {
+        "evaluator": {"const": "json_schema.v1"},
+        "records": {"$ref": "#/$defs/Records"},
+        "actual_field": {"type": "string", "minLength": 1},
+        "params": {"$ref": "#/$defs/JsonSchemaParams"}
+      },
+      "additionalProperties": false
+    },
+    "NumericToleranceRequest": {
+      "type": "object",
+      "required": ["evaluator", "records", "expected_field", "actual_field"],
+      "properties": {
+        "evaluator": {"const": "numeric_tolerance.v1"},
+        "records": {"$ref": "#/$defs/Records"},
+        "expected_field": {"type": "string", "minLength": 1},
+        "actual_field": {"type": "string", "minLength": 1},
+        "params": {"$ref": "#/$defs/NumericToleranceParams"}
+      },
+      "additionalProperties": false
+    },
+    "EvaluateRequest": {
+      "oneOf": [
+        {"$ref": "#/$defs/ContainsRequest"},
+        {"$ref": "#/$defs/RegexRequest"},
+        {"$ref": "#/$defs/JsonStructuralRequest"},
+        {"$ref": "#/$defs/JsonSchemaRequest"},
+        {"$ref": "#/$defs/NumericToleranceRequest"}
+      ]
+    },
+    "Sample": {
+      "type": "object",
+      "required": ["sample_index", "passed", "score", "detail"],
+      "properties": {
+        "sample_index": {"type": "integer", "minimum": 1},
+        "passed": {"type": "boolean"},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "detail": {"type": ["string", "null"]}
+      },
+      "additionalProperties": false
+    },
+    "EvaluateResponse": {
+      "type": "object",
+      "required": ["evaluator", "record_count", "passed_count", "score", "samples"],
+      "properties": {
+        "evaluator": {"$ref": "#/$defs/EvaluatorId"},
+        "record_count": {"type": "integer", "minimum": 0},
+        "passed_count": {"type": "integer", "minimum": 0},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "samples": {"type": "array", "items": {"$ref": "#/$defs/Sample"}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

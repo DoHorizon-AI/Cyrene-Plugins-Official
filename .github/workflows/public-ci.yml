@@ -35,11 +35,17 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Install manifest validation dependency
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.23.0
       - name: Verify exported source manifest
         run: >-
           python3 tools/ci/verify_source_manifest.py
           --root .
           --allow-git-metadata
+      - name: Validate plugin manifests against the schema
+        run: python3 tools/ci/validate_manifests.py --root .
+      - name: Verify the capability index is current
+        run: python3 tools/ci/capability_catalog.py --root . --check
       - name: Verify public repository metadata and hygiene
         run: python3 tools/ci/check_public_repository.py
       - name: Scan the exported source for credentials
@@ -82,12 +88,15 @@ jobs:
           compression-level: 0
       - name: Install Python runtime test dependencies
         run: |
-          python3 -m pip install --disable-pip-version-check pytest ruff
+          python3 -m pip install --disable-pip-version-check pytest ruff jsonschema==4.23.0
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_plugin_runtime \
             -e plugins/connectors/onebot-v11 \
+          -e plugins/connectors/wecom \
             -e plugins/evaluation/exact-match \
+          -e plugins/evaluation/evaluator-pack \
+          -e plugins/evaluation/llm-judge \
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
             -e plugins/tools/dataset-preparation \
@@ -99,17 +108,26 @@ jobs:
             sdk/python/cyrene_model_provider_contracts/src \
             sdk/python/cyrene_plugin_runtime/src \
             plugins/connectors/onebot-v11/src \
+            plugins/connectors/wecom \
             plugins/evaluation/exact-match \
+            plugins/evaluation/evaluator-pack \
+            plugins/evaluation/llm-judge \
             plugins/models/hf-model-analyzer \
             plugins/policy/compat-rules \
             plugins/tools/dataset-preparation \
             plugins/tools/dataset-validator \
+            tools/ci/capability_catalog.py \
+            tools/ci/update_source_manifest.py \
+            tools/ci/validate_manifests.py \
             tools/ci/verify_source_manifest.py
       - name: Run Python runtime and official Plugin tests
         run: |
           python3 -m pytest -q \
             sdk/python/cyrene_plugin_runtime/tests \
             plugins/connectors/onebot-v11/tests \
+            plugins/connectors/wecom/tests \
+            plugins/evaluation/evaluator-pack/tests \
+            plugins/evaluation/llm-judge/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests
 
@@ -122,6 +140,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.45.0"
+          github_token: ${{ github.token }}
       - name: Lint and format protobuf contracts
         working-directory: contracts
         run: |
@@ -146,6 +165,7 @@ jobs:
             runtime/rust/cyrene-agent-runtime/Cargo.toml \
             runtime/rust/cyrene-memory-runtime/Cargo.toml \
             runtime/rust/cyrene-computer-runtime/Cargo.toml \
+            runtime/rust/cyrene-mcp-provider/Cargo.toml \
             runtime/rust/cyrene-plugin-cabi/Cargo.toml \
             runtime/rust/cyrene-plugin-server/Cargo.toml; do
             cargo fmt --manifest-path "$manifest" --check

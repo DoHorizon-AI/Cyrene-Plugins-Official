@@ -22,14 +22,39 @@ use cyrene_plugin_contracts::agent_runtime_v1::{
     UsageStats,
 };
 use cyrene_plugin_contracts::model_provider_v1::{
-    chat_message, ChatCompletionRequest, ChatMessage as ModelChatMessage, ChatToolCall,
-    ChatToolCallFunction,
+    chat_message, ChatCompletionRequest, ChatFunction, ChatMessage as ModelChatMessage, ChatTool,
+    ChatToolCall, ChatToolCallFunction,
 };
 
 use crate::adapter::model_provider::ModelProvider;
 use crate::adapter::tool_provider::ToolProvider;
 use crate::engine::cancel::CancellationToken;
 use crate::limits::RuntimeLimits;
+
+/// Project the run's declared tools into the model-facing tool list.
+fn advertise_tools(request: &AgentRunRequest) -> Vec<ChatTool> {
+    request
+        .available_tools
+        .iter()
+        .map(|declaration| ChatTool {
+            r#type: "function".to_string(),
+            function: Some(ChatFunction {
+                name: declaration.name.clone(),
+                description: if declaration.description.is_empty() {
+                    None
+                } else {
+                    Some(declaration.description.clone())
+                },
+                parameters_json: if declaration.parameters_json_schema.is_empty() {
+                    "{}".to_string()
+                } else {
+                    declaration.parameters_json_schema.clone()
+                },
+                strict: None,
+            }),
+        })
+        .collect()
+}
 
 #[derive(Default)]
 pub struct CyreneNativeAgentLoop {}
@@ -55,6 +80,9 @@ impl CyreneNativeAgentLoop {
     ) -> Result<AgentRunResponse, AgentRunError> {
         let limits = RuntimeLimits::from_config(request.config.as_ref())?;
         let start_time = Instant::now();
+        // The run's tool declarations are exactly the snapshot the caller took
+        // at run start (decision B); the model only ever sees these names.
+        let advertised_tools = advertise_tools(&request);
 
         let timeout_cancel = if let Some(t_ms) = limits.timeout_ms {
             CancellationToken::with_timeout(Duration::from_millis(t_ms))
@@ -147,7 +175,7 @@ impl CyreneNativeAgentLoop {
                     .as_ref()
                     .and_then(|c| c.temperature.map(|t| t as f64)),
                 max_tokens: None,
-                tools: Vec::new(),
+                tools: advertised_tools.clone(),
                 tool_choice: None,
                 parallel_tool_calls: None,
                 include_usage: Some(true),
@@ -297,6 +325,7 @@ impl CyreneNativeAgentLoop {
         sender: mpsc::Sender<AgentStreamEvent>,
     ) -> Result<(), AgentRunError> {
         let limits = RuntimeLimits::from_config(request.config.as_ref())?;
+        let advertised_tools = advertise_tools(&request);
         let seq = AtomicI64::new(1);
         let start_time = Instant::now();
 
@@ -395,7 +424,7 @@ impl CyreneNativeAgentLoop {
                     .as_ref()
                     .and_then(|c| c.temperature.map(|t| t as f64)),
                 max_tokens: None,
-                tools: Vec::new(),
+                tools: advertised_tools.clone(),
                 tool_choice: None,
                 parallel_tool_calls: None,
                 include_usage: Some(true),

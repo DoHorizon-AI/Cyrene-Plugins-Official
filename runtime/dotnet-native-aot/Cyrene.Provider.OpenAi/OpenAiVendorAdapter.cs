@@ -38,13 +38,16 @@ public sealed class OpenAiVendorAdapter : IModelCapability, IEmbeddingCapability
         CancellationToken cancellationToken = default
     )
     {
-        var wireMessages = parameters.Messages.Select(m => new OpenAiWireMessage(m.Role, m.Content, m.Name)).ToList();
+        var wireMessages = parameters.Messages.Select(ToWireMessage).ToList();
         var wireReq = new OpenAiChatRequest(
             Model: parameters.Model,
             Messages: wireMessages,
             Temperature: parameters.Temperature,
             MaxTokens: parameters.MaxTokens,
-            Stream: false
+            Stream: false,
+            Tools: parameters.Tools?.Select(ToWireTool).ToList(),
+            ToolChoice: ToWireToolChoice(parameters.ToolChoice),
+            ParallelToolCalls: parameters.ParallelToolCalls
         );
 
         var json = JsonSerializer.Serialize(wireReq, ProviderJsonSerializerContext.Default.OpenAiChatRequest);
@@ -68,13 +71,22 @@ public sealed class OpenAiVendorAdapter : IModelCapability, IEmbeddingCapability
         }
 
         var firstChoice = parsed.Choices[0];
+        var toolCalls = firstChoice.Message?.ToolCalls?
+            .Select(call => new ChatToolCall(
+                Id: call.Id,
+                Type: call.Type,
+                Function: new ChatToolCallFunction(call.Function.Name, call.Function.Arguments)
+            ))
+            .ToList();
         return new ChatCompletionResult(
             Id: parsed.Id,
             Model: parsed.Model,
             Content: firstChoice.Message?.Content ?? string.Empty,
             FinishReason: firstChoice.FinishReason,
             PromptTokens: parsed.Usage?.PromptTokens,
-            CompletionTokens: parsed.Usage?.CompletionTokens
+            CompletionTokens: parsed.Usage?.CompletionTokens,
+            ToolCalls: toolCalls,
+            TotalTokens: parsed.Usage?.TotalTokens
         );
     }
 
@@ -83,13 +95,19 @@ public sealed class OpenAiVendorAdapter : IModelCapability, IEmbeddingCapability
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {
-        var wireMessages = parameters.Messages.Select(m => new OpenAiWireMessage(m.Role, m.Content, m.Name)).ToList();
+        var wireMessages = parameters.Messages.Select(ToWireMessage).ToList();
         var wireReq = new OpenAiChatRequest(
             Model: parameters.Model,
             Messages: wireMessages,
             Temperature: parameters.Temperature,
             MaxTokens: parameters.MaxTokens,
-            Stream: true
+            Stream: true,
+            Tools: parameters.Tools?.Select(ToWireTool).ToList(),
+            ToolChoice: ToWireToolChoice(parameters.ToolChoice),
+            ParallelToolCalls: parameters.ParallelToolCalls,
+            StreamOptions: parameters.IncludeUsage == true
+                ? new OpenAiStreamOptions(IncludeUsage: true)
+                : null
         );
 
         var json = JsonSerializer.Serialize(wireReq, ProviderJsonSerializerContext.Default.OpenAiChatRequest);
@@ -115,16 +133,98 @@ public sealed class OpenAiVendorAdapter : IModelCapability, IEmbeddingCapability
                 continue;
             }
 
-            if (chunk?.Choices != null && chunk.Choices.Count > 0)
+            if (chunk == null)
+            {
+                continue;
+            }
+
+            if (chunk.Choices != null && chunk.Choices.Count > 0)
             {
                 var choice = chunk.Choices[0];
+                var toolCallDeltas = choice.Delta?.ToolCalls?
+                    .Select(delta => new ChatToolCallDelta(
+                        Index: delta.Index,
+                        Id: delta.Id,
+                        Type: delta.Type,
+                        FunctionName: delta.Function?.Name,
+                        FunctionArguments: delta.Function?.Arguments
+                    ))
+                    .ToList();
                 yield return new ChatCompletionChunk(
                     Id: chunk.Id,
                     Delta: choice.Delta?.Content ?? string.Empty,
-                    FinishReason: choice.FinishReason
+                    FinishReason: choice.FinishReason,
+                    ToolCalls: toolCallDeltas
+                );
+                continue;
+            }
+
+            if (chunk.Usage != null)
+            {
+                // Final usage-only frame requested through stream_options.include_usage.
+                yield return new ChatCompletionChunk(
+                    Id: chunk.Id,
+                    Delta: string.Empty,
+                    FinishReason: null,
+                    PromptTokens: chunk.Usage.PromptTokens,
+                    CompletionTokens: chunk.Usage.CompletionTokens,
+                    TotalTokens: chunk.Usage.TotalTokens
                 );
             }
         }
+    }
+
+    private static OpenAiWireMessage ToWireMessage(ChatMessage message)
+    {
+        var toolCalls = message.ToolCalls?
+            .Select(call => new OpenAiWireToolCall(
+                Id: call.Id,
+                Type: call.Type,
+                Function: new OpenAiWireToolCallFunction(call.Function.Name, call.Function.Arguments)
+            ))
+            .ToList();
+        return new OpenAiWireMessage(
+            Role: message.Role,
+            Content: message.Content,
+            Name: message.Name,
+            ToolCallId: message.ToolCallId,
+            ToolCalls: toolCalls
+        );
+    }
+
+    private static OpenAiWireTool ToWireTool(ChatTool tool) =>
+        new(
+            Type: tool.Type,
+            Function: new OpenAiWireFunctionDefinition(
+                Name: tool.Function.Name,
+                Description: tool.Function.Description,
+                Parameters: ParseParameters(tool.Function.ParametersJson),
+                Strict: tool.Function.Strict
+            )
+        );
+
+    private static OpenAiWireToolChoice? ToWireToolChoice(ChatToolChoice? choice)
+    {
+        if (choice == null)
+        {
+            return null;
+        }
+
+        var function = string.IsNullOrEmpty(choice.FunctionName)
+            ? null
+            : new OpenAiWireFunctionName(choice.FunctionName);
+        return new OpenAiWireToolChoice(choice.Mode, function);
+    }
+
+    private static JsonElement? ParseParameters(string parametersJson)
+    {
+        if (string.IsNullOrWhiteSpace(parametersJson))
+        {
+            return null;
+        }
+
+        using var document = JsonDocument.Parse(parametersJson);
+        return document.RootElement.Clone();
     }
 
     public async Task<EmbeddingResult> GenerateEmbeddingsAsync(

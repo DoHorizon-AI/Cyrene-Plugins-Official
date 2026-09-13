@@ -1,0 +1,366 @@
+schema_version: cyrene.capabilities.v1
+generated_by: tools/ci/capability_catalog.py
+verification_registry: contracts/capability-verification.json
+capabilities:
+  - id: agent.runtime.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/agent/runtime/v1/agent_runtime.proto
+    contract_methods:
+      - run
+      - run_stream
+    implementations:
+      - ref: cyrene.runtime.rust-native-host
+        source: contracts/runtime-implementations.json
+        language: rust
+        protocol: cyrene.plugin.runtime.v1.DirectPluginRuntime
+        publication: in-repo-unpublished
+        methods:
+          - Run
+          - RunStream
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/agent_runtime_contract_tck.rs
+  - id: compatibility.evaluator.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/policy/compat-rules/contracts/v1/schema.json
+    contract_methods:
+      - evaluate
+    implementations:
+      - ref: cyrene.policy.compat-rules
+        source: plugins/policy/compat-rules/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - evaluate
+        interface_versions:
+          - "1"
+        verification_level: DECLARED
+    tck: []
+  - id: computer.runtime.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/computer/runtime/v1/computer_runtime.proto
+    contract_methods:
+      - create_artifact
+      - execute_command
+      - execute_command_stream
+      - get_artifact
+      - list_dir
+      - read_file
+      - write_file
+    implementations:
+      - ref: cyrene.tools.computer-runtime
+        source: plugins/tools/computer-runtime/plugin.manifest.json
+        kind: tool-provider
+        language: rust
+        publication: published
+        methods:
+          - CreateArtifact
+          - ExecuteCommand
+          - ExecuteCommandStream
+          - GetArtifact
+          - ListDir
+          - ReadFile
+          - WriteFile
+        interface_versions:
+          - "1"
+        maturity: migrating
+        verification_level: INTEGRATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/computer_runtime_contract_tck.rs
+      - contracts/tck/computer-runtime-v1
+  - id: dataset.preparation.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/dataset-preparation/contracts/v1/schema.json
+    contract_methods:
+      - inspect
+      - prepare
+      - transform
+    implementations:
+      - ref: cyrene.tools.dataset-preparation
+        source: plugins/tools/dataset-preparation/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - inspect
+          - prepare
+          - transform
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
+    tck: []
+  - id: evaluation.runner.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/evaluation/evaluator-pack/contracts/v1/schema.json
+        - plugins/evaluation/exact-match/contracts/v1/schema.json
+        - plugins/evaluation/llm-judge/contracts/v1/schema.json
+    contract_methods:
+      - evaluate
+    implementations:
+      - ref: cyrene.evaluation.evaluator-pack
+        source: plugins/evaluation/evaluator-pack/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - evaluate
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
+      - ref: cyrene.evaluation.exact-match
+        source: plugins/evaluation/exact-match/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - evaluate
+        interface_versions:
+          - "1"
+        verification_level: DECLARED
+      - ref: cyrene.evaluation.llm-judge
+        source: plugins/evaluation/llm-judge/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - evaluate
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+    tck: []
+  - id: memory.provider.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/memory/provider/v1/memory_provider.proto
+    contract_methods:
+      - delete
+      - export_batch
+      - get
+      - import_batch
+      - prune
+      - recall
+      - store
+    implementations:
+      - ref: cyrene.runtime.rust-native-host
+        source: contracts/runtime-implementations.json
+        language: rust
+        protocol: cyrene.plugin.runtime.v1.DirectPluginRuntime
+        publication: in-repo-unpublished
+        methods:
+          - DeleteMemory
+          - GetMemory
+          - RecallMemory
+          - StoreMemory
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/memory_provider_contract_tck.rs
+  - id: message.connector.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/json/message-connector-v1-inbound-request.schema.json
+        - contracts/json/message-connector-v1-request-response.schema.json
+        - contracts/proto/cyrene/message/connector/v1/message_connector.proto
+    contract_methods:
+      - inbound_message
+      - inbound_request
+      - respond_request
+      - send_message
+    implementations:
+      - ref: cyrene.connectors.onebot-v11
+        source: plugins/connectors/onebot-v11/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - inbound_message
+          - inbound_request
+          - respond_request
+          - send_message
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+      - ref: cyrene.connectors.wecom
+        source: plugins/connectors/wecom/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - send_message
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/message_connector_contract_tck.rs
+      - contracts/tck/message-connector-v1
+  - id: model.analyzer.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/models/hf-model-analyzer/contracts/v1/schema.json
+    contract_methods:
+      - analyze
+      - compute_sha256
+      - validate_shards
+    implementations:
+      - ref: cyrene.models.hf-analyzer
+        source: plugins/models/hf-model-analyzer/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - analyze
+          - compute_sha256
+          - validate_shards
+        interface_versions:
+          - "1"
+        verification_level: DECLARED
+    tck: []
+  - id: model.provider.v1
+    interface_versions:
+      - "1"
+      - "2"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/model/provider/v1/model_provider.proto
+    contract_methods:
+      - chat_completion
+      - chat_completion_v2
+      - embeddings
+    implementations:
+      - ref: cyrene.runtime.dotnet-native-aot-anthropic
+        source: contracts/runtime-implementations.json
+        language: csharp
+        protocol: cyrene.plugin.cabi.v1
+        publication: in-repo-unpublished
+        methods:
+          - chat_completion
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+      - ref: cyrene.runtime.dotnet-native-aot-gemini
+        source: contracts/runtime-implementations.json
+        language: csharp
+        protocol: cyrene.plugin.cabi.v1
+        publication: in-repo-unpublished
+        methods:
+          - chat_completion
+          - embeddings
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+      - ref: cyrene.runtime.dotnet-native-aot-openai
+        source: contracts/runtime-implementations.json
+        language: csharp
+        protocol: cyrene.plugin.cabi.v1
+        publication: in-repo-unpublished
+        methods:
+          - chat_completion
+          - embeddings
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/model_provider_chat_contract_tck.rs
+      - contracts/rust/cyrene-plugin-contracts/tests/model_provider_embedding_contract_tck.rs
+      - contracts/tck/model-provider-v1
+  - id: tool.dataset.validator.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/dataset-validator/contracts/v1/schema.json
+    contract_methods:
+      - validate
+    implementations:
+      - ref: cyrene.tools.dataset-validator
+        source: plugins/tools/dataset-validator/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - validate
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
+    tck: []
+  - id: tool.provider.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/tool/provider/v1/tool_provider.proto
+    contract_methods:
+      - call_tool
+      - list_tools
+    implementations:
+      - ref: cyrene.runtime.mcp-tool-provider
+        source: contracts/runtime-implementations.json
+        language: rust
+        protocol: cyrene.plugin.runtime.v1.DirectPluginRuntime
+        publication: in-repo-unpublished
+        methods:
+          - call_tool
+          - list_tools
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs
+      - contracts/tck/tool-provider-v1
+declared_without_contract:
+  - id: rerank.provider.v1
+    declared_by: runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs
+    notes: "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."
+  - id: speech.provider.v1
+    declared_by: runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs
+    notes: "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."

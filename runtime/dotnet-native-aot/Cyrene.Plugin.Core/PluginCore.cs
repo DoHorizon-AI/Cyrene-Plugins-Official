@@ -56,9 +56,7 @@ public class PluginCoreInstance : IPluginInstance
 
     public static IReadOnlyList<CapabilityInfo> SupportedCapabilities { get; } = new List<CapabilityInfo>
     {
-        new("model.provider.v1", 1, 0),
-        new("speech.provider.v1", 1, 0),
-        new("rerank.provider.v1", 1, 0)
+        new("model.provider.v1", 1, 0)
     };
 
     public InvokeResult Invoke(string method, string? inputTypeUrl, ReadOnlySpan<byte> inputData, ulong deadlineMs)
@@ -75,6 +73,8 @@ public class PluginCoreInstance : IPluginInstance
             case "Echo":
                 return new InvokeResult(StatusCode.Ok, null, inputTypeUrl ?? "", inputData.ToArray());
 
+            case "model.provider.v1/chat_completion":
+            // Compatibility alias for interface version 1 (W6-3).
             case "model.provider.v1/Chat":
                 return new InvokeResult(
                     StatusCode.Unavailable,

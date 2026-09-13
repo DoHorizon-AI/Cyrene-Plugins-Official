@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/evaluation.runner.v1.llm-judge/configuration.schema.json",
+  "title": "evaluation.runner.v1 LLM judge activation configuration",
+  "description": "Activation configuration for the judge. The model endpoint is a loopback or Unix connection reference resolved by the host; the plugin never selects providers, holds credentials, or routes traffic.",
+  "type": "object",
+  "required": ["model_endpoint", "model"],
+  "properties": {
+    "model_endpoint": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Loopback or Unix-socket connection reference of the resolved model.provider.v1 endpoint."
+    },
+    "model": {"type": "string", "minLength": 1},
+    "temperature": {"type": "number", "minimum": 0},
+    "max_tokens": {"type": "integer", "minimum": 1},
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "pass_threshold": {"type": "number", "minimum": 0, "maximum": 1}
+  },
+  "additionalProperties": false
+}

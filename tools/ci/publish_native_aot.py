@@ -168,11 +168,13 @@ def _publish_and_smoke(rid: str, output_dir: Path) -> dict[str, object]:
     (output_dir / "lib").mkdir()
     (output_dir / "providers" / "openai").mkdir(parents=True)
     (output_dir / "providers" / "anthropic").mkdir(parents=True)
+    (output_dir / "providers" / "gemini").mkdir(parents=True)
 
     host_stage = output_dir / "_host"
     native_lib_stage = output_dir / "_native-lib"
     openai_stage = output_dir / "_openai"
     anthropic_stage = output_dir / "_anthropic"
+    gemini_stage = output_dir / "_gemini"
 
     _publish(
         "runtime/dotnet-native-aot/Cyrene.Plugin.Host/Cyrene.Plugin.Host.csproj",
@@ -194,21 +196,29 @@ def _publish_and_smoke(rid: str, output_dir: Path) -> dict[str, object]:
         rid,
         anthropic_stage,
     )
+    _publish(
+        "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/Cyrene.Provider.Gemini.csproj",
+        rid,
+        gemini_stage,
+    )
 
     host = _find_executable(host_stage, "cyrene-plugin-host")
     native_library = _find_native_library(native_lib_stage)
     openai = _find_executable(openai_stage, "Cyrene.Provider.OpenAi")
     anthropic = _find_executable(anthropic_stage, "Cyrene.Provider.Anthropic")
+    gemini = _find_executable(gemini_stage, "Cyrene.Provider.Gemini")
 
     staged_host = output_dir / "bin" / host.name
     staged_library = output_dir / "lib" / native_library.name
     staged_openai = output_dir / "providers" / "openai" / openai.name
     staged_anthropic = output_dir / "providers" / "anthropic" / anthropic.name
+    staged_gemini = output_dir / "providers" / "gemini" / gemini.name
     for source, target in (
         (host, staged_host),
         (native_library, staged_library),
         (openai, staged_openai),
         (anthropic, staged_anthropic),
+        (gemini, staged_gemini),
     ):
         shutil.copy2(source, target)
         target.chmod(target.stat().st_mode | 0o111)
@@ -222,7 +232,11 @@ def _publish_and_smoke(rid: str, output_dir: Path) -> dict[str, object]:
         raise RuntimeError(f"Native AOT host prototype did not fail closed: {health}")
 
     provider_checks: dict[str, dict[str, object]] = {}
-    for provider, binary in (("openai", staged_openai), ("anthropic", staged_anthropic)):
+    for provider, binary in (
+        ("openai", staged_openai),
+        ("anthropic", staged_anthropic),
+        ("gemini", staged_gemini),
+    ):
         readiness = _run_json_binary(
             PublishedBinary(f"{provider} Native AOT provider", binary),
             "--readiness",
@@ -245,6 +259,7 @@ def _publish_and_smoke(rid: str, output_dir: Path) -> dict[str, object]:
             for provider, path in (
                 ("openai", staged_openai),
                 ("anthropic", staged_anthropic),
+                ("gemini", staged_gemini),
             )
         },
         "binary_smoke": {
@@ -258,7 +273,13 @@ def _publish_and_smoke(rid: str, output_dir: Path) -> dict[str, object]:
         json.dumps(evidence, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
 
-    for disposable in (host_stage, native_lib_stage, openai_stage, anthropic_stage):
+    for disposable in (
+        host_stage,
+        native_lib_stage,
+        openai_stage,
+        anthropic_stage,
+        gemini_stage,
+    ):
         shutil.rmtree(disposable)
     return evidence
 

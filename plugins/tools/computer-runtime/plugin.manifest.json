@@ -30,6 +30,11 @@
       "executionMode": "service"
     },
     {
+      "name": "ListDir",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
       "name": "CreateArtifact",
       "interfaceVersion": "1",
       "executionMode": "service"

@@ -11,8 +11,13 @@
 //! - Unknown capabilities and methods
 //! - Invalid or spoofed Type URLs
 //! - Corrupted or unparseable Protobuf payloads
+//!
+//! Dispatch accepts the canonical contract method spelling first (`run`,
+//! `list_dir`, ...) and keeps the legacy PascalCase ids (`Run`, `ListDir`, ...)
+//! as interface-version 1 compatibility aliases; see `canonical_method`.
 
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -20,10 +25,12 @@ use tonic::{Request, Response, Status};
 
 use prost::Message;
 
+use cyrene_agent_runtime::adapter::tool_catalog::ToolCatalogSource;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::{MockModelProvider, MockToolProvider};
 use cyrene_agent_runtime::CancellationToken;
 use cyrene_computer_runtime::ComputerRuntimeService;
+use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_memory_runtime::backend::sqlite::SqliteMemoryBackend;
 use cyrene_memory_runtime::embedding::ContractModelEmbeddingClient;
 use cyrene_memory_runtime::CyreneMemoryService;
@@ -33,11 +40,12 @@ use cyrene_plugin_contracts::agent_runtime_v1::{
 };
 use cyrene_plugin_contracts::computer_runtime_v1::{
     CommandExecutionRequest, CommandStreamEvent, CreateArtifactRequest, GetArtifactRequest,
-    ReadFileRequest, WriteFileRequest,
+    ListDirRequest, ReadFileRequest, WriteFileRequest,
 };
 use cyrene_plugin_contracts::memory_provider_v1::{
     DeleteMemoryRequest, GetMemoryRequest, RecallMemoryRequest, StoreMemoryRequest,
 };
+use cyrene_plugin_contracts::tool_provider_v1::{CallToolRequest, ListToolsRequest};
 
 use crate::proto::direct_invocation_error::Code;
 use crate::proto::direct_invocation_response::Result as InvocationResult;
@@ -48,10 +56,67 @@ use crate::proto::{
     DirectPayload, DirectStreamEnd, DirectStreamItem, HealthRequest, HealthResponse,
 };
 
+/// Maps legacy PascalCase dispatch ids to their canonical contract method
+/// names. New consumers and the capability catalog use the canonical spelling;
+/// the aliases stay dispatchable for the lifetime of interface version 1 and
+/// are only removable through the breaking-change process in
+/// `contracts/VERSIONING.md` (W6-3).
+fn canonical_method<'a>(capability: &str, method: &'a str) -> &'a str {
+    match (capability, method) {
+        ("agent.runtime.v1", "Run") => "run",
+        ("agent.runtime.v1", "RunStream") => "run_stream",
+        ("memory.provider.v1", "StoreMemory") => "store",
+        ("memory.provider.v1", "GetMemory") => "get",
+        ("memory.provider.v1", "RecallMemory") => "recall",
+        ("memory.provider.v1", "DeleteMemory") => "delete",
+        ("computer.runtime.v1", "ExecuteCommand") => "execute_command",
+        ("computer.runtime.v1", "ExecuteCommandStream") => "execute_command_stream",
+        ("computer.runtime.v1", "ReadFile") => "read_file",
+        ("computer.runtime.v1", "WriteFile") => "write_file",
+        ("computer.runtime.v1", "ListDir") => "list_dir",
+        ("computer.runtime.v1", "CreateArtifact") => "create_artifact",
+        ("computer.runtime.v1", "GetArtifact") => "get_artifact",
+        _ => method,
+    }
+}
+
 pub struct DirectPluginRuntimeServiceImpl {
     memory: Option<Arc<CyreneMemoryService>>,
     computer: Arc<ComputerRuntimeService>,
+    mcp: Option<Arc<McpToolProvider>>,
     simulated_agent_dependencies: bool,
+}
+
+/// Host-side `ToolCatalogSource` over the configured MCP tool provider.
+///
+/// This is the agent-runtime host path: the package assembles the runtime
+/// with a provider that actually speaks `tool.provider.v1`.
+pub struct McpCatalogSource {
+    provider: Arc<McpToolProvider>,
+}
+
+impl McpCatalogSource {
+    /// Wrap one configured MCP tool provider.
+    pub fn new(provider: Arc<McpToolProvider>) -> Self {
+        Self { provider }
+    }
+}
+
+#[async_trait::async_trait]
+impl ToolCatalogSource for McpCatalogSource {
+    async fn list_tools(
+        &self,
+        binding_id: Option<&str>,
+    ) -> cyrene_plugin_contracts::tool_provider_v1::ListToolsResponse {
+        self.provider.list_tools(binding_id).await
+    }
+
+    async fn call_tool(
+        &self,
+        request: &CallToolRequest,
+    ) -> cyrene_plugin_contracts::tool_provider_v1::CallToolResponse {
+        self.provider.call_tool(request).await
+    }
 }
 
 impl Default for DirectPluginRuntimeServiceImpl {
@@ -73,6 +138,22 @@ impl DirectPluginRuntimeServiceImpl {
         Self {
             memory: None,
             computer,
+            mcp: None,
+            simulated_agent_dependencies: false,
+        }
+    }
+
+    /// Builds a host that serves `tool.provider.v1` over the configured MCP
+    /// server bindings. The package launcher is expected to call this once
+    /// bindings are resolved; without it, tool calls fail closed.
+    pub fn with_mcp_servers(servers: Vec<McpServerConfig>) -> Self {
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let computer = Arc::new(ComputerRuntimeService::new(vec![current_dir]));
+
+        Self {
+            memory: None,
+            computer,
+            mcp: Some(Arc::new(McpToolProvider::new(servers))),
             simulated_agent_dependencies: false,
         }
     }
@@ -89,6 +170,7 @@ impl DirectPluginRuntimeServiceImpl {
         Self {
             memory: Some(memory),
             computer,
+            mcp: None,
             simulated_agent_dependencies: true,
         }
     }
@@ -167,10 +249,12 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
             )));
         }
 
-        // 2. Dispatch by capability
+        // 2. Dispatch by capability; method ids are normalized to their
+        //    canonical contract spelling first.
+        let method = canonical_method(req.capability.as_str(), req.method.as_str());
         match req.capability.as_str() {
-            "agent.runtime.v1" => match req.method.as_str() {
-                "Run" => {
+            "agent.runtime.v1" => match method {
+                "run" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -255,8 +339,8 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                     )));
                 };
 
-                match req.method.as_str() {
-                    "StoreMemory" => {
+                match method {
+                    "store" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.StoreMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -292,7 +376,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                             })),
                         }))
                     }
-                    "GetMemory" => {
+                    "get" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.GetMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -328,7 +412,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                             })),
                         }))
                     }
-                    "RecallMemory" => {
+                    "recall" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.RecallMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -364,7 +448,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                             })),
                         }))
                     }
-                    "DeleteMemory" => {
+                    "delete" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.DeleteMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -411,45 +495,242 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 }
             }
 
-            "computer.runtime.v1" => {
-                match req.method.as_str() {
-                    "ExecuteCommand" => {
-                        const EXPECTED_URL: &str =
-                            "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest";
-                        if req.payload_type_url != EXPECTED_URL {
+            "computer.runtime.v1" => match method {
+                "execute_command" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
+                    }
+                    let cmd_req = match CommandExecutionRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
                             return Ok(Response::new(Self::fail_closed_error(
                                 Code::InvalidRequest,
-                                format!(
-                                    "Invalid payload_type_url '{}', expected '{}'",
-                                    req.payload_type_url, EXPECTED_URL
-                                ),
-                                "INVALID_TYPE_URL",
+                                format!("Failed to decode CommandExecutionRequest: {}", e),
+                                "DECODE_ERROR",
                             )));
                         }
-                        let cmd_req = match CommandExecutionRequest::decode(&req.payload[..]) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                return Ok(Response::new(Self::fail_closed_error(
-                                    Code::InvalidRequest,
-                                    format!("Failed to decode CommandExecutionRequest: {}", e),
-                                    "DECODE_ERROR",
-                                )));
-                            }
-                        };
-                        let resp = self.computer.execute_command(cmd_req, None).await;
-                        let mut buf = Vec::new();
-                        resp.encode(&mut buf).unwrap();
-                        Ok(Response::new(DirectInvocationResponse {
+                    };
+                    let resp = self.computer.execute_command(cmd_req, None).await;
+                    let mut buf = Vec::new();
+                    resp.encode(&mut buf).unwrap();
+                    Ok(Response::new(DirectInvocationResponse {
                         result: Some(InvocationResult::Payload(DirectPayload {
-                            type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionResponse".into(),
+                            type_url:
+                                "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionResponse"
+                                    .into(),
                             value: buf,
                             event_type: String::new(),
                         })),
                     }))
+                }
+                "read_file" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.computer.runtime.v1.ReadFileRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
                     }
-                    "ReadFile" => {
+                    let rf_req = match ReadFileRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!("Failed to decode ReadFileRequest: {}", e),
+                                "DECODE_ERROR",
+                            )));
+                        }
+                    };
+                    let resp = self.computer.read_file(rf_req);
+                    let mut buf = Vec::new();
+                    resp.encode(&mut buf).unwrap();
+                    Ok(Response::new(DirectInvocationResponse {
+                        result: Some(InvocationResult::Payload(DirectPayload {
+                            type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ReadFileResponse"
+                                .into(),
+                            value: buf,
+                            event_type: String::new(),
+                        })),
+                    }))
+                }
+                "write_file" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.computer.runtime.v1.WriteFileRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
+                    }
+                    let wf_req = match WriteFileRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!("Failed to decode WriteFileRequest: {}", e),
+                                "DECODE_ERROR",
+                            )));
+                        }
+                    };
+                    let resp = self.computer.write_file(wf_req);
+                    let mut buf = Vec::new();
+                    resp.encode(&mut buf).unwrap();
+                    Ok(Response::new(DirectInvocationResponse {
+                        result: Some(InvocationResult::Payload(DirectPayload {
+                            type_url: "type.cyrene.io/cyrene.computer.runtime.v1.WriteFileResponse"
+                                .into(),
+                            value: buf,
+                            event_type: String::new(),
+                        })),
+                    }))
+                }
+                "list_dir" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
+                    }
+                    let ld_req = match ListDirRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!("Failed to decode ListDirRequest: {}", e),
+                                "DECODE_ERROR",
+                            )));
+                        }
+                    };
+                    let resp = self.computer.list_dir(ld_req);
+                    let mut buf = Vec::new();
+                    resp.encode(&mut buf).unwrap();
+                    Ok(Response::new(DirectInvocationResponse {
+                        result: Some(InvocationResult::Payload(DirectPayload {
+                            type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ListDirResponse"
+                                .into(),
+                            value: buf,
+                            event_type: String::new(),
+                        })),
+                    }))
+                }
+                "create_artifact" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.computer.runtime.v1.CreateArtifactRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
+                    }
+                    let ca_req = match CreateArtifactRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!("Failed to decode CreateArtifactRequest: {}", e),
+                                "DECODE_ERROR",
+                            )));
+                        }
+                    };
+                    let resp = self.computer.create_artifact(ca_req);
+                    let mut buf = Vec::new();
+                    resp.encode(&mut buf).unwrap();
+                    Ok(Response::new(DirectInvocationResponse {
+                        result: Some(InvocationResult::Payload(DirectPayload {
+                            type_url:
+                                "type.cyrene.io/cyrene.computer.runtime.v1.CreateArtifactResponse"
+                                    .into(),
+                            value: buf,
+                            event_type: String::new(),
+                        })),
+                    }))
+                }
+                "get_artifact" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.computer.runtime.v1.GetArtifactRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
+                    }
+                    let ga_req = match GetArtifactRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!("Failed to decode GetArtifactRequest: {}", e),
+                                "DECODE_ERROR",
+                            )));
+                        }
+                    };
+                    let resp = self.computer.get_artifact(ga_req);
+                    let mut buf = Vec::new();
+                    resp.encode(&mut buf).unwrap();
+                    Ok(Response::new(DirectInvocationResponse {
+                        result: Some(InvocationResult::Payload(DirectPayload {
+                            type_url:
+                                "type.cyrene.io/cyrene.computer.runtime.v1.GetArtifactResponse"
+                                    .into(),
+                            value: buf,
+                            event_type: String::new(),
+                        })),
+                    }))
+                }
+                _ => Ok(Response::new(Self::fail_closed_error(
+                    Code::MethodNotFound,
+                    format!(
+                        "Method '{}' not found in capability 'computer.runtime.v1'",
+                        req.method
+                    ),
+                    "METHOD_NOT_FOUND",
+                ))),
+            },
+
+            "tool.provider.v1" => {
+                let Some(mcp) = self.mcp.clone() else {
+                    return Ok(Response::new(Self::fail_closed_error(
+                        Code::Unavailable,
+                        "MCP tool provider binding is not configured",
+                        "TOOL_PROVIDER_NOT_CONFIGURED",
+                    )));
+                };
+                match method {
+                    "list_tools" => {
                         const EXPECTED_URL: &str =
-                            "type.cyrene.io/cyrene.computer.runtime.v1.ReadFileRequest";
+                            "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest";
                         if req.payload_type_url != EXPECTED_URL {
                             return Ok(Response::new(Self::fail_closed_error(
                                 Code::InvalidRequest,
@@ -460,32 +741,32 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                                 "INVALID_TYPE_URL",
                             )));
                         }
-                        let rf_req = match ReadFileRequest::decode(&req.payload[..]) {
+                        let list_req = match ListToolsRequest::decode(&req.payload[..]) {
                             Ok(r) => r,
                             Err(e) => {
                                 return Ok(Response::new(Self::fail_closed_error(
                                     Code::InvalidRequest,
-                                    format!("Failed to decode ReadFileRequest: {}", e),
+                                    format!("Failed to decode ListToolsRequest: {}", e),
                                     "DECODE_ERROR",
                                 )));
                             }
                         };
-                        let resp = self.computer.read_file(rf_req);
+                        let response = mcp.list_tools(list_req.binding_id.as_deref()).await;
                         let mut buf = Vec::new();
-                        resp.encode(&mut buf).unwrap();
+                        response.encode(&mut buf).unwrap();
                         Ok(Response::new(DirectInvocationResponse {
                             result: Some(InvocationResult::Payload(DirectPayload {
                                 type_url:
-                                    "type.cyrene.io/cyrene.computer.runtime.v1.ReadFileResponse"
+                                    "type.cyrene.io/cyrene.tool.provider.v1.ListToolsResponse"
                                         .into(),
                                 value: buf,
                                 event_type: String::new(),
                             })),
                         }))
                     }
-                    "WriteFile" => {
+                    "call_tool" => {
                         const EXPECTED_URL: &str =
-                            "type.cyrene.io/cyrene.computer.runtime.v1.WriteFileRequest";
+                            "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest";
                         if req.payload_type_url != EXPECTED_URL {
                             return Ok(Response::new(Self::fail_closed_error(
                                 Code::InvalidRequest,
@@ -496,94 +777,23 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                                 "INVALID_TYPE_URL",
                             )));
                         }
-                        let wf_req = match WriteFileRequest::decode(&req.payload[..]) {
+                        let call_req = match CallToolRequest::decode(&req.payload[..]) {
                             Ok(r) => r,
                             Err(e) => {
                                 return Ok(Response::new(Self::fail_closed_error(
                                     Code::InvalidRequest,
-                                    format!("Failed to decode WriteFileRequest: {}", e),
+                                    format!("Failed to decode CallToolRequest: {}", e),
                                     "DECODE_ERROR",
                                 )));
                             }
                         };
-                        let resp = self.computer.write_file(wf_req);
+                        let response = mcp.call_tool(&call_req).await;
                         let mut buf = Vec::new();
-                        resp.encode(&mut buf).unwrap();
+                        response.encode(&mut buf).unwrap();
                         Ok(Response::new(DirectInvocationResponse {
                             result: Some(InvocationResult::Payload(DirectPayload {
-                                type_url:
-                                    "type.cyrene.io/cyrene.computer.runtime.v1.WriteFileResponse"
-                                        .into(),
-                                value: buf,
-                                event_type: String::new(),
-                            })),
-                        }))
-                    }
-                    "CreateArtifact" => {
-                        const EXPECTED_URL: &str =
-                            "type.cyrene.io/cyrene.computer.runtime.v1.CreateArtifactRequest";
-                        if req.payload_type_url != EXPECTED_URL {
-                            return Ok(Response::new(Self::fail_closed_error(
-                                Code::InvalidRequest,
-                                format!(
-                                    "Invalid payload_type_url '{}', expected '{}'",
-                                    req.payload_type_url, EXPECTED_URL
-                                ),
-                                "INVALID_TYPE_URL",
-                            )));
-                        }
-                        let ca_req = match CreateArtifactRequest::decode(&req.payload[..]) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                return Ok(Response::new(Self::fail_closed_error(
-                                    Code::InvalidRequest,
-                                    format!("Failed to decode CreateArtifactRequest: {}", e),
-                                    "DECODE_ERROR",
-                                )));
-                            }
-                        };
-                        let resp = self.computer.create_artifact(ca_req);
-                        let mut buf = Vec::new();
-                        resp.encode(&mut buf).unwrap();
-                        Ok(Response::new(DirectInvocationResponse {
-                        result: Some(InvocationResult::Payload(DirectPayload {
-                            type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CreateArtifactResponse".into(),
-                            value: buf,
-                            event_type: String::new(),
-                        })),
-                    }))
-                    }
-                    "GetArtifact" => {
-                        const EXPECTED_URL: &str =
-                            "type.cyrene.io/cyrene.computer.runtime.v1.GetArtifactRequest";
-                        if req.payload_type_url != EXPECTED_URL {
-                            return Ok(Response::new(Self::fail_closed_error(
-                                Code::InvalidRequest,
-                                format!(
-                                    "Invalid payload_type_url '{}', expected '{}'",
-                                    req.payload_type_url, EXPECTED_URL
-                                ),
-                                "INVALID_TYPE_URL",
-                            )));
-                        }
-                        let ga_req = match GetArtifactRequest::decode(&req.payload[..]) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                return Ok(Response::new(Self::fail_closed_error(
-                                    Code::InvalidRequest,
-                                    format!("Failed to decode GetArtifactRequest: {}", e),
-                                    "DECODE_ERROR",
-                                )));
-                            }
-                        };
-                        let resp = self.computer.get_artifact(ga_req);
-                        let mut buf = Vec::new();
-                        resp.encode(&mut buf).unwrap();
-                        Ok(Response::new(DirectInvocationResponse {
-                            result: Some(InvocationResult::Payload(DirectPayload {
-                                type_url:
-                                    "type.cyrene.io/cyrene.computer.runtime.v1.GetArtifactResponse"
-                                        .into(),
+                                type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolResponse"
+                                    .into(),
                                 value: buf,
                                 event_type: String::new(),
                             })),
@@ -592,7 +802,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                     _ => Ok(Response::new(Self::fail_closed_error(
                         Code::MethodNotFound,
                         format!(
-                            "Method '{}' not found in capability 'computer.runtime.v1'",
+                            "Method '{}' not found in capability 'tool.provider.v1'",
                             req.method
                         ),
                         "METHOD_NOT_FOUND",
@@ -634,8 +844,9 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
             return Ok(Response::new(Box::pin(ReceiverStream::new(rx))));
         }
 
-        match (req.capability.as_str(), req.method.as_str()) {
-            ("agent.runtime.v1", "RunStream") => {
+        let method = canonical_method(req.capability.as_str(), req.method.as_str());
+        match (req.capability.as_str(), method) {
+            ("agent.runtime.v1", "run_stream") => {
                 const EXPECTED_URL: &str = "type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest";
                 if req.payload_type_url != EXPECTED_URL {
                     let _ = tx
@@ -716,7 +927,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
             }
 
-            ("computer.runtime.v1", "ExecuteCommandStream") => {
+            ("computer.runtime.v1", "execute_command_stream") => {
                 const EXPECTED_URL: &str =
                     "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest";
                 if req.payload_type_url != EXPECTED_URL {
@@ -750,26 +961,46 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 let computer = self.computer.clone();
                 tokio::spawn(async move {
                     let (event_tx, mut event_rx) = mpsc::channel::<CommandStreamEvent>(64);
+                    let cancel_flag = Arc::new(AtomicBool::new(false));
 
                     let comp = computer.clone();
+                    let command_cancel = Arc::clone(&cancel_flag);
                     tokio::spawn(async move {
-                        let _ = comp.execute_command_stream(cmd_req, None, event_tx).await;
+                        let _ = comp
+                            .execute_command_stream(cmd_req, Some(command_cancel), event_tx)
+                            .await;
                     });
 
-                    while let Some(event) = event_rx.recv().await {
-                        let mut buf = Vec::new();
-                        event.encode(&mut buf).unwrap();
-                        let item = DirectStreamItem {
-                            event: Some(Event::Payload(DirectPayload {
-                                type_url:
-                                    "type.cyrene.io/cyrene.computer.runtime.v1.CommandStreamEvent"
-                                        .into(),
-                                value: buf,
-                                event_type: String::new(),
-                            })),
-                        };
-                        if tx.send(Ok(item)).await.is_err() {
-                            break;
+                    loop {
+                        tokio::select! {
+                            event = event_rx.recv() => {
+                                let Some(event) = event else {
+                                    break;
+                                };
+                                let mut buf = Vec::new();
+                                event.encode(&mut buf).unwrap();
+                                let item = DirectStreamItem {
+                                    event: Some(Event::Payload(DirectPayload {
+                                        type_url:
+                                            "type.cyrene.io/cyrene.computer.runtime.v1.CommandStreamEvent"
+                                                .into(),
+                                        value: buf,
+                                        event_type: String::new(),
+                                    })),
+                                };
+                                if tx.send(Ok(item)).await.is_err() {
+                                    // The client dropped the stream: stop the managed
+                                    // command instead of orphaning its process group.
+                                    cancel_flag.store(true, Ordering::SeqCst);
+                                    break;
+                                }
+                            }
+                            _ = tx.closed() => {
+                                // The client dropped the stream: stop the managed
+                                // command instead of orphaning its process group.
+                                cancel_flag.store(true, Ordering::SeqCst);
+                                break;
+                            }
                         }
                     }
 

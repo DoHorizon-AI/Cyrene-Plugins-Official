@@ -231,16 +231,12 @@ public static unsafe class PluginNativeAbi
     private static readonly byte[] ImplementationVersionBytes = Encoding.UTF8.GetBytes("0.1.0\0");
 
     private static readonly byte[] CapModelBytes = Encoding.UTF8.GetBytes("model.provider.v1\0");
-    private static readonly byte[] CapSpeechBytes = Encoding.UTF8.GetBytes("speech.provider.v1\0");
-    private static readonly byte[] CapRerankBytes = Encoding.UTF8.GetBytes("rerank.provider.v1\0");
 
     private static CapabilityDescriptorV1[]? s_capabilities;
     private static GCHandle s_capHandle;
     private static GCHandle s_nameHandle;
     private static GCHandle s_verHandle;
     private static GCHandle s_cap1Handle;
-    private static GCHandle s_cap2Handle;
-    private static GCHandle s_cap3Handle;
 
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
@@ -270,14 +266,12 @@ public static unsafe class PluginNativeAbi
         s_nameHandle = GCHandle.Alloc(ImplementationNameBytes, GCHandleType.Pinned);
         s_verHandle = GCHandle.Alloc(ImplementationVersionBytes, GCHandleType.Pinned);
         s_cap1Handle = GCHandle.Alloc(CapModelBytes, GCHandleType.Pinned);
-        s_cap2Handle = GCHandle.Alloc(CapSpeechBytes, GCHandleType.Pinned);
-        s_cap3Handle = GCHandle.Alloc(CapRerankBytes, GCHandleType.Pinned);
 
+        // Only contract-backed capabilities are advertised over the C ABI;
+        // speech/rerank have no canonical contract and no implementation (W6-3).
         s_capabilities = new CapabilityDescriptorV1[]
         {
             new() { CapabilityId = (byte*)s_cap1Handle.AddrOfPinnedObject(), VersionMajor = 1, VersionMinor = 0 },
-            new() { CapabilityId = (byte*)s_cap2Handle.AddrOfPinnedObject(), VersionMajor = 1, VersionMinor = 0 },
-            new() { CapabilityId = (byte*)s_cap3Handle.AddrOfPinnedObject(), VersionMajor = 1, VersionMinor = 0 },
         };
         s_capHandle = GCHandle.Alloc(s_capabilities, GCHandleType.Pinned);
     }

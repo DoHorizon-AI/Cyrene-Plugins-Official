@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.connectors.wecom",
+  "name": "Official WeCom Application Connector",
+  "version": "0.1.0",
+  "description": "WeCom application-message connector implementing message.connector.v1 send_message with access-token caching and deterministic delivery status mapping.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "message.connector.v1"
+  ],
+  "methods": [
+    {
+      "name": "send_message",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "wecom_connector:WeComConnector",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "wecom_connector:WeComConnector"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11"
+  },
+  "configuration": {
+    "schemaRef": "configuration.schema.json"
+  },
+  "secrets": {
+    "requiredSecretRefs": [
+      "WECOM_CORP_SECRET"
+    ]
+  },
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}
