@@ -210,6 +210,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "cyrene-mcp-provider"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "cyrene-plugin-contracts",
+ "serde_json",
+ "sha2",
+ "tokio",
+]
+
+[[package]]
 name = "cyrene-memory-runtime"
 version = "0.1.0"
 dependencies = [
@@ -238,8 +249,10 @@ dependencies = [
 name = "cyrene-plugin-server"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "cyrene-agent-runtime",
  "cyrene-computer-runtime",
+ "cyrene-mcp-provider",
  "cyrene-memory-runtime",
  "cyrene-plugin-contracts",
  "futures",
@@ -248,6 +261,7 @@ dependencies = [
  "protoc-bin-vendored",
  "serde",
  "serde_json",
+ "tempfile",
  "tokio",
  "tokio-stream",
  "tonic",

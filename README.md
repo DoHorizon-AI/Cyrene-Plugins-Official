@@ -25,7 +25,11 @@ fail-closed。
 - `contracts/`: versioned Protobuf, JSON, C ABI, TCK, and generated contract projections.
 - `sdk/`: Java/Spring and Python client/runtime SDKs.
 - `runtime/`: Rust runtimes and .NET Native AOT hosts/providers.
-- `plugins/connectors/onebot-v11/`: the Plugins-owned OneBot v11 connector.
+- `plugins/`: official capability Plugins across connectors, evaluation, models,
+  policy, and tools, including the Plugins-owned OneBot v11 connector.
+- `contracts/capabilities.yaml`: the generated capability index covering contracts,
+  implementations, TCK coverage, and maturity.
+- `docs/plans/`: reviewed implementation plans and their evidence.
 - Protected QQ-side interface research documents, not a bundled QQ runtime.
 - `manifests/`: the canonical Plugin manifest schema.
 

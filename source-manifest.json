@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "618ca45abc002ecca264ba1105c66816d1e5525b5b1da335226ecf01221e3a1a",
-      "size_bytes": 14696
+      "sha256": "373e940e6a7175c98e9ce756b7a1a0743097755a1180cae0c769e16ddaa7c070",
+      "size_bytes": 15745
     },
     {
       "kind": "file",
@@ -46,8 +46,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "README.md",
-      "sha256": "209a4662aed911728f65eeb7e3c03aa24bf964cc8767bdb8f75e7cc70f912589",
-      "size_bytes": 3144
+      "sha256": "8d84b68354656e4ff678f26a5f782e09f46bade47a47409cbdb164248c1936c5",
+      "size_bytes": 3418
     },
     {
       "kind": "file",
@@ -67,8 +67,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/README.md",
-      "sha256": "886c6336d6e38e6aff295a37563f7ab26d0c72613ef93adff949a20c4b5cc212",
-      "size_bytes": 4042
+      "sha256": "67ebe6295605712118d09a4d6caca634c28e19f53e1ad63ec8473ede641e76af",
+      "size_bytes": 4514
     },
     {
       "kind": "file",
@@ -126,6 +126,20 @@
       "path": "contracts/cabi/v1/cyrene_plugin_abi_v1.h",
       "sha256": "33617626ad416f7ce566bee1cd8497347e3ec67194c0c6ac029833cfd5891f27",
       "size_bytes": 17539
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/capabilities.yaml",
+      "sha256": "56cee00f85e1f765711ece44c3111961c687d0441459ea426d45437722d15190",
+      "size_bytes": 11452
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/capability-verification.json",
+      "sha256": "e76958ffae381763329354888b34983e0fd894d627a76a902bae6d98ad8709c0",
+      "size_bytes": 13691
     },
     {
       "kind": "file",
@@ -243,8 +257,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/legacy-spi-disposition.yaml",
-      "sha256": "66f944ed4b8c0c3994208a988e3b5734a46ec2a7e774792390de96d785bf05ff",
-      "size_bytes": 1886
+      "sha256": "1a2ab03477d315b2042663d7546d2699131231ff6885b662cd87cbc0c7fb75df",
+      "size_bytes": 2177
     },
     {
       "kind": "file",
@@ -291,6 +305,20 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/proto/cyrene/tool/provider/v1/tool_provider.proto",
+      "sha256": "19869c9b65a0f207378e2e052a04a29ad8472529038da5498984f603e0329b30",
+      "size_bytes": 5194
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/runtime-implementations.json",
+      "sha256": "09e09a39b9d177185e8f2fc9eeb6d9273f55fcb2ca6ddc886706d78fa0c9b9e2",
+      "size_bytes": 4530
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/Cargo.lock",
       "sha256": "9438eb472158aa6236e55e112f34ad2c4416dbd886186f5022a927858d34df0e",
       "size_bytes": 11137
@@ -306,8 +334,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/build.rs",
-      "sha256": "4a8b282b3ed3bd59f11c4f70c209f7d677d5d751fb29ce3fd95d00a9caa02457",
-      "size_bytes": 1628
+      "sha256": "02327ffa36e473004415d02662e545ce4196d4d6cd575dfb537463a057cad33f",
+      "size_bytes": 1811
     },
     {
       "kind": "file",
@@ -334,8 +362,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/src/lib.rs",
-      "sha256": "7a28b13594598f59e181aa67354b8d98ba77a18b9a402580949cd566f3b9c671",
-      "size_bytes": 1388
+      "sha256": "26f2af022d8aae8d5721e0023935a68e486c2085e3692fa795a837e302a0dd6e",
+      "size_bytes": 1570
     },
     {
       "kind": "file",
@@ -357,6 +385,13 @@
       "path": "contracts/rust/cyrene-plugin-contracts/src/model_provider.rs",
       "sha256": "26874a98255962c30e2fbc0956cdcae2968f9f51c60417936c80634a6cdbad71",
       "size_bytes": 1637
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/tool_provider.rs",
+      "sha256": "63c6cd145be5505c75ddd1058573afc8dec8ddaa16c6ba6c907172c3b39a83c4",
+      "size_bytes": 700
     },
     {
       "kind": "file",
@@ -406,6 +441,34 @@
       "path": "contracts/rust/cyrene-plugin-contracts/tests/model_provider_embedding_contract_tck.rs",
       "sha256": "b15f71a1c03e459fc4e7d1868b4c38ba9bd870ff6da77f2c02397f12e924df8f",
       "size_bytes": 7753
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs",
+      "sha256": "6a31d72d1604c64f34da86a36d868d31891ffbcc2c6533ec68cc7f7b670fff5c",
+      "size_bytes": 6435
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/computer-runtime-v1/README.md",
+      "sha256": "53fe8db32b1dea5f9efe227be1e3032654ea1c5f654dbb03f2b90ad3dcd1eac4",
+      "size_bytes": 1400
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/computer-runtime-v1/dotnet/ComputerRuntimeContractTck.csproj",
+      "sha256": "e1ff397353020bf5b5dce8ac2120f49da92b4367f482782620dedf63b4de2bfd",
+      "size_bytes": 616
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/computer-runtime-v1/dotnet/Program.cs",
+      "sha256": "e1e23de06a2ab96a9ba8fe1e39e3abd0e5ef067ab0dd1c57a6be7ea3df3783e3",
+      "size_bytes": 3231
     },
     {
       "kind": "file",
@@ -481,8 +544,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/dotnet/Program.cs",
-      "sha256": "3d7714d8cf65e05152202109fbc28dd94d37f9f0c914705c6c7bf61a645df608",
-      "size_bytes": 1756
+      "sha256": "295f983b8c892a973eca7176893e97e0878edc72c95326413da969a0d4e9ee8d",
+      "size_bytes": 4412
     },
     {
       "kind": "file",
@@ -523,8 +586,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/python/run_tck.py",
-      "sha256": "93c94ca96a5694bb11566ac318f0e8933108143ca9af04c80238308b980ead8e",
-      "size_bytes": 1949
+      "sha256": "4a49977bb52217dd780dd733f0612335810c8dfabaa458b0f2d9c5db406d38ed",
+      "size_bytes": 4718
     },
     {
       "kind": "file",
@@ -539,6 +602,20 @@
       "path": "contracts/tck/model-provider-v1/run-jvm-tck.sh",
       "sha256": "c7eb3a539e90897b97153e5f05a2ff1c3d71b2a08160bcf9133244d95bca4c4e",
       "size_bytes": 900
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/tool-provider-v1/README.md",
+      "sha256": "0d78bcdb57e8fbf1ce9e2ef0bb709cef952c6740b70f0916961ee8757a72783a",
+      "size_bytes": 1344
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
+      "sha256": "7e196e2148a6649747b8c4d4b50db6fca0b8011ea8c14df4ef7777fc7911fdfc",
+      "size_bytes": 30046
     },
     {
       "kind": "file",
@@ -683,6 +760,118 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/wecom/README.md",
+      "sha256": "92089ade9513ddea14efd7ff9fb20aa3062c818dec20e1bc068e2d707bd50cd9",
+      "size_bytes": 2264
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/configuration.schema.json",
+      "sha256": "95b0bf6d76192f0de6d2b7e46b1a2139e6637288e270e340321d73fcb4640006",
+      "size_bytes": 750
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/plugin.manifest.json",
+      "sha256": "9777664cbb4d780029815a0360377e3f7a5e548c79cfc22ef37649bf5498c648",
+      "size_bytes": 1254
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/pyproject.toml",
+      "sha256": "833597ebede7333a34fe3997121d71e9ac12f111fa03ab7375e0c8827934e3fe",
+      "size_bytes": 815
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/__init__.py",
+      "sha256": "fbdce921d2462db8d1384ac73c9118414cf768dc3277472eb644a92dfe7d62fe",
+      "size_bytes": 599
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/_generated/message_connector_pb2.py",
+      "sha256": "2236b0ac3215bfaa1be71e0ffecaacd697264c01b8af981356640f9e62f4dd17",
+      "size_bytes": 6945
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/connector.py",
+      "sha256": "c378cbcac4ff73fcce3d478b5006e98ef49cb1bf1a28f055291bba106ec7f2b0",
+      "size_bytes": 26430
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_connector.py",
+      "sha256": "04b814339d94d3822e520e5eeadfc65191c3344ab3e66a10d2af02735ca9fac9",
+      "size_bytes": 12104
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_transport.py",
+      "sha256": "7a414320e0aa716ec2cd2c6bcb0cbc297be44c0089173e64a749ed54eb58e16d",
+      "size_bytes": 4877
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tools/generate_message_connector_bindings.py",
+      "sha256": "a247b10aa63c842089589e9f94e8f0d7765a8615105d7eb0a5118dcf428c5a92",
+      "size_bytes": 1991
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/README.md",
+      "sha256": "b2940a1086dac104cfb1f9fbb22fabf86c78e18dc833ba6c58ceda7418312492",
+      "size_bytes": 2070
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/contracts/v1/schema.json",
+      "sha256": "4b0cb7aeba31cfca25e1656a419510cdf424ae8fd3f62cdee4a63dfaa02b883d",
+      "size_bytes": 5898
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/evaluator_pack.py",
+      "sha256": "bd1d0a84056ca06de21e3ff516cc24742d11752b221d2a96143524b86e6e647b",
+      "size_bytes": 13845
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/plugin.manifest.json",
+      "sha256": "cff265b365dd336213be3fa7e0ee61bd61338f8d9296e50ad8ed33c6d6d56e24",
+      "size_bytes": 1322
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/pyproject.toml",
+      "sha256": "53854c4a55cfe9bee552200d5afd8b60895f9cb2d2657ac3145b6c4828abf541",
+      "size_bytes": 644
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/tests/test_evaluator_pack.py",
+      "sha256": "35ca01a43d7daa5efc956de371a60e4bdf3eedd501592c4c310f255275abb346",
+      "size_bytes": 11042
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/evaluation/exact-match/README.md",
       "sha256": "225b789127095c29ee2da986b98f01c9afe07543933a7c386a8b468b9ae52d16",
       "size_bytes": 1143
@@ -714,6 +903,55 @@
       "path": "plugins/evaluation/exact-match/pyproject.toml",
       "sha256": "20f0a2cda467050dbb12698e4413e82d5f1b28c2b3187ca7378cffca16d20da9",
       "size_bytes": 465
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/README.md",
+      "sha256": "b1e22e0244dfcb81e9bac78c77acf6a5405a0074eae0a331469afd3deb29231f",
+      "size_bytes": 2142
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/contracts/v1/configuration.schema.json",
+      "sha256": "9a5757433001e1b7321fb4e7a43e3cabcf7572e097636cd73bcc36717e3602ec",
+      "size_bytes": 1047
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/contracts/v1/schema.json",
+      "sha256": "077d80e292d596cd5b04f6a3f543a53965101ffbbc98bc7f66978b88ff8559d8",
+      "size_bytes": 6977
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/llm_judge.py",
+      "sha256": "d7c01d252bd5115a4af6650000b9a01621d89b9cc695ea18892d0461c822a851",
+      "size_bytes": 20732
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/plugin.manifest.json",
+      "sha256": "7e62ef5e5b5f7abb7432da535830a0c0d8205260fd43f5675285b3a22e4c7084",
+      "size_bytes": 1287
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/pyproject.toml",
+      "sha256": "c15879b8d1fe0c7807b327fc7439b66f34e2566ac45ad700a57d43dd496eacdc",
+      "size_bytes": 708
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/tests/test_llm_judge.py",
+      "sha256": "143d42a854b23b4a5a13ff068bfe18620163a4f5bd4d648815d679876836df5a",
+      "size_bytes": 11345
     },
     {
       "kind": "file",
@@ -789,8 +1027,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/computer-runtime/plugin.manifest.json",
-      "sha256": "29ca45e173ebe8dadc528a018e914de403528c5db5a9e40d3c80c496da3e1c4e",
-      "size_bytes": 1578
+      "sha256": "505fb457cbabb2d796ee774f674e7cd93d74b76466f90b2a4adf5c8c06d309b3",
+      "size_bytes": 1680
     },
     {
       "kind": "file",
@@ -894,8 +1132,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
-      "sha256": "19eced085d9cdbbaf76c3da1c784b16e9da557505ac91860c00260849db5b47f",
-      "size_bytes": 5382
+      "sha256": "bf5dc43237d6cb0eab4f0d24d8e49dfe35d6f6caffcde75905318e428bae60b7",
+      "size_bytes": 5421
     },
     {
       "kind": "file",
@@ -929,8 +1167,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Host/Program.cs",
-      "sha256": "93c5e3977eef6ae701b5f8e4b8e439d785c719d2d0b992c7c062286ca4175fc0",
-      "size_bytes": 12845
+      "sha256": "d715b2b6ee9efb4ac520c03ef23ec9d17fd8f16dc0bac6327bd0b58bbca68988",
+      "size_bytes": 12709
     },
     {
       "kind": "file",
@@ -943,15 +1181,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.NativeLib/PluginNativeAbi.cs",
-      "sha256": "d1b3ce99b63d63467dbe8cb7ace75312a062bc1238f4829e00287e203d24462b",
-      "size_bytes": 18713
+      "sha256": "40e63e7ac72d909143c0981f86754e3eec242cab225c207d22b472dba725ea40",
+      "size_bytes": 18205
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/AnthropicVendorAdapter.cs",
-      "sha256": "43b713305919880cee304887bcccffc7353df48cd9ddb1670284ff8408d70957",
-      "size_bytes": 4044
+      "sha256": "7da4d79e86fac9b1f505498fabcc79158c6ee2994df3eb3cdfe45ee26ab77bf7",
+      "size_bytes": 11792
     },
     {
       "kind": "file",
@@ -970,9 +1208,30 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/Cyrene.Provider.Gemini.csproj",
+      "sha256": "c726c2d2c5139a849bfd1bb555e6c96f3e2bfef5e732f3b15c3145324811e3f4",
+      "size_bytes": 492
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/GeminiVendorAdapter.cs",
+      "sha256": "e4d4eb450ed8916aacaebd388db6ad57cb94cc3235738acffd7ce69dc35c0497",
+      "size_bytes": 20234
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/Program.cs",
+      "sha256": "83df05dd2d29998c8694c1bb8da8089197eb0c476ab93331da6e8a3e1fefcec2",
+      "size_bytes": 1151
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Capability/CapabilityProfiles.cs",
-      "sha256": "d936bd76baafa1e2e001a45a2d620bd110ad8707f1396dbfdc368d9dd86e24fe",
-      "size_bytes": 3730
+      "sha256": "c7c38fa2defa05a1c4303b5f213a4a5e1c4a2eab68536d832da498d4c11078f8",
+      "size_bytes": 5284
     },
     {
       "kind": "file",
@@ -999,8 +1258,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Serialization/WireModels.cs",
-      "sha256": "a1fbcbe0b32bca9547316e9c74fe004ac44fe3187b8394988b2e82306d9cb747",
-      "size_bytes": 5291
+      "sha256": "90c2a08273904c6412773b3bfd8e6b9d7fa741f783664726cf211148f710475f",
+      "size_bytes": 14673
     },
     {
       "kind": "file",
@@ -1020,8 +1279,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi/OpenAiVendorAdapter.cs",
-      "sha256": "0adda9bc2ac63fddd3340f11b2d057bbe7099571c72fdfa8354b1a8fee45b5b3",
-      "size_bytes": 7648
+      "sha256": "486862381a1764f10a87b0462c54632607e5317c1c15df2794ba232c04c683c6",
+      "size_bytes": 11287
     },
     {
       "kind": "file",
@@ -1034,15 +1293,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj",
-      "sha256": "8040c66682483549729157814454f60bee0f44400e5d2505597f74caf209b4f7",
-      "size_bytes": 825
+      "sha256": "a63aa40d96e519c3d76ca5d34fa3b93437223d16c5a4a6ae28c035474f96efc5",
+      "size_bytes": 916
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/ProviderTests.cs",
-      "sha256": "f2dda10803ae6d8ba0781e1c007b4a500766509ac471b4bd40d5430e74848dda",
-      "size_bytes": 15653
+      "sha256": "e0925b3c94895b58a02be2bf6b5aa3b40ffa78f506bd46cdc92bd771c7521fa3",
+      "size_bytes": 50721
     },
     {
       "kind": "file",
@@ -1090,8 +1349,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/adapter/mod.rs",
-      "sha256": "4a33253d6dcf15bcfb0e7d07c22b8fb0f5396c6895fcf72da788f3a4b697cbb4",
-      "size_bytes": 272
+      "sha256": "fc61d9ee8db965ffdec407bf890523360b8f9b217047ed85dad42aeedf10d4a0",
+      "size_bytes": 421
     },
     {
       "kind": "file",
@@ -1106,6 +1365,13 @@
       "path": "runtime/rust/cyrene-agent-runtime/src/adapter/rig_adapter.rs",
       "sha256": "afa1468d6d27fade7cf031057b5210c4f33a26eb98054cb7a6399de28db010e1",
       "size_bytes": 3411
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/adapter/tool_catalog.rs",
+      "sha256": "32b975322317ae2a495cc189c4568bfee089f46eec1d87dddfa1c4f312993ba6",
+      "size_bytes": 11211
     },
     {
       "kind": "file",
@@ -1132,15 +1398,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/engine/turn_loop.rs",
-      "sha256": "6843c902697c6e777a067239807ab57abaa020a0d8069e9480f784204fd8ef68",
-      "size_bytes": 26650
+      "sha256": "3a16c06cf70f1f5ab0b430bf43905969dd8b703031311e8ce80fc4b9465ad426",
+      "size_bytes": 27837
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/lib.rs",
-      "sha256": "7423008dc895a48dc3985702408d9bf10f90c445c33f15b9332e0b038b3add19",
-      "size_bytes": 1879
+      "sha256": "d8988eb0c6cd090ecf58646ea74cce66001dbe87124490dcbae7790862691b10",
+      "size_bytes": 1986
     },
     {
       "kind": "file",
@@ -1153,8 +1419,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/tck/mod.rs",
-      "sha256": "13ce603d48f1e386829d92a866f5d16005bc80490a9d3bc4afe33ed5dbcf9470",
-      "size_bytes": 11942
+      "sha256": "ed4ca93ab486e23a263b35ae682a3821d9b3695beed7b34cdaf016f1772c162e",
+      "size_bytes": 18073
     },
     {
       "kind": "file",
@@ -1162,6 +1428,13 @@
       "path": "runtime/rust/cyrene-agent-runtime/tests/agent_runtime_tests.rs",
       "sha256": "eb8bd9b6ebe239933cc2f4431c0d79899f4e3d06a8fd22dfcba2665fc5efd308",
       "size_bytes": 6779
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/tests/tool_catalog_tck.rs",
+      "sha256": "ba644dbe7719fe7683564a066bbb9b94467f1fcc029abbdc43c083fe14135762",
+      "size_bytes": 7542
     },
     {
       "kind": "file",
@@ -1292,6 +1565,48 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/Cargo.lock",
+      "sha256": "54a44644963caf3c52678db15a0326020375d63ee79a2335518facd4ede46e98",
+      "size_bytes": 18137
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/Cargo.toml",
+      "sha256": "6108cbf9c6f909a5124834907a99a5ffa7013a6e5f7db0ef69b6d16ccb51c4b3",
+      "size_bytes": 434
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/src/client.rs",
+      "sha256": "942c5e6e34e09314feb02c64ba4fe78c1b7a39a1ffbdbbb4d39cb5b9d992ec95",
+      "size_bytes": 13493
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/src/lib.rs",
+      "sha256": "fdc71e390b8bfa1eb3233f876108e1471df1b79fc6853eb091d4fbefed4f8261",
+      "size_bytes": 16337
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/tests/fixtures/fake_mcp_server.py",
+      "sha256": "75d28dd00fa1bb8af3c8bbc6b590f51ede327fd908df44b005984d791b170b90",
+      "size_bytes": 3757
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/tests/mcp_provider_tests.rs",
+      "sha256": "1f6359ab8a3dfa0a07702e784f155e056644899d3eb15a3824530f7cd5a62dd2",
+      "size_bytes": 11405
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/Cargo.lock",
       "sha256": "5be1f82bd877fe180bf02df0e68567026d4080ac7198667c1aec31016798d277",
       "size_bytes": 22153
@@ -1391,15 +1706,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.lock",
-      "sha256": "8bb512e117ec71eff02491ccde580453fe0111291f883590345845bafc714bbb",
-      "size_bytes": 37878
+      "sha256": "1e87088f706f3110c96c8a6a0f4d062679188638450bf803051304eb1071cd06",
+      "size_bytes": 38088
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.toml",
-      "sha256": "a230a5ae097f4aa57076122ad4955ca96ed8c4ac8be27d7793bb6bc487a6b9c3",
-      "size_bytes": 871
+      "sha256": "946adee0d15f9119d52af13a99eca39d37e3237b7095d1e773e2756057d86785",
+      "size_bytes": 984
     },
     {
       "kind": "file",
@@ -1419,15 +1734,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
-      "sha256": "0a0f7cd94328bbe4d49727bb03bf7b027dfaf5d1671fc334d25dd749cdb48dfa",
-      "size_bytes": 36856
+      "sha256": "79581f29ebdfb539e7b307f10d10ac017a57cddd858712db37cf5a3bf698d8d1",
+      "size_bytes": 47518
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/tests/packaged_runtime_acceptance.rs",
+      "sha256": "12a56cd9844bc01b88af98f08aee724737fedbfda98424aa9efad90f08403356",
+      "size_bytes": 14564
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "5b3accc693b3e9eca63bb4eaf52ec82a66a6e8f7dfb9da6b29b3865205ed873b",
-      "size_bytes": 19286
+      "sha256": "f859b418608cbeee966dc59917fec24965efedc5e2465b37a5767da863c594af",
+      "size_bytes": 37157
     },
     {
       "kind": "file",
@@ -3314,6 +3636,13 @@
     },
     {
       "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/capability_catalog.py",
+      "sha256": "f4f9de77a2a0aa5a7cd799d2359115a00fed01363197b5011d91d524c76760b1",
+      "size_bytes": 25412
+    },
+    {
+      "kind": "file",
       "mode": "100644",
       "path": "tools/ci/check_public_repository.py",
       "sha256": "ddbcc71deef416cac3f94895ec8cfefef982aac0363b6454ea1115d4c3fbc4b6",
@@ -3330,15 +3659,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/publish_native_aot.py",
-      "sha256": "a826832c7b5e2ec68be15548b0616635c9a290b1927cb025c7643e7e378f8a44",
-      "size_bytes": 9684
+      "sha256": "254db6b612323cd991023e6c2bec05a9636a6f4cf6868514a218553b66045dd6",
+      "size_bytes": 10268
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/update_source_manifest.py",
+      "sha256": "88040a439f62b511a7d7ac0a66cd6ac625f2b80030db83d910c6867283efaf07",
+      "size_bytes": 8126
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/validate_manifests.py",
+      "sha256": "7b436ded24d9ffe6714f1b5ce8081ded7c45ccaf7ef0761248831ca0d7553d66",
+      "size_bytes": 3079
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/verify_source_manifest.py",
-      "sha256": "a1e47b97378f162facfd8aa8f1d27ad6c794ca23bdd67e989724d2a63fddec80",
-      "size_bytes": 12140
+      "sha256": "9f96314cd66884887714ec1f537f4b6098e98a40ec1c95dd53a02b1f2e462cae",
+      "size_bytes": 12344
     }
   ],
   "history_policy": "EMPTY_HISTORY_REQUIRED",

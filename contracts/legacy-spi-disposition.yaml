@@ -1,5 +1,8 @@
 schema_version: cyrene.legacy-spi-disposition.v1
 source: retired_platform_named_spi_v0
+# publication: not_present_in_this_export marks a replacement owner that this
+# public source export does not contain; the named owner keeps the contract
+# authority in the repository that publishes it.
 entries:
   - legacy_api: ModelAnalyzer
     disposition: replaced_by_owner_contract
@@ -13,10 +16,12 @@ entries:
     disposition: replaced_by_owner_contract
     capability_id: environment.builder.v1
     owner: plugins/environment/docker-uv-builder
+    publication: not_present_in_this_export
   - legacy_api: ExecutionEngine
     disposition: replaced_by_owner_contract
     capability_id: execution.engine.v1
     owner: plugins/engines
+    publication: not_present_in_this_export
   - legacy_api: Probe
     disposition: removed_no_capability_consumer
     rationale: Hardware discovery is a Platform adapter and resource-fact control primitive, not a Product Plugin API.

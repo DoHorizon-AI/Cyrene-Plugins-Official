@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.evaluation.llm-judge",
+  "name": "Model-Backed LLM Judge",
+  "version": "0.1.0",
+  "description": "evaluation.runner.v1 pointwise judge (llm_judge.v1) and pairwise comparison (llm_pairwise.v1) backed by model.provider.v1.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "evaluation.runner.v1"
+  ],
+  "methods": [
+    {
+      "name": "evaluate",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/EvaluateRequest"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "llm_judge:LLMJudgePlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "llm_judge:LLMJudgePlugin"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": [
+      "linux",
+      "windows",
+      "darwin"
+    ]
+  },
+  "configuration": {
+    "schemaRef": "contracts/v1/configuration.schema.json"
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

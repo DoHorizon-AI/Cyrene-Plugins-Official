@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-evaluator-pack"
+version = "0.1.0"
+description = "Deterministic evaluation.runner.v1 evaluator pack"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "jsonschema>=4.18,<5",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools]
+py-modules = ["evaluator_pack"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.evaluation.evaluator-pack" = [
+  "plugin.manifest.json",
+  "contracts/v1/schema.json",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

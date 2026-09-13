@@ -1,0 +1,324 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/evaluation.runner.v1.llm-judge/schema.json",
+  "title": "evaluation.runner.v1 LLM judge (owner-scoped)",
+  "description": "Owner-scoped payload contract for the model-backed judge. Each evaluator keeps its own request and response definition with a stable evaluator id; model access happens only through model.provider.v1 against an endpoint resolved by the host.",
+  "$ref": "#/$defs/EvaluateRequest",
+  "$defs": {
+    "EvaluatorId": {
+      "type": "string",
+      "enum": [
+        "llm_judge.v1",
+        "llm_pairwise.v1"
+      ]
+    },
+    "Record": {
+      "type": "object",
+      "required": [
+        "sample_index",
+        "record"
+      ],
+      "properties": {
+        "sample_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "record": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    },
+    "Records": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/Record"
+      }
+    },
+    "JudgeParams": {
+      "type": "object",
+      "properties": {
+        "rubric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 20000
+        },
+        "pass_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "PairwiseParams": {
+      "type": "object",
+      "properties": {
+        "rubric": {
+          "type": "string",
+          "minLength": 1
+        },
+        "max_chars": {
+          "type": "integer",
+          "minimum": 64,
+          "maximum": 20000
+        },
+        "allow_tie": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "JudgeRequest": {
+      "type": "object",
+      "required": [
+        "evaluator",
+        "records",
+        "expected_field",
+        "actual_field"
+      ],
+      "properties": {
+        "evaluator": {
+          "const": "llm_judge.v1"
+        },
+        "records": {
+          "$ref": "#/$defs/Records"
+        },
+        "expected_field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "actual_field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "$ref": "#/$defs/JudgeParams"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PairwiseRequest": {
+      "type": "object",
+      "required": [
+        "evaluator",
+        "records",
+        "candidate_a_field",
+        "candidate_b_field"
+      ],
+      "properties": {
+        "evaluator": {
+          "const": "llm_pairwise.v1"
+        },
+        "records": {
+          "$ref": "#/$defs/Records"
+        },
+        "candidate_a_field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "candidate_b_field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "params": {
+          "$ref": "#/$defs/PairwiseParams"
+        }
+      },
+      "additionalProperties": false
+    },
+    "EvaluateRequest": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/JudgeRequest"
+        },
+        {
+          "$ref": "#/$defs/PairwiseRequest"
+        }
+      ]
+    },
+    "JudgeIdentity": {
+      "type": "object",
+      "required": [
+        "model",
+        "plugin_binding_id"
+      ],
+      "properties": {
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "plugin_binding_id": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "PointwiseSample": {
+      "type": "object",
+      "required": [
+        "sample_index",
+        "passed",
+        "score",
+        "detail"
+      ],
+      "properties": {
+        "sample_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "JudgeResponse": {
+      "type": "object",
+      "required": [
+        "evaluator",
+        "judge",
+        "record_count",
+        "passed_count",
+        "score",
+        "samples"
+      ],
+      "properties": {
+        "evaluator": {
+          "const": "llm_judge.v1"
+        },
+        "judge": {
+          "$ref": "#/$defs/JudgeIdentity"
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "passed_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PointwiseSample"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "PairwiseSample": {
+      "type": "object",
+      "required": [
+        "sample_index",
+        "winner",
+        "score",
+        "detail",
+        "judged"
+      ],
+      "properties": {
+        "sample_index": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "winner": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "a",
+            "b",
+            "tie",
+            null
+          ]
+        },
+        "score": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "detail": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "judged": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false
+    },
+    "PairwiseResponse": {
+      "type": "object",
+      "required": [
+        "evaluator",
+        "judge",
+        "record_count",
+        "a_wins",
+        "b_wins",
+        "ties",
+        "unjudged",
+        "samples"
+      ],
+      "properties": {
+        "evaluator": {
+          "const": "llm_pairwise.v1"
+        },
+        "judge": {
+          "$ref": "#/$defs/JudgeIdentity"
+        },
+        "record_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "a_wins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "b_wins": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ties": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "samples": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PairwiseSample"
+          }
+        },
+        "unjudged": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

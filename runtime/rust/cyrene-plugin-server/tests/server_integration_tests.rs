@@ -3,6 +3,8 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -23,24 +25,34 @@ use proto::direct_plugin_runtime_server::DirectPluginRuntimeServer;
 use proto::{health_response, DirectInvocationRequest, DirectStreamMode, HealthRequest};
 
 // Contract types
+use cyrene_agent_runtime::adapter::{snapshot_tool_catalog, SnapshotToolProvider};
+use cyrene_agent_runtime::engine::cancel::CancellationToken;
+use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
+use cyrene_agent_runtime::tck::MockModelProvider;
+use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse,
 };
 use cyrene_plugin_contracts::computer_runtime_v1::{
-    create_artifact_response, get_artifact_response, CreateArtifactRequest, CreateArtifactResponse,
-    GetArtifactRequest, GetArtifactResponse,
+    create_artifact_response, get_artifact_response, list_dir_response, ComputerErrorCode,
+    CreateArtifactRequest, CreateArtifactResponse, GetArtifactRequest, GetArtifactResponse,
+    ListDirRequest, ListDirResponse,
 };
 use cyrene_plugin_contracts::memory_provider_v1::{
     delete_memory_response, get_memory_response, recall_memory_response, store_memory_response,
     DeleteMemoryRequest, DeleteMemoryResponse, GetMemoryRequest, GetMemoryResponse, MemoryItem,
     RecallMemoryRequest, RecallMemoryResponse, StoreMemoryRequest, StoreMemoryResponse,
 };
+use cyrene_plugin_contracts::tool_provider_v1::{
+    call_tool_response, list_tools_response, CallToolRequest, CallToolResponse, ListToolsRequest,
+    ListToolsResponse, ToolProviderErrorCode,
+};
 
 // Service implementation
 #[path = "../src/service.rs"]
 mod service;
 
-use service::DirectPluginRuntimeServiceImpl;
+use service::{DirectPluginRuntimeServiceImpl, McpCatalogSource};
 
 /// Helper to spin up an in-process server instance listening on an ephemeral port.
 async fn start_test_server() -> (DirectPluginRuntimeClient<Channel>, SocketAddr) {
@@ -399,6 +411,464 @@ async fn test_r08_computer_artifact_lifecycle() {
     };
     assert_eq!(payload.data, artifact_data);
     assert_eq!(payload.metadata.unwrap().artifact_id, artifact_id);
+}
+
+#[tokio::test]
+async fn test_w2_list_dir_roundtrip_and_traversal_denied() {
+    let (mut client, _addr) = start_test_server().await;
+
+    // 1. List the crate root; the bounded root is the server working directory.
+    let list_req = ListDirRequest {
+        path: ".".into(),
+        max_depth: Some(1),
+    };
+    let mut list_buf = Vec::new();
+    list_req.encode(&mut list_buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "ListDir".into(),
+            payload: list_buf,
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest".into(),
+            request_id: "req-list-01".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    let list_resp = match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => ListDirResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("ListDir failed: {:?}", e),
+    };
+    let entries = match list_resp.result.unwrap() {
+        list_dir_response::Result::Entries(entries) => entries.entries,
+        list_dir_response::Result::Error(e) => panic!("ListDir error: {:?}", e),
+    };
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.name == "Cargo.toml" && !entry.is_directory),
+        "expected Cargo.toml in the crate root listing"
+    );
+
+    // 2. Path traversal is denied by the bounded validator.
+    let bad_req = ListDirRequest {
+        path: "../".into(),
+        max_depth: Some(1),
+    };
+    let mut bad_buf = Vec::new();
+    bad_req.encode(&mut bad_buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "ListDir".into(),
+            payload: bad_buf,
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest".into(),
+            request_id: "req-list-02".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    let bad_resp = match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => ListDirResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("ListDir traversal call failed: {:?}", e),
+    };
+    match bad_resp.result.unwrap() {
+        list_dir_response::Result::Error(error) => {
+            assert_eq!(error.code, ComputerErrorCode::PathTraversalDenied as i32);
+        }
+        list_dir_response::Result::Entries(_) => panic!("traversal must be denied"),
+    }
+}
+
+// ── W6-3: canonical contract method names and their v1 compatibility aliases ──
+
+async fn invoke_list_dir(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> ListDirResponse {
+    let list_req = ListDirRequest {
+        path: ".".into(),
+        max_depth: Some(1),
+    };
+    let mut buf = Vec::new();
+    list_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => ListDirResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("ListDir via '{method}' failed: {e:?}"),
+    }
+}
+
+async fn invoke_agent_run(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> AgentRunResponse {
+    let run_req = AgentRunRequest {
+        run_id: format!("run-w6-{method}"),
+        session_id: "sess-w6".into(),
+        prompt: "Hello Cyrene Agent Runtime".into(),
+        messages: vec![],
+        available_tools: vec![],
+        config: None,
+    };
+    let mut buf = Vec::new();
+    run_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "agent.runtime.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => AgentRunResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("Agent Run via '{method}' failed: {e:?}"),
+    }
+}
+
+async fn invoke_store_memory(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> StoreMemoryResponse {
+    let item = MemoryItem {
+        item_id: "item-w6-1".into(),
+        tenant_id: "tenant-w6".into(),
+        scope: "default".into(),
+        subject: "test".into(),
+        content: "Canonical dispatch and legacy aliases share one memory".into(),
+        embedding: vec![0.1, 0.2, 0.3, 0.4],
+        metadata: HashMap::new(),
+        created_at_ms: 2000,
+        expires_at_ms: None,
+        ttl_seconds: None,
+    };
+    let store_req = StoreMemoryRequest {
+        tenant_id: "tenant-w6".into(),
+        item: Some(item),
+    };
+    let mut buf = Vec::new();
+    store_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "memory.provider.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.memory.provider.v1.StoreMemoryRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => StoreMemoryResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("StoreMemory via '{method}' failed: {e:?}"),
+    }
+}
+
+async fn invoke_recall_memory(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> RecallMemoryResponse {
+    let recall_req = RecallMemoryRequest {
+        tenant_id: "tenant-w6".into(),
+        scope: None,
+        subject: None,
+        query_embedding: vec![0.1, 0.2, 0.3, 0.4],
+        query_text: Some("canonical".into()),
+        metadata_filters: HashMap::new(),
+        min_similarity: Some(0.0),
+        top_k: Some(5),
+    };
+    let mut buf = Vec::new();
+    recall_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "memory.provider.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.memory.provider.v1.RecallMemoryRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => RecallMemoryResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("RecallMemory via '{method}' failed: {e:?}"),
+    }
+}
+
+#[tokio::test]
+async fn test_w6_canonical_methods_and_legacy_aliases_agree() {
+    let (mut client, _addr) = start_test_server().await;
+
+    // computer.runtime.v1: list_dir (canonical) and ListDir (v1 alias).
+    let canonical = invoke_list_dir(&mut client, "list_dir", "req-w6-list-canonical").await;
+    let alias = invoke_list_dir(&mut client, "ListDir", "req-w6-list-alias").await;
+    let canonical_entries = match canonical.result.unwrap() {
+        list_dir_response::Result::Entries(entries) => entries.entries,
+        list_dir_response::Result::Error(e) => panic!("list_dir error: {e:?}"),
+    };
+    let alias_entries = match alias.result.unwrap() {
+        list_dir_response::Result::Entries(entries) => entries.entries,
+        list_dir_response::Result::Error(e) => panic!("ListDir error: {e:?}"),
+    };
+    assert!(!canonical_entries.is_empty());
+    assert_eq!(canonical_entries.len(), alias_entries.len());
+
+    // agent.runtime.v1: run (canonical) and Run (v1 alias).
+    for response in [
+        invoke_agent_run(&mut client, "run", "req-w6-run-canonical").await,
+        invoke_agent_run(&mut client, "Run", "req-w6-run-alias").await,
+    ] {
+        match response.result.unwrap() {
+            agent_run_response::Result::Success(succ) => assert!(!succ.output_text.is_empty()),
+            agent_run_response::Result::Error(e) => panic!("agent run error: {e:?}"),
+        }
+    }
+
+    // memory.provider.v1: store through the legacy alias and recall through the
+    // canonical name, proving the two spellings share one memory.
+    let store = invoke_store_memory(&mut client, "StoreMemory", "req-w6-store-alias").await;
+    match store.result.unwrap() {
+        store_memory_response::Result::ItemId(id) => assert_eq!(id, "item-w6-1"),
+        store_memory_response::Result::Error(e) => panic!("store error: {e:?}"),
+    }
+    let recall = invoke_recall_memory(&mut client, "recall", "req-w6-recall-canonical").await;
+    match recall.result.unwrap() {
+        recall_memory_response::Result::Matches(m) => assert!(!m.matches.is_empty()),
+        recall_memory_response::Result::Error(e) => panic!("recall error: {e:?}"),
+    }
+}
+
+fn fake_mcp_server_config() -> McpServerConfig {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../cyrene-mcp-provider/tests/fixtures/fake_mcp_server.py");
+    McpServerConfig::new(
+        "mcp.fake",
+        "python3",
+        vec![fixture.to_string_lossy().into_owned()],
+    )
+    .with_timeout(Duration::from_secs(10))
+}
+
+#[tokio::test]
+async fn test_w3_tool_provider_without_bindings_fails_closed() {
+    let (mut client, _addr) = start_production_server().await;
+
+    let mut buf = Vec::new();
+    ListToolsRequest { binding_id: None }
+        .encode(&mut buf)
+        .unwrap();
+
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "list_tools".into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest".into(),
+            request_id: "req-mcp-00".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match response.result.unwrap() {
+        InvocationResult::Error(error) => assert_eq!(error.code, Code::Unavailable as i32),
+        InvocationResult::Payload(_) => {
+            panic!("an unconfigured tool provider must fail closed")
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_w3_mcp_tool_provider_dispatch() {
+    let service = DirectPluginRuntimeServiceImpl::with_mcp_servers(vec![fake_mcp_server_config()]);
+    let (mut client, _addr) = start_server(service).await;
+
+    // list_tools returns the recorded catalog snapshot.
+    let mut list_buf = Vec::new();
+    ListToolsRequest { binding_id: None }
+        .encode(&mut list_buf)
+        .unwrap();
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "list_tools".into(),
+            payload: list_buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest".into(),
+            request_id: "req-mcp-01".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let list_response = match response.result.unwrap() {
+        InvocationResult::Payload(payload) => {
+            ListToolsResponse::decode(&payload.value[..]).unwrap()
+        }
+        InvocationResult::Error(error) => panic!("list_tools failed: {error:?}"),
+    };
+    let catalog = match list_response.result.unwrap() {
+        list_tools_response::Result::Catalog(catalog) => catalog,
+        list_tools_response::Result::Error(error) => panic!("list_tools error: {error:?}"),
+    };
+    assert_eq!(catalog.tools.len(), 3);
+    assert!(catalog.catalog_version.starts_with("sha256:"));
+    assert!(catalog
+        .tools
+        .iter()
+        .any(|tool| tool.provider_tool_id == "echo" && tool.binding_id == "mcp.fake"));
+
+    // call_tool dispatches through the recorded snapshot.
+    let mut call_buf = Vec::new();
+    CallToolRequest {
+        binding_id: "mcp.fake".into(),
+        provider_tool_id: "echo".into(),
+        arguments_json: "{\"text\":\"hello from dispatch\"}".into(),
+        catalog_version: Some(catalog.catalog_version.clone()),
+    }
+    .encode(&mut call_buf)
+    .unwrap();
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "call_tool".into(),
+            payload: call_buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest".into(),
+            request_id: "req-mcp-02".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let call_response = match response.result.unwrap() {
+        InvocationResult::Payload(payload) => CallToolResponse::decode(&payload.value[..]).unwrap(),
+        InvocationResult::Error(error) => panic!("call_tool failed: {error:?}"),
+    };
+    match call_response.result.unwrap() {
+        call_tool_response::Result::Outcome(outcome) => {
+            assert!(!outcome.is_error);
+            assert_eq!(outcome.content.len(), 1);
+        }
+        call_tool_response::Result::Error(error) => panic!("call_tool error: {error:?}"),
+    }
+
+    // A tool outside the snapshot is rejected before any child process starts.
+    let mut missing_buf = Vec::new();
+    CallToolRequest {
+        binding_id: "mcp.fake".into(),
+        provider_tool_id: "not-in-snapshot".into(),
+        arguments_json: "{}".into(),
+        catalog_version: None,
+    }
+    .encode(&mut missing_buf)
+    .unwrap();
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "call_tool".into(),
+            payload: missing_buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest".into(),
+            request_id: "req-mcp-03".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let missing_response = match response.result.unwrap() {
+        InvocationResult::Payload(payload) => CallToolResponse::decode(&payload.value[..]).unwrap(),
+        InvocationResult::Error(error) => panic!("call_tool failed: {error:?}"),
+    };
+    match missing_response.result.unwrap() {
+        call_tool_response::Result::Error(error) => {
+            assert_eq!(error.code, ToolProviderErrorCode::ToolNotFound as i32);
+        }
+        call_tool_response::Result::Outcome(_) => {
+            panic!("a tool outside the snapshot must not dispatch")
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_w3_agent_loop_runs_with_mcp_backed_tool_provider() {
+    let provider = Arc::new(McpToolProvider::new(vec![fake_mcp_server_config()]));
+    let source = Arc::new(McpCatalogSource::new(provider));
+    let snapshot = snapshot_tool_catalog(source.as_ref(), None)
+        .await
+        .expect("catalog snapshot");
+    assert_eq!(snapshot.tool_count(), 3);
+
+    let tool_provider = SnapshotToolProvider::new(snapshot.clone(), source.clone());
+    let model = MockModelProvider::with_tool_call("echo", "{\"text\":\"hello from agent\"}", 1);
+    let request = AgentRunRequest {
+        run_id: "run-mcp-agent".to_string(),
+        session_id: "session-mcp".to_string(),
+        prompt: "Please echo".to_string(),
+        messages: Vec::new(),
+        available_tools: snapshot.declarations().to_vec(),
+        config: None,
+    };
+    let response = CyreneNativeAgentLoop::new()
+        .execute_run(
+            request,
+            &model,
+            Some(&tool_provider),
+            CancellationToken::new(),
+        )
+        .await
+        .expect("agent run");
+    match response.result.unwrap() {
+        agent_run_response::Result::Success(success) => assert_eq!(success.total_turns, 2),
+        agent_run_response::Result::Error(error) => panic!("agent run failed: {error:?}"),
+    }
 }
 
 #[tokio::test]

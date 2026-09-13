@@ -1,0 +1,250 @@
+{
+  "schemaVersion": "cyrene.capability-verification.v1",
+  "description": "Authored verification evidence per (capability, implementation). Levels are evidence claims and are never inferred from test or code presence. execution_mode (REAL/SIMULATED/MOCK) records how the evidence was produced and is required whenever the level is above DECLARED. The capability catalog merges these records; this file is not a capability authority and must not duplicate manifest- or registry-owned data.",
+  "records": [
+    {
+      "capability": "agent.runtime.v1",
+      "implementation": "cyrene.runtime.rust-native-host",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / in-process gRPC server with simulated model and tool dependencies",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "7 passed; Run and RunStream dispatch exercised through DirectPluginRuntime",
+          "notes": "Production host fails closed for agent calls until the launcher injects real capability bindings; packaged-runtime acceptance not performed."
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / per-run tool catalog snapshot with flat-name projection, exercised on the native loop and the rig adapter",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-agent-runtime/Cargo.toml",
+          "result": "14 passed; TCK vector 6 covers snapshot routing, snapshot-miss fail-closed, and tool advertisement to the model"
+        }
+      ]
+    },
+    {
+      "capability": "memory.provider.v1",
+      "implementation": "cyrene.runtime.rust-native-host",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / in-process gRPC server with sqlite in-memory backend",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "7 passed; StoreMemory/GetMemory/RecallMemory/DeleteMemory dispatched through DirectPluginRuntime",
+          "notes": "Prune, ExportBatch, and ImportBatch are declared by the contract but not dispatched; no integration consumer observed."
+        }
+      ]
+    },
+    {
+      "capability": "computer.runtime.v1",
+      "implementation": "cyrene.tools.computer-runtime",
+      "verification_level": "INTEGRATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / real gRPC server on an ephemeral port with the bounded working-directory root",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "7 passed; ExecuteCommand, artifacts, and ListDir dispatch verified; path traversal denied",
+          "notes": "Packaged-runtime acceptance (install/start, cancellation, timeout, descendant process cleanup, environment filtering) not performed; maturity stays migrating."
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / packaged cyrene-plugin-server binary started per the manifest launch contract, driven over DirectPluginRuntime gRPC",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml --test packaged_runtime_acceptance",
+          "result": "4 passed; start/health, ExecuteCommand, ListDir, traversal denial, env filtering, artifact roundtrip, timeout and stream-cancellation process-group reaping all verified",
+          "notes": "No Product consumer is exercised and Windows is not covered; the managed-runtime full chain in a controlled environment is what this level records. Maturity promotion remains an owner decision."
+        }
+      ]
+    },
+    {
+      "capability": "message.connector.v1",
+      "implementation": "cyrene.connectors.onebot-v11",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / in-process transport doubles, no live OneBot endpoint",
+          "command": "python3 -m pytest -q plugins/connectors/onebot-v11/tests",
+          "result": "23 passed",
+          "notes": "Connector behaviour verified against the simulated transport; no live vendor endpoint exercised."
+        }
+      ]
+    },
+    {
+      "capability": "model.provider.v1",
+      "implementation": "cyrene.runtime.dotnet-native-aot-openai",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / .NET 10 / MockHttpMessageHandler transport doubles",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release",
+          "result": "19 passed including chat_completion_v2 tool calling and streaming usage",
+          "notes": "W1-4 stop gate: no real host/binding/DirectPluginRuntime dispatch is connected, so this record must not exceed IMPLEMENTATION_VERIFIED while SIMULATED."
+        }
+      ]
+    },
+    {
+      "capability": "model.provider.v1",
+      "implementation": "cyrene.runtime.dotnet-native-aot-anthropic",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / .NET 10 / MockHttpMessageHandler transport doubles",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release",
+          "result": "19 passed including real SSE streaming and v2 tool blocks",
+          "notes": "W1-4 stop gate: no real host/binding/DirectPluginRuntime dispatch is connected, so this record must not exceed IMPLEMENTATION_VERIFIED while SIMULATED."
+        }
+      ]
+    },
+    {
+      "capability": "model.provider.v1",
+      "implementation": "cyrene.runtime.dotnet-native-aot-gemini",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / .NET 10 / MockHttpMessageHandler transport doubles",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release",
+          "result": "25 passed including Gemini generateContent, toolConfig, functionResponse correlation, SSE streaming, and batchEmbedContents",
+          "notes": "W1-4 stop gate: no real host/binding/DirectPluginRuntime dispatch is connected, so this record must not exceed IMPLEMENTATION_VERIFIED while SIMULATED."
+        }
+      ]
+    },
+    {
+      "capability": "dataset.preparation.v1",
+      "implementation": "cyrene.tools.dataset-preparation",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / real parquet and tmp_path filesystem",
+          "command": "python3 -m pytest -q plugins/tools/dataset-preparation/tests",
+          "result": "3 passed"
+        }
+      ]
+    },
+    {
+      "capability": "tool.dataset.validator.v1",
+      "implementation": "cyrene.tools.dataset-validator",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / tmp_path filesystem and direct runtime path",
+          "command": "python3 -m pytest -q plugins/tools/dataset-validator/tests",
+          "result": "3 passed"
+        }
+      ]
+    },
+    {
+      "capability": "model.analyzer.v1",
+      "implementation": "cyrene.models.hf-analyzer",
+      "verification_level": "DECLARED",
+      "evidence": [],
+      "notes": "No test suite exists in this export; declared by the plugin manifest only."
+    },
+    {
+      "capability": "compatibility.evaluator.v1",
+      "implementation": "cyrene.policy.compat-rules",
+      "verification_level": "DECLARED",
+      "evidence": [],
+      "notes": "No test suite exists in this export; declared by the plugin manifest only."
+    },
+    {
+      "capability": "evaluation.runner.v1",
+      "implementation": "cyrene.evaluation.exact-match",
+      "verification_level": "DECLARED",
+      "evidence": [],
+      "notes": "No test suite exists in this export. Echo consumes this capability per its own repository docs; that consumption is informational cross-repo evidence and is not this repository's canonical truth."
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.runtime.mcp-tool-provider",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / real child process (checked-in fake MCP server fixture) with real newline-delimited JSON-RPC over stdio",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-mcp-provider/Cargo.toml",
+          "result": "6 passed; catalog snapshot, snapshot enforcement, typed errors, timeout reaping, and cancellation kill semantics verified"
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / in-process gRPC server dispatching tool.provider.v1 to the MCP provider",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "9 passed; list_tools and call_tool dispatched through DirectPluginRuntime and fail closed without bindings"
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / real agent loop in cyrene-plugin-server calling the MCP provider against the fake MCP server fixture",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "10 passed; the agent loop completes a tool turn end to end through tool.provider.v1 and the MCP child process"
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / injected session adapter with a counting and a flaky implementation",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-mcp-provider/Cargo.toml",
+          "result": "6 passed; one logical session serves list_tools and every later call_tool, a broken transport re-opens a fresh session, a timeout leaves the session usable, and shutdown releases the child process"
+        }
+      ]
+    },
+    {
+      "capability": "evaluation.runner.v1",
+      "implementation": "cyrene.evaluation.evaluator-pack",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / pure deterministic evaluators, direct runtime round trip",
+          "command": "python3 -m pytest -q plugins/evaluation/evaluator-pack/tests",
+          "result": "9 passed; contains/regex/JSON structural/JSON Schema/numeric tolerance semantics, request-level fail-closed behaviour, schema validation of responses, determinism, and a DirectPluginRuntime round trip",
+          "notes": "No Product consumer is bound to this pack yet; Echo would declare a new runner binding when it adopts these evaluators."
+        }
+      ]
+    },
+    {
+      "capability": "evaluation.runner.v1",
+      "implementation": "cyrene.evaluation.llm-judge",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / scripted model provider served over real DirectPluginRuntime gRPC",
+          "command": "python3 -m pytest -q plugins/evaluation/llm-judge/tests",
+          "result": "8 passed; pointwise thresholding and judge identity, fenced/embedded JSON parsing, per-sample output failures, pairwise winners/ties/unjudged, request-level fail-closed, unconfigured and unreachable model handling, environment activation, and a DirectPluginRuntime round trip",
+          "notes": "The model provider is exercised through a scripted test double, not a real vendor model; no Product consumer is bound to this judge yet."
+        }
+      ]
+    },
+    {
+      "capability": "message.connector.v1",
+      "implementation": "cyrene.connectors.wecom",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / scripted transport plus a local fake WeCom REST API over loopback HTTP",
+          "command": "python3 -m pytest -q plugins/connectors/wecom/tests",
+          "result": "13 passed; target/content mapping, mentions and markdown, delivery status mapping, token caching and one-shot refresh, typed fail-closed validation, proto round trip, activation environment, and the urllib transport end to end",
+          "notes": "Outbound send_message only; inbound callbacks and approvals are not in v1. No live WeCom tenant has been exercised."
+        }
+      ]
+    }
+  ]
+}

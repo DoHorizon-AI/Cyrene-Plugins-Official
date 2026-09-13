@@ -11,6 +11,7 @@
 
 use async_trait::async_trait;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use tokio::sync::mpsc;
 
 use cyrene_plugin_contracts::agent_runtime_v1::{
@@ -20,9 +21,17 @@ use cyrene_plugin_contracts::agent_runtime_v1::{
 use cyrene_plugin_contracts::model_provider_v1::{
     ChatCompletionChunk, ChatCompletionRequest, ChatCompletionResponse, ChatToolCallDelta,
 };
+use cyrene_plugin_contracts::tool_provider_v1::{
+    call_tool_response, list_tools_response, tool_content_part, CallToolRequest, CallToolResponse,
+    ListToolsResponse, ToolCallOutcome, ToolCatalog, ToolContentPart, ToolDescriptor,
+    ToolTextContent,
+};
 
 use crate::adapter::model_provider::ModelProvider;
 use crate::adapter::rig_adapter::AgentDriver;
+use crate::adapter::tool_catalog::{
+    snapshot_tool_catalog, SnapshotToolProvider, ToolCatalogSource,
+};
 use crate::adapter::tool_provider::ToolProvider;
 use crate::engine::cancel::CancellationToken;
 
@@ -31,20 +40,30 @@ use crate::engine::cancel::CancellationToken;
 pub struct MockModelProvider {
     pub call_count: AtomicUsize,
     pub return_tool_calls_until: usize,
+    tool_name: String,
+    tool_arguments: String,
 }
 
 impl MockModelProvider {
     pub fn simple_text() -> Self {
-        Self {
-            call_count: AtomicUsize::new(0),
-            return_tool_calls_until: 0,
-        }
+        Self::with_tool_call("lookup_data", "{\"query\":\"cyrene\"}", 0)
     }
 
     pub fn with_tool_turns(turns: usize) -> Self {
+        Self::with_tool_call("lookup_data", "{\"query\":\"cyrene\"}", turns)
+    }
+
+    /// Ask for one named tool for the first `turns` model calls.
+    pub fn with_tool_call(
+        tool_name: impl Into<String>,
+        tool_arguments: impl Into<String>,
+        turns: usize,
+    ) -> Self {
         Self {
             call_count: AtomicUsize::new(0),
             return_tool_calls_until: turns,
+            tool_name: tool_name.into(),
+            tool_arguments: tool_arguments.into(),
         }
     }
 }
@@ -68,8 +87,8 @@ impl ModelProvider for MockModelProvider {
                         index: 0,
                         id: Some(format!("call-{}", count)),
                         r#type: Some("function".to_string()),
-                        function_name: Some("lookup_data".to_string()),
-                        function_arguments: Some("{\"query\":\"cyrene\"}".to_string()),
+                        function_name: Some(self.tool_name.clone()),
+                        function_arguments: Some(self.tool_arguments.clone()),
                     }],
                     total_tokens: Some(30),
                 }],
@@ -118,6 +137,66 @@ impl ToolProvider for MockToolProvider {
             output_json: "{\"status\":\"success\",\"fact\":\"cyrene native engine\"}".to_string(),
             is_error: false,
         })
+    }
+}
+
+/// Deterministic tool.provider.v1 source for TCK vectors.
+pub struct MockToolCatalogSource {
+    catalog: ToolCatalog,
+    calls: Mutex<Vec<CallToolRequest>>,
+}
+
+impl MockToolCatalogSource {
+    pub fn new(tools: Vec<ToolDescriptor>, catalog_version: &str) -> Self {
+        Self {
+            catalog: ToolCatalog {
+                catalog_version: catalog_version.to_string(),
+                tools,
+            },
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+
+    /// Calls recorded so far, in order.
+    pub fn recorded_calls(&self) -> Vec<CallToolRequest> {
+        self.calls.lock().expect("mock source lock").clone()
+    }
+}
+
+#[async_trait]
+impl ToolCatalogSource for MockToolCatalogSource {
+    async fn list_tools(&self, _binding_id: Option<&str>) -> ListToolsResponse {
+        ListToolsResponse {
+            result: Some(list_tools_response::Result::Catalog(self.catalog.clone())),
+        }
+    }
+
+    async fn call_tool(&self, request: &CallToolRequest) -> CallToolResponse {
+        self.calls
+            .lock()
+            .expect("mock source lock")
+            .push(request.clone());
+        CallToolResponse {
+            result: Some(call_tool_response::Result::Outcome(ToolCallOutcome {
+                content: vec![ToolContentPart {
+                    content: Some(tool_content_part::Content::Text(ToolTextContent {
+                        text: "mock tool result".to_string(),
+                    })),
+                }],
+                is_error: false,
+            })),
+        }
+    }
+}
+
+fn mock_descriptor(binding_id: &str, provider_tool_id: &str) -> ToolDescriptor {
+    ToolDescriptor {
+        binding_id: binding_id.to_string(),
+        provider_tool_id: provider_tool_id.to_string(),
+        display_name: provider_tool_id.to_string(),
+        description: format!("Mock tool {provider_tool_id}"),
+        input_schema_json: "{\"type\":\"object\"}".to_string(),
+        output_schema_json: None,
     }
 }
 
@@ -303,5 +382,82 @@ impl AgentTckSuite {
                 panic!("Expected Cancelled error, but got success!");
             }
         }
+    }
+
+    /// Test Vector 6: per-run tool catalog snapshot with flat-name routing.
+    pub async fn run_tck_tool_catalog_snapshot(driver: &(dyn AgentDriver + 'static)) {
+        let source = Arc::new(MockToolCatalogSource::new(
+            vec![mock_descriptor("mcp.mock", "lookup_data")],
+            "catalog-v1",
+        ));
+        let snapshot = snapshot_tool_catalog(source.as_ref(), None)
+            .await
+            .expect("snapshot must succeed");
+        assert_eq!(snapshot.tool_count(), 1);
+        assert_eq!(snapshot.declarations()[0].name, "lookup_data");
+        assert_eq!(snapshot.catalog_version(), "catalog-v1");
+        let provider = SnapshotToolProvider::new(snapshot.clone(), source.clone());
+
+        let model = MockModelProvider::with_tool_turns(1);
+        let request = AgentRunRequest {
+            run_id: "tck-run-catalog".to_string(),
+            session_id: "session-catalog".to_string(),
+            prompt: "Use the tool".to_string(),
+            messages: Vec::new(),
+            available_tools: snapshot.declarations().to_vec(),
+            config: None,
+        };
+        let response = driver
+            .execute_run(request, &model, Some(&provider), CancellationToken::new())
+            .await
+            .expect("snapshot-backed run must succeed");
+        match response.result.unwrap() {
+            agent_run_response::Result::Success(success) => assert_eq!(success.total_turns, 2),
+            agent_run_response::Result::Error(error) => {
+                panic!("expected success, got {error:?}")
+            }
+        }
+        let calls = source.recorded_calls();
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].binding_id, "mcp.mock");
+        assert_eq!(calls[0].provider_tool_id, "lookup_data");
+        assert_eq!(calls[0].catalog_version.as_deref(), Some("catalog-v1"));
+
+        // A flat name outside the snapshot fails closed before any call.
+        let other_source = Arc::new(MockToolCatalogSource::new(
+            vec![mock_descriptor("mcp.other", "different_tool")],
+            "catalog-v2",
+        ));
+        let other_snapshot = snapshot_tool_catalog(other_source.as_ref(), None)
+            .await
+            .expect("snapshot must succeed");
+        let other_provider = SnapshotToolProvider::new(other_snapshot, other_source.clone());
+        let model2 = MockModelProvider::with_tool_turns(1);
+        let request2 = AgentRunRequest {
+            run_id: "tck-run-catalog-miss".to_string(),
+            session_id: "session-catalog".to_string(),
+            prompt: "Use the tool".to_string(),
+            messages: Vec::new(),
+            available_tools: Vec::new(),
+            config: None,
+        };
+        let response2 = driver
+            .execute_run(
+                request2,
+                &model2,
+                Some(&other_provider),
+                CancellationToken::new(),
+            )
+            .await
+            .expect("run must return a typed error response");
+        match response2.result.unwrap() {
+            agent_run_response::Result::Error(error) => {
+                assert_eq!(error.domain_details, "tools.not_in_snapshot");
+            }
+            agent_run_response::Result::Success(_) => {
+                panic!("a tool outside the snapshot must not execute")
+            }
+        }
+        assert!(other_source.recorded_calls().is_empty());
     }
 }

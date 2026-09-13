@@ -22,7 +22,10 @@ pub mod tck;
 pub use cyrene_plugin_contracts::agent_runtime_v1;
 
 // Re-export runtime core components
-pub use adapter::{InjectedMemoryProvider, ModelProvider, RigAgentAdapter, ToolProvider};
+pub use adapter::{
+    snapshot_tool_catalog, InjectedMemoryProvider, ModelProvider, RigAgentAdapter,
+    SnapshotToolProvider, ToolCatalogSnapshot, ToolCatalogSource, ToolProvider, ToolRoute,
+};
 pub use engine::{CancellationToken, CyreneNativeAgentLoop};
 pub use limits::RuntimeLimits;
 pub use tck::AgentTckSuite;

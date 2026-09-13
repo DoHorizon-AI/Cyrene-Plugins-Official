@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/message.connector.v1.wecom/configuration.schema.json",
+  "title": "wecom.app connector activation configuration",
+  "type": "object",
+  "required": ["corp_id", "corp_secret", "agent_id"],
+  "properties": {
+    "binding_id": {"type": "string", "minLength": 1},
+    "corp_id": {"type": "string", "minLength": 1},
+    "corp_secret": {"type": "string", "minLength": 1},
+    "agent_id": {"type": "integer", "minimum": 1},
+    "base_url": {"type": "string", "pattern": "^https://"},
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "token_refresh_skew_seconds": {"type": "number", "minimum": 0}
+  },
+  "additionalProperties": false
+}
