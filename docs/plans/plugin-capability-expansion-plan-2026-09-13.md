@@ -223,8 +223,10 @@ Evidence / 证据:
 
 ## 10. Wave 5 — Connector Ecosystem
 
-- [ ] W5-1 WeCom connector：`message.connector.v1` 实现，复用 `contracts/tck/message-connector-v1` 模板。
-  如 WeCom 优先级更高，可与 Wave 4 并行，但不得推迟 evaluator contract/TCK。
+- [x] W5-1 WeCom connector（v1 出站）：`plugins/connectors/wecom` 实现 `message.connector.v1/send_message`
+  （应用消息 API、token 缓存与一次性刷新、errcode→DeliveryStatus 确定性映射、text/markdown/提及；
+  入站回调与审批明确不在 v1）。
+- [ ] W5-3 WeCom 入站回调：URL 验证 + AES 解密 + 消息接收（需要宿主回调面，出现真实需求时启动）。
 - [ ] W5-2 候选：Discord / Telegram connector。
 
 Evidence / 证据:
@@ -273,6 +275,7 @@ Evidence / 证据:
 | 2026-09-13 (v1.1) | 新 capability 的 dispatch method 使用契约标识符原文（`tool.provider.v1` 为 `list_tools` / `call_tool`）；legacy PascalCase 分支保留到 Wave 6 命名统一 | 避免制造新的不一致 |
 | 2026-09-13 (v1.1) | W3-3 移入 W6-5：stdio 已覆盖本地/agent 路径，无远程 MCP 需求，暂不扩大传输面 | owner 同意 |
 | 2026-09-13 (v1.1) | 平面工具名字母表取 `[A-Za-z0-9_-]`（各厂商 tool-name 语法的交集）；点号/斜杠/空格折叠为 `_`，冲突按 binding 前缀与序号确定性去重 | 模型侧名称约束 + 决策 A |
+| 2026-09-13 (v1.1) | WeCom v1 只做应用消息出站（`send_message`）；入站回调与审批需要宿主的 HTTP 回调面，不在无契约的情况下自造；`base_url` 仅允许 https（loopback 测试端点可 http） | owner 排序 + 契约边界 |
 | 2026-09-13 (v1.1) | LLM judge 的模型访问只走 `model.provider.v1` 编解码器 + 宿主解析出的端点点位；插件不做提供方选择、凭据或路由；裁判输出按严格 JSON 解析，不可解析只失败该样本 | owner 决策 + 契约边界 |
 | 2026-09-13 (v1.1) | Wave 4 采用方案 A：deterministic evaluator pack（5 个 evaluator）+ 独立 LLM judge（含 pairwise）；不抽共享 evaluator proto | owner 决策 |
 | 2026-09-13 (v1.1) | `computer.runtime.v1` 暂不晋升 supported：等同一 packaged-runtime acceptance 在 Windows 通过后再升；不为此增加功能/架构 | owner 决策 |

@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "201a8d5b53861d51e3e0d55ddb114bac16fb6a992f70200c703caa073f968dc2",
-      "size_bytes": 15441
+      "sha256": "e1c3d39bc16508af9de97bc72a41bacacc708112c57118f16c52ccd57155e107",
+      "size_bytes": 15565
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "b8da98f9d083a6bed5081ba1d15004805449ef0385ad48c6b19a1669fd00ba77",
-      "size_bytes": 10661
+      "sha256": "b9ceca33cdfb8d4bf51bb32358bb1bbd15ce1c9f1bd22a25aa0efe721b2a0692",
+      "size_bytes": 11052
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "06e69f07c5437914b9191188a998a5fe0b3d08d8c51b4dabb3058aaa2a3f9896",
-      "size_bytes": 11971
+      "sha256": "f8bea5dd2a04f8f94da031d234f3f5219f9a1a1ef0ca62900153fd9a6067e459",
+      "size_bytes": 12847
     },
     {
       "kind": "file",
@@ -614,8 +614,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "b61a8062dd79b97e5eeaa0b5df677b4d4d6e2b425713efb63b600404ec951bc6",
-      "size_bytes": 27396
+      "sha256": "564e100e85ff2999215dffb68ab35293b335f9e45b117b0f8b9647a72cb8e826",
+      "size_bytes": 27862
     },
     {
       "kind": "file",
@@ -756,6 +756,76 @@
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
       "sha256": "6cf86ab69237f098d861d6f16582b3af5dd245f69d430a7e3c40ef4a4003ec10",
       "size_bytes": 2194
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/README.md",
+      "sha256": "92089ade9513ddea14efd7ff9fb20aa3062c818dec20e1bc068e2d707bd50cd9",
+      "size_bytes": 2264
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/configuration.schema.json",
+      "sha256": "95b0bf6d76192f0de6d2b7e46b1a2139e6637288e270e340321d73fcb4640006",
+      "size_bytes": 750
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/plugin.manifest.json",
+      "sha256": "9777664cbb4d780029815a0360377e3f7a5e548c79cfc22ef37649bf5498c648",
+      "size_bytes": 1254
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/pyproject.toml",
+      "sha256": "833597ebede7333a34fe3997121d71e9ac12f111fa03ab7375e0c8827934e3fe",
+      "size_bytes": 815
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/__init__.py",
+      "sha256": "fbdce921d2462db8d1384ac73c9118414cf768dc3277472eb644a92dfe7d62fe",
+      "size_bytes": 599
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/_generated/message_connector_pb2.py",
+      "sha256": "2eb4cf47ae985c6f471a3a9cf0513ee590927a35bcb7b185a255ec40128d85ad",
+      "size_bytes": 7191
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/connector.py",
+      "sha256": "c378cbcac4ff73fcce3d478b5006e98ef49cb1bf1a28f055291bba106ec7f2b0",
+      "size_bytes": 26430
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_connector.py",
+      "sha256": "04b814339d94d3822e520e5eeadfc65191c3344ab3e66a10d2af02735ca9fac9",
+      "size_bytes": 12104
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_transport.py",
+      "sha256": "7a414320e0aa716ec2cd2c6bcb0cbc297be44c0089173e64a749ed54eb58e16d",
+      "size_bytes": 4877
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tools/generate_message_connector_bindings.py",
+      "sha256": "a247b10aa63c842089589e9f94e8f0d7765a8615105d7eb0a5118dcf428c5a92",
+      "size_bytes": 1991
     },
     {
       "kind": "file",

@@ -215,6 +215,21 @@
           "notes": "The model provider is exercised through a scripted test double, not a real vendor model; no Product consumer is bound to this judge yet."
         }
       ]
+    },
+    {
+      "capability": "message.connector.v1",
+      "implementation": "cyrene.connectors.wecom",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / scripted transport plus a local fake WeCom REST API over loopback HTTP",
+          "command": "python3 -m pytest -q plugins/connectors/wecom/tests",
+          "result": "13 passed; target/content mapping, mentions and markdown, delivery status mapping, token caching and one-shot refresh, typed fail-closed validation, proto round trip, activation environment, and the urllib transport end to end",
+          "notes": "Outbound send_message only; inbound callbacks and approvals are not in v1. No live WeCom tenant has been exercised."
+        }
+      ]
     }
   ]
 }

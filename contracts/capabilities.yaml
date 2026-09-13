@@ -220,6 +220,18 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-09-13
+      - ref: cyrene.connectors.wecom
+        source: plugins/connectors/wecom/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - send_message
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/message_connector_contract_tck.rs
       - contracts/tck/message-connector-v1
