@@ -27,8 +27,9 @@ use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse,
 };
 use cyrene_plugin_contracts::computer_runtime_v1::{
-    create_artifact_response, get_artifact_response, CreateArtifactRequest, CreateArtifactResponse,
-    GetArtifactRequest, GetArtifactResponse,
+    create_artifact_response, get_artifact_response, list_dir_response, ComputerErrorCode,
+    CreateArtifactRequest, CreateArtifactResponse, GetArtifactRequest, GetArtifactResponse,
+    ListDirRequest, ListDirResponse,
 };
 use cyrene_plugin_contracts::memory_provider_v1::{
     delete_memory_response, get_memory_response, recall_memory_response, store_memory_response,
@@ -399,6 +400,81 @@ async fn test_r08_computer_artifact_lifecycle() {
     };
     assert_eq!(payload.data, artifact_data);
     assert_eq!(payload.metadata.unwrap().artifact_id, artifact_id);
+}
+
+#[tokio::test]
+async fn test_w2_list_dir_roundtrip_and_traversal_denied() {
+    let (mut client, _addr) = start_test_server().await;
+
+    // 1. List the crate root; the bounded root is the server working directory.
+    let list_req = ListDirRequest {
+        path: ".".into(),
+        max_depth: Some(1),
+    };
+    let mut list_buf = Vec::new();
+    list_req.encode(&mut list_buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "ListDir".into(),
+            payload: list_buf,
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest".into(),
+            request_id: "req-list-01".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    let list_resp = match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => ListDirResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("ListDir failed: {:?}", e),
+    };
+    let entries = match list_resp.result.unwrap() {
+        list_dir_response::Result::Entries(entries) => entries.entries,
+        list_dir_response::Result::Error(e) => panic!("ListDir error: {:?}", e),
+    };
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.name == "Cargo.toml" && !entry.is_directory),
+        "expected Cargo.toml in the crate root listing"
+    );
+
+    // 2. Path traversal is denied by the bounded validator.
+    let bad_req = ListDirRequest {
+        path: "../".into(),
+        max_depth: Some(1),
+    };
+    let mut bad_buf = Vec::new();
+    bad_req.encode(&mut bad_buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "ListDir".into(),
+            payload: bad_buf,
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest".into(),
+            request_id: "req-list-02".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    let bad_resp = match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => ListDirResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("ListDir traversal call failed: {:?}", e),
+    };
+    match bad_resp.result.unwrap() {
+        list_dir_response::Result::Error(error) => {
+            assert_eq!(error.code, ComputerErrorCode::PathTraversalDenied as i32);
+        }
+        list_dir_response::Result::Entries(_) => panic!("traversal must be denied"),
+    }
 }
 
 #[tokio::test]

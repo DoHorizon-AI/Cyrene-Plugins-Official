@@ -20,7 +20,8 @@ capabilities:
         methods:
           - Run
           - RunStream
-    tck: []
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/agent_runtime_contract_tck.rs
   - id: compatibility.evaluator.v1
     interface_versions:
       - "1"
@@ -67,12 +68,15 @@ capabilities:
           - ExecuteCommand
           - ExecuteCommandStream
           - GetArtifact
+          - ListDir
           - ReadFile
           - WriteFile
         interface_versions:
           - "1"
         maturity: migrating
-    tck: []
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/computer_runtime_contract_tck.rs
+      - contracts/tck/computer-runtime-v1
   - id: dataset.preparation.v1
     interface_versions:
       - "1"
@@ -143,7 +147,8 @@ capabilities:
           - GetMemory
           - RecallMemory
           - StoreMemory
-    tck: []
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/memory_provider_contract_tck.rs
   - id: message.connector.v1
     interface_versions:
       - "1"
@@ -172,6 +177,7 @@ capabilities:
         interface_versions:
           - "1"
     tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/message_connector_contract_tck.rs
       - contracts/tck/message-connector-v1
   - id: model.analyzer.v1
     interface_versions:
@@ -226,6 +232,8 @@ capabilities:
           - chat_completion
           - embeddings
     tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/model_provider_chat_contract_tck.rs
+      - contracts/rust/cyrene-plugin-contracts/tests/model_provider_embedding_contract_tck.rs
       - contracts/tck/model-provider-v1
   - id: tool.dataset.validator.v1
     interface_versions:

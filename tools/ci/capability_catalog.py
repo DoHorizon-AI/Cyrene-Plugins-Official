@@ -30,6 +30,7 @@ TRANSPORT_PROTO_PREFIX = "contracts/proto/cyrene/plugin/"
 REGISTRY_PATH = "contracts/runtime-implementations.json"
 MANIFEST_GLOB = "plugins/*/*/plugin.manifest.json"
 TCK_GLOB = "contracts/tck/*"
+RUST_TCK_GLOB = "contracts/rust/cyrene-plugin-contracts/tests/*_tck.rs"
 IDENTIFIER_MARKER = "Direct plugin invocation identifiers"
 
 _COMMENT_LINE = re.compile(r"^//(\s*)(.*)$")
@@ -285,6 +286,19 @@ def _collect_tck(root: Path) -> dict[str, list[str]]:
     return suites
 
 
+def _collect_rust_tck(root: Path, capability_ids: set[str]) -> dict[str, list[str]]:
+    """Map Rust contract TCK files to capability IDs by quoted identifiers."""
+
+    suites: dict[str, list[str]] = {}
+    for test_file in sorted(root.glob(RUST_TCK_GLOB)):
+        text = test_file.read_text(encoding="utf-8")
+        relative = test_file.relative_to(root).as_posix()
+        for capability_id in sorted(capability_ids):
+            if f'"{capability_id}"' in text:
+                suites.setdefault(capability_id, []).append(relative)
+    return suites
+
+
 def build_catalog(root: Path) -> dict:
     """Build the capability index document from repository artifacts."""
 
@@ -351,6 +365,10 @@ def build_catalog(root: Path) -> dict:
                 f"{REGISTRY_PATH}: {capability_id} is not backed by a proto contract"
             )
         row["implementations"].extend(records)
+
+    suite_paths = _collect_rust_tck(root, set(rows))
+    for capability_id, paths in suite_paths.items():
+        suites.setdefault(capability_id, []).extend(paths)
 
     for capability_id, paths in sorted(suites.items()):
         row = rows.get(capability_id)

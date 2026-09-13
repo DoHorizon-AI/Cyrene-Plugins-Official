@@ -131,8 +131,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "bc4dbdcb6ec4d32f3d229b89e1fe644129e81f799250d592c39ceaf624d0e8ca",
-      "size_bytes": 7280
+      "sha256": "e69d4c05e5e3007e3014544eaf04d87a97ef432f96e2f5e374702715b96e1ca1",
+      "size_bytes": 7857
     },
     {
       "kind": "file",
@@ -424,6 +424,27 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/tck/computer-runtime-v1/README.md",
+      "sha256": "53fe8db32b1dea5f9efe227be1e3032654ea1c5f654dbb03f2b90ad3dcd1eac4",
+      "size_bytes": 1400
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/computer-runtime-v1/dotnet/ComputerRuntimeContractTck.csproj",
+      "sha256": "e1ff397353020bf5b5dce8ac2120f49da92b4367f482782620dedf63b4de2bfd",
+      "size_bytes": 616
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/computer-runtime-v1/dotnet/Program.cs",
+      "sha256": "e1e23de06a2ab96a9ba8fe1e39e3abd0e5ef067ab0dd1c57a6be7ea3df3783e3",
+      "size_bytes": 3231
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/tck/message-connector-v1/README.md",
       "sha256": "db9e7efa7f47c127aca74714ccca6bf4a2fff1ff8fe892c915af4238ca1b6682",
       "size_bytes": 755
@@ -558,8 +579,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "90425e756b952559c98601c1448c026c307d36c7403d3668f9c0b4f7019e3faf",
-      "size_bytes": 10152
+      "sha256": "4d903fb1038c1647cebadf78ee6d2ac511f526df8e72fb778959c620fcbed400",
+      "size_bytes": 11589
     },
     {
       "kind": "file",
@@ -810,8 +831,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/computer-runtime/plugin.manifest.json",
-      "sha256": "29ca45e173ebe8dadc528a018e914de403528c5db5a9e40d3c80c496da3e1c4e",
-      "size_bytes": 1578
+      "sha256": "505fb457cbabb2d796ee774f674e7cd93d74b76466f90b2a4adf5c8c06d309b3",
+      "size_bytes": 1680
     },
     {
       "kind": "file",
@@ -1440,15 +1461,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
-      "sha256": "0a0f7cd94328bbe4d49727bb03bf7b027dfaf5d1671fc334d25dd749cdb48dfa",
-      "size_bytes": 36856
+      "sha256": "2755523f4484a52e910c888a714a3256de540e0785f7a2e2d9b173d6fb61c61e",
+      "size_bytes": 37983
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "5b3accc693b3e9eca63bb4eaf52ec82a66a6e8f7dfb9da6b29b3865205ed873b",
-      "size_bytes": 19286
+      "sha256": "3eaa00921957aa02c25c0d274c2bb3a1160305832a29f5fa23510a58c32771e6",
+      "size_bytes": 22141
     },
     {
       "kind": "file",
@@ -3337,8 +3358,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/capability_catalog.py",
-      "sha256": "8a5d4b65fa0eb950965209310483e465e87c3e49c718a5aa4af205800ed16e84",
-      "size_bytes": 19103
+      "sha256": "f1d77783f08e83dcc71f69aec2f482014347ce193da7fab1fc34158e4424fc82",
+      "size_bytes": 19898
     },
     {
       "kind": "file",

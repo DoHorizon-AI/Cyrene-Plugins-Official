@@ -90,14 +90,17 @@ Evidence / 证据:
 
 ## 6. Wave 2 — Computer Runtime 正式化 / Formalization
 
-- [ ] W2-1 computer runtime `list_dir` 全链路补齐：plugin server 增加 `ListDir` 分派（当前仅 crate 与 proto 已声明）→ manifest 声明 → TCK。
-- [ ] W2-2 建立 `contracts/tck/computer-runtime-v1/`：execute / read / write / list_dir / artifact 最小集。
-- [ ] W2-3 `maturity: migrating` → `supported`（以 W2-2 证据为前置）。
-- [ ] W2-4 Browser 决策记录：独立 capability 还是 `computer.runtime.v1` 扩展（只写决策，不实现）。
+- [x] W2-1 computer runtime `list_dir` 全链路补齐：plugin server 增加 `ListDir` 分派（此前仅 crate 与 proto 已声明）→ manifest 声明 → 集成测试。
+- [x] W2-2 建立 `contracts/tck/computer-runtime-v1/`：dotnet 投影 TCK + Rust 契约 TCK + host 集成测试构成覆盖（无 Java/Python 投影，因此不建对应 runner）。
+- [ ] W2-3 `maturity: migrating` → `supported`（证据已备；是否宣称生产就绪属 **owner 决策**，不由实现方单方面提升）。
+- [x] W2-4 Browser 决策记录：不扩展 `computer.runtime.v1`，未来按独立 `browser.runtime.v1` 处理（见决策记录）。
 
 Evidence / 证据:
 
-- （待填）
+- W2-1：`cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml` → `7 passed`（含新增 `test_w2_list_dir_roundtrip_and_traversal_denied`，验证列表与路径逃逸拒绝）；`cargo clippy --all-targets -- -D warnings` 与 `cargo fmt --check` 通过。
+- W2-1：`plugins/tools/computer-runtime/plugin.manifest.json` 声明 `ListDir`；catalog 重新生成后 implementation 方法与契约方法一致（`list_dir` ↔ `ListDir` 大小写差异继续保留可见，W5-5 处理）。
+- W2-2：`dotnet run --project contracts/tck/computer-runtime-v1/dotnet/ComputerRuntimeContractTck.csproj` → `computer.runtime.v1 generated C# payload TCK: PASS`。
+- W2-2：catalog TCK 来源扩展为 `contracts/tck/*` + `contracts/rust/.../tests/*_tck.rs`；agent/computer/memory/message/model 的既有 Rust 契约 TCK 现在都可见（此前只识别 2 个跨语言套件）。
 
 ## 7. Wave 3 — Tool Provider / MCP
 
@@ -142,4 +145,5 @@ Evidence / 证据:
 | 2026-09-13 | 运行时实现注册表用 JSON（仓库无 PyYAML 依赖，工具保持 stdlib-only） | 仓库现有依赖面 |
 | 2026-09-13 | W0 不包含 manifest schema 全量校验（需引入依赖，移入 W5-4） | 保持 Wave 0 零新依赖 |
 | 2026-09-13 | catalog 的 implementation 侧记录实际 dispatch 名（Rust host 为 PascalCase），contract 侧保留 proto 标识符原文；二者差异在索引中直接可见 | 不掩盖命名平面差异，交由 W5-5 处理 |
+| 2026-09-13 | Browser 不进入 `computer.runtime.v1`：浏览器引入网络与渲染攻击面、真实后端未在公开 CI 固定，与有界主机执行的信任模型不同；未来按独立 `browser.runtime.v1` capability 设计（独立 binding / 权限 / 超时），当前保留内部 `BrowserService` 与可用性探测 | `computer_runtime.proto` 明确不主张抗恶意代码隔离 |
 | 2026-09-13 | W1-4 暂缓：`Cyrene.Provider.*` 的 host 入口在当前导出中是 fail-closed stub（`DIRECT_RUNTIME_HOST_NOT_CONFIGURED`），先写 proto↔capability 转换层会造成无消费者的抽象；等 host/binding 注入路径明确后按真实需求实现 | 与删除 TrainingBackend / Quantization 的同一判据 |
