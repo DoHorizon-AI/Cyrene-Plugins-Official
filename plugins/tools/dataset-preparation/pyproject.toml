@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-dataset-preparation"
+version = "0.1.0"
+description = "Deterministic implementation of dataset.preparation.v1"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "duckdb>=1.4,<2",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools]
+py-modules = ["dataset_preparation"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.tools.dataset-preparation" = [
+  "plugin.manifest.json",
+  "contracts/v1/schema.json",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

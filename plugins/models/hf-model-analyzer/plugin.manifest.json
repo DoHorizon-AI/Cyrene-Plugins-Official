@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.models.hf-analyzer",
+  "name": "HuggingFace Model & VRAM Analyzer",
+  "version": "0.3.0",
+  "description": "Model architecture probing, multi-precision VRAM estimator, and model shard SHA256 integrity validator.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "model.analyzer.v1"
+  ],
+  "methods": [
+    {
+      "name": "analyze",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/AnalyzeRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/AnalyzeResponse"
+    },
+    {
+      "name": "validate_shards",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/ValidateShardsRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ValidateShardsResponse"
+    },
+    {
+      "name": "compute_sha256",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/ComputeSha256Request",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ComputeSha256Response"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "hf_model_analyzer:HfModelAnalyzer",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "hf_model_analyzer:HfModelAnalyzer"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": [
+      "linux",
+      "windows",
+      "darwin"
+    ]
+  },
+  "secrets": {
+    "optionalSecretRefs": [
+      "HF_TOKEN"
+    ]
+  },
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

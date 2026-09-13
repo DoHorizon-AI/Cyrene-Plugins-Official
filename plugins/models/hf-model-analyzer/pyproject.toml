@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-hf-model-analyzer"
+version = "0.3.0"
+description = "Hugging Face model metadata and VRAM analyzer"
+requires-python = ">=3.11"
+dependencies = ["cyrene-plugin-runtime>=0.2,<0.3"]
+
+[tool.setuptools]
+py-modules = ["hf_model_analyzer"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.models.hf-analyzer" = ["plugin.manifest.json"]
