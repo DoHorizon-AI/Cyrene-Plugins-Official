@@ -53,6 +53,41 @@ public class ProviderTests
         return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "../../../../../../contracts/fixtures/providers"));
     }
 
+    private static readonly string[] AnthropicStreamFrames =
+    [
+        "event: message_start",
+        "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg-stream-1\",\"model\":\"claude-3-5-sonnet-20241022\",\"usage\":{\"input_tokens\":11,\"output_tokens\":1}}}",
+        "",
+        "event: content_block_start",
+        "data: {\"type\":\"content_block_start\",\"index\":0,\"content_block\":{\"type\":\"text\",\"text\":\"\"}}",
+        "",
+        "event: ping",
+        "data: {\"type\":\"ping\"}",
+        "",
+        "event: content_block_delta",
+        "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\"Hello\"}}",
+        "",
+        "event: content_block_delta",
+        "data: {\"type\":\"content_block_delta\",\"index\":0,\"delta\":{\"type\":\"text_delta\",\"text\":\" Cyrene\"}}",
+        "",
+        "event: message_delta",
+        "data: {\"type\":\"message_delta\",\"delta\":{\"stop_reason\":\"end_turn\"},\"usage\":{\"output_tokens\":7}}",
+        "",
+        "event: message_stop",
+        "data: {\"type\":\"message_stop\"}",
+        "",
+    ];
+
+    private static readonly string[] AnthropicStreamErrorFrames =
+    [
+        "event: message_start",
+        "data: {\"type\":\"message_start\",\"message\":{\"id\":\"msg-stream-2\",\"model\":\"claude-3-5-sonnet-20241022\"}}",
+        "",
+        "event: error",
+        "data: {\"type\":\"error\",\"error\":{\"type\":\"overloaded_error\",\"message\":\"Overloaded\"}}",
+        "",
+    ];
+
     [Fact]
     public void PluginCoreRejectsUnknownMethodsAndUnconfiguredModelCalls()
     {
@@ -199,6 +234,74 @@ public class ProviderTests
         Assert.Equal("end_turn", result.FinishReason);
         Assert.Equal(12, result.PromptTokens);
         Assert.Equal(8, result.CompletionTokens);
+    }
+
+    [Fact]
+    public async Task Test_W1_AnthropicStreaming_YieldsOrderedDeltasAndUsage()
+    {
+        var sse = string.Join("\n", AnthropicStreamFrames);
+
+        string? capturedBody = null;
+        var mockHandler = new MockHttpMessageHandler(req =>
+        {
+            capturedBody = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(sse, Encoding.UTF8, "text/event-stream")
+            };
+        });
+
+        var config = new ProviderBindingConfiguration(new Uri("https://api.anthropic.com"), "ant-test-key");
+        var client = new HttpTransportClient(new HttpClient(mockHandler));
+        var adapter = new AnthropicVendorAdapter(config, client);
+
+        var chunks = new List<ChatCompletionChunk>();
+        await foreach (var chunk in adapter.StreamChatAsync(new ChatCompletionParameters(
+            Model: "claude-3-5-sonnet-20241022",
+            Messages: new List<ChatMessage> { new("user", "Hello Claude") }
+        )))
+        {
+            chunks.Add(chunk);
+        }
+
+        Assert.Equal(3, chunks.Count);
+        Assert.Equal("msg-stream-1", chunks[0].Id);
+        Assert.Equal("Hello", chunks[0].Delta);
+        Assert.Null(chunks[0].FinishReason);
+        Assert.Equal(" Cyrene", chunks[1].Delta);
+        Assert.Equal(string.Empty, chunks[2].Delta);
+        Assert.Equal("end_turn", chunks[2].FinishReason);
+        Assert.Equal(11, chunks[2].PromptTokens);
+        Assert.Equal(7, chunks[2].CompletionTokens);
+        Assert.Contains("\"stream\":true", capturedBody);
+    }
+
+    [Fact]
+    public async Task Test_W1_AnthropicStreaming_ErrorEventFailsClosed()
+    {
+        var sse = string.Join("\n", AnthropicStreamErrorFrames);
+
+        var mockHandler = new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(sse, Encoding.UTF8, "text/event-stream")
+        });
+
+        var config = new ProviderBindingConfiguration(new Uri("https://api.anthropic.com"), "ant-test-key");
+        var client = new HttpTransportClient(new HttpClient(mockHandler));
+        var adapter = new AnthropicVendorAdapter(config, client);
+
+        var exception = await Assert.ThrowsAsync<ProviderException>(async () =>
+        {
+            await foreach (var _ in adapter.StreamChatAsync(new ChatCompletionParameters(
+                Model: "claude-3-5-sonnet-20241022",
+                Messages: new List<ChatMessage> { new("user", "Hello Claude") }
+            )))
+            {
+            }
+        });
+
+        Assert.Equal(ProviderErrorCode.ServiceUnavailable, exception.ErrorCode);
+        Assert.True(exception.Retryable);
     }
 
     // ── T86: Sanitized Fixtures Testing ────────────────────────────────────

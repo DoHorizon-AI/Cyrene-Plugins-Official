@@ -76,14 +76,15 @@ Evidence / 证据:
 
 ## 5. Wave 1 — Model Provider 完成度 / Provider Completeness
 
-- [ ] W1-1 Anthropic 真 SSE streaming：wire `stream: true`，逐事件 yield，携带 usage / finish_reason；加测试。
+- [x] W1-1 Anthropic 真 SSE streaming：wire `stream: true`，逐事件 yield，携带 usage / finish_reason；加测试。
 - [ ] W1-2 OpenAI `chat_completion_v2`：tools / tool_choice / parallel_tool_calls / tool_call delta / usage；Native AOT 序列化上下文更新；fixtures 测试。
 - [ ] W1-3 Anthropic v2：tools 声明与 `tool_result` 消息块。
 - [ ] W1-4 Provider host 按 interface version 分发 v1 / v2，行为可测。
 
 Evidence / 证据:
 
-- （待填）
+- W1-1：`dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests --configuration Release` → `Passed: 15, Failed: 0`（含新增 `Test_W1_AnthropicStreaming_YieldsOrderedDeltasAndUsage`、`Test_W1_AnthropicStreaming_ErrorEventFailsClosed`）。
+- W1-1：`python3 tools/check_dotnet_aot_rules.py` → `SUCCESS`；6 个 Native AOT 工程全部 build succeeded。
 
 ## 6. Wave 2 — Computer Runtime 正式化 / Formalization
 

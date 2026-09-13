@@ -31,7 +31,10 @@ public record ChatCompletionResult(
 public record ChatCompletionChunk(
     string Id,
     string Delta,
-    string? FinishReason
+    string? FinishReason,
+    int? PromptTokens = null,
+    int? CompletionTokens = null,
+    int? TotalTokens = null
 );
 
 public interface IModelCapability

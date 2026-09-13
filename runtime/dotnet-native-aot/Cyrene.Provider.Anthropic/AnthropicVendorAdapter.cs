@@ -79,8 +79,84 @@ public sealed class AnthropicVendorAdapter : IModelCapability
         [EnumeratorCancellation] CancellationToken cancellationToken = default
     )
     {
-        // For demonstration of wire streaming: yields aggregated chunks
-        var result = await CompleteChatAsync(parameters, cancellationToken).ConfigureAwait(false);
-        yield return new ChatCompletionChunk(result.Id, result.Content, result.FinishReason);
+        var wireMessages = parameters.Messages
+            .Select(m => new AnthropicWireMessage(m.Role, m.Content))
+            .ToList();
+
+        var wireReq = new AnthropicMessagesRequest(
+            Model: parameters.Model,
+            Messages: wireMessages,
+            MaxTokens: parameters.MaxTokens ?? 1024,
+            Temperature: parameters.Temperature,
+            Stream: true
+        );
+
+        var json = JsonSerializer.Serialize(wireReq, ProviderJsonSerializerContext.Default.AnthropicMessagesRequest);
+        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(_config.EndpointUri, "/v1/messages"))
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+        httpRequest.Headers.Add("x-api-key", _config.ApiKey);
+        httpRequest.Headers.Add("anthropic-version", "2023-06-01");
+
+        using var response = await _transport.SendRequestAsync(httpRequest, _config, cancellationToken).ConfigureAwait(false);
+        var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false);
+
+        var messageId = string.Empty;
+        int? promptTokens = null;
+
+        await foreach (var sseEvent in SseStreamReader.ReadEventsAsync(stream, cancellationToken).ConfigureAwait(false))
+        {
+            AnthropicStreamEvent? parsed;
+            try
+            {
+                parsed = JsonSerializer.Deserialize(sseEvent, ProviderJsonSerializerContext.Default.AnthropicStreamEvent);
+            }
+            catch (JsonException)
+            {
+                // Ignore malformed or vendor comment frames, matching the OpenAI stream path.
+                continue;
+            }
+
+            switch (parsed?.Type)
+            {
+                case "message_start":
+                    messageId = parsed.Message?.Id ?? messageId;
+                    promptTokens = parsed.Message?.Usage?.InputTokens ?? promptTokens;
+                    break;
+
+                case "content_block_delta" when parsed.Delta?.Text is { Length: > 0 } text:
+                    yield return new ChatCompletionChunk(messageId, text, null);
+                    break;
+
+                case "message_delta":
+                    yield return new ChatCompletionChunk(
+                        Id: messageId,
+                        Delta: string.Empty,
+                        FinishReason: parsed.Delta?.StopReason,
+                        PromptTokens: promptTokens,
+                        CompletionTokens: parsed.Usage?.OutputTokens
+                    );
+                    break;
+
+                case "error":
+                    throw MapStreamError(parsed.Error);
+
+                default:
+                    // message_stop, content_block_start/stop, and ping carry no delta.
+                    break;
+            }
+        }
+    }
+
+    private static ProviderException MapStreamError(AnthropicStreamError? error)
+    {
+        var errorCode = error?.Type == "overloaded_error"
+            ? ProviderErrorCode.ServiceUnavailable
+            : ProviderErrorCode.WireProtocolViolation;
+        return new ProviderException(
+            errorCode,
+            error?.Message ?? "Anthropic stream reported an error event."
+        );
     }
 }

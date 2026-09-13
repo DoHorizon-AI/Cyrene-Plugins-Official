@@ -558,8 +558,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "1e1a1a7b112e030cdc375a7db82020cbec7d1cb372f69b3235e1af77c3165075",
-      "size_bytes": 8741
+      "sha256": "e0b75563b110c3a59358b4f4089659224736be627f997456e22fd52d83e7a90c",
+      "size_bytes": 9093
     },
     {
       "kind": "file",
@@ -971,8 +971,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/AnthropicVendorAdapter.cs",
-      "sha256": "43b713305919880cee304887bcccffc7353df48cd9ddb1670284ff8408d70957",
-      "size_bytes": 4044
+      "sha256": "65f498bec11c098661339d097e1511d2be59ede45e44998ec36a6834b03d67ac",
+      "size_bytes": 7019
     },
     {
       "kind": "file",
@@ -992,8 +992,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Capability/CapabilityProfiles.cs",
-      "sha256": "d936bd76baafa1e2e001a45a2d620bd110ad8707f1396dbfdc368d9dd86e24fe",
-      "size_bytes": 3730
+      "sha256": "83d9d5675b9e92bf3a8afe58e74348082410968d46686116087c569206df0c29",
+      "size_bytes": 3823
     },
     {
       "kind": "file",
@@ -1020,8 +1020,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Serialization/WireModels.cs",
-      "sha256": "a1fbcbe0b32bca9547316e9c74fe004ac44fe3187b8394988b2e82306d9cb747",
-      "size_bytes": 5291
+      "sha256": "6d158138685f31c41ac0bf322ea15c25c7bfeefdad68c54c2d855c5b091c12d3",
+      "size_bytes": 6499
     },
     {
       "kind": "file",
@@ -1062,8 +1062,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/ProviderTests.cs",
-      "sha256": "f2dda10803ae6d8ba0781e1c007b4a500766509ac471b4bd40d5430e74848dda",
-      "size_bytes": 15653
+      "sha256": "185db4ef56d6d8ed5c02fe2b6464e22da54f1929a31257f48af5058aa295a52d",
+      "size_bytes": 19918
     },
     {
       "kind": "file",

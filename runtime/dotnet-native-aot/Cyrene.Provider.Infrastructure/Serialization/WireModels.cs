@@ -99,12 +99,40 @@ public sealed record AnthropicMessagesResponse(
     [property: JsonPropertyName("usage")] AnthropicUsage? Usage = null
 );
 
+// Anthropic streaming event models (SSE data frames carry the event type inline).
+
+public sealed record AnthropicStreamError(
+    [property: JsonPropertyName("type")] string? Type = null,
+    [property: JsonPropertyName("message")] string? Message = null
+);
+
+public sealed record AnthropicStreamDelta(
+    [property: JsonPropertyName("type")] string? Type = null,
+    [property: JsonPropertyName("text")] string? Text = null,
+    [property: JsonPropertyName("stop_reason")] string? StopReason = null
+);
+
+public sealed record AnthropicStreamMessage(
+    [property: JsonPropertyName("id")] string? Id = null,
+    [property: JsonPropertyName("model")] string? Model = null,
+    [property: JsonPropertyName("usage")] AnthropicUsage? Usage = null
+);
+
+public sealed record AnthropicStreamEvent(
+    [property: JsonPropertyName("type")] string Type,
+    [property: JsonPropertyName("message")] AnthropicStreamMessage? Message = null,
+    [property: JsonPropertyName("delta")] AnthropicStreamDelta? Delta = null,
+    [property: JsonPropertyName("usage")] AnthropicUsage? Usage = null,
+    [property: JsonPropertyName("error")] AnthropicStreamError? Error = null
+);
+
 [JsonSerializable(typeof(OpenAiChatRequest))]
 [JsonSerializable(typeof(OpenAiChatResponse))]
 [JsonSerializable(typeof(OpenAiEmbeddingRequest))]
 [JsonSerializable(typeof(OpenAiEmbeddingResponse))]
 [JsonSerializable(typeof(AnthropicMessagesRequest))]
 [JsonSerializable(typeof(AnthropicMessagesResponse))]
+[JsonSerializable(typeof(AnthropicStreamEvent))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.Unspecified, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 public partial class ProviderJsonSerializerContext : JsonSerializerContext
 {
