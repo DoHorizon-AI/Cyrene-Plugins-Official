@@ -246,6 +246,12 @@ jobs:
         with:
           name: cyrene-dotnet-linux-x64-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/cyrene-dotnet-native-linux-x64
+      - name: Restore executable permissions on downloaded native artifacts
+        run: |
+          chmod +x \
+            "${RUNNER_TEMP}/cyrene-rust-native/bin/cyrene-plugin-server" \
+            "${RUNNER_TEMP}/cyrene-rust-native/tests/cabi_harness" \
+            "${RUNNER_TEMP}/cyrene-dotnet-native-linux-x64/bin/cyrene-plugin-host"
       - name: Build Java client and Spring Boot 3/4 starters
         env:
           CYRENE_RUST_SERVER_BIN: ${{ runner.temp }}/cyrene-rust-native/bin/cyrene-plugin-server
