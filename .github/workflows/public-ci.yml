@@ -40,6 +40,8 @@ jobs:
           python3 tools/ci/verify_source_manifest.py
           --root .
           --allow-git-metadata
+      - name: Validate plugin manifests against the schema
+        run: python3 tools/ci/validate_manifests.py --root .
       - name: Verify the capability index is current
         run: python3 tools/ci/capability_catalog.py --root . --check
       - name: Verify public repository metadata and hygiene
@@ -84,7 +86,7 @@ jobs:
           compression-level: 0
       - name: Install Python runtime test dependencies
         run: |
-          python3 -m pip install --disable-pip-version-check pytest ruff
+          python3 -m pip install --disable-pip-version-check pytest ruff jsonschema==4.23.0
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_plugin_runtime \
@@ -108,6 +110,7 @@ jobs:
             plugins/tools/dataset-validator \
             tools/ci/capability_catalog.py \
             tools/ci/update_source_manifest.py \
+            tools/ci/validate_manifests.py \
             tools/ci/verify_source_manifest.py
       - name: Run Python runtime and official Plugin tests
         run: |

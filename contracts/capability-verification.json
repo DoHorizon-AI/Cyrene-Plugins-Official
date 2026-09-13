@@ -1,0 +1,145 @@
+{
+  "schemaVersion": "cyrene.capability-verification.v1",
+  "description": "Authored verification evidence per (capability, implementation). Levels are evidence claims and are never inferred from test or code presence. execution_mode (REAL/SIMULATED/MOCK) records how the evidence was produced and is required whenever the level is above DECLARED. The capability catalog merges these records; this file is not a capability authority and must not duplicate manifest- or registry-owned data.",
+  "records": [
+    {
+      "capability": "agent.runtime.v1",
+      "implementation": "cyrene.runtime.rust-native-host",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / in-process gRPC server with simulated model and tool dependencies",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "7 passed; Run and RunStream dispatch exercised through DirectPluginRuntime",
+          "notes": "Production host fails closed for agent calls until the launcher injects real capability bindings; packaged-runtime acceptance not performed."
+        }
+      ]
+    },
+    {
+      "capability": "memory.provider.v1",
+      "implementation": "cyrene.runtime.rust-native-host",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / in-process gRPC server with sqlite in-memory backend",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "7 passed; StoreMemory/GetMemory/RecallMemory/DeleteMemory dispatched through DirectPluginRuntime",
+          "notes": "Prune, ExportBatch, and ImportBatch are declared by the contract but not dispatched; no integration consumer observed."
+        }
+      ]
+    },
+    {
+      "capability": "computer.runtime.v1",
+      "implementation": "cyrene.tools.computer-runtime",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / real gRPC server on an ephemeral port with the bounded working-directory root",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "7 passed; ExecuteCommand, artifacts, and ListDir dispatch verified; path traversal denied",
+          "notes": "Packaged-runtime acceptance (install/start, cancellation, timeout, descendant process cleanup, environment filtering) not performed; maturity stays migrating."
+        }
+      ]
+    },
+    {
+      "capability": "message.connector.v1",
+      "implementation": "cyrene.connectors.onebot-v11",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / in-process transport doubles, no live OneBot endpoint",
+          "command": "python3 -m pytest -q plugins/connectors/onebot-v11/tests",
+          "result": "23 passed",
+          "notes": "Connector behaviour verified against the simulated transport; no live vendor endpoint exercised."
+        }
+      ]
+    },
+    {
+      "capability": "model.provider.v1",
+      "implementation": "cyrene.runtime.dotnet-native-aot-openai",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / .NET 10 / MockHttpMessageHandler transport doubles",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release",
+          "result": "19 passed including chat_completion_v2 tool calling and streaming usage",
+          "notes": "W1-4 stop gate: no real host/binding/DirectPluginRuntime dispatch is connected, so this record must not exceed IMPLEMENTATION_VERIFIED while SIMULATED."
+        }
+      ]
+    },
+    {
+      "capability": "model.provider.v1",
+      "implementation": "cyrene.runtime.dotnet-native-aot-anthropic",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / .NET 10 / MockHttpMessageHandler transport doubles",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release",
+          "result": "19 passed including real SSE streaming and v2 tool blocks",
+          "notes": "W1-4 stop gate: no real host/binding/DirectPluginRuntime dispatch is connected, so this record must not exceed IMPLEMENTATION_VERIFIED while SIMULATED."
+        }
+      ]
+    },
+    {
+      "capability": "dataset.preparation.v1",
+      "implementation": "cyrene.tools.dataset-preparation",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / real parquet and tmp_path filesystem",
+          "command": "python3 -m pytest -q plugins/tools/dataset-preparation/tests",
+          "result": "3 passed"
+        }
+      ]
+    },
+    {
+      "capability": "tool.dataset.validator.v1",
+      "implementation": "cyrene.tools.dataset-validator",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / tmp_path filesystem and direct runtime path",
+          "command": "python3 -m pytest -q plugins/tools/dataset-validator/tests",
+          "result": "3 passed"
+        }
+      ]
+    },
+    {
+      "capability": "model.analyzer.v1",
+      "implementation": "cyrene.models.hf-analyzer",
+      "verification_level": "DECLARED",
+      "evidence": [],
+      "notes": "No test suite exists in this export; declared by the plugin manifest only."
+    },
+    {
+      "capability": "compatibility.evaluator.v1",
+      "implementation": "cyrene.policy.compat-rules",
+      "verification_level": "DECLARED",
+      "evidence": [],
+      "notes": "No test suite exists in this export; declared by the plugin manifest only."
+    },
+    {
+      "capability": "evaluation.runner.v1",
+      "implementation": "cyrene.evaluation.exact-match",
+      "verification_level": "DECLARED",
+      "evidence": [],
+      "notes": "No test suite exists in this export. Echo consumes this capability per its own repository docs; that consumption is informational cross-repo evidence and is not this repository's canonical truth."
+    }
+  ]
+}

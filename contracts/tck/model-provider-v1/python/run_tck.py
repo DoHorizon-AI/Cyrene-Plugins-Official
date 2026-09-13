@@ -58,4 +58,82 @@ assert packed_chat.Unpack(unpacked_chat)
 assert unpacked_chat.HasField("include_usage")
 assert unpacked_chat.include_usage is True
 
+# Structured chat v2: index, identity, type, function facts, usage, and
+# finish_reason must survive the projection byte-for-byte.
+tool_chat = model_provider_pb2.ChatCompletionRequest(
+    messages=[
+        model_provider_pb2.ChatMessage(
+            role=model_provider_pb2.ChatMessage.ROLE_USER,
+            content="weather?",
+        )
+    ],
+    model="deterministic-model",
+    stream=True,
+    parallel_tool_calls=False,
+    include_usage=True,
+    tools=[
+        model_provider_pb2.ChatTool(
+            type="function",
+            function=model_provider_pb2.ChatFunction(
+                name="weather",
+                description="look up weather",
+                parameters_json='{"type":"object"}',
+                strict=True,
+            ),
+        )
+    ],
+    tool_choice=model_provider_pb2.ChatToolChoice(
+        mode="function",
+        function_name="weather",
+    ),
+)
+packed_tool_chat = Any()
+packed_tool_chat.Pack(tool_chat)
+unpacked_tool_chat = model_provider_pb2.ChatCompletionRequest()
+assert packed_tool_chat.Unpack(unpacked_tool_chat)
+assert unpacked_tool_chat.tools[0].function.name == "weather"
+assert unpacked_tool_chat.tools[0].function.parameters_json == '{"type":"object"}'
+assert unpacked_tool_chat.tools[0].function.strict is True
+assert unpacked_tool_chat.tool_choice.function_name == "weather"
+assert unpacked_tool_chat.HasField("parallel_tool_calls")
+assert unpacked_tool_chat.parallel_tool_calls is False
+assert unpacked_tool_chat.include_usage is True
+
+tool_response = model_provider_pb2.ChatCompletionResponse(
+    chunks=[
+        model_provider_pb2.ChatCompletionChunk(
+            delta="",
+            finish_reason="tool_calls",
+            prompt_tokens=8,
+            completion_tokens=4,
+            total_tokens=12,
+            role="assistant",
+            tool_calls=[
+                model_provider_pb2.ChatToolCallDelta(
+                    index=0,
+                    id="call-1",
+                    type="function",
+                    function_name="weather",
+                    function_arguments='{"city":',
+                )
+            ],
+        )
+    ]
+)
+packed_tool_response = Any()
+packed_tool_response.Pack(tool_response)
+unpacked_tool_response = model_provider_pb2.ChatCompletionResponse()
+assert packed_tool_response.Unpack(unpacked_tool_response)
+tool_chunk = unpacked_tool_response.chunks[0]
+tool_delta = tool_chunk.tool_calls[0]
+assert tool_delta.index == 0
+assert tool_delta.id == "call-1"
+assert tool_delta.type == "function"
+assert tool_delta.function_name == "weather"
+assert tool_delta.function_arguments == '{"city":'
+assert tool_chunk.finish_reason == "tool_calls"
+assert tool_chunk.prompt_tokens == 8
+assert tool_chunk.completion_tokens == 4
+assert tool_chunk.total_tokens == 12
+
 print("model.provider.v1 generated Python payload TCK: PASS")

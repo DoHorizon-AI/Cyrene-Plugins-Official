@@ -270,8 +270,12 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     print(
         "SOURCE_MANIFEST: PASS "
-        f"commit={manifest['source_commit']} files={len(manifest['files'])}"
+        f"commit={manifest['source_commit']} "
+        f"files={len(manifest['files'])} "
+        f"protected={len(manifest['protected_files'])}"
     )
+    for record in manifest["protected_files"]:
+        print(f"SOURCE_MANIFEST_PROTECTED: {record['path']} sha256={record['sha256']}")
     return 0
 
 

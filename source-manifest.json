@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "fa5b8103ef0462da6b6db3624fd1ad41ff094c488cf3ba3d9dd390c253332063",
-      "size_bytes": 14912
+      "sha256": "f321b70949ba2e984de275efccfa477a480d3059ff705ebdecc654b28313c838",
+      "size_bytes": 15096
     },
     {
       "kind": "file",
@@ -67,8 +67,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/README.md",
-      "sha256": "e70bbb86b2ae61320df29f911910e26621733bb357afb509c48536e6bdf17acf",
-      "size_bytes": 4277
+      "sha256": "67ebe6295605712118d09a4d6caca634c28e19f53e1ad63ec8473ede641e76af",
+      "size_bytes": 4514
     },
     {
       "kind": "file",
@@ -131,8 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "e69d4c05e5e3007e3014544eaf04d87a97ef432f96e2f5e374702715b96e1ca1",
-      "size_bytes": 7857
+      "sha256": "fa33459af6042bebafcb7e241f09e42815ac09877cd1d4608b8e4228ecba52db",
+      "size_bytes": 8941
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/capability-verification.json",
+      "sha256": "7e5411ff8f7f63687c414f51ca552c917d43f1cf07500af03299190472bcedbb",
+      "size_bytes": 6945
     },
     {
       "kind": "file",
@@ -516,8 +523,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/dotnet/Program.cs",
-      "sha256": "3d7714d8cf65e05152202109fbc28dd94d37f9f0c914705c6c7bf61a645df608",
-      "size_bytes": 1756
+      "sha256": "295f983b8c892a973eca7176893e97e0878edc72c95326413da969a0d4e9ee8d",
+      "size_bytes": 4412
     },
     {
       "kind": "file",
@@ -558,8 +565,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/python/run_tck.py",
-      "sha256": "93c94ca96a5694bb11566ac318f0e8933108143ca9af04c80238308b980ead8e",
-      "size_bytes": 1949
+      "sha256": "4a49977bb52217dd780dd733f0612335810c8dfabaa458b0f2d9c5db406d38ed",
+      "size_bytes": 4718
     },
     {
       "kind": "file",
@@ -579,8 +586,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "d6adea65bf3293c682ce728fbb8d7f8cc5081846a4ac80d84f91c84eeec28481",
-      "size_bytes": 11771
+      "sha256": "9e581120137b5359375e00943e161da11d036f38a6c268b76f97c11238e7a993",
+      "size_bytes": 20891
     },
     {
       "kind": "file",
@@ -3358,8 +3365,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/capability_catalog.py",
-      "sha256": "f1d77783f08e83dcc71f69aec2f482014347ce193da7fab1fc34158e4424fc82",
-      "size_bytes": 19898
+      "sha256": "03f2f906f75ec2715f6b351df049bbd9aa220074a69b521ebadd3f47f4ee08a7",
+      "size_bytes": 25094
     },
     {
       "kind": "file",
@@ -3386,15 +3393,22 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/update_source_manifest.py",
-      "sha256": "d0bf3a0ba9638462418820de5a55871255c72bc390a40bf5f299af8a15e802e4",
-      "size_bytes": 7704
+      "sha256": "88040a439f62b511a7d7ac0a66cd6ac625f2b80030db83d910c6867283efaf07",
+      "size_bytes": 8126
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/validate_manifests.py",
+      "sha256": "7b436ded24d9ffe6714f1b5ce8081ded7c45ccaf7ef0761248831ca0d7553d66",
+      "size_bytes": 3079
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/verify_source_manifest.py",
-      "sha256": "a1e47b97378f162facfd8aa8f1d27ad6c794ca23bdd67e989724d2a63fddec80",
-      "size_bytes": 12140
+      "sha256": "9f96314cd66884887714ec1f537f4b6098e98a40ec1c95dd53a02b1f2e462cae",
+      "size_bytes": 12344
     }
   ],
   "history_policy": "EMPTY_HISTORY_REQUIRED",

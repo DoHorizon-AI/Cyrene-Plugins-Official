@@ -106,8 +106,8 @@ def _existing_records(manifest: dict) -> dict[str, dict]:
     return records
 
 
-def _protected_changes(manifest: dict, changed: list[str], observed: dict[str, dict]) -> list[str]:
-    """List protected files whose digest moved away from the manifest record."""
+def _protected_changes(manifest: dict, changed: list[str], observed: dict[str, dict]) -> list[dict]:
+    """Describe protected files whose digest moved away from the manifest record."""
 
     protected = {
         record.get("path"): record.get("sha256")
@@ -115,7 +115,11 @@ def _protected_changes(manifest: dict, changed: list[str], observed: dict[str, d
         if isinstance(record, dict)
     }
     return [
-        path
+        {
+            "path": path,
+            "old_sha256": protected[path],
+            "new_sha256": observed[path]["sha256"],
+        }
         for path in changed
         if path in protected and observed.get(path, {}).get("sha256") != protected[path]
     ]
@@ -137,7 +141,7 @@ def refresh(root: Path, manifest: dict, *, accept_protected_changes: bool) -> di
     if protected_changed and not accept_protected_changes:
         raise ManifestUpdateError(
             "Protected files changed: "
-            + ", ".join(protected_changed)
+            + ", ".join(change["path"] for change in protected_changed)
             + "; rerun with --accept-protected-changes after review"
         )
 
@@ -155,6 +159,7 @@ def refresh(root: Path, manifest: dict, *, accept_protected_changes: bool) -> di
         "added": added,
         "changed": changed,
         "removed": removed,
+        "protected": protected_changed,
     }
     return manifest
 
@@ -200,6 +205,12 @@ def main(argv: list[str] | None = None) -> int:
     for label in ("added", "changed", "removed"):
         for path in summary[label]:
             print(f"  {label}: {path}")
+    for change in summary["protected"]:
+        print(
+            "SOURCE_MANIFEST_PROTECTED: "
+            f"{change['path']} "
+            f"{change['old_sha256'][:12]}... -> {change['new_sha256'][:12]}..."
+        )
     return 0
 
 

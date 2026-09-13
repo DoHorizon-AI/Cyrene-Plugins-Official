@@ -24,10 +24,17 @@ import re
 import sys
 from pathlib import Path
 
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
+
+import validate_manifests
+
 INDEX_PATH = "contracts/capabilities.yaml"
 PROTO_ROOT = "contracts/proto/cyrene"
 TRANSPORT_PROTO_PREFIX = "contracts/proto/cyrene/plugin/"
 REGISTRY_PATH = "contracts/runtime-implementations.json"
+VERIFICATION_PATH = "contracts/capability-verification.json"
 MANIFEST_GLOB = "plugins/*/*/plugin.manifest.json"
 TCK_GLOB = "contracts/tck/*"
 RUST_TCK_GLOB = "contracts/rust/cyrene-plugin-contracts/tests/*_tck.rs"
@@ -38,6 +45,16 @@ _KEY_VALUE = re.compile(r"^([A-Za-z][A-Za-z ]*?):\s*(.*)$")
 _SCALAR_SAFE = re.compile(r"[A-Za-z0-9_./\-]+")
 _NUMERIC_LIKE = re.compile(r"\d+(\.\d+)*")
 _RESERVED_SCALARS = {"true", "false", "null", "yes", "no", "on", "off", "~"}
+VERIFICATION_LEVELS = (
+    "DECLARED",
+    "CONTRACT_VERIFIED",
+    "IMPLEMENTATION_VERIFIED",
+    "DISPATCH_VERIFIED",
+    "INTEGRATION_VERIFIED",
+    "LIVE_VERIFIED",
+)
+EXECUTION_MODES = {"REAL", "SIMULATED", "MOCK"}
+REAL_ONLY_LEVELS = {"INTEGRATION_VERIFIED", "LIVE_VERIFIED"}
 
 
 class CatalogError(ValueError):
@@ -152,6 +169,11 @@ def _schema_paths(manifest_dir: Path, manifest: dict) -> list[Path]:
 
 def _collect_manifests(root: Path) -> tuple[list[dict], dict[str, dict]]:
     """Collect published implementations and their contract hints."""
+
+    try:
+        validate_manifests.validate_root(root)
+    except validate_manifests.ManifestSchemaError as error:
+        raise CatalogError(str(error)) from error
 
     implementations: list[dict] = []
     contract_hints: dict[str, dict] = {}
@@ -276,6 +298,75 @@ def _collect_registry(root: Path) -> tuple[list[dict], dict[str, list[dict]], li
     return records, per_capability, unbacked
 
 
+def _collect_verification(root: Path) -> dict[tuple[str, str], dict]:
+    """Collect authored verification evidence keyed by (capability, implementation)."""
+
+    registry = _read_json(root / VERIFICATION_PATH)
+    if not isinstance(registry, dict):
+        raise CatalogError(f"{VERIFICATION_PATH}: registry root is not an object")
+    records = registry.get("records")
+    if not isinstance(records, list) or not records:
+        raise CatalogError(f"{VERIFICATION_PATH}: no verification records")
+    collected: dict[tuple[str, str], dict] = {}
+    for record in records:
+        if not isinstance(record, dict):
+            raise CatalogError(f"{VERIFICATION_PATH}: record is not an object")
+        capability = record.get("capability")
+        implementation = record.get("implementation")
+        level = record.get("verification_level")
+        mode = record.get("execution_mode")
+        evidence = record.get("evidence", [])
+        if not isinstance(capability, str) or not isinstance(implementation, str):
+            raise CatalogError(f"{VERIFICATION_PATH}: record needs capability and implementation")
+        key = (capability, implementation)
+        if key in collected:
+            raise CatalogError(
+                f"{VERIFICATION_PATH}: duplicate record for {capability} / {implementation}"
+            )
+        if level not in VERIFICATION_LEVELS:
+            raise CatalogError(
+                f"{VERIFICATION_PATH}: invalid verification_level for {capability}: {level!r}"
+            )
+        if not isinstance(evidence, list):
+            raise CatalogError(f"{VERIFICATION_PATH}: evidence must be a list for {capability}")
+        if level == "DECLARED":
+            if evidence or mode is not None:
+                raise CatalogError(
+                    f"{VERIFICATION_PATH}: DECLARED records carry no evidence or mode: {capability}"
+                )
+        else:
+            if mode not in EXECUTION_MODES:
+                raise CatalogError(
+                    f"{VERIFICATION_PATH}: {capability} / {implementation} needs a valid execution_mode"
+                )
+            if not evidence:
+                raise CatalogError(
+                    f"{VERIFICATION_PATH}: {capability} / {implementation} needs evidence above DECLARED"
+                )
+            if level in REAL_ONLY_LEVELS and mode != "REAL":
+                raise CatalogError(
+                    f"{VERIFICATION_PATH}: {level} requires execution_mode REAL: "
+                    f"{capability} / {implementation}"
+                )
+            for item in evidence:
+                if (
+                    not isinstance(item, dict)
+                    or not item.get("observed_at")
+                    or not item.get("command")
+                    or not item.get("result")
+                ):
+                    raise CatalogError(
+                        f"{VERIFICATION_PATH}: evidence needs observed_at, command, and result: {capability}"
+                    )
+        verified_at = max((item.get("observed_at", "") for item in evidence), default="")
+        collected[key] = {
+            "verification_level": level,
+            "execution_mode": mode,
+            "verified_at": verified_at,
+        }
+    return collected
+
+
 def _collect_tck(root: Path) -> dict[str, list[str]]:
     """Map TCK suite directories to capability IDs."""
 
@@ -376,6 +467,35 @@ def build_catalog(root: Path) -> dict:
             raise CatalogError(f"TCK suite has no matching capability: {paths[0]}")
         row["tck"] = sorted(paths)
 
+    verification = _collect_verification(root)
+    implemented_pairs = {
+        (row["id"], implementation["ref"])
+        for row in rows.values()
+        for implementation in row["implementations"]
+    }
+    missing = sorted(
+        f"{capability} / {implementation}"
+        for capability, implementation in implemented_pairs - set(verification)
+    )
+    if missing:
+        raise CatalogError(f"{VERIFICATION_PATH}: missing records for: {', '.join(missing)}")
+    unknown = sorted(
+        f"{capability} / {implementation}"
+        for capability, implementation in set(verification) - implemented_pairs
+    )
+    if unknown:
+        raise CatalogError(
+            f"{VERIFICATION_PATH}: records reference unknown implementations: {', '.join(unknown)}"
+        )
+    for row in rows.values():
+        for implementation in row["implementations"]:
+            record = verification[(row["id"], implementation["ref"])]
+            implementation["verification_level"] = record["verification_level"]
+            if record["execution_mode"]:
+                implementation["execution_mode"] = record["execution_mode"]
+            if record["verified_at"]:
+                implementation["verified_at"] = record["verified_at"]
+
     for row in rows.values():
         duplicates = [item for item in row["implementations"] if row["implementations"].count(item) > 1]
         if duplicates:
@@ -385,6 +505,7 @@ def build_catalog(root: Path) -> dict:
     document = {
         "schema_version": "cyrene.capabilities.v1",
         "generated_by": "tools/ci/capability_catalog.py",
+        "verification_registry": VERIFICATION_PATH,
         "capabilities": [rows[key] for key in sorted(rows)],
     }
     if unbacked:

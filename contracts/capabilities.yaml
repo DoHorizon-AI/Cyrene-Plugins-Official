@@ -1,5 +1,6 @@
 schema_version: cyrene.capabilities.v1
 generated_by: tools/ci/capability_catalog.py
+verification_registry: contracts/capability-verification.json
 capabilities:
   - id: agent.runtime.v1
     interface_versions:
@@ -20,6 +21,9 @@ capabilities:
         methods:
           - Run
           - RunStream
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/agent_runtime_contract_tck.rs
   - id: compatibility.evaluator.v1
@@ -41,6 +45,7 @@ capabilities:
           - evaluate
         interface_versions:
           - "1"
+        verification_level: DECLARED
     tck: []
   - id: computer.runtime.v1
     interface_versions:
@@ -74,6 +79,9 @@ capabilities:
         interface_versions:
           - "1"
         maturity: migrating
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/computer_runtime_contract_tck.rs
       - contracts/tck/computer-runtime-v1
@@ -100,6 +108,9 @@ capabilities:
           - transform
         interface_versions:
           - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
     tck: []
   - id: evaluation.runner.v1
     interface_versions:
@@ -120,6 +131,7 @@ capabilities:
           - evaluate
         interface_versions:
           - "1"
+        verification_level: DECLARED
     tck: []
   - id: memory.provider.v1
     interface_versions:
@@ -147,6 +159,9 @@ capabilities:
           - GetMemory
           - RecallMemory
           - StoreMemory
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/memory_provider_contract_tck.rs
   - id: message.connector.v1
@@ -176,6 +191,9 @@ capabilities:
           - send_message
         interface_versions:
           - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/message_connector_contract_tck.rs
       - contracts/tck/message-connector-v1
@@ -202,6 +220,7 @@ capabilities:
           - validate_shards
         interface_versions:
           - "1"
+        verification_level: DECLARED
     tck: []
   - id: model.provider.v1
     interface_versions:
@@ -223,6 +242,9 @@ capabilities:
         publication: in-repo-unpublished
         methods:
           - chat_completion
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
       - ref: cyrene.runtime.dotnet-native-aot-openai
         source: contracts/runtime-implementations.json
         language: csharp
@@ -231,6 +253,9 @@ capabilities:
         methods:
           - chat_completion
           - embeddings
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/model_provider_chat_contract_tck.rs
       - contracts/rust/cyrene-plugin-contracts/tests/model_provider_embedding_contract_tck.rs
@@ -254,6 +279,9 @@ capabilities:
           - validate
         interface_versions:
           - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
     tck: []
 declared_without_contract:
   - id: rerank.provider.v1
