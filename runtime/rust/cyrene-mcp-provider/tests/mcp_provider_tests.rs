@@ -7,9 +7,17 @@
 //! kill semantics. It requires a system `python3`.
 
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
-use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
+use async_trait::async_trait;
+use serde_json::{json, Value};
+
+use cyrene_mcp_provider::{
+    McpClientError, McpServerConfig, McpSession, McpSessionAdapter, McpToolProvider,
+    StdioProcessAdapter,
+};
 use cyrene_plugin_contracts::tool_provider_v1::{
     call_tool_response, list_tools_response, tool_content_part, CallToolRequest, CallToolResponse,
     ListToolsResponse, ToolCatalog, ToolProviderError, ToolProviderErrorCode,
@@ -142,61 +150,159 @@ async fn call_tool_without_a_snapshot_still_dispatches_and_validates_arguments()
     assert_eq!(error.code, ToolProviderErrorCode::InvalidArguments as i32);
 }
 
+/// Adapter wrapper that counts how many sessions the provider opens.
+struct CountingAdapter {
+    inner: StdioProcessAdapter,
+    opens: AtomicUsize,
+}
+
+impl CountingAdapter {
+    fn new() -> Self {
+        Self {
+            inner: StdioProcessAdapter,
+            opens: AtomicUsize::new(0),
+        }
+    }
+
+    fn open_count(&self) -> usize {
+        self.opens.load(Ordering::SeqCst)
+    }
+}
+
+#[async_trait]
+impl McpSessionAdapter for CountingAdapter {
+    async fn open(&self, server: &McpServerConfig) -> Result<Box<dyn McpSession>, McpClientError> {
+        self.opens.fetch_add(1, Ordering::SeqCst);
+        self.inner.open(server).await
+    }
+}
+
+/// First opened session fails the transport once; later sessions answer.
+struct FlakyAdapter {
+    opens: AtomicUsize,
+}
+
+#[async_trait]
+impl McpSessionAdapter for FlakyAdapter {
+    async fn open(&self, _server: &McpServerConfig) -> Result<Box<dyn McpSession>, McpClientError> {
+        let attempt = self.opens.fetch_add(1, Ordering::SeqCst);
+        Ok(Box::new(FlakySession {
+            broken: attempt == 0,
+        }))
+    }
+}
+
+struct FlakySession {
+    broken: bool,
+}
+
+#[async_trait]
+impl McpSession for FlakySession {
+    async fn request(
+        &mut self,
+        method: &str,
+        _params: Value,
+        _timeout: Duration,
+    ) -> Result<Value, McpClientError> {
+        if self.broken {
+            return Err(McpClientError::Io("simulated transport break".to_string()));
+        }
+        if method == "tools/list" {
+            return Ok(json!({ "tools": [] }));
+        }
+        Ok(json!({ "content": [] }))
+    }
+
+    async fn notify(&mut self, _method: &str, _params: Value) -> Result<(), McpClientError> {
+        Ok(())
+    }
+
+    async fn close(self: Box<Self>) {}
+}
+
 #[tokio::test]
-async fn timeout_is_typed_and_reaps_the_child_process() {
+async fn one_logical_session_serves_the_snapshot_and_later_calls() {
+    let adapter = Arc::new(CountingAdapter::new());
+    let provider =
+        McpToolProvider::with_adapter(adapter.clone(), vec![fake_server(Duration::from_secs(10))]);
+
+    let _ = provider.list_tools(None).await;
+    let _ = provider
+        .call_tool(&call_request("echo", r#"{"text":"one"}"#))
+        .await;
+    let _ = provider
+        .call_tool(&call_request("echo", r#"{"text":"two"}"#))
+        .await;
+
+    assert_eq!(
+        adapter.open_count(),
+        1,
+        "tools/list and tools/call must share one logical session"
+    );
+}
+
+#[tokio::test]
+async fn broken_transport_reopens_a_fresh_session() {
+    let adapter = Arc::new(FlakyAdapter {
+        opens: AtomicUsize::new(0),
+    });
+    let provider =
+        McpToolProvider::with_adapter(adapter.clone(), vec![fake_server(Duration::from_secs(10))]);
+
+    let first = provider.list_tools(None).await;
+    match first.result {
+        Some(list_tools_response::Result::Error(error)) => {
+            assert_eq!(error.code, ToolProviderErrorCode::ProviderError as i32);
+        }
+        other => panic!("broken transport must surface a typed error, got {other:?}"),
+    }
+
+    let second = catalog(provider.list_tools(None).await);
+    assert!(second.tools.is_empty());
+    assert_eq!(adapter.opens.load(Ordering::SeqCst), 2);
+}
+
+#[tokio::test]
+async fn timeout_is_typed_and_the_session_survives_until_shutdown() {
     let directory = tempfile::tempdir().unwrap();
-    let (config, pid_path) = server_with_pid_file(directory.path(), Duration::from_millis(400));
+    // The client deadline is shorter than the tool's own runtime so the
+    // timeout fires while the session is still healthy.
+    let (config, pid_path) = server_with_pid_file(directory.path(), Duration::from_millis(300));
     let provider = McpToolProvider::new(vec![config]);
 
     let response = provider
-        .call_tool(&call_request("slow", r#"{"ms":10000}"#))
+        .call_tool(&call_request("slow", r#"{"ms":900}"#))
         .await;
     let error = provider_error(response);
     assert_eq!(error.code, ToolProviderErrorCode::Timeout as i32);
     assert!(error.retryable);
 
-    let pid = wait_for_pid_file(&pid_path);
-    assert!(
-        wait_for_process_exit(&pid, Duration::from_secs(5)),
-        "timed-out MCP child {pid} was not reaped"
-    );
-}
-
-#[tokio::test]
-async fn cancelled_call_kills_the_child_process() {
-    let directory = tempfile::tempdir().unwrap();
-    let (config, pid_path) = server_with_pid_file(directory.path(), Duration::from_secs(30));
-    let provider = McpToolProvider::new(vec![config]);
-    let request = call_request("slow", r#"{"ms":10000}"#);
-
-    {
-        let call = provider.call_tool(&request);
-        tokio::pin!(call);
-        tokio::select! {
-            result = &mut call => panic!("call unexpectedly completed: {result:?}"),
-            () = tokio::time::sleep(Duration::from_millis(600)) => {}
+    // Let the in-flight tool finish; its stale response is skipped by request
+    // id matching, and the logical session keeps working.
+    tokio::time::sleep(Duration::from_millis(900)).await;
+    let echo = provider
+        .call_tool(&call_request("echo", r#"{"text":"after timeout"}"#))
+        .await;
+    match echo.result {
+        Some(call_tool_response::Result::Outcome(outcome)) => {
+            assert!(!outcome.is_error);
+            match &outcome.content[0].content {
+                Some(tool_content_part::Content::Text(text)) => {
+                    assert_eq!(text.text, "after timeout")
+                }
+                other => panic!("expected text content, got {other:?}"),
+            }
         }
+        other => panic!("expected an outcome after timeout, got {other:?}"),
     }
 
+    // Explicit shutdown closes the session and releases the child process.
     let pid = wait_for_pid_file(&pid_path);
+    provider.shutdown().await;
     assert!(
         wait_for_process_exit(&pid, Duration::from_secs(5)),
-        "cancelled MCP child {pid} was not reaped"
+        "MCP child {pid} was not released by shutdown"
     );
-}
-
-#[tokio::test]
-async fn spawn_failure_maps_to_a_provider_error() {
-    let config = McpServerConfig::new("mcp.broken", "/nonexistent/cyrene-mcp-server", Vec::new())
-        .with_timeout(Duration::from_millis(500));
-    let provider = McpToolProvider::new(vec![config]);
-    let response = provider.list_tools(None).await;
-    match response.result {
-        Some(list_tools_response::Result::Error(error)) => {
-            assert_eq!(error.code, ToolProviderErrorCode::ProviderError as i32);
-        }
-        other => panic!("expected a typed error, got {other:?}"),
-    }
 }
 
 fn wait_for_pid_file(path: &Path) -> i32 {

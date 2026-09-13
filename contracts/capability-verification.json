@@ -177,6 +177,12 @@
           "environment": "linux / cargo test / real agent loop in cyrene-plugin-server calling the MCP provider against the fake MCP server fixture",
           "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
           "result": "10 passed; the agent loop completes a tool turn end to end through tool.provider.v1 and the MCP child process"
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / injected session adapter with a counting and a flaky implementation",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-mcp-provider/Cargo.toml",
+          "result": "6 passed; one logical session serves list_tools and every later call_tool, a broken transport re-opens a fresh session, a timeout leaves the session usable, and shutdown releases the child process"
         }
       ]
     }

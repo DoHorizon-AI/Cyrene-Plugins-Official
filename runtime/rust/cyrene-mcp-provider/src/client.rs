@@ -1,12 +1,13 @@
 //! Minimal MCP stdio transport: newline-delimited JSON-RPC 2.0 over a child
-//! process, scoped to a single operation.
+//! process, with one logical session per binding.
 //!
-//! Sessions are per-operation on purpose. The provider never holds a
-//! long-lived process, and dropping the session (timeout or cancellation)
-//! kills the child through `kill_on_drop`. Long-lived process supervision is
-//! explicitly out of scope for this provider; the production path reuses the
-//! managed execution primitives owned by the launcher (see the capability
-//! expansion plan, decision C).
+//! A session is a stable JSON-RPC conversation: `tools/list` and every later
+//! `tools/call` for the binding share it, so a catalog snapshot and the calls
+//! planned against it stay on one server-side session. Session *lifecycle*
+//! (spawn, supervision, teardown) belongs to the injected
+//! [`McpSessionAdapter`]; the default adapter uses `kill_on_drop` children for
+//! tests and local development, while production hosts inject an adapter
+//! backed by managed execution (capability expansion plan, decision C).
 
 use std::collections::VecDeque;
 use std::fmt;
@@ -101,6 +102,68 @@ impl fmt::Display for McpClientError {
             }
             Self::Io(message) => write!(formatter, "MCP transport error: {message}"),
         }
+    }
+}
+
+/// One logical MCP session: a stable JSON-RPC conversation with one server
+/// binding for as long as the session is open.
+#[async_trait::async_trait]
+pub trait McpSession: Send {
+    /// Send one request and await the matching response.
+    async fn request(
+        &mut self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+    ) -> Result<Value, McpClientError>;
+
+    /// Send one notification (no response expected).
+    async fn notify(&mut self, method: &str, params: Value) -> Result<(), McpClientError>;
+
+    /// Close the session and release its process resources.
+    async fn close(self: Box<Self>);
+}
+
+/// Opens and closes MCP sessions; the host owns process lifecycle through it.
+///
+/// The provider never spawns or supervises processes itself. Production hosts
+/// inject an adapter backed by managed execution; the default
+/// [`StdioProcessAdapter`] spawns one child per session for tests and local
+/// development.
+#[async_trait::async_trait]
+pub trait McpSessionAdapter: Send + Sync {
+    /// Open one session for a configured server binding.
+    async fn open(&self, server: &McpServerConfig) -> Result<Box<dyn McpSession>, McpClientError>;
+}
+
+/// Default adapter: one stdio child process per session (test/dev posture).
+#[derive(Debug, Default)]
+pub struct StdioProcessAdapter;
+
+#[async_trait::async_trait]
+impl McpSessionAdapter for StdioProcessAdapter {
+    async fn open(&self, server: &McpServerConfig) -> Result<Box<dyn McpSession>, McpClientError> {
+        Ok(Box::new(McpStdioClient::start(server).await?))
+    }
+}
+
+#[async_trait::async_trait]
+impl McpSession for McpStdioClient {
+    async fn request(
+        &mut self,
+        method: &str,
+        params: Value,
+        timeout: Duration,
+    ) -> Result<Value, McpClientError> {
+        McpStdioClient::request(self, method, params, timeout).await
+    }
+
+    async fn notify(&mut self, method: &str, params: Value) -> Result<(), McpClientError> {
+        McpStdioClient::notify(self, method, params).await
+    }
+
+    async fn close(self: Box<Self>) {
+        (*self).shutdown().await;
     }
 }
 

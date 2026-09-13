@@ -6,6 +6,7 @@ description = "tool.provider.v1 implementation over MCP stdio servers (tools/lis
 license = "Apache-2.0"
 
 [dependencies]
+async-trait = "0.1"
 serde_json = "1.0"
 sha2 = "0.10"
 tokio = { version = "1", features = ["full"] }

@@ -6,18 +6,22 @@
 //! `call_tool` enforces, which is what lets an Agent Runtime take one catalog
 //! snapshot per run.
 //!
-//! Process lifecycle: every operation opens a short-lived MCP session and
-//! closes it deterministically; a timeout or a dropped future kills the child
-//! process (`kill_on_drop`). The provider is not a process supervisor — the
-//! production path is expected to reuse the launcher's managed execution
-//! primitives (capability expansion plan, decision C).
+//! Session lifecycle: one binding owns one logical session, opened lazily on
+//! first use through the injected [`McpSessionAdapter`] and re-opened after a
+//! broken transport. The provider is not a process supervisor — production
+//! hosts inject an adapter backed by managed execution (capability expansion
+//! plan, decision C).
 
 pub mod client;
 
-pub use client::{McpClientError, McpServerConfig, McpStdioClient, MCP_PROTOCOL_VERSION};
+pub use client::{
+    McpClientError, McpServerConfig, McpSession, McpSessionAdapter, McpStdioClient,
+    StdioProcessAdapter, MCP_PROTOCOL_VERSION,
+};
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
+use std::sync::Arc;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -34,10 +38,21 @@ pub const CAPABILITY_ID: &str = "tool.provider.v1";
 /// Interface version owned by this implementation.
 pub const INTERFACE_VERSION: &str = "1";
 
+/// One binding's logical session slot; `None` means the session must be opened.
+type SessionSlot = Arc<Mutex<Option<Box<dyn McpSession>>>>;
+
 /// MCP stdio tool provider implementing `tool.provider.v1`.
+///
+/// One binding owns one logical session: `tools/list` and every later
+/// `tools/call` for that binding share the same initialized MCP session, so a
+/// catalog snapshot and the calls planned against it stay on one server-side
+/// session. Sessions are opened through the injected [`McpSessionAdapter`];
+/// the provider never supervises processes.
 pub struct McpToolProvider {
+    adapter: Arc<dyn McpSessionAdapter>,
     servers: Vec<McpServerConfig>,
     snapshots: Mutex<HashMap<String, Vec<String>>>,
+    sessions: Mutex<HashMap<String, SessionSlot>>,
 }
 
 impl std::fmt::Debug for McpToolProvider {
@@ -50,11 +65,38 @@ impl std::fmt::Debug for McpToolProvider {
 }
 
 impl McpToolProvider {
-    /// Build a provider over the configured server bindings.
+    /// Build a provider over the configured server bindings using the default
+    /// stdio process adapter.
     pub fn new(servers: Vec<McpServerConfig>) -> Self {
+        Self::with_adapter(Arc::new(StdioProcessAdapter), servers)
+    }
+
+    /// Build a provider whose session lifecycle is owned by the given adapter.
+    pub fn with_adapter(
+        adapter: Arc<dyn McpSessionAdapter>,
+        servers: Vec<McpServerConfig>,
+    ) -> Self {
         Self {
+            adapter,
             servers,
             snapshots: Mutex::new(HashMap::new()),
+            sessions: Mutex::new(HashMap::new()),
+        }
+    }
+
+    /// Close every open logical session. Hosts call this when a package unloads;
+    /// dropping the provider also releases the sessions (the default adapter's
+    /// children die with their session).
+    pub async fn shutdown(&self) {
+        let slots: Vec<SessionSlot> = {
+            let mut sessions = self.sessions.lock().await;
+            sessions.drain().map(|(_, slot)| slot).collect()
+        };
+        for slot in slots {
+            let session = slot.lock().await.take();
+            if let Some(session) = session {
+                session.close().await;
+            }
         }
     }
 
@@ -99,7 +141,7 @@ impl McpToolProvider {
         let mut descriptors = Vec::new();
         let mut snapshot = HashMap::new();
         for server in selected.iter() {
-            let tools = match fetch_tools(server).await {
+            let tools = match self.fetch_tools(server).await {
                 Ok(tools) => tools,
                 Err(error) => {
                     return ListToolsResponse {
@@ -182,7 +224,10 @@ impl McpToolProvider {
             }
         };
 
-        match invoke_tool(server, &request.provider_tool_id, arguments).await {
+        match self
+            .invoke_tool(server, &request.provider_tool_id, arguments)
+            .await
+        {
             Ok(outcome) => CallToolResponse {
                 result: Some(call_tool_response::Result::Outcome(outcome)),
             },
@@ -191,29 +236,85 @@ impl McpToolProvider {
             },
         }
     }
+
+    async fn session_slot(&self, binding_id: &str) -> SessionSlot {
+        let mut sessions = self.sessions.lock().await;
+        sessions.entry(binding_id.to_string()).or_default().clone()
+    }
+
+    /// Ensure the binding has an open logical session and return its slot.
+    async fn ensure_session(
+        &self,
+        server: &McpServerConfig,
+    ) -> Result<SessionSlot, McpClientError> {
+        let slot = self.session_slot(&server.binding_id).await;
+        let mut guard = slot.lock().await;
+        if guard.is_none() {
+            *guard = Some(self.adapter.open(server).await?);
+        }
+        drop(guard);
+        Ok(slot)
+    }
+
+    /// Drop a session whose transport broke so the next operation re-opens one.
+    async fn reset_broken_session(&self, slot: &SessionSlot) {
+        let mut guard = slot.lock().await;
+        *guard = None;
+    }
+
+    async fn fetch_tools(
+        &self,
+        server: &McpServerConfig,
+    ) -> Result<Vec<ToolDescriptor>, McpClientError> {
+        let slot = self.ensure_session(server).await?;
+        let result = {
+            let mut guard = slot.lock().await;
+            let session = guard.as_mut().expect("session is present after ensure");
+            session
+                .request("tools/list", json!({}), server.timeout)
+                .await
+        };
+        match result {
+            Ok(value) => Ok(map_tool_list(server, &value)),
+            Err(error) => {
+                if is_broken_transport(&error) {
+                    self.reset_broken_session(&slot).await;
+                }
+                Err(error)
+            }
+        }
+    }
+
+    async fn invoke_tool(
+        &self,
+        server: &McpServerConfig,
+        provider_tool_id: &str,
+        arguments: Value,
+    ) -> Result<ToolCallOutcome, McpClientError> {
+        let slot = self.ensure_session(server).await?;
+        let params = json!({ "name": provider_tool_id, "arguments": arguments });
+        let result = {
+            let mut guard = slot.lock().await;
+            let session = guard.as_mut().expect("session is present after ensure");
+            session.request("tools/call", params, server.timeout).await
+        };
+        match result {
+            Ok(value) => Ok(map_tool_outcome(&value)),
+            Err(error) => {
+                if is_broken_transport(&error) {
+                    self.reset_broken_session(&slot).await;
+                }
+                Err(error)
+            }
+        }
+    }
 }
 
-async fn fetch_tools(server: &McpServerConfig) -> Result<Vec<ToolDescriptor>, McpClientError> {
-    let mut session = McpStdioClient::start(server).await?;
-    let result = session
-        .request("tools/list", json!({}), server.timeout)
-        .await;
-    let mapped = result.map(|value| map_tool_list(server, &value));
-    session.shutdown().await;
-    mapped
-}
-
-async fn invoke_tool(
-    server: &McpServerConfig,
-    provider_tool_id: &str,
-    arguments: Value,
-) -> Result<ToolCallOutcome, McpClientError> {
-    let mut session = McpStdioClient::start(server).await?;
-    let params = json!({ "name": provider_tool_id, "arguments": arguments });
-    let result = session.request("tools/call", params, server.timeout).await;
-    let mapped = result.map(|value| map_tool_outcome(&value));
-    session.shutdown().await;
-    mapped
+fn is_broken_transport(error: &McpClientError) -> bool {
+    matches!(
+        error,
+        McpClientError::Io(_) | McpClientError::ProcessExited { .. }
+    )
 }
 
 fn map_tool_list(server: &McpServerConfig, result: &Value) -> Vec<ToolDescriptor> {

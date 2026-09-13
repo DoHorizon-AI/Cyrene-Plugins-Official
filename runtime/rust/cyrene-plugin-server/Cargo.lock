@@ -213,6 +213,7 @@ dependencies = [
 name = "cyrene-mcp-provider"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "cyrene-plugin-contracts",
  "serde_json",
  "sha2",
