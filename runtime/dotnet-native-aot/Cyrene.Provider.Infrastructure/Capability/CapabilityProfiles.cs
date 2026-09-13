@@ -9,14 +9,24 @@
 
 namespace Cyrene.Provider.Infrastructure.Capability;
 
-public record ChatMessage(string Role, string Content, string? Name = null);
+public record ChatMessage(
+    string Role,
+    string Content,
+    string? Name = null,
+    string? ToolCallId = null,
+    IReadOnlyList<ChatToolCall>? ToolCalls = null
+);
 
 public record ChatCompletionParameters(
     string Model,
     IReadOnlyList<ChatMessage> Messages,
     float? Temperature = null,
     int? MaxTokens = null,
-    IReadOnlyList<string>? StopSequences = null
+    IReadOnlyList<string>? StopSequences = null,
+    IReadOnlyList<ChatTool>? Tools = null,
+    ChatToolChoice? ToolChoice = null,
+    bool? ParallelToolCalls = null,
+    bool? IncludeUsage = null
 );
 
 public record ChatCompletionResult(
@@ -25,7 +35,9 @@ public record ChatCompletionResult(
     string Content,
     string? FinishReason,
     int? PromptTokens,
-    int? CompletionTokens
+    int? CompletionTokens,
+    IReadOnlyList<ChatToolCall>? ToolCalls = null,
+    int? TotalTokens = null
 );
 
 public record ChatCompletionChunk(
@@ -34,7 +46,35 @@ public record ChatCompletionChunk(
     string? FinishReason,
     int? PromptTokens = null,
     int? CompletionTokens = null,
-    int? TotalTokens = null
+    int? TotalTokens = null,
+    IReadOnlyList<ChatToolCallDelta>? ToolCalls = null
+);
+
+// Structured chat (interface version 2) capability models. They mirror the
+// optional model.provider.v1 fields carried by the chat_completion_v2 method.
+
+public record ChatFunctionDefinition(
+    string Name,
+    string? Description,
+    string ParametersJson,
+    bool? Strict = null
+);
+
+public record ChatTool(string Type, ChatFunctionDefinition Function);
+
+// A named function uses Mode "function" and sets FunctionName.
+public record ChatToolChoice(string Mode, string? FunctionName = null);
+
+public record ChatToolCallFunction(string Name, string Arguments);
+
+public record ChatToolCall(string Id, string Type, ChatToolCallFunction Function);
+
+public record ChatToolCallDelta(
+    int Index,
+    string? Id = null,
+    string? Type = null,
+    string? FunctionName = null,
+    string? FunctionArguments = null
 );
 
 public interface IModelCapability

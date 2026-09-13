@@ -77,14 +77,16 @@ Evidence / 证据:
 ## 5. Wave 1 — Model Provider 完成度 / Provider Completeness
 
 - [x] W1-1 Anthropic 真 SSE streaming：wire `stream: true`，逐事件 yield，携带 usage / finish_reason；加测试。
-- [ ] W1-2 OpenAI `chat_completion_v2`：tools / tool_choice / parallel_tool_calls / tool_call delta / usage；Native AOT 序列化上下文更新；fixtures 测试。
-- [ ] W1-3 Anthropic v2：tools 声明与 `tool_result` 消息块。
-- [ ] W1-4 Provider host 按 interface version 分发 v1 / v2，行为可测。
+- [x] W1-2 OpenAI `chat_completion_v2`：tools / tool_choice / parallel_tool_calls / tool_call delta / usage；Native AOT 序列化上下文更新；fixtures 测试。
+- [x] W1-3 Anthropic v2：tools 声明与 `tool_result` 消息块（含 system 提升为顶层字段、`input_json_delta` 流式分片）。
+- [ ] W1-4 Provider host 按 interface version 分发 v1 / v2（**暂缓**：本导出中的 .NET provider host 为未配置 stub，直接写 proto↔模型转换层会产生无消费者抽象；等 host/binding 注入落地后启动，见决策记录）。
 
 Evidence / 证据:
 
 - W1-1：`dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests --configuration Release` → `Passed: 15, Failed: 0`（含新增 `Test_W1_AnthropicStreaming_YieldsOrderedDeltasAndUsage`、`Test_W1_AnthropicStreaming_ErrorEventFailsClosed`）。
 - W1-1：`python3 tools/check_dotnet_aot_rules.py` → `SUCCESS`；6 个 Native AOT 工程全部 build succeeded。
+- W1-2/W1-3：`dotnet test ... --configuration Release` → `Passed: 19, Failed: 0`；新增 4 个 v2 测试（OpenAI round-trip、OpenAI streaming tool deltas、Anthropic round-trip、Anthropic streaming tool_use 分片）。
+- W1-2/W1-3：能力模型扩展 mirrored proto：`ChatMessage.ToolCallId/ToolCalls`、`ChatCompletionParameters.Tools/ToolChoice/ParallelToolCalls/IncludeUsage`、`ChatCompletionChunk.ToolCalls`、`ChatCompletionResult.ToolCalls/TotalTokens`。
 
 ## 6. Wave 2 — Computer Runtime 正式化 / Formalization
 
@@ -140,3 +142,4 @@ Evidence / 证据:
 | 2026-09-13 | 运行时实现注册表用 JSON（仓库无 PyYAML 依赖，工具保持 stdlib-only） | 仓库现有依赖面 |
 | 2026-09-13 | W0 不包含 manifest schema 全量校验（需引入依赖，移入 W5-4） | 保持 Wave 0 零新依赖 |
 | 2026-09-13 | catalog 的 implementation 侧记录实际 dispatch 名（Rust host 为 PascalCase），contract 侧保留 proto 标识符原文；二者差异在索引中直接可见 | 不掩盖命名平面差异，交由 W5-5 处理 |
+| 2026-09-13 | W1-4 暂缓：`Cyrene.Provider.*` 的 host 入口在当前导出中是 fail-closed stub（`DIRECT_RUNTIME_HOST_NOT_CONFIGURED`），先写 proto↔capability 转换层会造成无消费者的抽象；等 host/binding 注入路径明确后按真实需求实现 | 与删除 TrainingBackend / Quantization 的同一判据 |

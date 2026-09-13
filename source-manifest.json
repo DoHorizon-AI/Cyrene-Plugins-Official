@@ -558,8 +558,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "e0b75563b110c3a59358b4f4089659224736be627f997456e22fd52d83e7a90c",
-      "size_bytes": 9093
+      "sha256": "90425e756b952559c98601c1448c026c307d36c7403d3668f9c0b4f7019e3faf",
+      "size_bytes": 10152
     },
     {
       "kind": "file",
@@ -971,8 +971,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/AnthropicVendorAdapter.cs",
-      "sha256": "65f498bec11c098661339d097e1511d2be59ede45e44998ec36a6834b03d67ac",
-      "size_bytes": 7019
+      "sha256": "7da4d79e86fac9b1f505498fabcc79158c6ee2994df3eb3cdfe45ee26ab77bf7",
+      "size_bytes": 11792
     },
     {
       "kind": "file",
@@ -992,8 +992,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Capability/CapabilityProfiles.cs",
-      "sha256": "83d9d5675b9e92bf3a8afe58e74348082410968d46686116087c569206df0c29",
-      "size_bytes": 3823
+      "sha256": "93e310e093f841bb69db0aa2251e55430873f3e324599969b971ccf47396508f",
+      "size_bytes": 5025
     },
     {
       "kind": "file",
@@ -1020,8 +1020,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Serialization/WireModels.cs",
-      "sha256": "6d158138685f31c41ac0bf322ea15c25c7bfeefdad68c54c2d855c5b091c12d3",
-      "size_bytes": 6499
+      "sha256": "da119063041a55368d67fdbe9d01369aa99b061abe693e22ed54c1219ab5af35",
+      "size_bytes": 10376
     },
     {
       "kind": "file",
@@ -1041,8 +1041,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi/OpenAiVendorAdapter.cs",
-      "sha256": "0adda9bc2ac63fddd3340f11b2d057bbe7099571c72fdfa8354b1a8fee45b5b3",
-      "size_bytes": 7648
+      "sha256": "486862381a1764f10a87b0462c54632607e5317c1c15df2794ba232c04c683c6",
+      "size_bytes": 11287
     },
     {
       "kind": "file",
@@ -1062,8 +1062,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/ProviderTests.cs",
-      "sha256": "185db4ef56d6d8ed5c02fe2b6464e22da54f1929a31257f48af5058aa295a52d",
-      "size_bytes": 19918
+      "sha256": "ef1f40aefe12be79f46b3122d351b507265bdf1a607956bd044fb6c3e56ba985",
+      "size_bytes": 31601
     },
     {
       "kind": "file",

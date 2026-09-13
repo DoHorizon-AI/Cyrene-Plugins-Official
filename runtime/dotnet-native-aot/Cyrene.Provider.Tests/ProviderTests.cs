@@ -304,6 +304,245 @@ public class ProviderTests
         Assert.True(exception.Retryable);
     }
 
+    private const string OpenAiToolStreamSse = """
+        data: {"id":"chatcmpl-tool-stream","model":"gpt-4o","choices":[{"index":0,"delta":{"role":"assistant","tool_calls":[{"index":0,"id":"call_9","type":"function","function":{"name":"get_weather","arguments":""}}]},"finish_reason":null}]}
+
+        data: {"id":"chatcmpl-tool-stream","model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"city\":"}}]},"finish_reason":null}]}
+
+        data: {"id":"chatcmpl-tool-stream","model":"gpt-4o","choices":[{"index":0,"delta":{"tool_calls":[{"index":0,"function":{"arguments":"\"Paris\"}"}}]},"finish_reason":"tool_calls"}]}
+
+        data: {"id":"chatcmpl-tool-stream","model":"gpt-4o","choices":[],"usage":{"prompt_tokens":30,"completion_tokens":12,"total_tokens":42}}
+
+        data: [DONE]
+        """;
+
+    [Fact]
+    public async Task Test_W1_OpenAiV2_ToolCallingRoundTrip()
+    {
+        const string mockResponseJson = "{\"id\":\"chatcmpl-tool\",\"model\":\"gpt-4o\",\"choices\":[{\"index\":0,\"message\":{\"role\":\"assistant\",\"content\":\"\",\"tool_calls\":[{\"id\":\"call_1\",\"type\":\"function\",\"function\":{\"name\":\"get_weather\",\"arguments\":\"{\\\"city\\\":\\\"Paris\\\"}\"}}]},\"finish_reason\":\"tool_calls\"}],\"usage\":{\"prompt_tokens\":42,\"completion_tokens\":9,\"total_tokens\":51}}";
+
+        string? capturedBody = null;
+        var mockHandler = new MockHttpMessageHandler(req =>
+        {
+            capturedBody = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var config = new ProviderBindingConfiguration(new Uri("https://api.openai.com"), "sk-test-openai-key");
+        var client = new HttpTransportClient(new HttpClient(mockHandler));
+        var adapter = new OpenAiVendorAdapter(config, client);
+
+        var tools = new List<ChatTool>
+        {
+            new("function", new ChatFunctionDefinition(
+                Name: "get_weather",
+                Description: "Get the weather for a city",
+                ParametersJson: "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}",
+                Strict: true
+            ))
+        };
+        var messages = new List<ChatMessage>
+        {
+            new("user", "What is the weather in Paris?"),
+            new("assistant", string.Empty, ToolCalls: new List<ChatToolCall>
+            {
+                new("call_1", "function", new ChatToolCallFunction("get_weather", "{\"city\":\"Paris\"}"))
+            }),
+            new("tool", "{\"temp_c\":21}", ToolCallId: "call_1")
+        };
+
+        var result = await adapter.CompleteChatAsync(new ChatCompletionParameters(
+            Model: "gpt-4o",
+            Messages: messages,
+            Tools: tools,
+            ToolChoice: new ChatToolChoice("function", "get_weather"),
+            ParallelToolCalls: false
+        ));
+
+        Assert.NotNull(result.ToolCalls);
+        var call = Assert.Single(result.ToolCalls!);
+        Assert.Equal("call_1", call.Id);
+        Assert.Equal("get_weather", call.Function.Name);
+        Assert.Equal("{\"city\":\"Paris\"}", call.Function.Arguments);
+        Assert.Equal("tool_calls", result.FinishReason);
+        Assert.Equal(51, result.TotalTokens);
+
+        Assert.NotNull(capturedBody);
+        Assert.Contains("\"tools\":[", capturedBody);
+        Assert.Contains("\"tool_choice\":{\"type\":\"function\",\"function\":{\"name\":\"get_weather\"}}", capturedBody);
+        Assert.Contains("\"parallel_tool_calls\":false", capturedBody);
+        Assert.Contains("\"strict\":true", capturedBody);
+        Assert.Contains("\"parameters\":{\"type\":\"object\"", capturedBody);
+        Assert.Contains("\"tool_call_id\":\"call_1\"", capturedBody);
+    }
+
+    [Fact]
+    public async Task Test_W1_OpenAiV2_StreamingToolCallDeltasAndUsage()
+    {
+        string? capturedBody = null;
+        var mockHandler = new MockHttpMessageHandler(req =>
+        {
+            capturedBody = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(OpenAiToolStreamSse, Encoding.UTF8, "text/event-stream")
+            };
+        });
+
+        var config = new ProviderBindingConfiguration(new Uri("https://api.openai.com"), "sk-test-openai-key");
+        var client = new HttpTransportClient(new HttpClient(mockHandler));
+        var adapter = new OpenAiVendorAdapter(config, client);
+
+        var chunks = new List<ChatCompletionChunk>();
+        await foreach (var chunk in adapter.StreamChatAsync(new ChatCompletionParameters(
+            Model: "gpt-4o",
+            Messages: new List<ChatMessage> { new("user", "Weather in Paris?") },
+            IncludeUsage: true
+        )))
+        {
+            chunks.Add(chunk);
+        }
+
+        Assert.Equal(4, chunks.Count);
+        var first = Assert.Single(chunks[0].ToolCalls!);
+        Assert.Equal(0, first.Index);
+        Assert.Equal("call_9", first.Id);
+        Assert.Equal("get_weather", first.FunctionName);
+        var second = Assert.Single(chunks[1].ToolCalls!);
+        Assert.Equal("{\"city\":", second.FunctionArguments);
+        Assert.Equal("tool_calls", chunks[2].FinishReason);
+        var third = Assert.Single(chunks[2].ToolCalls!);
+        Assert.Equal("\"Paris\"}", third.FunctionArguments);
+        Assert.Equal(30, chunks[3].PromptTokens);
+        Assert.Equal(12, chunks[3].CompletionTokens);
+        Assert.Equal(42, chunks[3].TotalTokens);
+
+        Assert.NotNull(capturedBody);
+        Assert.Contains("\"stream\":true", capturedBody);
+        Assert.Contains("\"stream_options\":{\"include_usage\":true}", capturedBody);
+    }
+
+    private const string AnthropicToolStreamSse = """
+        event: message_start
+        data: {"type":"message_start","message":{"id":"msg-tool-stream","model":"claude-3-5-sonnet-20241022","usage":{"input_tokens":18,"output_tokens":1}}}
+
+        event: content_block_start
+        data: {"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":"toolu_9","name":"get_weather","input":{}}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"{\"city\":"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":"\"Paris\"}"}}
+
+        event: content_block_stop
+        data: {"type":"content_block_stop","index":0}
+
+        event: message_delta
+        data: {"type":"message_delta","delta":{"stop_reason":"tool_use"},"usage":{"output_tokens":12}}
+
+        event: message_stop
+        data: {"type":"message_stop"}
+        """;
+
+    [Fact]
+    public async Task Test_W1_AnthropicV2_ToolCallingRoundTrip()
+    {
+        const string mockResponseJson = "{\"id\":\"msg-tool-1\",\"model\":\"claude-3-5-sonnet-20241022\",\"role\":\"assistant\",\"content\":[{\"type\":\"text\",\"text\":\"\"},{\"type\":\"tool_use\",\"id\":\"toolu_1\",\"name\":\"get_weather\",\"input\":{\"city\":\"Paris\"}}],\"stop_reason\":\"tool_use\",\"usage\":{\"input_tokens\":20,\"output_tokens\":15}}";
+
+        string? capturedBody = null;
+        var mockHandler = new MockHttpMessageHandler(req =>
+        {
+            capturedBody = req.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var config = new ProviderBindingConfiguration(new Uri("https://api.anthropic.com"), "ant-test-key");
+        var client = new HttpTransportClient(new HttpClient(mockHandler));
+        var adapter = new AnthropicVendorAdapter(config, client);
+
+        var result = await adapter.CompleteChatAsync(new ChatCompletionParameters(
+            Model: "claude-3-5-sonnet-20241022",
+            Messages: new List<ChatMessage>
+            {
+                new("system", "You are helpful"),
+                new("user", "What is the weather in Paris?"),
+                new("assistant", string.Empty, ToolCalls: new List<ChatToolCall>
+                {
+                    new("call_1", "function", new ChatToolCallFunction("get_weather", "{\"city\":\"Paris\"}"))
+                }),
+                new("tool", "{\"temp_c\":21}", ToolCallId: "toolu_1")
+            },
+            Tools: new List<ChatTool>
+            {
+                new("function", new ChatFunctionDefinition(
+                    Name: "get_weather",
+                    Description: "Get the weather for a city",
+                    ParametersJson: "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}",
+                    Strict: true
+                ))
+            },
+            ToolChoice: new ChatToolChoice("function", "get_weather")
+        ));
+
+        Assert.NotNull(result.ToolCalls);
+        var call = Assert.Single(result.ToolCalls!);
+        Assert.Equal("toolu_1", call.Id);
+        Assert.Equal("get_weather", call.Function.Name);
+        Assert.Equal("{\"city\":\"Paris\"}", call.Function.Arguments);
+        Assert.Equal("tool_use", result.FinishReason);
+
+        Assert.NotNull(capturedBody);
+        Assert.Contains("\"system\":\"You are helpful\"", capturedBody);
+        Assert.Contains("\"tools\":[{\"name\":\"get_weather\"", capturedBody);
+        Assert.Contains("\"input_schema\":{\"type\":\"object\"", capturedBody);
+        Assert.Contains("\"tool_choice\":{\"type\":\"tool\",\"name\":\"get_weather\"}", capturedBody);
+        Assert.Contains("\"type\":\"tool_use\",\"id\":\"call_1\",\"name\":\"get_weather\"", capturedBody);
+        Assert.Contains("\"type\":\"tool_result\",\"tool_use_id\":\"toolu_1\"", capturedBody);
+        Assert.DoesNotContain("\"role\":\"system\"", capturedBody);
+    }
+
+    [Fact]
+    public async Task Test_W1_AnthropicV2_StreamingToolUseDeltas()
+    {
+        var mockHandler = new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(AnthropicToolStreamSse, Encoding.UTF8, "text/event-stream")
+        });
+
+        var config = new ProviderBindingConfiguration(new Uri("https://api.anthropic.com"), "ant-test-key");
+        var client = new HttpTransportClient(new HttpClient(mockHandler));
+        var adapter = new AnthropicVendorAdapter(config, client);
+
+        var chunks = new List<ChatCompletionChunk>();
+        await foreach (var chunk in adapter.StreamChatAsync(new ChatCompletionParameters(
+            Model: "claude-3-5-sonnet-20241022",
+            Messages: new List<ChatMessage> { new("user", "Weather in Paris?") }
+        )))
+        {
+            chunks.Add(chunk);
+        }
+
+        Assert.Equal(4, chunks.Count);
+        var start = Assert.Single(chunks[0].ToolCalls!);
+        Assert.Equal(0, start.Index);
+        Assert.Equal("toolu_9", start.Id);
+        Assert.Equal("get_weather", start.FunctionName);
+        var firstFragment = Assert.Single(chunks[1].ToolCalls!);
+        Assert.Equal("{\"city\":", firstFragment.FunctionArguments);
+        var secondFragment = Assert.Single(chunks[2].ToolCalls!);
+        Assert.Equal("\"Paris\"}", secondFragment.FunctionArguments);
+        Assert.Equal("tool_use", chunks[3].FinishReason);
+        Assert.Equal(18, chunks[3].PromptTokens);
+        Assert.Equal(12, chunks[3].CompletionTokens);
+    }
+
     // ── T86: Sanitized Fixtures Testing ────────────────────────────────────
 
     [Fact]
