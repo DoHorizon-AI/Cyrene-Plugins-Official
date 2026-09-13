@@ -200,6 +200,21 @@
           "notes": "No Product consumer is bound to this pack yet; Echo would declare a new runner binding when it adopts these evaluators."
         }
       ]
+    },
+    {
+      "capability": "evaluation.runner.v1",
+      "implementation": "cyrene.evaluation.llm-judge",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / scripted model provider served over real DirectPluginRuntime gRPC",
+          "command": "python3 -m pytest -q plugins/evaluation/llm-judge/tests",
+          "result": "8 passed; pointwise thresholding and judge identity, fenced/embedded JSON parsing, per-sample output failures, pairwise winners/ties/unjudged, request-level fail-closed, unconfigured and unreachable model handling, environment activation, and a DirectPluginRuntime round trip",
+          "notes": "The model provider is exercised through a scripted test double, not a real vendor model; no Product consumer is bound to this judge yet."
+        }
+      ]
     }
   ]
 }

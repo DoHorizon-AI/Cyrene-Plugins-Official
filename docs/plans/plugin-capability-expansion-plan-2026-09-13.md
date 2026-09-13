@@ -209,8 +209,8 @@ pairwise comparison 放入 LLM judge 路径。
 - [x] W4-1 deterministic evaluator pack（`contains.v1` / `regex.v1` / `json_structural.v1` /
   `json_schema.v1` / `numeric_tolerance.v1`；owner-scoped 契约、失败请求整体 fail closed、
   逐样本明细有界）。
-- [ ] W4-2 LLM judge 插件（独立包；使用 `model.provider.v1`，含 pairwise comparison；需要有消费者
-  或明确决策后再启动）。
+- [x] W4-2 LLM judge 插件（独立包 `plugins/evaluation/llm-judge`；`llm_judge.v1` pointwise +
+  `llm_pairwise.v1` pairwise；模型只经 `model.provider.v1` 编解码器调用宿主解析出的端点点位）。
 
 原 W4-1..W4-5 合并为新的 W4-1，原 W4-6 变为 W4-2（纳入 pairwise）；原条目均未执行、无证据。
 
@@ -273,6 +273,7 @@ Evidence / 证据:
 | 2026-09-13 (v1.1) | 新 capability 的 dispatch method 使用契约标识符原文（`tool.provider.v1` 为 `list_tools` / `call_tool`）；legacy PascalCase 分支保留到 Wave 6 命名统一 | 避免制造新的不一致 |
 | 2026-09-13 (v1.1) | W3-3 移入 W6-5：stdio 已覆盖本地/agent 路径，无远程 MCP 需求，暂不扩大传输面 | owner 同意 |
 | 2026-09-13 (v1.1) | 平面工具名字母表取 `[A-Za-z0-9_-]`（各厂商 tool-name 语法的交集）；点号/斜杠/空格折叠为 `_`，冲突按 binding 前缀与序号确定性去重 | 模型侧名称约束 + 决策 A |
+| 2026-09-13 (v1.1) | LLM judge 的模型访问只走 `model.provider.v1` 编解码器 + 宿主解析出的端点点位；插件不做提供方选择、凭据或路由；裁判输出按严格 JSON 解析，不可解析只失败该样本 | owner 决策 + 契约边界 |
 | 2026-09-13 (v1.1) | Wave 4 采用方案 A：deterministic evaluator pack（5 个 evaluator）+ 独立 LLM judge（含 pairwise）；不抽共享 evaluator proto | owner 决策 |
 | 2026-09-13 (v1.1) | `computer.runtime.v1` 暂不晋升 supported：等同一 packaged-runtime acceptance 在 Windows 通过后再升；不为此增加功能/架构 | owner 决策 |
 | 2026-09-13 (v1.1) | MCP stdio 使用 **per-binding 稳定 logical session**：同一 binding 的 `tools/list` 与后续 `tools/call` 共用同一 MCP 会话（此前每次操作新开）；session 生命周期由注入的 `McpSessionAdapter` 管理，provider 不承担进程监管；传输损坏时丢弃会话并在下次操作重开；超时不再杀会话 | owner 前置要求（Wave 4 之前） |

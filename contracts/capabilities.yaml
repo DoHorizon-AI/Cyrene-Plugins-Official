@@ -120,6 +120,7 @@ capabilities:
       paths:
         - plugins/evaluation/evaluator-pack/contracts/v1/schema.json
         - plugins/evaluation/exact-match/contracts/v1/schema.json
+        - plugins/evaluation/llm-judge/contracts/v1/schema.json
     contract_methods:
       - evaluate
     implementations:
@@ -145,6 +146,18 @@ capabilities:
         interface_versions:
           - "1"
         verification_level: DECLARED
+      - ref: cyrene.evaluation.llm-judge
+        source: plugins/evaluation/llm-judge/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - evaluate
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
     tck: []
   - id: memory.provider.v1
     interface_versions:

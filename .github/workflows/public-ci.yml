@@ -93,6 +93,7 @@ jobs:
             -e plugins/connectors/onebot-v11 \
             -e plugins/evaluation/exact-match \
           -e plugins/evaluation/evaluator-pack \
+          -e plugins/evaluation/llm-judge \
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
             -e plugins/tools/dataset-preparation \
@@ -106,6 +107,7 @@ jobs:
             plugins/connectors/onebot-v11/src \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \
+            plugins/evaluation/llm-judge \
             plugins/models/hf-model-analyzer \
             plugins/policy/compat-rules \
             plugins/tools/dataset-preparation \
@@ -120,6 +122,7 @@ jobs:
             sdk/python/cyrene_plugin_runtime/tests \
             plugins/connectors/onebot-v11/tests \
             plugins/evaluation/evaluator-pack/tests \
+            plugins/evaluation/llm-judge/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests
 

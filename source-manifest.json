@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "52c6f2a90be0c0c8ddb017accb884e0e59919ad74c23f187abbc63cb57e8c279",
-      "size_bytes": 15305
+      "sha256": "201a8d5b53861d51e3e0d55ddb114bac16fb6a992f70200c703caa073f968dc2",
+      "size_bytes": 15441
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "e83454a6b579caf435eef65be0215ff4158db874aeab221cb3f0e8021d25876f",
-      "size_bytes": 10202
+      "sha256": "b8da98f9d083a6bed5081ba1d15004805449ef0385ad48c6b19a1669fd00ba77",
+      "size_bytes": 10661
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "8ce44383fb185f8a9a466ebe7a6e2a9d0ca6861665df6b465c2f16c2eab40263",
-      "size_bytes": 11022
+      "sha256": "06e69f07c5437914b9191188a998a5fe0b3d08d8c51b4dabb3058aaa2a3f9896",
+      "size_bytes": 11971
     },
     {
       "kind": "file",
@@ -614,8 +614,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "7b8412a26ff7e061dcb77a57b9ddfef243b96fa1f101073116c86c5470d0cda4",
-      "size_bytes": 27060
+      "sha256": "b61a8062dd79b97e5eeaa0b5df677b4d4d6e2b425713efb63b600404ec951bc6",
+      "size_bytes": 27396
     },
     {
       "kind": "file",
@@ -833,6 +833,55 @@
       "path": "plugins/evaluation/exact-match/pyproject.toml",
       "sha256": "20f0a2cda467050dbb12698e4413e82d5f1b28c2b3187ca7378cffca16d20da9",
       "size_bytes": 465
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/README.md",
+      "sha256": "b1e22e0244dfcb81e9bac78c77acf6a5405a0074eae0a331469afd3deb29231f",
+      "size_bytes": 2142
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/contracts/v1/configuration.schema.json",
+      "sha256": "9a5757433001e1b7321fb4e7a43e3cabcf7572e097636cd73bcc36717e3602ec",
+      "size_bytes": 1047
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/contracts/v1/schema.json",
+      "sha256": "077d80e292d596cd5b04f6a3f543a53965101ffbbc98bc7f66978b88ff8559d8",
+      "size_bytes": 6977
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/llm_judge.py",
+      "sha256": "d7c01d252bd5115a4af6650000b9a01621d89b9cc695ea18892d0461c822a851",
+      "size_bytes": 20732
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/plugin.manifest.json",
+      "sha256": "7e62ef5e5b5f7abb7432da535830a0c0d8205260fd43f5675285b3a22e4c7084",
+      "size_bytes": 1287
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/pyproject.toml",
+      "sha256": "c15879b8d1fe0c7807b327fc7439b66f34e2566ac45ad700a57d43dd496eacdc",
+      "size_bytes": 708
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/llm-judge/tests/test_llm_judge.py",
+      "sha256": "143d42a854b23b4a5a13ff068bfe18620163a4f5bd4d648815d679876836df5a",
+      "size_bytes": 11345
     },
     {
       "kind": "file",
