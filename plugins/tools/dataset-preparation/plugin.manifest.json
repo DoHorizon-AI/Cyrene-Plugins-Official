@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.tools.dataset-preparation",
+  "name": "Dataset Preparation",
+  "version": "0.1.0",
+  "description": "Deterministic dataset import, mapping, normalization, deduplication, splitting, and DuckDB conversion.",
+  "kind": "capability-plugin",
+  "capabilities": ["dataset.preparation.v1"],
+  "methods": [
+    {
+      "name": "inspect",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/InspectRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/InspectResponse"
+    },
+    {
+      "name": "prepare",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/PrepareRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/PrepareResponse"
+    },
+    {
+      "name": "transform",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/TransformRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/TransformResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "dataset_preparation:DatasetPreparationPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "dataset_preparation:DatasetPreparationPlugin"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": ["linux", "windows", "darwin"]
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

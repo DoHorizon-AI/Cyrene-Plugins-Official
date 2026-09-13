@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.tools.dataset-validator",
+  "name": "Training Dataset Deep Validator",
+  "version": "0.2.0",
+  "description": "Deep validation for training datasets (JSONL, JSON, CSV), checking token truncation risks, field distributions, and empty rates.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "tool.dataset.validator.v1"
+  ],
+  "methods": [
+    {
+      "name": "validate",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/ValidateRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ValidateResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "dataset_validator:DatasetValidatorPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "dataset_validator:DatasetValidatorPlugin"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": [
+      "linux",
+      "windows",
+      "darwin"
+    ]
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

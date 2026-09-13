@@ -93,6 +93,8 @@ def _walk_payload(
             if candidate == manifest_path:
                 continue
             if filename == ".git":
+                if allow_git_metadata and current_path == root:
+                    continue
                 relative = candidate.relative_to(root).as_posix()
                 raise ManifestVerificationError(f"Unexpected Git metadata: {relative}")
             relative = candidate.relative_to(root).as_posix()

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.policy.compat-rules",
+  "name": "Hardware, CUDA & Model Compatibility Evaluator",
+  "version": "0.2.0",
+  "description": "Rule-based compatibility analyzer checking VRAM bounds, Compute Capabilities, CUDA levels.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "compatibility.evaluator.v1"
+  ],
+  "methods": [
+    {
+      "name": "evaluate",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/EvaluateRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/EvaluateResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "compat_rules:CompatibilityRuleEvaluator",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "compat_rules:CompatibilityRuleEvaluator"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11"
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

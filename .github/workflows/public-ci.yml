@@ -5,10 +5,12 @@ on:
     branches:
       - main
       - develop
+      - release
   pull_request:
     branches:
       - main
       - develop
+      - release
   workflow_dispatch:
 
 concurrency:
@@ -84,20 +86,32 @@ jobs:
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_plugin_runtime \
-            -e plugins/connectors/onebot-v11
-      - name: Lint Python runtime and OneBot sources
+            -e plugins/connectors/onebot-v11 \
+            -e plugins/evaluation/exact-match \
+            -e plugins/models/hf-model-analyzer \
+            -e plugins/policy/compat-rules \
+            -e plugins/tools/dataset-preparation \
+            -e plugins/tools/dataset-validator
+      - name: Lint Python runtime and official Plugin sources
         run: |
           python3 -m ruff check \
             --exclude '**/_generated/**' \
             sdk/python/cyrene_model_provider_contracts/src \
             sdk/python/cyrene_plugin_runtime/src \
             plugins/connectors/onebot-v11/src \
+            plugins/evaluation/exact-match \
+            plugins/models/hf-model-analyzer \
+            plugins/policy/compat-rules \
+            plugins/tools/dataset-preparation \
+            plugins/tools/dataset-validator \
             tools/ci/verify_source_manifest.py
-      - name: Run Python runtime and OneBot tests
+      - name: Run Python runtime and official Plugin tests
         run: |
           python3 -m pytest -q \
             sdk/python/cyrene_plugin_runtime/tests \
-            plugins/connectors/onebot-v11/tests
+            plugins/connectors/onebot-v11/tests \
+            plugins/tools/dataset-preparation/tests \
+            plugins/tools/dataset-validator/tests
 
   buf-contracts:
     name: public-ci / buf-contracts
