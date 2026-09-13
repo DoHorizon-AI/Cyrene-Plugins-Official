@@ -96,6 +96,10 @@ public interface IEmbeddingCapability
     Task<EmbeddingResult> GenerateEmbeddingsAsync(EmbeddingParameters parameters, CancellationToken cancellationToken = default);
 }
 
+// The speech and rerank profiles below are internal-only seeds: they have no
+// canonical contract, no runtime dispatch, and must not be published or
+// advertised as capabilities (W6-3). Resurrect them only with a real consumer
+// and a canonical contract.
 public record TtsParameters(string Model, string Text, string Voice, string OutputFormat = "mp3", float? Speed = null);
 
 public record TtsResult(byte[] AudioData, string MimeType, int DurationMs);

@@ -796,8 +796,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/_generated/message_connector_pb2.py",
-      "sha256": "2eb4cf47ae985c6f471a3a9cf0513ee590927a35bcb7b185a255ec40128d85ad",
-      "size_bytes": 7191
+      "sha256": "2236b0ac3215bfaa1be71e0ffecaacd697264c01b8af981356640f9e62f4dd17",
+      "size_bytes": 6945
     },
     {
       "kind": "file",
@@ -1132,8 +1132,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
-      "sha256": "19eced085d9cdbbaf76c3da1c784b16e9da557505ac91860c00260849db5b47f",
-      "size_bytes": 5382
+      "sha256": "bf5dc43237d6cb0eab4f0d24d8e49dfe35d6f6caffcde75905318e428bae60b7",
+      "size_bytes": 5421
     },
     {
       "kind": "file",
@@ -1167,8 +1167,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Host/Program.cs",
-      "sha256": "93c5e3977eef6ae701b5f8e4b8e439d785c719d2d0b992c7c062286ca4175fc0",
-      "size_bytes": 12845
+      "sha256": "d715b2b6ee9efb4ac520c03ef23ec9d17fd8f16dc0bac6327bd0b58bbca68988",
+      "size_bytes": 12709
     },
     {
       "kind": "file",
@@ -1181,8 +1181,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.NativeLib/PluginNativeAbi.cs",
-      "sha256": "d1b3ce99b63d63467dbe8cb7ace75312a062bc1238f4829e00287e203d24462b",
-      "size_bytes": 18713
+      "sha256": "40e63e7ac72d909143c0981f86754e3eec242cab225c207d22b472dba725ea40",
+      "size_bytes": 18205
     },
     {
       "kind": "file",
@@ -1216,8 +1216,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/GeminiVendorAdapter.cs",
-      "sha256": "bd41eb29b9aac5da185cc0f3228b327a8840460113fd1f6307cfd7198842262e",
-      "size_bytes": 18790
+      "sha256": "e4d4eb450ed8916aacaebd388db6ad57cb94cc3235738acffd7ce69dc35c0497",
+      "size_bytes": 20234
     },
     {
       "kind": "file",
@@ -1230,8 +1230,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Capability/CapabilityProfiles.cs",
-      "sha256": "93e310e093f841bb69db0aa2251e55430873f3e324599969b971ccf47396508f",
-      "size_bytes": 5025
+      "sha256": "c7c38fa2defa05a1c4303b5f213a4a5e1c4a2eab68536d832da498d4c11078f8",
+      "size_bytes": 5284
     },
     {
       "kind": "file",
@@ -1300,8 +1300,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/ProviderTests.cs",
-      "sha256": "927a94d736570e8b4ebb0f5847ad9b82a04ff4c420eab9498d08150b92142f8a",
-      "size_bytes": 45804
+      "sha256": "e0925b3c94895b58a02be2bf6b5aa3b40ffa78f506bd46cdc92bd771c7521fa3",
+      "size_bytes": 50721
     },
     {
       "kind": "file",
@@ -1734,8 +1734,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
-      "sha256": "62aef857f8e8a1c4482b9838d87d90a0c1b9ab5a2afbb0aa89fc21f85bf77edf",
-      "size_bytes": 45830
+      "sha256": "79581f29ebdfb539e7b307f10d10ac017a57cddd858712db37cf5a3bf698d8d1",
+      "size_bytes": 47518
     },
     {
       "kind": "file",
@@ -1748,8 +1748,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "09e87c5739edb10491dcde81aab2270f7834b55cd182226b24bb3afafe4eec24",
-      "size_bytes": 29923
+      "sha256": "f859b418608cbeee966dc59917fec24965efedc5e2465b37a5767da863c594af",
+      "size_bytes": 37157
     },
     {
       "kind": "file",

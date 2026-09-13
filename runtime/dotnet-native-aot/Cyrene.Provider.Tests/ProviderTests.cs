@@ -842,6 +842,90 @@ public class ProviderTests
     }
 
     [Fact]
+    public async Task Test_W6_Gemini_ParallelSameNameToolCallsGetDistinctSyntheticIds()
+    {
+        // Two parallel calls to the same function must stay distinguishable in
+        // the capability model even though the Gemini wire protocol carries no
+        // call ids.
+        const string mockResponseJson = "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"Paris\"}}},{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"London\"}}}]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":20,\"candidatesTokenCount\":8,\"totalTokenCount\":28}}";
+
+        var handler = new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+        });
+        var adapter = NewGeminiAdapter(handler);
+
+        var result = await adapter.CompleteChatAsync(new ChatCompletionParameters(
+            Model: "gemini-2.0-flash",
+            Messages: new List<ChatMessage> { new("user", "Compare Paris and London weather") }
+        ));
+
+        Assert.Equal(2, result.ToolCalls!.Count);
+        Assert.Equal("gemini-call-0", result.ToolCalls[0].Id);
+        Assert.Equal("gemini-call-1", result.ToolCalls[1].Id);
+        Assert.Equal("get_weather", result.ToolCalls[0].Function.Name);
+        Assert.Equal("get_weather", result.ToolCalls[1].Function.Name);
+        Assert.Equal("{\"city\":\"Paris\"}", result.ToolCalls[0].Function.Arguments);
+        Assert.Equal("{\"city\":\"London\"}", result.ToolCalls[1].Function.Arguments);
+    }
+
+    [Fact]
+    public async Task Test_W6_Gemini_ParallelToolResponsesFollowCallOrderNotMessageOrder()
+    {
+        const string mockResponseJson = "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"both\"}]},\"finishReason\":\"STOP\",\"index\":0}]}";
+
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            capturedBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+        var adapter = NewGeminiAdapter(handler);
+
+        var messages = new List<ChatMessage>
+        {
+            new("user", "Compare Paris and London weather and the time"),
+            new("assistant", string.Empty, ToolCalls: new List<ChatToolCall>
+            {
+                new("gemini-call-0", "function", new ChatToolCallFunction("get_weather", "{\"city\":\"Paris\"}")),
+                new("gemini-call-1", "function", new ChatToolCallFunction("get_weather", "{\"city\":\"London\"}")),
+                new("gemini-call-2", "function", new ChatToolCallFunction("get_time", "{\"zone\":\"UTC\"}"))
+            }),
+            // The runtime reports the results out of order on purpose.
+            new("tool", "{\"temp_c\":14}", ToolCallId: "gemini-call-1"),
+            new("tool", "{\"utc\":\"12:00\"}", ToolCallId: "gemini-call-2"),
+            new("tool", "{\"temp_c\":21}", ToolCallId: "gemini-call-0")
+        };
+
+        await adapter.CompleteChatAsync(new ChatCompletionParameters("gemini-2.0-flash", messages));
+
+        Assert.NotNull(capturedBody);
+        using var request = JsonDocument.Parse(capturedBody);
+        var contents = request.RootElement.GetProperty("contents");
+
+        // The model turn keeps the calls in their original order.
+        var calls = contents[1].GetProperty("parts");
+        Assert.Equal("Paris", calls[0].GetProperty("functionCall").GetProperty("args").GetProperty("city").GetString());
+        Assert.Equal("London", calls[1].GetProperty("functionCall").GetProperty("args").GetProperty("city").GetString());
+        Assert.Equal("get_time", calls[2].GetProperty("functionCall").GetProperty("name").GetString());
+
+        // Responses are emitted in call order: Paris, London, then time.
+        Assert.Equal(5, contents.GetArrayLength());
+        var paris = contents[2].GetProperty("parts")[0].GetProperty("functionResponse");
+        var london = contents[3].GetProperty("parts")[0].GetProperty("functionResponse");
+        var time = contents[4].GetProperty("parts")[0].GetProperty("functionResponse");
+        Assert.Equal("get_weather", paris.GetProperty("name").GetString());
+        Assert.Equal("get_weather", london.GetProperty("name").GetString());
+        Assert.Equal("get_time", time.GetProperty("name").GetString());
+        Assert.Equal(21, paris.GetProperty("response").GetProperty("temp_c").GetInt32());
+        Assert.Equal(14, london.GetProperty("response").GetProperty("temp_c").GetInt32());
+        Assert.Equal("12:00", time.GetProperty("response").GetProperty("utc").GetString());
+    }
+
+    [Fact]
     public async Task Test_W6_Gemini_PlainTextToolResponseWrapsAndUnknownIdFailsClosed()
     {
         const string mockResponseJson = "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"ok\"}]},\"finishReason\":\"STOP\",\"index\":0}]}";

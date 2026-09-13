@@ -197,7 +197,8 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
             .Where(content => !string.IsNullOrEmpty(content))
             .ToList();
 
-        var toolNamesById = new Dictionary<string, string>();
+        var toolTargetsById = new Dictionary<string, (string Name, int Order)>();
+        var callOrder = 0;
         foreach (var message in parameters.Messages)
         {
             if (message.ToolCalls is not { } calls)
@@ -206,35 +207,33 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
             }
             foreach (var call in calls)
             {
-                toolNamesById[call.Id] = call.Function.Name;
+                toolTargetsById[call.Id] = (call.Function.Name, callOrder);
+                callOrder++;
             }
         }
 
         var contents = new List<GeminiContent>();
-        foreach (var message in parameters.Messages.Where(item => item.Role != "system"))
+        var remaining = parameters.Messages.Where(item => item.Role != "system").ToList();
+        for (var index = 0; index < remaining.Count; index++)
         {
+            var message = remaining[index];
+
             if (message.Role == "tool")
             {
-                // Gemini correlates tool responses by function name, not by id.
-                if (message.ToolCallId is null ||
-                    !toolNamesById.TryGetValue(message.ToolCallId, out var toolName))
+                // Gemini correlates tool responses by function name and, when a
+                // name repeats within one turn, by position. Collect the run of
+                // tool responses and emit it in the order of the assistant tool
+                // calls so parallel calls stay unambiguous even when the runtime
+                // reports its tool messages out of order.
+                var run = new List<(int Order, GeminiContent Content)>();
+                while (index < remaining.Count && remaining[index].Role == "tool")
                 {
-                    throw new ProviderException(
-                        ProviderErrorCode.WireProtocolViolation,
-                        "Gemini requires a resolvable tool name for tool responses; "
-                            + "the tool_call_id has no matching assistant tool call."
-                    );
+                    run.Add(ResolveToolResponse(remaining[index], toolTargetsById));
+                    index++;
                 }
-                contents.Add(new GeminiContent(
-                    Role: "user",
-                    Parts: new[]
-                    {
-                        new GeminiPart(FunctionResponse: new GeminiFunctionResponse(
-                            Name: toolName,
-                            Response: ParseObjectOrWrap(message.Content)
-                        )),
-                    }
-                ));
+                index--;
+                run.Sort((left, right) => left.Order.CompareTo(right.Order));
+                contents.AddRange(run.Select(item => item.Content));
                 continue;
             }
 
@@ -388,6 +387,41 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
             ));
         }
         return deltas;
+    }
+
+    /// <summary>
+    /// Resolves one tool message into its Gemini functionResponse. Gemini
+    /// carries no call ids, so the response is correlated through the function
+    /// name of the assistant tool call that the tool_call_id belongs to; the
+    /// call order keeps parallel calls with the same name positional.
+    /// </summary>
+    private static (int Order, GeminiContent Content) ResolveToolResponse(
+        ChatMessage message,
+        Dictionary<string, (string Name, int Order)> toolTargetsById
+    )
+    {
+        if (message.ToolCallId is null ||
+            !toolTargetsById.TryGetValue(message.ToolCallId, out var target))
+        {
+            throw new ProviderException(
+                ProviderErrorCode.WireProtocolViolation,
+                "Gemini requires a resolvable tool name for tool responses; "
+                    + "the tool_call_id has no matching assistant tool call."
+            );
+        }
+        return (
+            target.Order,
+            new GeminiContent(
+                Role: "user",
+                Parts: new[]
+                {
+                    new GeminiPart(FunctionResponse: new GeminiFunctionResponse(
+                        Name: target.Name,
+                        Response: ParseObjectOrWrap(message.Content)
+                    )),
+                }
+            )
+        );
     }
 
     // ── helpers ────────────────────────────────────────────────────────

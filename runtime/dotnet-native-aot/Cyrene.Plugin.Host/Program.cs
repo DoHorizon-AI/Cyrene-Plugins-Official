@@ -74,9 +74,7 @@ public static class Program
             },
             Capabilities = new List<PluginCapabilityDeclaration>
             {
-                new() { Id = "model.provider.v1", Version = "1" },
-                new() { Id = "speech.provider.v1", Version = "1" },
-                new() { Id = "rerank.provider.v1", Version = "1" }
+                new() { Id = "model.provider.v1", Version = "1" }
             }
         };
 

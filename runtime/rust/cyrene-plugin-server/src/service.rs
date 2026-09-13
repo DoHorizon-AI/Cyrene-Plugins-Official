@@ -11,6 +11,10 @@
 //! - Unknown capabilities and methods
 //! - Invalid or spoofed Type URLs
 //! - Corrupted or unparseable Protobuf payloads
+//!
+//! Dispatch accepts the canonical contract method spelling first (`run`,
+//! `list_dir`, ...) and keeps the legacy PascalCase ids (`Run`, `ListDir`, ...)
+//! as interface-version 1 compatibility aliases; see `canonical_method`.
 
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -51,6 +55,30 @@ use crate::proto::{
     health_response, DirectInvocationError, DirectInvocationRequest, DirectInvocationResponse,
     DirectPayload, DirectStreamEnd, DirectStreamItem, HealthRequest, HealthResponse,
 };
+
+/// Maps legacy PascalCase dispatch ids to their canonical contract method
+/// names. New consumers and the capability catalog use the canonical spelling;
+/// the aliases stay dispatchable for the lifetime of interface version 1 and
+/// are only removable through the breaking-change process in
+/// `contracts/VERSIONING.md` (W6-3).
+fn canonical_method<'a>(capability: &str, method: &'a str) -> &'a str {
+    match (capability, method) {
+        ("agent.runtime.v1", "Run") => "run",
+        ("agent.runtime.v1", "RunStream") => "run_stream",
+        ("memory.provider.v1", "StoreMemory") => "store",
+        ("memory.provider.v1", "GetMemory") => "get",
+        ("memory.provider.v1", "RecallMemory") => "recall",
+        ("memory.provider.v1", "DeleteMemory") => "delete",
+        ("computer.runtime.v1", "ExecuteCommand") => "execute_command",
+        ("computer.runtime.v1", "ExecuteCommandStream") => "execute_command_stream",
+        ("computer.runtime.v1", "ReadFile") => "read_file",
+        ("computer.runtime.v1", "WriteFile") => "write_file",
+        ("computer.runtime.v1", "ListDir") => "list_dir",
+        ("computer.runtime.v1", "CreateArtifact") => "create_artifact",
+        ("computer.runtime.v1", "GetArtifact") => "get_artifact",
+        _ => method,
+    }
+}
 
 pub struct DirectPluginRuntimeServiceImpl {
     memory: Option<Arc<CyreneMemoryService>>,
@@ -221,10 +249,12 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
             )));
         }
 
-        // 2. Dispatch by capability
+        // 2. Dispatch by capability; method ids are normalized to their
+        //    canonical contract spelling first.
+        let method = canonical_method(req.capability.as_str(), req.method.as_str());
         match req.capability.as_str() {
-            "agent.runtime.v1" => match req.method.as_str() {
-                "Run" => {
+            "agent.runtime.v1" => match method {
+                "run" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -309,8 +339,8 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                     )));
                 };
 
-                match req.method.as_str() {
-                    "StoreMemory" => {
+                match method {
+                    "store" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.StoreMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -346,7 +376,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                             })),
                         }))
                     }
-                    "GetMemory" => {
+                    "get" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.GetMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -382,7 +412,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                             })),
                         }))
                     }
-                    "RecallMemory" => {
+                    "recall" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.RecallMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -418,7 +448,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                             })),
                         }))
                     }
-                    "DeleteMemory" => {
+                    "delete" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.memory.provider.v1.DeleteMemoryRequest";
                         if req.payload_type_url != EXPECTED_URL {
@@ -465,8 +495,8 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 }
             }
 
-            "computer.runtime.v1" => match req.method.as_str() {
-                "ExecuteCommand" => {
+            "computer.runtime.v1" => match method {
+                "execute_command" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -502,7 +532,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         })),
                     }))
                 }
-                "ReadFile" => {
+                "read_file" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.computer.runtime.v1.ReadFileRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -537,7 +567,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         })),
                     }))
                 }
-                "WriteFile" => {
+                "write_file" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.computer.runtime.v1.WriteFileRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -572,7 +602,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         })),
                     }))
                 }
-                "ListDir" => {
+                "list_dir" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -607,7 +637,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         })),
                     }))
                 }
-                "CreateArtifact" => {
+                "create_artifact" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.computer.runtime.v1.CreateArtifactRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -643,7 +673,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         })),
                     }))
                 }
-                "GetArtifact" => {
+                "get_artifact" => {
                     const EXPECTED_URL: &str =
                         "type.cyrene.io/cyrene.computer.runtime.v1.GetArtifactRequest";
                     if req.payload_type_url != EXPECTED_URL {
@@ -697,7 +727,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         "TOOL_PROVIDER_NOT_CONFIGURED",
                     )));
                 };
-                match req.method.as_str() {
+                match method {
                     "list_tools" => {
                         const EXPECTED_URL: &str =
                             "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest";
@@ -814,8 +844,9 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
             return Ok(Response::new(Box::pin(ReceiverStream::new(rx))));
         }
 
-        match (req.capability.as_str(), req.method.as_str()) {
-            ("agent.runtime.v1", "RunStream") => {
+        let method = canonical_method(req.capability.as_str(), req.method.as_str());
+        match (req.capability.as_str(), method) {
+            ("agent.runtime.v1", "run_stream") => {
                 const EXPECTED_URL: &str = "type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest";
                 if req.payload_type_url != EXPECTED_URL {
                     let _ = tx
@@ -896,7 +927,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 Ok(Response::new(Box::pin(ReceiverStream::new(rx))))
             }
 
-            ("computer.runtime.v1", "ExecuteCommandStream") => {
+            ("computer.runtime.v1", "execute_command_stream") => {
                 const EXPECTED_URL: &str =
                     "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest";
                 if req.payload_type_url != EXPECTED_URL {

@@ -488,6 +488,201 @@ async fn test_w2_list_dir_roundtrip_and_traversal_denied() {
     }
 }
 
+// ── W6-3: canonical contract method names and their v1 compatibility aliases ──
+
+async fn invoke_list_dir(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> ListDirResponse {
+    let list_req = ListDirRequest {
+        path: ".".into(),
+        max_depth: Some(1),
+    };
+    let mut buf = Vec::new();
+    list_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.ListDirRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => ListDirResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("ListDir via '{method}' failed: {e:?}"),
+    }
+}
+
+async fn invoke_agent_run(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> AgentRunResponse {
+    let run_req = AgentRunRequest {
+        run_id: format!("run-w6-{method}"),
+        session_id: "sess-w6".into(),
+        prompt: "Hello Cyrene Agent Runtime".into(),
+        messages: vec![],
+        available_tools: vec![],
+        config: None,
+    };
+    let mut buf = Vec::new();
+    run_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "agent.runtime.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => AgentRunResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("Agent Run via '{method}' failed: {e:?}"),
+    }
+}
+
+async fn invoke_store_memory(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> StoreMemoryResponse {
+    let item = MemoryItem {
+        item_id: "item-w6-1".into(),
+        tenant_id: "tenant-w6".into(),
+        scope: "default".into(),
+        subject: "test".into(),
+        content: "Canonical dispatch and legacy aliases share one memory".into(),
+        embedding: vec![0.1, 0.2, 0.3, 0.4],
+        metadata: HashMap::new(),
+        created_at_ms: 2000,
+        expires_at_ms: None,
+        ttl_seconds: None,
+    };
+    let store_req = StoreMemoryRequest {
+        tenant_id: "tenant-w6".into(),
+        item: Some(item),
+    };
+    let mut buf = Vec::new();
+    store_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "memory.provider.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.memory.provider.v1.StoreMemoryRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => StoreMemoryResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("StoreMemory via '{method}' failed: {e:?}"),
+    }
+}
+
+async fn invoke_recall_memory(
+    client: &mut DirectPluginRuntimeClient<Channel>,
+    method: &str,
+    request_id: &str,
+) -> RecallMemoryResponse {
+    let recall_req = RecallMemoryRequest {
+        tenant_id: "tenant-w6".into(),
+        scope: None,
+        subject: None,
+        query_embedding: vec![0.1, 0.2, 0.3, 0.4],
+        query_text: Some("canonical".into()),
+        metadata_filters: HashMap::new(),
+        min_similarity: Some(0.0),
+        top_k: Some(5),
+    };
+    let mut buf = Vec::new();
+    recall_req.encode(&mut buf).unwrap();
+
+    let inv_resp = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "memory.provider.v1".into(),
+            method: method.into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.memory.provider.v1.RecallMemoryRequest".into(),
+            request_id: request_id.into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match inv_resp.result.unwrap() {
+        InvocationResult::Payload(p) => RecallMemoryResponse::decode(&p.value[..]).unwrap(),
+        InvocationResult::Error(e) => panic!("RecallMemory via '{method}' failed: {e:?}"),
+    }
+}
+
+#[tokio::test]
+async fn test_w6_canonical_methods_and_legacy_aliases_agree() {
+    let (mut client, _addr) = start_test_server().await;
+
+    // computer.runtime.v1: list_dir (canonical) and ListDir (v1 alias).
+    let canonical = invoke_list_dir(&mut client, "list_dir", "req-w6-list-canonical").await;
+    let alias = invoke_list_dir(&mut client, "ListDir", "req-w6-list-alias").await;
+    let canonical_entries = match canonical.result.unwrap() {
+        list_dir_response::Result::Entries(entries) => entries.entries,
+        list_dir_response::Result::Error(e) => panic!("list_dir error: {e:?}"),
+    };
+    let alias_entries = match alias.result.unwrap() {
+        list_dir_response::Result::Entries(entries) => entries.entries,
+        list_dir_response::Result::Error(e) => panic!("ListDir error: {e:?}"),
+    };
+    assert!(!canonical_entries.is_empty());
+    assert_eq!(canonical_entries.len(), alias_entries.len());
+
+    // agent.runtime.v1: run (canonical) and Run (v1 alias).
+    for response in [
+        invoke_agent_run(&mut client, "run", "req-w6-run-canonical").await,
+        invoke_agent_run(&mut client, "Run", "req-w6-run-alias").await,
+    ] {
+        match response.result.unwrap() {
+            agent_run_response::Result::Success(succ) => assert!(!succ.output_text.is_empty()),
+            agent_run_response::Result::Error(e) => panic!("agent run error: {e:?}"),
+        }
+    }
+
+    // memory.provider.v1: store through the legacy alias and recall through the
+    // canonical name, proving the two spellings share one memory.
+    let store = invoke_store_memory(&mut client, "StoreMemory", "req-w6-store-alias").await;
+    match store.result.unwrap() {
+        store_memory_response::Result::ItemId(id) => assert_eq!(id, "item-w6-1"),
+        store_memory_response::Result::Error(e) => panic!("store error: {e:?}"),
+    }
+    let recall = invoke_recall_memory(&mut client, "recall", "req-w6-recall-canonical").await;
+    match recall.result.unwrap() {
+        recall_memory_response::Result::Matches(m) => assert!(!m.matches.is_empty()),
+        recall_memory_response::Result::Error(e) => panic!("recall error: {e:?}"),
+    }
+}
+
 fn fake_mcp_server_config() -> McpServerConfig {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../cyrene-mcp-provider/tests/fixtures/fake_mcp_server.py");
