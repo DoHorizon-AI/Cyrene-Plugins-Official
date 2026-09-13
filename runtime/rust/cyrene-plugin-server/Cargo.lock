@@ -210,6 +210,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cyrene-mcp-provider"
+version = "0.1.0"
+dependencies = [
+ "cyrene-plugin-contracts",
+ "serde_json",
+ "sha2",
+ "tokio",
+]
+
+[[package]]
 name = "cyrene-memory-runtime"
 version = "0.1.0"
 dependencies = [
@@ -240,6 +250,7 @@ version = "0.1.0"
 dependencies = [
  "cyrene-agent-runtime",
  "cyrene-computer-runtime",
+ "cyrene-mcp-provider",
  "cyrene-memory-runtime",
  "cyrene-plugin-contracts",
  "futures",

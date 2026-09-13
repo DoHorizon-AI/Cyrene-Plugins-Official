@@ -43,6 +43,7 @@ fn tool_provider_identifiers_and_error_codes_are_stable() {
     assert_eq!(ToolProviderErrorCode::InvalidArguments as i32, 2);
     assert_eq!(ToolProviderErrorCode::ExecutionFailed as i32, 3);
     assert_eq!(ToolProviderErrorCode::ProviderError as i32, 4);
+    assert_eq!(ToolProviderErrorCode::Timeout as i32, 5);
 }
 
 #[test]

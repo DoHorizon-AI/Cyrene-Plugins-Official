@@ -140,6 +140,26 @@
       "verification_level": "DECLARED",
       "evidence": [],
       "notes": "No test suite exists in this export. Echo consumes this capability per its own repository docs; that consumption is informational cross-repo evidence and is not this repository's canonical truth."
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.runtime.mcp-tool-provider",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / real child process (checked-in fake MCP server fixture) with real newline-delimited JSON-RPC over stdio",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-mcp-provider/Cargo.toml",
+          "result": "6 passed; catalog snapshot, snapshot enforcement, typed errors, timeout reaping, and cancellation kill semantics verified"
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / in-process gRPC server dispatching tool.provider.v1 to the MCP provider",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
+          "result": "9 passed; list_tools and call_tool dispatched through DirectPluginRuntime and fail closed without bindings"
+        }
+      ]
     }
   ]
 }

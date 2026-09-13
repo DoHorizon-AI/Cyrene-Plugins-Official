@@ -24,6 +24,7 @@ use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::{MockModelProvider, MockToolProvider};
 use cyrene_agent_runtime::CancellationToken;
 use cyrene_computer_runtime::ComputerRuntimeService;
+use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_memory_runtime::backend::sqlite::SqliteMemoryBackend;
 use cyrene_memory_runtime::embedding::ContractModelEmbeddingClient;
 use cyrene_memory_runtime::CyreneMemoryService;
@@ -38,6 +39,7 @@ use cyrene_plugin_contracts::computer_runtime_v1::{
 use cyrene_plugin_contracts::memory_provider_v1::{
     DeleteMemoryRequest, GetMemoryRequest, RecallMemoryRequest, StoreMemoryRequest,
 };
+use cyrene_plugin_contracts::tool_provider_v1::{CallToolRequest, ListToolsRequest};
 
 use crate::proto::direct_invocation_error::Code;
 use crate::proto::direct_invocation_response::Result as InvocationResult;
@@ -51,6 +53,7 @@ use crate::proto::{
 pub struct DirectPluginRuntimeServiceImpl {
     memory: Option<Arc<CyreneMemoryService>>,
     computer: Arc<ComputerRuntimeService>,
+    mcp: Option<Arc<McpToolProvider>>,
     simulated_agent_dependencies: bool,
 }
 
@@ -73,6 +76,22 @@ impl DirectPluginRuntimeServiceImpl {
         Self {
             memory: None,
             computer,
+            mcp: None,
+            simulated_agent_dependencies: false,
+        }
+    }
+
+    /// Builds a host that serves `tool.provider.v1` over the configured MCP
+    /// server bindings. The package launcher is expected to call this once
+    /// bindings are resolved; without it, tool calls fail closed.
+    pub fn with_mcp_servers(servers: Vec<McpServerConfig>) -> Self {
+        let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let computer = Arc::new(ComputerRuntimeService::new(vec![current_dir]));
+
+        Self {
+            memory: None,
+            computer,
+            mcp: Some(Arc::new(McpToolProvider::new(servers))),
             simulated_agent_dependencies: false,
         }
     }
@@ -89,6 +108,7 @@ impl DirectPluginRuntimeServiceImpl {
         Self {
             memory: Some(memory),
             computer,
+            mcp: None,
             simulated_agent_dependencies: true,
         }
     }
@@ -634,6 +654,97 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                     "METHOD_NOT_FOUND",
                 ))),
             },
+
+            "tool.provider.v1" => {
+                let Some(mcp) = self.mcp.clone() else {
+                    return Ok(Response::new(Self::fail_closed_error(
+                        Code::Unavailable,
+                        "MCP tool provider binding is not configured",
+                        "TOOL_PROVIDER_NOT_CONFIGURED",
+                    )));
+                };
+                match req.method.as_str() {
+                    "list_tools" => {
+                        const EXPECTED_URL: &str =
+                            "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest";
+                        if req.payload_type_url != EXPECTED_URL {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!(
+                                    "Invalid payload_type_url '{}', expected '{}'",
+                                    req.payload_type_url, EXPECTED_URL
+                                ),
+                                "INVALID_TYPE_URL",
+                            )));
+                        }
+                        let list_req = match ListToolsRequest::decode(&req.payload[..]) {
+                            Ok(r) => r,
+                            Err(e) => {
+                                return Ok(Response::new(Self::fail_closed_error(
+                                    Code::InvalidRequest,
+                                    format!("Failed to decode ListToolsRequest: {}", e),
+                                    "DECODE_ERROR",
+                                )));
+                            }
+                        };
+                        let response = mcp.list_tools(list_req.binding_id.as_deref()).await;
+                        let mut buf = Vec::new();
+                        response.encode(&mut buf).unwrap();
+                        Ok(Response::new(DirectInvocationResponse {
+                            result: Some(InvocationResult::Payload(DirectPayload {
+                                type_url:
+                                    "type.cyrene.io/cyrene.tool.provider.v1.ListToolsResponse"
+                                        .into(),
+                                value: buf,
+                                event_type: String::new(),
+                            })),
+                        }))
+                    }
+                    "call_tool" => {
+                        const EXPECTED_URL: &str =
+                            "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest";
+                        if req.payload_type_url != EXPECTED_URL {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!(
+                                    "Invalid payload_type_url '{}', expected '{}'",
+                                    req.payload_type_url, EXPECTED_URL
+                                ),
+                                "INVALID_TYPE_URL",
+                            )));
+                        }
+                        let call_req = match CallToolRequest::decode(&req.payload[..]) {
+                            Ok(r) => r,
+                            Err(e) => {
+                                return Ok(Response::new(Self::fail_closed_error(
+                                    Code::InvalidRequest,
+                                    format!("Failed to decode CallToolRequest: {}", e),
+                                    "DECODE_ERROR",
+                                )));
+                            }
+                        };
+                        let response = mcp.call_tool(&call_req).await;
+                        let mut buf = Vec::new();
+                        response.encode(&mut buf).unwrap();
+                        Ok(Response::new(DirectInvocationResponse {
+                            result: Some(InvocationResult::Payload(DirectPayload {
+                                type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolResponse"
+                                    .into(),
+                                value: buf,
+                                event_type: String::new(),
+                            })),
+                        }))
+                    }
+                    _ => Ok(Response::new(Self::fail_closed_error(
+                        Code::MethodNotFound,
+                        format!(
+                            "Method '{}' not found in capability 'tool.provider.v1'",
+                            req.method
+                        ),
+                        "METHOD_NOT_FOUND",
+                    ))),
+                }
+            }
 
             unknown => Ok(Response::new(Self::fail_closed_error(
                 Code::MethodNotFound,

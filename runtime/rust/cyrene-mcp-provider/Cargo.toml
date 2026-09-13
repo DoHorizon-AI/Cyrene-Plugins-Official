@@ -1,0 +1,15 @@
+[package]
+name = "cyrene-mcp-provider"
+version = "0.1.0"
+edition = "2021"
+description = "tool.provider.v1 implementation over MCP stdio servers (tools/list and tools/call)"
+license = "Apache-2.0"
+
+[dependencies]
+serde_json = "1.0"
+sha2 = "0.10"
+tokio = { version = "1", features = ["full"] }
+cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contracts" }
+
+[dev-dependencies]
+tempfile = "3"

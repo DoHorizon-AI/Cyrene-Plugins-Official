@@ -34,7 +34,7 @@
 | `agent.runtime.v1` | proto | `runtime/rust/cyrene-plugin-server` | none | 未见已接通消费者（observed_at=2026-09-13） | Rust TCK |
 | `memory.provider.v1` | proto | `runtime/rust/cyrene-plugin-server` | none | Navigator 文档：not connected（observed_at=2026-09-13） | Rust TCK |
 | `computer.runtime.v1` | proto（含 `list_dir`） | `plugins/tools/computer-runtime` | yes（maturity: migrating） | 未发现（observed_at=2026-09-13） | `contracts/tck/computer-runtime-v1` + Rust TCK |
-| `tool.provider.v1` | proto（v1，contract-only） | 无（MCP provider 待 W3-2） | none | 无（observed_at=2026-09-13） | `contracts/tck/tool-provider-v1` + Rust TCK |
+| `tool.provider.v1` | proto（v1） | `runtime/rust/cyrene-mcp-provider`（DISPATCH_VERIFIED / SIMULATED；未接外部 MCP server 与消费者） | none | 无（observed_at=2026-09-13） | `contracts/tck/tool-provider-v1` + Rust TCK + provider/server 测试 |
 | `model.analyzer.v1` | owner-scoped | `plugins/models/hf-model-analyzer` | yes | Yield（observed_at=2026-09-13） | 插件 tests |
 | `compatibility.evaluator.v1` | owner-scoped | `plugins/policy/compat-rules` | yes | Yield（observed_at=2026-09-13） | 插件 tests |
 | `evaluation.runner.v1` | owner-scoped | `plugins/evaluation/exact-match` | yes | Echo（`Cyrene-Services/Cyrene-Echo@603511c`）已通过 `EvaluationExecutionPort` 直连消费（observed_at=2026-09-13） | 插件 tests |
@@ -90,6 +90,10 @@
 - **Protected surface 规则**：`source-manifest.json` 的 protected files 机制保留；接受 protected
   digest 变更必须显式使用 `--accept-protected-changes`，且工具必须打印 old → new digest 差异，
   使 protected surface 的变化在 CI / review 中可见，不与普通源码变化等价。
+- **Write-scope guard（禁止跨仓写入）**：每轮开始前在 `Cyrene-Workspace` 运行
+  `python3 scripts/write_scope_guard.py --snapshot`，提交后用
+  `--verify --allow Cyrene-Plugins-Official` 复核。Platform 或任一 Service 仓库出现新的
+  worktree 变化或 HEAD 移动即视为越界，必须先还原再继续（负测试已覆盖）。
 - 本地提交在 `develop` 分支，逐项原子提交；进度一律在本文档维护。
 
 ## 5. Wave 0 — 索引与可见性 / Index and Visibility（已完成）
@@ -180,7 +184,7 @@ Evidence / 证据:
 - [ ] W3-0c2 Gate hardening：JVM/Kotlin 投影 v2 七字段检查（本环境无 gradle，未执行；不写无法运行的测试）。
 - [x] W3-0d Gate hardening：protected surface 可见性（`--accept-protected-changes` 时打印 old → new digest；CI/review 可见）。
 - [x] W3-1 `tool.provider.v1` 契约：proto 载荷、method id、interface version、TCK 骨架。
-- [ ] W3-2 MCP stdio provider：`tools/list` / `tools/call` / schema 转换 / 超时 / 取消 / 类型化错误（按 §8.1 A-D）。
+- [x] W3-2 MCP stdio provider：`tools/list` / `tools/call` / schema 转换 / 超时 / 取消 / 类型化错误（按 §8.1 A-D）。
 - [ ] W3-3 MCP HTTP/SSE transport。
 - [ ] W3-4 agent runtime 接入真实 `ToolProvider` 主机路径 + TCK。
 
@@ -191,6 +195,7 @@ Evidence / 证据:
 - W3-0b：`python3 tools/ci/validate_manifests.py --root .` → `MANIFEST_SCHEMA: PASS manifests=7`；`jsonschema==4.23.0` 为 pinned CI/dev 依赖，catalog 生成前强制校验（生产 runtime 无新依赖）。
 - W3-0c1：Rust 既有 `structured_chat_v2_round_trip_preserves_tools_history_and_usage` 覆盖七字段；C# TCK `dotnet run --project contracts/tck/model-provider-v1/dotnet/ModelProviderContractTck.csproj` → `PASS`；Python TCK `bash contracts/tck/model-provider-v1/generate-bindings.sh` → `model.provider.v1 generated Python payload TCK: PASS` 且四语言生成 PASS。
 - W3-0d：实测 updater `--accept-protected-changes` 输出 `SOURCE_MANIFEST_PROTECTED: plugins/connectors/onebot-v11/README.md c0c1691bcd72... -> a3c0f3345c41...`；verifier 现在每次 PASS 打印 pinned protected surface（path + sha256）。
+- W3-2：新增 crate `runtime/rust/cyrene-mcp-provider`（每操作一次短生命周期 MCP session；`kill_on_drop`；快照强制；`catalog_version` 为 sha256 摘要）；plugin server 增加 `with_mcp_servers` 与 `tool.provider.v1` 分派（未配置 bindings 时 fail closed）。证据：`cargo test --manifest-path runtime/rust/cyrene-mcp-provider/Cargo.toml` → `6 passed`（含超时回收与取消杀子进程）；`cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml` → `9 passed`（含 dispatch 与 fail-closed）；fmt/clippy 干净；catalog → `capabilities=11 implementations=12`，tool.provider.v1 记 `DISPATCH_VERIFIED / SIMULATED`。
 - W3-1：新增 `contracts/proto/cyrene/tool/provider/v1/tool_provider.proto` + Rust 投影/标识 + `contracts/tck/tool-provider-v1/`（含 `tool_provider_contract_tck.rs`）；buf 1.45.0（与 CI 同版本）`lint` / `format --diff --exit-code` / `build` 全通过；`cargo test --manifest-path contracts/rust/cyrene-plugin-contracts/Cargo.toml` → 3 个 tool_provider 契约测试通过，fmt/clippy 干净；catalog → `capabilities=11`，`tool.provider.v1` 以 contract-only 形式出现。
 
 ## 9. Wave 4 — Evaluation Pack
@@ -259,6 +264,7 @@ Evidence / 证据:
 | 2026-09-13 (v1.1) | MCP v1 只做 `tools/list` + `tools/call`；identity = `(binding_id, provider_tool_id)`；per-run snapshot；不承担进程监管 | 避免提前进入 memory/context/prompt ownership |
 | 2026-09-13 (v1.1) | manifest schema validation 前移为 Wave 3 gate；使用 pinned dev/CI validator | catalog 输入必须先通过 schema 校验 |
 | 2026-09-13 (v1.1) | 后续优先级：Wave 3 MCP → Wave 4 Evaluation Pack → Wave 5 Connector → Wave 6 Provider/Retrieval Backlog | owner 排序 |
+| 2026-09-13 (v1.1) | 新 capability 的 dispatch method 使用契约标识符原文（`tool.provider.v1` 为 `list_tools` / `call_tool`）；legacy PascalCase 分支保留到 Wave 6 命名统一 | 避免制造新的不一致 |
 
 ## 14. v1.0 → v1.1 修订记录 / Revision Notes
 

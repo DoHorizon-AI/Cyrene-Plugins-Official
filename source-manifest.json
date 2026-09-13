@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "f321b70949ba2e984de275efccfa477a480d3059ff705ebdecc654b28313c838",
-      "size_bytes": 15096
+      "sha256": "d1ca948d843e583e9fb978d396fb63725605d28b39150ab5db091b84720981b8",
+      "size_bytes": 15154
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "a080faea6fc5777d00923e742173e6598c8187d683c9742e93b1140bfbf0f29e",
-      "size_bytes": 9331
+      "sha256": "468ea49c2321b342d4806eafb1db1e231e4d8a084870f39ddcc214bd4d91c3e0",
+      "size_bytes": 9730
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "7e5411ff8f7f63687c414f51ca552c917d43f1cf07500af03299190472bcedbb",
-      "size_bytes": 6945
+      "sha256": "4fcacd9397b8441130d186c561c96d8af0a2f729eba01e0afe116bd4fb191ae1",
+      "size_bytes": 8029
     },
     {
       "kind": "file",
@@ -306,15 +306,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/tool/provider/v1/tool_provider.proto",
-      "sha256": "a39cdb5bbda471cac80e811adc6719952d6c715a3c9ba3754773a1d9bf6d827a",
-      "size_bytes": 5154
+      "sha256": "19869c9b65a0f207378e2e052a04a29ad8472529038da5498984f603e0329b30",
+      "size_bytes": 5194
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/runtime-implementations.json",
-      "sha256": "783b0a8b0e29d1b150f2f0bf7c8e0460225f8c89007b4645d908ea3435d07eb7",
-      "size_bytes": 3007
+      "sha256": "9badd1acfa6aaa1edf350784643e5312dbacf3f5be86772b31ef9a3da68b0726",
+      "size_bytes": 3751
     },
     {
       "kind": "file",
@@ -446,8 +446,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs",
-      "sha256": "cc5887c36de082bd151089801ad132250a16d2a0c293c177965e0a6f0b3d681f",
-      "size_bytes": 6377
+      "sha256": "6a31d72d1604c64f34da86a36d868d31891ffbcc2c6533ec68cc7f7b670fff5c",
+      "size_bytes": 6435
     },
     {
       "kind": "file",
@@ -607,15 +607,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/tool-provider-v1/README.md",
-      "sha256": "c78c52d55cb7817cd351f72e8ecad5add31c8acc7ed10de6bb17cd76d72c71e1",
-      "size_bytes": 1247
+      "sha256": "0d78bcdb57e8fbf1ce9e2ef0bb709cef952c6740b70f0916961ee8757a72783a",
+      "size_bytes": 1344
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "19a319fe3ccc0dd21a80bd75440a65de6ef62c831ae628b859a32d02c9ff9275",
-      "size_bytes": 21564
+      "sha256": "aac611f0752673b8e8501f142bc7035cdcc69781617ab6c8101b7d6dcac02134",
+      "size_bytes": 22925
     },
     {
       "kind": "file",
@@ -1369,6 +1369,48 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/Cargo.lock",
+      "sha256": "ec4a7404262ee3cf3cd457c3eed1d20560562963ba124a382709fcea331b8902",
+      "size_bytes": 17866
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/Cargo.toml",
+      "sha256": "e25318655eb86fd65fb3de05878e28171bb132ca87e08b5a3a3151c37c0cd147",
+      "size_bytes": 414
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/src/client.rs",
+      "sha256": "2b192e827bd35d5b89c718c1780d6fe28c9f1a246760ed34ad58986b083f79e8",
+      "size_bytes": 11270
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/src/lib.rs",
+      "sha256": "24d54b6c6bf7e08bce851ab66c623a0a8b8991ac65bff60653d5c3434829f319",
+      "size_bytes": 12849
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/tests/fixtures/fake_mcp_server.py",
+      "sha256": "75d28dd00fa1bb8af3c8bbc6b590f51ede327fd908df44b005984d791b170b90",
+      "size_bytes": 3757
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-mcp-provider/tests/mcp_provider_tests.rs",
+      "sha256": "425892d8d8116dd27ce8da2d36c86c74b29880ca970555b088f590b11ab6f98c",
+      "size_bytes": 8353
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/Cargo.lock",
       "sha256": "5be1f82bd877fe180bf02df0e68567026d4080ac7198667c1aec31016798d277",
       "size_bytes": 22153
@@ -1468,15 +1510,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.lock",
-      "sha256": "8bb512e117ec71eff02491ccde580453fe0111291f883590345845bafc714bbb",
-      "size_bytes": 37878
+      "sha256": "a1430fc6e3f47457b6c0ac20a0353de6c3b0439a6044c4bc2568157cdbe0e090",
+      "size_bytes": 38043
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.toml",
-      "sha256": "a230a5ae097f4aa57076122ad4955ca96ed8c4ac8be27d7793bb6bc487a6b9c3",
-      "size_bytes": 871
+      "sha256": "430fc34af8bd859cdbb252af4ddecec666fe39920b16114c338656ac72fc51fa",
+      "size_bytes": 929
     },
     {
       "kind": "file",
@@ -1496,15 +1538,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
-      "sha256": "2755523f4484a52e910c888a714a3256de540e0785f7a2e2d9b173d6fb61c61e",
-      "size_bytes": 37983
+      "sha256": "9d2bf18c1341050deb0a2373e4a2bd0f05611e25186bdf77cf6cc19761bff92e",
+      "size_bytes": 43600
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "3eaa00921957aa02c25c0d274c2bb3a1160305832a29f5fa23510a58c32771e6",
-      "size_bytes": 22141
+      "sha256": "64d42f37a6fb482e667876cdd5bd47b84bb3ca6d5d0ded1187b53a7b1009a25d",
+      "size_bytes": 28281
     },
     {
       "kind": "file",

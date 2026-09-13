@@ -23,6 +23,7 @@ cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contra
 cyrene-agent-runtime = { path = "../cyrene-agent-runtime" }
 cyrene-memory-runtime = { path = "../cyrene-memory-runtime" }
 cyrene-computer-runtime = { path = "../cyrene-computer-runtime" }
+cyrene-mcp-provider = { path = "../cyrene-mcp-provider" }
 
 [build-dependencies]
 tonic-build = "0.11"

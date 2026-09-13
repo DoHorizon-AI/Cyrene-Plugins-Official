@@ -293,7 +293,18 @@ capabilities:
     contract_methods:
       - call_tool
       - list_tools
-    implementations: []
+    implementations:
+      - ref: cyrene.runtime.mcp-tool-provider
+        source: contracts/runtime-implementations.json
+        language: rust
+        protocol: cyrene.plugin.runtime.v1.DirectPluginRuntime
+        publication: in-repo-unpublished
+        methods:
+          - call_tool
+          - list_tools
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs
       - contracts/tck/tool-provider-v1

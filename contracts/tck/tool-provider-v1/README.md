@@ -21,5 +21,6 @@ Coverage map / 覆盖说明:
 - Tool execution: identity pair, opaque JSON arguments, optional catalog-version
   echo, text/JSON content parts, and typed `ToolProviderError` outcomes.
 
-Provider-level conformance (stdio MCP against this contract) lands with W3-2 of
-`docs/plans/plugin-capability-expansion-plan-2026-09-13.md`.
+Provider-level conformance (stdio MCP against this contract) lives in
+`runtime/rust/cyrene-mcp-provider/tests/mcp_provider_tests.rs` and the plugin-server
+dispatch tests; both run real child processes speaking newline-delimited JSON-RPC.

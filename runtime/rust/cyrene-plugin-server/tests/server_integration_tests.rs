@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::net::TcpListener;
 use tokio_stream::wrappers::TcpListenerStream;
@@ -23,6 +24,7 @@ use proto::direct_plugin_runtime_server::DirectPluginRuntimeServer;
 use proto::{health_response, DirectInvocationRequest, DirectStreamMode, HealthRequest};
 
 // Contract types
+use cyrene_mcp_provider::McpServerConfig;
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse,
 };
@@ -35,6 +37,10 @@ use cyrene_plugin_contracts::memory_provider_v1::{
     delete_memory_response, get_memory_response, recall_memory_response, store_memory_response,
     DeleteMemoryRequest, DeleteMemoryResponse, GetMemoryRequest, GetMemoryResponse, MemoryItem,
     RecallMemoryRequest, RecallMemoryResponse, StoreMemoryRequest, StoreMemoryResponse,
+};
+use cyrene_plugin_contracts::tool_provider_v1::{
+    call_tool_response, list_tools_response, CallToolRequest, CallToolResponse, ListToolsRequest,
+    ListToolsResponse, ToolProviderErrorCode,
 };
 
 // Service implementation
@@ -474,6 +480,160 @@ async fn test_w2_list_dir_roundtrip_and_traversal_denied() {
             assert_eq!(error.code, ComputerErrorCode::PathTraversalDenied as i32);
         }
         list_dir_response::Result::Entries(_) => panic!("traversal must be denied"),
+    }
+}
+
+fn fake_mcp_server_config() -> McpServerConfig {
+    let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../cyrene-mcp-provider/tests/fixtures/fake_mcp_server.py");
+    McpServerConfig::new(
+        "mcp.fake",
+        "python3",
+        vec![fixture.to_string_lossy().into_owned()],
+    )
+    .with_timeout(Duration::from_secs(10))
+}
+
+#[tokio::test]
+async fn test_w3_tool_provider_without_bindings_fails_closed() {
+    let (mut client, _addr) = start_production_server().await;
+
+    let mut buf = Vec::new();
+    ListToolsRequest { binding_id: None }
+        .encode(&mut buf)
+        .unwrap();
+
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "list_tools".into(),
+            payload: buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest".into(),
+            request_id: "req-mcp-00".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    match response.result.unwrap() {
+        InvocationResult::Error(error) => assert_eq!(error.code, Code::Unavailable as i32),
+        InvocationResult::Payload(_) => {
+            panic!("an unconfigured tool provider must fail closed")
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_w3_mcp_tool_provider_dispatch() {
+    let service = DirectPluginRuntimeServiceImpl::with_mcp_servers(vec![fake_mcp_server_config()]);
+    let (mut client, _addr) = start_server(service).await;
+
+    // list_tools returns the recorded catalog snapshot.
+    let mut list_buf = Vec::new();
+    ListToolsRequest { binding_id: None }
+        .encode(&mut list_buf)
+        .unwrap();
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "list_tools".into(),
+            payload: list_buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest".into(),
+            request_id: "req-mcp-01".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let list_response = match response.result.unwrap() {
+        InvocationResult::Payload(payload) => {
+            ListToolsResponse::decode(&payload.value[..]).unwrap()
+        }
+        InvocationResult::Error(error) => panic!("list_tools failed: {error:?}"),
+    };
+    let catalog = match list_response.result.unwrap() {
+        list_tools_response::Result::Catalog(catalog) => catalog,
+        list_tools_response::Result::Error(error) => panic!("list_tools error: {error:?}"),
+    };
+    assert_eq!(catalog.tools.len(), 3);
+    assert!(catalog.catalog_version.starts_with("sha256:"));
+    assert!(catalog
+        .tools
+        .iter()
+        .any(|tool| tool.provider_tool_id == "echo" && tool.binding_id == "mcp.fake"));
+
+    // call_tool dispatches through the recorded snapshot.
+    let mut call_buf = Vec::new();
+    CallToolRequest {
+        binding_id: "mcp.fake".into(),
+        provider_tool_id: "echo".into(),
+        arguments_json: "{\"text\":\"hello from dispatch\"}".into(),
+        catalog_version: Some(catalog.catalog_version.clone()),
+    }
+    .encode(&mut call_buf)
+    .unwrap();
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "call_tool".into(),
+            payload: call_buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest".into(),
+            request_id: "req-mcp-02".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let call_response = match response.result.unwrap() {
+        InvocationResult::Payload(payload) => CallToolResponse::decode(&payload.value[..]).unwrap(),
+        InvocationResult::Error(error) => panic!("call_tool failed: {error:?}"),
+    };
+    match call_response.result.unwrap() {
+        call_tool_response::Result::Outcome(outcome) => {
+            assert!(!outcome.is_error);
+            assert_eq!(outcome.content.len(), 1);
+        }
+        call_tool_response::Result::Error(error) => panic!("call_tool error: {error:?}"),
+    }
+
+    // A tool outside the snapshot is rejected before any child process starts.
+    let mut missing_buf = Vec::new();
+    CallToolRequest {
+        binding_id: "mcp.fake".into(),
+        provider_tool_id: "not-in-snapshot".into(),
+        arguments_json: "{}".into(),
+        catalog_version: None,
+    }
+    .encode(&mut missing_buf)
+    .unwrap();
+    let response = client
+        .invoke(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "tool.provider.v1".into(),
+            method: "call_tool".into(),
+            payload: missing_buf,
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest".into(),
+            request_id: "req-mcp-03".into(),
+            stream_mode: DirectStreamMode::Unspecified as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let missing_response = match response.result.unwrap() {
+        InvocationResult::Payload(payload) => CallToolResponse::decode(&payload.value[..]).unwrap(),
+        InvocationResult::Error(error) => panic!("call_tool failed: {error:?}"),
+    };
+    match missing_response.result.unwrap() {
+        call_tool_response::Result::Error(error) => {
+            assert_eq!(error.code, ToolProviderErrorCode::ToolNotFound as i32);
+        }
+        call_tool_response::Result::Outcome(_) => {
+            panic!("a tool outside the snapshot must not dispatch")
+        }
     }
 }
 

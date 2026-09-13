@@ -153,6 +153,7 @@ jobs:
             runtime/rust/cyrene-agent-runtime/Cargo.toml \
             runtime/rust/cyrene-memory-runtime/Cargo.toml \
             runtime/rust/cyrene-computer-runtime/Cargo.toml \
+            runtime/rust/cyrene-mcp-provider/Cargo.toml \
             runtime/rust/cyrene-plugin-cabi/Cargo.toml \
             runtime/rust/cyrene-plugin-server/Cargo.toml; do
             cargo fmt --manifest-path "$manifest" --check

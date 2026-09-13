@@ -76,6 +76,24 @@
           ]
         }
       ]
+    },
+    {
+      "id": "cyrene.runtime.mcp-tool-provider",
+      "package": "runtime/rust/cyrene-mcp-provider",
+      "language": "rust",
+      "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+      "publication": "in-repo-unpublished",
+      "notes": "MCP stdio implementation of tool.provider.v1 (list_tools and call_tool) served by cyrene-plugin-server when MCP bindings are configured. Per-operation child sessions only; no long-lived supervision. No external MCP server or connected consumer has been exercised yet.",
+      "capabilities": [
+        {
+          "id": "tool.provider.v1",
+          "interfaceVersion": "1",
+          "methods": [
+            "list_tools",
+            "call_tool"
+          ]
+        }
+      ]
     }
   ]
 }
