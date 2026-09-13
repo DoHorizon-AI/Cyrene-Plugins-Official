@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/message.connector.v1/request-response.json",
+  "title": "Message connector request response v1",
+  "description": "Vendor-neutral approval request carried by message.connector.v1/respond_request.",
+  "type": "object",
+  "required": ["request_id", "request_kind", "decision"],
+  "properties": {
+    "request_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "description": "Opaque vendor request identity, such as a OneBot flag."
+    },
+    "request_kind": {
+      "type": "string",
+      "enum": ["friend", "group_invite"],
+      "description": "Normalized request kind. Other vendor request types are rejected in v1."
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["approve", "reject"]
+    },
+    "comment": {"type": "string", "maxLength": 2048},
+    "vendor_request": {
+      "type": "object",
+      "description": "Optional bounded vendor facts needed to resolve request_id.",
+      "properties": {
+        "sub_type": {"type": "string", "enum": ["add", "invite"]},
+        "group_id": {"type": "string", "maxLength": 512},
+        "user_id": {"type": "string", "maxLength": 512}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,68 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.connectors.onebot-v11",
+  "name": "Official OneBot v11 Connector",
+  "version": "0.1.0",
+  "description": "Generic OneBot v11 message connector with configured capability binding support.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "message.connector.v1"
+  ],
+  "methods": [
+    {
+      "name": "send_message",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "inbound_message",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "inbound_request",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "outputSchema": "../../../contracts/json/message-connector-v1-inbound-request.schema.json"
+    },
+    {
+      "name": "respond_request",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "../../../contracts/json/message-connector-v1-request-response.schema.json"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "onebot_v11_connector:OneBotV11Connector",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "runtimeProfile": "onebot-v11",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "onebot_v11_connector:OneBotV11Connector"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11"
+  },
+  "configuration": {
+    "schemaRef": "configuration.schema.json"
+  },
+  "secrets": {
+    "requiredSecretRefs": [],
+    "optionalSecretRefs": [
+      "ONEBOT_HTTP_ACCESS_TOKEN"
+    ]
+  },
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

@@ -1,0 +1,165 @@
+// SPDX-License-Identifier: Apache-2.0
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │ 📄 memory_provider.proto                                                │
+// │ Package: cyrene.memory.provider.v1                                      │
+// │ Role: Canonical Memory Provider payload contracts owned by Plugins.    │
+// │                                                                         │
+// │ 协议职责：定义由 Cyrene Plugins 拥有的语义与情景记忆提供方契约。        │
+// │ · 严格遵循多租户隔离（tenant_id）；禁止跨租户查询。                   │
+// │ · 纯能力层，不包含 Product 层的画像推断、梦境审查或主动触发逻辑。      │
+// └─────────────────────────────────────────────────────────────────────────┘
+syntax = "proto3";
+
+package cyrene.memory.provider.v1;
+
+option csharp_namespace = "Cyrene.Memory.Provider.V1";
+option java_multiple_files = true;
+option java_outer_classname = "MemoryProviderProto";
+option java_package = "io.cyrene.proto.memory.provider.v1";
+
+// Direct plugin invocation identifiers:
+//   capability ID: memory.provider.v1
+//   interface version: 1
+//   methods: store, get, recall, delete, prune, export_batch, import_batch
+
+enum MemoryErrorCode {
+  MEMORY_ERROR_CODE_UNSPECIFIED = 0;
+  MEMORY_ERROR_CODE_NOT_FOUND = 1;
+  MEMORY_ERROR_CODE_TENANT_MISMATCH = 2;
+  MEMORY_ERROR_CODE_VECTOR_DIMENSION_MISMATCH = 3;
+  MEMORY_ERROR_CODE_QUOTA_EXCEEDED = 4;
+  MEMORY_ERROR_CODE_STORAGE_FAILED = 5;
+}
+
+message MemoryItem {
+  string item_id = 1;
+  string tenant_id = 2;
+  string scope = 3;
+  string subject = 4;
+  string content = 5;
+  // Dense float vector embedding (max 4096 dimensions).
+  repeated float embedding = 6;
+  map<string, string> metadata = 7;
+  int64 created_at_ms = 8;
+  optional int64 expires_at_ms = 9;
+  optional int64 ttl_seconds = 10;
+}
+
+message MemoryMatch {
+  MemoryItem item = 1;
+  // Similarity score (0.0 to 1.0).
+  float score = 2;
+}
+
+message MemoryError {
+  MemoryErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
+
+// 1. Store
+message StoreMemoryRequest {
+  string tenant_id = 1;
+  MemoryItem item = 2;
+}
+
+message StoreMemoryResponse {
+  oneof result {
+    string item_id = 1;
+    MemoryError error = 2;
+  }
+}
+
+// 2. Get
+message GetMemoryRequest {
+  string tenant_id = 1;
+  string item_id = 2;
+}
+
+message GetMemoryResponse {
+  oneof result {
+    MemoryItem item = 1;
+    MemoryError error = 2;
+  }
+}
+
+// 3. Recall
+message RecallMemoryRequest {
+  string tenant_id = 1;
+  optional string scope = 2;
+  optional string subject = 3;
+  repeated float query_embedding = 4;
+  optional string query_text = 5;
+  map<string, string> metadata_filters = 6;
+  optional float min_similarity = 7;
+  optional int32 top_k = 8;
+}
+
+message RecallBatch {
+  repeated MemoryMatch matches = 1;
+}
+
+message RecallMemoryResponse {
+  oneof result {
+    RecallBatch matches = 1;
+    MemoryError error = 2;
+  }
+}
+
+// 4. Delete
+message DeleteMemoryRequest {
+  string tenant_id = 1;
+  string item_id = 2;
+}
+
+message DeleteMemoryResponse {
+  oneof result {
+    bool deleted = 1;
+    MemoryError error = 2;
+  }
+}
+
+// 5. Prune
+message PruneMemoryRequest {
+  string tenant_id = 1;
+  optional int64 before_timestamp_ms = 2;
+}
+
+message PruneMemoryResponse {
+  oneof result {
+    int64 pruned_count = 1;
+    MemoryError error = 2;
+  }
+}
+
+// 6. Export Batch
+message ExportMemoryRequest {
+  string tenant_id = 1;
+  optional string scope = 2;
+  optional int32 limit = 3;
+}
+
+message ExportBatch {
+  repeated MemoryItem items = 1;
+}
+
+message ExportMemoryResponse {
+  oneof result {
+    ExportBatch batch = 1;
+    MemoryError error = 2;
+  }
+}
+
+// 7. Import Batch
+message ImportMemoryRequest {
+  string tenant_id = 1;
+  repeated MemoryItem items = 2;
+  bool overwrite = 3;
+}
+
+message ImportMemoryResponse {
+  oneof result {
+    int32 imported_count = 1;
+    MemoryError error = 2;
+  }
+}

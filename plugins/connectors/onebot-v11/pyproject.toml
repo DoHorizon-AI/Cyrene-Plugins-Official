@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-onebot-v11-connector"
+version = "0.1.0"
+description = "Generic OneBot v11 implementation of the Cyrene message connector capability"
+requires-python = ">=3.11"
+dependencies = ["grpcio>=1.62,<1.63", "protobuf>=4.21,<5"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.connectors.onebot-v11" = ["plugin.manifest.json"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+exclude = ["src/onebot_v11_connector/_generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

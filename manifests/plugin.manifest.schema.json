@@ -1,0 +1,277 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "CyrenePluginManifestDraftV1",
+  "type": "object",
+  "required": [
+    "id",
+    "name",
+    "version",
+    "schemaVersion",
+    "kind",
+    "capabilities",
+    "runtime"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "enum": [
+        1
+      ]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+(\\.[a-z0-9-]+)*$"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+.*$"
+    },
+    "description": {
+      "type": "string"
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "capability-plugin",
+        "gateway-runtime",
+        "provider-adapter",
+        "tool-provider",
+        "system-plugin"
+      ]
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "minItems": 1
+    },
+    "methods": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "executionMode"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string",
+            "description": "Capability selected by this method when the plugin declares more than one."
+          },
+          "interfaceVersion": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Callable capability interface version, distinct from the plugin release version."
+          },
+          "executionMode": {
+            "type": "string",
+            "description": "Execution mode placement accepted by Platform (inline, worker, service). Adding or modifying execution modes requires normative Platform generic contract acceptance.",
+            "enum": [
+              "inline",
+              "worker",
+              "service"
+            ]
+          },
+          "inputSchema": {
+            "type": "string"
+          },
+          "outputSchema": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "required": [
+        "language"
+      ],
+      "properties": {
+        "language": {
+          "type": "string",
+          "enum": [
+            "python",
+            "csharp",
+            "java",
+            "rust",
+            "shell",
+            "mixed"
+          ]
+        },
+        "entrypoint": {
+          "type": "string"
+        },
+        "protocol": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Plugin-owned versioned data-plane protocol. Platform treats the resulting endpoint as an opaque connection reference."
+        },
+        "runtimeProfile": {
+          "type": "string"
+        },
+        "launch": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Language-neutral package launch command consumed by Platform process supervision. The executable is either prepared-runtime or a safe package-relative path.",
+          "required": [
+            "executable"
+          ],
+          "properties": {
+            "executable": {
+              "type": "string",
+              "minLength": 1
+            },
+            "args": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "distribution": {
+      "$ref": "#/$defs/connectorPackageReference"
+    },
+    "compatibility": {
+      "type": "object",
+      "properties": {
+        "platformVersion": {
+          "type": "string"
+        },
+        "requiresPython": {
+          "type": "string"
+        },
+        "requiresDotnet": {
+          "type": "string"
+        },
+        "requiresJava": {
+          "type": "string"
+        },
+        "os": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "architectures": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "accelerators": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "properties": {
+        "schemaRef": {
+          "type": "string"
+        },
+        "defaultSettings": {
+          "type": "object"
+        }
+      }
+    },
+    "secrets": {
+      "type": "object",
+      "properties": {
+        "requiredSecretRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "optionalSecretRefs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "state": {
+      "type": "object",
+      "properties": {
+        "isStateful": {
+          "type": "boolean"
+        },
+        "storageCategory": {
+          "type": "string",
+          "enum": [
+            "relational",
+            "vector",
+            "document",
+            "blob",
+            "cache",
+            "stateless"
+          ]
+        },
+        "migrationSupported": {
+          "type": "boolean"
+        },
+        "downgradeSupported": {
+          "type": "boolean"
+        },
+        "retentionPolicyOnUninstall": {
+          "type": "string",
+          "enum": [
+            "retain",
+            "purge",
+            "prompt"
+          ]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "connectorPackageReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "A static reference to the Connector Package Spec descriptor. Package identity, version, capabilities, and runtime remain canonical top-level PluginManifest fields.",
+      "required": [
+        "specVersion",
+        "descriptorRef",
+        "publicationStatus"
+      ],
+      "properties": {
+        "specVersion": {
+          "const": "0.1"
+        },
+        "descriptorRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "publicationStatus": {
+          "type": "string",
+          "enum": [
+            "NOT_PUBLISHED",
+            "CANDIDATE",
+            "PUBLISHED"
+          ]
+        },
+        "descriptorDigest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    }
+  }
+}

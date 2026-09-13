@@ -1,0 +1,30 @@
+<Project>
+  <!--
+  ┌─────────────────────────────────────────────────────────────────────────┐
+  │ 📄 Directory.Build.props                                                │
+  │ Scope: runtime/dotnet-native-aot                                        │
+  │ Role: Shared .NET build properties enabling Native AOT, nullable,        │
+  │       trimming/AOT analyzers, and deterministic builds (Milestone M3).  │
+  └─────────────────────────────────────────────────────────────────────────┘
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <!-- Native AOT and Trimming Analyzers (T31) -->
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <EnableSingleFileAnalyzer>true</EnableSingleFileAnalyzer>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+
+    <!-- Deterministic Publishing (T31) -->
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+
+    <!-- Strict Code Analysis -->
+    <AnalysisLevel>latest-recommended</AnalysisLevel>
+    <!-- Allow underscores in native library identifiers (CA1707) -->
+    <NoWarn>$(NoWarn);CA1707</NoWarn>
+  </PropertyGroup>
+</Project>

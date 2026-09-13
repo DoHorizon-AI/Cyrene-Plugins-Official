@@ -1,0 +1,294 @@
+trigger: none
+pr: none
+
+parameters:
+  - name: githubRepository
+    displayName: GitHub repository (owner/name)
+    type: string
+    default: ""
+  - name: githubRunId
+    displayName: Successful GitHub Actions run ID
+    type: string
+    default: ""
+  - name: githubCommitSha
+    displayName: Expected GitHub commit SHA
+    type: string
+    default: ""
+  - name: githubArtifactName
+    displayName: Immutable GitHub artifact name
+    type: string
+    default: ""
+  - name: deployTarget
+    displayName: Explicit deployment target
+    type: string
+    default: "none"
+
+jobs:
+  - job: consume_github_release
+    displayName: Plugins / Verify GitHub release handoff
+    pool:
+      vmImage: ubuntu-latest
+    timeoutInMinutes: 15
+    steps:
+      - checkout: none
+        displayName: No source checkout
+      - bash: |
+          set -euo pipefail
+
+          work_dir="$(Pipeline.Workspace)/github-cd"
+          handoff_dir="$work_dir/handoff"
+          extract_dir="$work_dir/extracted"
+          rm -rf "$work_dir"
+          mkdir -p "$handoff_dir" "$extract_dir"
+
+          expected_repository="$EXPECTED_REPOSITORY"
+          expected_run_id="$EXPECTED_RUN_ID"
+          expected_commit_sha="$EXPECTED_COMMIT_SHA"
+          expected_artifact_name="$EXPECTED_ARTIFACT_NAME"
+
+          if [[ -z "$GITHUB_TOKEN" || "$GITHUB_TOKEN" == '$(GITHUB_TOKEN)' ]]; then
+            echo "GITHUB_TOKEN must be configured as an Azure secret variable." >&2
+            exit 1
+          fi
+          [[ "$expected_repository" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || {
+            echo "githubRepository must be owner/name." >&2
+            exit 1
+          }
+          [[ "$expected_run_id" =~ ^[0-9]+$ ]] || {
+            echo "githubRunId must be numeric." >&2
+            exit 1
+          }
+          [[ "$expected_commit_sha" =~ ^[0-9a-fA-F]{40}$ ]] || {
+            echo "githubCommitSha must be a full commit SHA." >&2
+            exit 1
+          }
+          [[ "$expected_artifact_name" =~ ^[A-Za-z0-9_.-]+$ ]] || {
+            echo "githubArtifactName contains unsupported characters." >&2
+            exit 1
+          }
+
+          for command in curl jq unzip sha256sum tar; do
+            command -v "$command" >/dev/null || {
+              echo "Required handoff verifier command is unavailable: $command" >&2
+              exit 1
+            }
+          done
+
+          github_get() {
+            curl -fsSL \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$1"
+          }
+
+          api_root="https://api.github.com/repos/$expected_repository"
+          github_get "$api_root/actions/runs/$expected_run_id" > "$work_dir/run.json"
+          jq -e --arg repository "$expected_repository" \
+            '.repository.full_name == $repository' "$work_dir/run.json" >/dev/null
+          jq -e --arg commit_sha "$expected_commit_sha" \
+            '.head_sha == $commit_sha' "$work_dir/run.json" >/dev/null
+          jq -e \
+            '.status == "completed" and .conclusion == "success" and .event == "push" and .path == ".github/workflows/public-ci.yml"' \
+            "$work_dir/run.json" >/dev/null
+
+          github_get "$api_root/actions/runs/$expected_run_id/artifacts?per_page=100" \
+            > "$work_dir/artifacts.json"
+          artifact_count="$(
+            jq --arg artifact_name "$expected_artifact_name" \
+              '[.artifacts[] | select(.name == $artifact_name and .expired == false)] | length' \
+              "$work_dir/artifacts.json"
+          )"
+          [[ "$artifact_count" == "1" ]] || {
+            echo "Expected exactly one unexpired GitHub artifact named $expected_artifact_name; found $artifact_count." >&2
+            exit 1
+          }
+          archive_url="$(
+            jq -r --arg artifact_name "$expected_artifact_name" \
+              '.artifacts[] | select(.name == $artifact_name and .expired == false) | .archive_download_url' \
+              "$work_dir/artifacts.json"
+          )"
+          [[ "$archive_url" == https://api.github.com/* ]] || {
+            echo "GitHub returned an unexpected artifact URL." >&2
+            exit 1
+          }
+          github_get "$archive_url" > "$work_dir/artifact.zip"
+          unzip -t "$work_dir/artifact.zip" >/dev/null
+          unzip -Z1 "$work_dir/artifact.zip" > "$work_dir/members.txt"
+          while IFS= read -r member; do
+            case "$member" in
+              /*|../*|*/../*)
+                echo "Unsafe artifact member: $member" >&2
+                exit 1
+                ;;
+            esac
+          done < "$work_dir/members.txt"
+          unzip -q "$work_dir/artifact.zip" -d "$extract_dir"
+
+          manifest_count="$(
+            find "$extract_dir" -type f -name release-manifest.json -print | wc -l
+          )"
+          [[ "$manifest_count" == "1" ]] || {
+            echo "Expected exactly one release-manifest.json in the artifact." >&2
+            exit 1
+          }
+          manifest_path="$(
+            find "$extract_dir" -type f -name release-manifest.json -print -quit
+          )"
+          manifest_dir="$(dirname "$manifest_path")"
+          payload_path="$manifest_dir/payload.tar.gz"
+          [[ -f "$manifest_dir/SHA256SUMS" && -f "$payload_path" ]] || {
+            echo "Release artifact is missing SHA256SUMS or payload.tar.gz." >&2
+            exit 1
+          }
+          (
+            cd "$manifest_dir"
+            sha256sum -c SHA256SUMS
+          )
+
+          jq -e --arg repository "$expected_repository" \
+            '.repository == $repository' "$manifest_path" >/dev/null
+          jq -e --arg run_id "$expected_run_id" \
+            '(.workflow_run_id | tostring) == $run_id' "$manifest_path" >/dev/null
+          jq -e --arg commit_sha "$expected_commit_sha" \
+            '.commit_sha == $commit_sha' "$manifest_path" >/dev/null
+          jq -e --arg artifact_name "$expected_artifact_name" \
+            '.artifact_name == $artifact_name' "$manifest_path" >/dev/null
+          jq -e \
+            '(.abi_version | (type == "string" and length > 0)) and
+             (.contract_version | (type == "string" and length > 0)) and
+             (.rid | (type == "string" and length > 0)) and
+             (.payload_file == "payload.tar.gz") and
+             (.payload_sha256 | test("^[0-9a-f]{64}$"))' \
+            "$manifest_path" >/dev/null
+
+          actual_payload_sha256="$(sha256sum "$payload_path" | awk '{print $1}')"
+          expected_payload_sha256="$(jq -r '.payload_sha256' "$manifest_path")"
+          [[ "$actual_payload_sha256" == "$expected_payload_sha256" ]] || {
+            echo "Payload SHA-256 does not match release-manifest.json." >&2
+            exit 1
+          }
+          tar -tzf "$payload_path" > "$work_dir/payload.list"
+          [[ -s "$work_dir/payload.list" ]] || {
+            echo "Release payload archive is empty." >&2
+            exit 1
+          }
+          while IFS= read -r member; do
+            case "$member" in
+              /*|../*|*/../*)
+                echo "Unsafe payload member: $member" >&2
+                exit 1
+                ;;
+            esac
+          done < "$work_dir/payload.list"
+          python3 - "$manifest_path" "$payload_path" <<'PY'
+          import hashlib
+          import json
+          import sys
+          import tarfile
+          from pathlib import PurePosixPath
+
+          manifest_path, payload_path = sys.argv[1:]
+          with open(manifest_path, encoding="utf-8") as stream:
+              manifest = json.load(stream)
+
+          declared = manifest.get("payload_entries")
+          if not isinstance(declared, list) or not declared:
+              raise SystemExit("release manifest has no payload_entries")
+
+          expected = {}
+          for entry in declared:
+              if not isinstance(entry, dict):
+                  raise SystemExit("release manifest contains an invalid payload entry")
+              path = entry.get("path")
+              size = entry.get("size_bytes")
+              digest = entry.get("sha256")
+              if (
+                  not isinstance(path, str)
+                  or PurePosixPath(path).is_absolute()
+                  or ".." in PurePosixPath(path).parts
+                  or not isinstance(size, int)
+                  or size < 0
+                  or not isinstance(digest, str)
+                  or len(digest) != 64
+              ):
+                  raise SystemExit(f"invalid manifest payload entry: {entry!r}")
+              if path in expected:
+                  raise SystemExit(f"duplicate manifest payload entry: {path}")
+              expected[path] = (size, digest)
+
+          observed = {}
+          with tarfile.open(payload_path, mode="r:gz") as archive:
+              for member in archive.getmembers():
+                  member_path = PurePosixPath(member.name)
+                  if member_path.is_absolute() or ".." in member_path.parts:
+                      raise SystemExit(f"unsafe payload member: {member.name}")
+                  if not member.isfile():
+                      raise SystemExit(f"payload contains a non-regular member: {member.name}")
+                  stream = archive.extractfile(member)
+                  if stream is None:
+                      raise SystemExit(f"payload member cannot be read: {member.name}")
+                  digest = hashlib.sha256()
+                  size = 0
+                  for block in iter(lambda: stream.read(1024 * 1024), b""):
+                      size += len(block)
+                      digest.update(block)
+                  if member.name in observed:
+                      raise SystemExit(f"duplicate payload member: {member.name}")
+                  observed[member.name] = (size, digest.hexdigest())
+
+          if observed != expected:
+              missing = sorted(set(expected) - set(observed))
+              unexpected = sorted(set(observed) - set(expected))
+              mismatched = sorted(
+                  path for path in set(expected) & set(observed)
+                  if expected[path] != observed[path]
+              )
+              raise SystemExit(
+                  "payload entries do not match release manifest: "
+                  f"missing={missing}, unexpected={unexpected}, mismatched={mismatched}"
+              )
+          PY
+
+          cp "$manifest_path" "$handoff_dir/release-manifest.json"
+          jq -n \
+            --arg status "VERIFIED_GITHUB_ARTIFACT" \
+            --arg repository "$expected_repository" \
+            --arg run_id "$expected_run_id" \
+            --arg commit_sha "$expected_commit_sha" \
+            --arg artifact_name "$expected_artifact_name" \
+            --arg payload_sha256 "$actual_payload_sha256" \
+            '{
+              status: $status,
+              repository: $repository,
+              workflow_run_id: $run_id,
+              commit_sha: $commit_sha,
+              artifact_name: $artifact_name,
+              payload_sha256: $payload_sha256
+            }' > "$handoff_dir/verification.json"
+        displayName: Verify exact successful GitHub artifact
+        env:
+          GITHUB_TOKEN: $(GITHUB_TOKEN)
+          EXPECTED_REPOSITORY: ${{ parameters.githubRepository }}
+          EXPECTED_RUN_ID: ${{ parameters.githubRunId }}
+          EXPECTED_COMMIT_SHA: ${{ parameters.githubCommitSha }}
+          EXPECTED_ARTIFACT_NAME: ${{ parameters.githubArtifactName }}
+      - bash: |
+          set -euo pipefail
+
+          handoff_dir="$(Pipeline.Workspace)/github-cd/handoff"
+          if [[ "$DEPLOY_TARGET" != "none" ]]; then
+            echo "No deployment adapter is configured for deployTarget=$DEPLOY_TARGET." >&2
+            exit 1
+          fi
+          jq -n \
+            --arg status "NOT_DEPLOYED" \
+            --arg reason "No explicit deployment target is configured; verified handoff is available." \
+            '{status: $status, reason: $reason}' > "$handoff_dir/deployment-status.json"
+          echo "NOT_DEPLOYED: verified GitHub artifact handoff was produced."
+        displayName: Emit explicit non-deployment handoff
+        env:
+          DEPLOY_TARGET: ${{ parameters.deployTarget }}
+      - publish: $(Pipeline.Workspace)/github-cd/handoff
+        artifact: plugins-cd-handoff
+        displayName: Publish verified handoff metadata

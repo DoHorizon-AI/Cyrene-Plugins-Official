@@ -1,0 +1,8 @@
+{
+  "id": "chatcmpl-test123",
+  "object": "chat.completion",
+  "created": 1720000000,
+  "choices": [
+    {
+      "index": 0,
+      "message": { "role": "assistant" /* corrupted json without closing bracket

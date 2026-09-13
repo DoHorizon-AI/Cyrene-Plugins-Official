@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyrene.dev/schemas/onebot-v11-connector-configuration-v0.1.json",
+  "title": "Cyrene OneBot v11 Connector Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "binding_id"
+  ],
+  "allOf": [
+    {
+      "anyOf": [
+        {
+          "required": ["http_base_url"]
+        },
+        {
+          "required": ["websocket_url"]
+        },
+        {
+          "required": ["transport_profile"],
+          "properties": {
+            "transport_profile": {
+              "const": "reverse_websocket"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "if": {
+        "required": ["transport_profile"],
+        "properties": {
+          "transport_profile": {
+            "const": "http_api"
+          }
+        }
+      },
+      "then": {
+        "required": ["http_base_url"]
+      }
+    },
+    {
+      "if": {
+        "required": ["transport_profile"],
+        "properties": {
+          "transport_profile": {
+            "const": "forward_websocket"
+          }
+        }
+      },
+      "then": {
+        "required": ["websocket_url"]
+      }
+    }
+  ],
+  "properties": {
+    "binding_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "http_base_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "websocket_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^wss?://"
+    },
+    "transport_profile": {
+      "type": "string",
+      "enum": [
+        "http_api",
+        "forward_websocket",
+        "reverse_websocket"
+      ],
+      "default": "http_api"
+    },
+    "reverse_listen_host": {
+      "type": "string",
+      "minLength": 1,
+      "default": "127.0.0.1"
+    },
+    "reverse_listen_port": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 6199
+    },
+    "access_token": {
+      "type": "string"
+    },
+    "runtime_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "self_account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    }
+  }
+}

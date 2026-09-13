@@ -1,0 +1,17 @@
+[package]
+name = "cyrene-plugin-cabi"
+version = "0.1.0"
+edition = "2021"
+description = "Cyrene versioned C ABI shared library implementation in Rust (cdylib)"
+license = "Apache-2.0"
+
+[lib]
+name = "rust_cyrene_plugin"
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+prost = "0.12"
+prost-types = "0.12"
+cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contracts" }
+cyrene-agent-runtime = { path = "../cyrene-agent-runtime" }
+tokio = { version = "1", features = ["sync", "time", "rt-multi-thread"] }

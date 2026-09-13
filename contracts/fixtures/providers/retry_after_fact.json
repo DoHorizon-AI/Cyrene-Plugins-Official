@@ -1,0 +1,8 @@
+{
+  "error": {
+    "message": "Quota exceeded for quota_group. Back off for 45 seconds.",
+    "type": "insufficient_quota",
+    "code": "quota_exceeded",
+    "retry_after_seconds": 45
+  }
+}

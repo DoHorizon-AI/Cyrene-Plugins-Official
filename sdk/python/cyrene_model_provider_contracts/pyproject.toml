@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-model-provider-contracts"
+version = "0.1.0"
+description = "Plugins-owned model.provider.v1 Python contracts and codecs"
+requires-python = ">=3.11"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cyrene_model_provider_contracts = ["py.typed"]
+

@@ -1,0 +1,92 @@
+// SPDX-License-Identifier: Apache-2.0
+// ┌─────────────────────────────────────────────────────────────────────┐
+// │ Direct Plugin Runtime V1                                            │
+// │ Plugin-owned data-plane transport; Platform never handles payloads. │
+// └─────────────────────────────────────────────────────────────────────┘
+syntax = "proto3";
+
+package cyrene.plugin.runtime.v1;
+
+option csharp_namespace = "Cyrene.Plugin.Runtime.V1";
+option java_multiple_files = true;
+option java_package = "io.cyrene.plugin.runtime.v1";
+
+// One Product calls one resolved Plugin endpoint. The endpoint is already
+// bound to a configured plugin instance, so selection and routing do not occur
+// in this service.
+service DirectPluginRuntime {
+  rpc Invoke(DirectInvocationRequest) returns (DirectInvocationResponse);
+  rpc InvokeStream(DirectInvocationRequest) returns (stream DirectStreamItem);
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message DirectInvocationRequest {
+  string capability = 1;
+  string interface_version = 2;
+  string method = 3;
+  string payload_type_url = 4;
+  bytes payload = 5;
+  string request_id = 6;
+  DirectStreamMode stream_mode = 7;
+}
+
+enum DirectStreamMode {
+  DIRECT_STREAM_MODE_UNSPECIFIED = 0;
+  DIRECT_STREAM_MODE_INVOCATION = 1;
+  DIRECT_STREAM_MODE_SUBSCRIPTION = 2;
+}
+
+message DirectPayload {
+  string type_url = 1;
+  bytes value = 2;
+  string event_type = 3;
+}
+
+message DirectInvocationError {
+  enum Code {
+    CODE_UNSPECIFIED = 0;
+    CODE_INVALID_REQUEST = 1;
+    CODE_METHOD_NOT_FOUND = 2;
+    CODE_CANCELLED = 3;
+    CODE_DEADLINE_EXCEEDED = 4;
+    CODE_EXECUTION_FAILED = 5;
+    CODE_UNAVAILABLE = 6;
+  }
+
+  Code code = 1;
+  string message = 2;
+  bool retryable = 3;
+  string domain_code = 4;
+}
+
+message DirectInvocationResponse {
+  oneof result {
+    DirectPayload payload = 1;
+    DirectInvocationError error = 2;
+  }
+}
+
+message DirectStreamEnd {}
+
+message DirectStreamItem {
+  oneof event {
+    DirectPayload payload = 1;
+    DirectInvocationError error = 2;
+    DirectStreamEnd end = 3;
+  }
+}
+
+message HealthRequest {}
+
+message HealthResponse {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_SERVING = 1;
+    STATUS_NOT_SERVING = 2;
+  }
+
+  Status status = 1;
+  string plugin_id = 2;
+  string plugin_version = 3;
+  repeated string capabilities = 4;
+}

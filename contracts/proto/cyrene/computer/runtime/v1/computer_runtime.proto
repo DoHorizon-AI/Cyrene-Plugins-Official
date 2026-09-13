@@ -1,0 +1,172 @@
+// SPDX-License-Identifier: Apache-2.0
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │ 📄 computer_runtime.proto                                               │
+// │ Package: cyrene.computer.runtime.v1                                     │
+// │ Role: Canonical Computer & Tool Runtime payload contracts.              │
+// │                                                                         │
+// │ 协议职责：定义由 Cyrene Plugins 拥有的有界受管主机执行契约。            │
+// │ · 涵盖 filesystem、shell、artifacts 与执行证据（ExecutionEvidence）。  │
+// │ · 严禁引入或实现 Platform 核心沙箱；不主张抗恶意代码的绝对容器隔离。    │
+// └─────────────────────────────────────────────────────────────────────────┘
+syntax = "proto3";
+
+package cyrene.computer.runtime.v1;
+
+option csharp_namespace = "Cyrene.Computer.Runtime.V1";
+option java_multiple_files = true;
+option java_outer_classname = "ComputerRuntimeProto";
+option java_package = "io.cyrene.proto.computer.runtime.v1";
+
+// Direct plugin invocation identifiers:
+//   capability ID: computer.runtime.v1
+//   interface version: 1
+//   methods: execute_command, execute_command_stream, read_file, write_file,
+//            list_dir, create_artifact, get_artifact
+
+enum ComputerErrorCode {
+  COMPUTER_ERROR_CODE_UNSPECIFIED = 0;
+  COMPUTER_ERROR_CODE_PATH_TRAVERSAL_DENIED = 1;
+  COMPUTER_ERROR_CODE_COMMAND_TIMEOUT = 2;
+  COMPUTER_ERROR_CODE_OUTPUT_LIMIT_EXCEEDED = 3;
+  COMPUTER_ERROR_CODE_EXECUTION_DENIED = 4;
+  COMPUTER_ERROR_CODE_ARTIFACT_NOT_FOUND = 5;
+}
+
+message ExecutionResourceUsage {
+  int64 cpu_time_ms = 1;
+  int64 peak_memory_bytes = 2;
+}
+
+message ExecutionEvidence {
+  int32 exit_code = 1;
+  int64 duration_ms = 2;
+  string stdout = 3;
+  string stderr = 4;
+  bool stdout_truncated = 5;
+  bool stderr_truncated = 6;
+  string sha256_hash = 7;
+  optional ExecutionResourceUsage resource_usage = 8;
+}
+
+message ComputerError {
+  ComputerErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
+
+// 1. Shell Command Execution
+message CommandExecutionRequest {
+  string command = 1;
+  optional string cwd = 2;
+  map<string, string> env = 3;
+  optional int64 timeout_ms = 4;
+  optional int64 max_output_bytes = 5;
+}
+
+message CommandExecutionResponse {
+  oneof result {
+    ExecutionEvidence evidence = 1;
+    ComputerError error = 2;
+  }
+}
+
+message CommandStreamEvent {
+  int64 sequence_number = 1;
+  int64 timestamp_ms = 2;
+
+  oneof event {
+    string stdout_chunk = 3;
+    string stderr_chunk = 4;
+    ExecutionEvidence exit_evidence = 5;
+    ComputerError stream_error = 6;
+  }
+}
+
+// 2. Filesystem Operations
+message ReadFileRequest {
+  string path = 1;
+  optional int64 offset = 2;
+  optional int64 length = 3;
+}
+
+message ReadFileResponse {
+  oneof result {
+    bytes content = 1;
+    ComputerError error = 2;
+  }
+}
+
+message WriteFileRequest {
+  string path = 1;
+  bytes content = 2;
+  bool overwrite = 3;
+}
+
+message WriteFileResponse {
+  oneof result {
+    int64 bytes_written = 1;
+    ComputerError error = 2;
+  }
+}
+
+message ListDirRequest {
+  string path = 1;
+  optional int32 max_depth = 2;
+}
+
+message DirEntry {
+  string name = 1;
+  bool is_directory = 2;
+  int64 size_bytes = 3;
+  int64 modified_at_ms = 4;
+}
+
+message DirEntries {
+  repeated DirEntry entries = 1;
+}
+
+message ListDirResponse {
+  oneof result {
+    DirEntries entries = 1;
+    ComputerError error = 2;
+  }
+}
+
+// 3. Artifact Management
+message CreateArtifactRequest {
+  string name = 1;
+  string mime_type = 2;
+  bytes data = 3;
+}
+
+message ArtifactMetadata {
+  string artifact_id = 1;
+  string name = 2;
+  string mime_type = 3;
+  int64 size_bytes = 4;
+  string sha256_hash = 5;
+  int64 created_at_ms = 6;
+}
+
+message CreateArtifactResponse {
+  oneof result {
+    ArtifactMetadata artifact = 1;
+    ComputerError error = 2;
+  }
+}
+
+message GetArtifactRequest {
+  string artifact_id = 1;
+}
+
+message ArtifactPayload {
+  ArtifactMetadata metadata = 1;
+  bytes data = 2;
+}
+
+message GetArtifactResponse {
+  oneof result {
+    ArtifactPayload payload = 1;
+    ComputerError error = 2;
+  }
+}

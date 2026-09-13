@@ -1,0 +1,13 @@
+cyrene:
+  plugin:
+    enabled: true
+    bindings:
+      sample-agent-binding:
+        target-uri: direct://127.0.0.1:50099
+        generation: gen-001
+      sample-memory-binding:
+        target-uri: direct://127.0.0.1:50099
+        generation: gen-001
+    retry:
+      max-attempts: 3
+      backoff-millis: 50

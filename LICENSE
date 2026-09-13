@@ -1,0 +1,10 @@
+Cyrene-Plugins is a multi-license component collection. There is no single
+repository-wide license grant.
+
+The license applicable to a component is identified by the nearest LICENSE
+file, package metadata, and the mapping in LICENSING.md. Third-party and
+upstream-derived material retains its original license and notices.
+
+Source without an explicit license designation is not granted an open-source
+license merely because this repository is publicly visible. All rights in such
+source remain reserved by their respective copyright holders.

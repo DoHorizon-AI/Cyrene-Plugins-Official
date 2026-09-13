@@ -1,0 +1,18 @@
+[package]
+name = "cyrene-plugin-contracts"
+version = "0.1.0"
+edition = "2021"
+description = "Generated Rust projections for Cyrene Plugin-owned capability payload contracts."
+license = "Apache-2.0"
+
+[lib]
+name = "cyrene_plugin_contracts"
+path = "src/lib.rs"
+
+[dependencies]
+prost = "0.12"
+prost-types = "0.12"
+
+[build-dependencies]
+prost-build = "0.12"
+protoc-bin-vendored = "3"

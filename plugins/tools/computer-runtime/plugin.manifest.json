@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.tools.computer-runtime",
+  "name": "Cyrene Bounded Computer Runtime",
+  "version": "0.1.0",
+  "description": "Rust implementation of bounded filesystem, process, browser, and artifact operations; it does not claim hostile-code containment.",
+  "kind": "tool-provider",
+  "capabilities": [
+    "computer.runtime.v1"
+  ],
+  "methods": [
+    {
+      "name": "ExecuteCommand",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "ExecuteCommandStream",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "ReadFile",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "WriteFile",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "CreateArtifact",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "GetArtifact",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    }
+  ],
+  "runtime": {
+    "language": "rust",
+    "entrypoint": "cyrene-plugin-server",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "cyrene-plugin-server"
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "os": [
+      "linux",
+      "windows"
+    ],
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  },
+  "maturity": "migrating"
+}

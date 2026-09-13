@@ -1,0 +1,5 @@
+# Exact runtime dependency lock for the official OneBot v11 connector.
+# Production installation must consume this file; it must not resolve a
+# floating "latest" dependency.
+grpcio==1.62.3
+protobuf==4.25.9

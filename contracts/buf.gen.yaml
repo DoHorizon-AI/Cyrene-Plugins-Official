@@ -1,0 +1,8 @@
+version: v2
+
+# Language packages are built and tested by owner-scoped TCK projects. This
+# file intentionally defines no remote generator plugin or Platform checkout.
+inputs:
+  - directory: proto
+
+plugins: []

@@ -1,0 +1,49 @@
+# Byte-compiled / optimized / cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Environments & Packaging
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+*.dist-info/
+node_modules/
+target/
+
+# IDEs & System files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Compiled outputs (.NET / Java)
+bin/
+obj/
+out/
+.gradle/
+*.class
+*.jar
+!plugins/gateway/spring/gradle/wrapper/gradle-wrapper.jar
+*.user
+
+# Local secrets & Logs
+.env
+.env.*
+!**/.env.example
+*.log
+secrets/
+credentials/
+data/
+
+# Release Artifacts & Test Executables
+artifacts/
+contracts/cabi/tests/cabi_harness

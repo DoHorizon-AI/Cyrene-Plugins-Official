@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <PublishAot>true</PublishAot>
+    <OutputType>Library</OutputType>
+    <NativeLib>Shared</NativeLib>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>Cyrene.Plugin.NativeLib</AssemblyName>
+    <TargetName>dotnet_cyrene_plugin</TargetName>
+    <Description>Cyrene Native C ABI shared library implemented in C# via Native AOT.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Cyrene.Plugin.Core/Cyrene.Plugin.Core.csproj" />
+  </ItemGroup>
+</Project>

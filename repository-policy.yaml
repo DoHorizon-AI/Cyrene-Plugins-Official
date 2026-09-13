@@ -1,0 +1,64 @@
+schema_version: cyrene.repository-policy.v1
+repository:
+  logical_name: Cyrene-Plugins
+  lifecycle_class: PUBLIC_COMPONENT_COLLECTION
+  # Desired publication policy; live hosting visibility is verified separately.
+  visibility: public
+  source_owner: Ecosystem & Plugin Contributors
+  remote_default_branch: main
+  integration_branch: develop
+  release_branch: main
+  default_branch: develop
+ownership:
+  owns:
+  - Versioned capability payload contracts and generated language SDKs
+  - Replaceable capability implementations behind Plugin-owned contracts
+  - Native Rust and .NET runtime packages behind published contracts
+  - OneBot v11 connector implementation and protected QQ interface research
+  - Plugin manifest schema and owner-scoped contract TCKs
+  does_not_own:
+  - Product desired/observed state machines
+  - Platform installation, admission, process supervision, lease, fence, or endpoint resolution
+  - Product deployment or Product-specific compatibility copies
+  - Invoicing, payments, or customer billing lifecycle
+build:
+  independent: true
+  build_systems:
+  - pyproject
+  - cargo
+  - maven
+  - dotnet
+  - buf
+artifacts:
+  package_units:
+  - versioned capability contract packages
+  - individual plugin packages
+  - connector packages
+  native_binaries:
+  - Rust plugin server and C ABI shared library
+  - .NET Native AOT host, native library, and provider executables
+distribution:
+  role: MULTI_COMPONENT_COLLECTION
+  profiles:
+  - contracts
+  - native-runtime
+  - language-sdk
+  - connector
+  - full
+  standalone_user_product: false
+integration:
+  multi_repo_required: false
+  optional_acceptance:
+  - Product consumer compatibility at released contract versions
+authorities:
+  ci: github
+  release: github_releases
+  deployment: community
+trust:
+  public_requires_private: false
+versioning:
+  scheme: semver
+  scope: component
+  tag_strategy: component_namespace
+  tag_pattern: '{component-id}/v{version}'
+  automated_release: false

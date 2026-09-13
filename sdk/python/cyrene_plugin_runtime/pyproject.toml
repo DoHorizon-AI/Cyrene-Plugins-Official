@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-plugin-runtime"
+version = "0.2.0"
+description = "Plugin-owned direct data-plane runtime for one configured capability instance"
+requires-python = ">=3.11"
+dependencies = [
+    "grpcio>=1.62,<1.63",
+    "protobuf>=4.21,<5",
+]
+
+[project.scripts]
+cyrene-plugin-runtime = "cyrene_plugin_runtime.server:main"
+cyrene-plugin-python-preparer = "cyrene_plugin_runtime.dependency_preparer:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cyrene_plugin_runtime = ["py.typed"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

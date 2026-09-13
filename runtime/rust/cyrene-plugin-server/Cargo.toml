@@ -1,0 +1,29 @@
+[package]
+name = "cyrene-plugin-server"
+version = "0.1.0"
+edition = "2021"
+description = "Standalone native gRPC host binary for Cyrene Agent, Memory, and Computer Runtimes (R08)"
+license = "Apache-2.0"
+
+[[bin]]
+name = "cyrene-plugin-server"
+path = "src/main.rs"
+
+[dependencies]
+prost = "0.12"
+prost-types = "0.12"
+tonic = "0.11"
+tokio = { version = "1", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync", "net"] }
+futures = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contracts" }
+cyrene-agent-runtime = { path = "../cyrene-agent-runtime" }
+cyrene-memory-runtime = { path = "../cyrene-memory-runtime" }
+cyrene-computer-runtime = { path = "../cyrene-computer-runtime" }
+
+[build-dependencies]
+tonic-build = "0.11"
+protoc-bin-vendored = "3"

@@ -1,0 +1,37 @@
+schema_version: cyrene.legacy-spi-disposition.v1
+source: retired_platform_named_spi_v0
+entries:
+  - legacy_api: ModelAnalyzer
+    disposition: replaced_by_owner_contract
+    capability_id: model.analyzer.v1
+    owner: plugins/models/hf-model-analyzer
+  - legacy_api: CompatRule
+    disposition: replaced_by_owner_contract
+    capability_id: compatibility.evaluator.v1
+    owner: plugins/policy/compat-rules
+  - legacy_api: RuntimeBuilder
+    disposition: replaced_by_owner_contract
+    capability_id: environment.builder.v1
+    owner: plugins/environment/docker-uv-builder
+  - legacy_api: ExecutionEngine
+    disposition: replaced_by_owner_contract
+    capability_id: execution.engine.v1
+    owner: plugins/engines
+  - legacy_api: Probe
+    disposition: removed_no_capability_consumer
+    rationale: Hardware discovery is a Platform adapter and resource-fact control primitive, not a Product Plugin API.
+  - legacy_api: TrainingBackend
+    disposition: removed_no_capability_consumer
+    rationale: Existing training Plugins expose narrower planning and custom-script capabilities; neither implements the old run_training_step API.
+  - legacy_api: Quantization
+    disposition: removed_no_capability_consumer
+    rationale: No official Plugin implements the old quantize_model API.
+  - legacy_api: GatewayFilter
+    disposition: removed_no_capability_consumer
+    rationale: Prompt cache and resilience Plugins have distinct owner contracts and do not implement the old boolean filter API.
+  - legacy_api: Notification
+    disposition: removed_no_capability_consumer
+    rationale: The only Platform implementation was a POC fixture; no official Plugin or Product consumes the API.
+  - legacy_api: Storage
+    disposition: removed_no_capability_consumer
+    rationale: No official Plugin implements the byte-copy API; Products use owner-scoped storage and generic ArtifactRef handoffs.

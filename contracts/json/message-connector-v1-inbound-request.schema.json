@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/message.connector.v1/inbound-request.json",
+  "title": "Message connector inbound request v1",
+  "description": "Bounded request event consumed by Product approval policy.",
+  "type": "object",
+  "required": ["account_id", "vendor", "request_id", "request_kind", "vendor_request"],
+  "properties": {
+    "account_id": {"type": "string", "minLength": 1, "maxLength": 512},
+    "vendor": {"type": "string", "minLength": 1, "maxLength": 64},
+    "request_id": {"type": "string", "minLength": 1, "maxLength": 512},
+    "request_kind": {"enum": ["friend", "group_invite"]},
+    "vendor_request": {
+      "type": "object",
+      "properties": {
+        "sub_type": {"enum": ["add", "invite"]},
+        "group_id": {"type": "string", "maxLength": 512},
+        "user_id": {"type": "string", "maxLength": 512}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

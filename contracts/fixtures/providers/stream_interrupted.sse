@@ -1,0 +1,5 @@
+data: {"id":"chatcmpl-1","choices":[{"delta":{"content":"Hello"}}]}
+
+data: {"id":"chatcmpl-2","choices":[{"delta":{"content":" world"}}]}
+
+: ping keepalive

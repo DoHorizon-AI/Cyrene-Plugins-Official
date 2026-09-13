@@ -1,0 +1,69 @@
+{
+  "record_type": "package_descriptor",
+  "spec_version": "0.1",
+  "package": {
+    "manifest_ref": "plugins/connectors/onebot-v11/plugin.manifest.json",
+    "id": "cyrene.connectors.onebot-v11",
+    "version": "0.1.0"
+  },
+  "capability": {
+    "id": "message.connector.v1",
+    "interface_version": "1"
+  },
+  "connector": {
+    "family": "onebot_v11",
+    "type": "onebot_v11"
+  },
+  "implementation": {
+    "artifact": {
+      "status": "NOT_PUBLISHED"
+    },
+    "entrypoint": "onebot_v11_connector:OneBotV11Connector"
+  },
+  "dependencies": {
+    "lock": {
+      "status": "NOT_PUBLISHED"
+    }
+  },
+  "configuration": {
+    "schema_ref": "plugins/connectors/onebot-v11/configuration.schema.json",
+    "digest": null
+  },
+  "runtime": {
+    "kind": "subprocess-python",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "external": {
+      "required": true,
+      "kind": "onebot_v11_runtime",
+      "artifact_ref": null
+    }
+  },
+  "compatibility": {
+    "platform_api": ">=0.1.0",
+    "capability_interface": "message.connector.v1@1",
+    "os": [
+      "linux"
+    ],
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  "integrity": {
+    "artifact_digest": null,
+    "archive_digest": null,
+    "signature_ref": null
+  },
+  "lifecycle": {
+    "rollback_identity": "cyrene.connectors.onebot-v11@0.1.0",
+    "cache_identity": "cyrene.connectors.onebot-v11@0.1.0"
+  },
+  "provenance": {
+    "source_repository": "Cyrene-Plugins-Official",
+    "source_revision": "22ed62c3d78859a76111a0d06c8b4f07d87c1f20",
+    "builder": null,
+    "sbom_ref": null,
+    "attestation_ref": null
+  },
+  "publication_status": "CANDIDATE"
+}

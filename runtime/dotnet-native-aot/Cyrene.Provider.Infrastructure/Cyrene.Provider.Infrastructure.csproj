@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsAotCompatible>true</IsAotCompatible>
+    <Description>Shared AOT-compatible infrastructure library for Cyrene Providers (Milestone M5D)</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Cyrene.Plugin.Core/Cyrene.Plugin.Core.csproj" />
+  </ItemGroup>
+</Project>

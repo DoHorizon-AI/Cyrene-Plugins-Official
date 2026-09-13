@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.cyrene</groupId>
+        <artifactId>cyrene-plugin-parent</artifactId>
+        <version>0.1.0</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>cyrene-plugin-bom</artifactId>
+    <packaging>pom</packaging>
+    <name>Cyrene Plugin Java Bill of Materials (BOM)</name>
+    <description>Bill of Materials (BOM) defining consistent dependency versions for Cyrene Java SDK (T56).</description>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>io.cyrene</groupId>
+                <artifactId>cyrene-plugin-contracts</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.cyrene</groupId>
+                <artifactId>cyrene-plugin-client-java</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.cyrene</groupId>
+                <artifactId>cyrene-plugin-spring-boot-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>io.cyrene</groupId>
+                <artifactId>cyrene-plugin-spring-boot4-starter</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+</project>

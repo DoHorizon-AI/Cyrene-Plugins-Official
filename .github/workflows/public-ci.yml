@@ -1,0 +1,335 @@
+name: public-ci
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+  workflow_dispatch:
+
+concurrency:
+  group: public-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: "0"
+  CI: "true"
+
+jobs:
+  source-hygiene:
+    name: public-ci / source-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Verify exported source manifest
+        run: >-
+          python3 tools/ci/verify_source_manifest.py
+          --root .
+          --allow-git-metadata
+      - name: Verify public repository metadata and hygiene
+        run: python3 tools/ci/check_public_repository.py
+      - name: Scan the exported source for credentials
+        run: >-
+          docker run --rm
+          -v "$PWD:/source:ro"
+          zricethezav/gitleaks:v8.30.0
+          detect --source=/source --no-git --redact --verbose
+      - name: Generate source and dependency SBOMs
+        run: |
+          set -euo pipefail
+          sbom_root="$RUNNER_TEMP/cyrene-source-sbom"
+          mkdir -p "$sbom_root"
+          docker run --rm \
+            -v "$PWD:/source:ro" \
+            -v "$sbom_root:/output" \
+            ghcr.io/anchore/syft:v1.51.1@sha256:95fe0835e5bebc6f8b1f8acef68d47d63d594ef4c0f25c097ff853b23cbac74c \
+            scan dir:/source \
+            -o spdx-json=/output/source.spdx.json \
+            -o cyclonedx-json=/output/source.cdx.json
+          python3 - "$sbom_root" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          spdx = json.loads((root / "source.spdx.json").read_text(encoding="utf-8"))
+          cyclonedx = json.loads((root / "source.cdx.json").read_text(encoding="utf-8"))
+          if spdx.get("spdxVersion") != "SPDX-2.3" or not spdx.get("packages"):
+              raise SystemExit("source SPDX SBOM is missing packages")
+          if cyclonedx.get("bomFormat") != "CycloneDX" or not cyclonedx.get("components"):
+              raise SystemExit("source CycloneDX SBOM is missing components")
+          PY
+      - name: Upload source and dependency SBOMs
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-source-sbom-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-source-sbom
+          if-no-files-found: error
+          compression-level: 0
+      - name: Install Python runtime test dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check pytest ruff
+          python3 -m pip install --disable-pip-version-check \
+            -e sdk/python/cyrene_model_provider_contracts \
+            -e sdk/python/cyrene_plugin_runtime \
+            -e plugins/connectors/onebot-v11
+      - name: Lint Python runtime and OneBot sources
+        run: |
+          python3 -m ruff check \
+            --exclude '**/_generated/**' \
+            sdk/python/cyrene_model_provider_contracts/src \
+            sdk/python/cyrene_plugin_runtime/src \
+            plugins/connectors/onebot-v11/src \
+            tools/ci/verify_source_manifest.py
+      - name: Run Python runtime and OneBot tests
+        run: |
+          python3 -m pytest -q \
+            sdk/python/cyrene_plugin_runtime/tests \
+            plugins/connectors/onebot-v11/tests
+
+  buf-contracts:
+    name: public-ci / buf-contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.45.0"
+      - name: Lint and format protobuf contracts
+        working-directory: contracts
+        run: |
+          buf lint
+          buf format --diff --exit-code
+          buf build
+
+  rust-native:
+    name: public-ci / rust-native
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Format, lint, and test Rust crates
+        run: |
+          set -euo pipefail
+          for manifest in \
+            contracts/rust/cyrene-plugin-contracts/Cargo.toml \
+            runtime/rust/cyrene-agent-runtime/Cargo.toml \
+            runtime/rust/cyrene-memory-runtime/Cargo.toml \
+            runtime/rust/cyrene-computer-runtime/Cargo.toml \
+            runtime/rust/cyrene-plugin-cabi/Cargo.toml \
+            runtime/rust/cyrene-plugin-server/Cargo.toml; do
+            cargo fmt --manifest-path "$manifest" --check
+            cargo clippy --manifest-path "$manifest" --all-targets -- -D warnings
+            cargo test --manifest-path "$manifest"
+          done
+      - name: Build Rust server and C ABI
+        run: |
+          cargo build --release --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml
+          cargo build --release --manifest-path runtime/rust/cyrene-plugin-cabi/Cargo.toml
+      - name: Run the pure C ABI harness
+        run: |
+          set -euo pipefail
+          native_root="$RUNNER_TEMP/cyrene-rust-native"
+          mkdir -p "$native_root/bin" "$native_root/lib" "$native_root/tests"
+          cp runtime/rust/cyrene-plugin-server/target/release/cyrene-plugin-server "$native_root/bin/"
+          cp runtime/rust/cyrene-plugin-cabi/target/release/librust_cyrene_plugin.so "$native_root/lib/"
+          cc -std=c11 -Wall -Wextra -Werror -Wpedantic -Wshadow -pthread \
+            contracts/cabi/tests/cabi_harness.c -ldl \
+            -o "$native_root/tests/cabi_harness"
+          "$native_root/tests/cabi_harness" "$native_root/lib/librust_cyrene_plugin.so"
+      - name: Upload Rust build evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-rust-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-rust-native
+          if-no-files-found: error
+          compression-level: 0
+
+  dotnet-native-aot:
+    name: public-ci / dotnet-native-aot (${{ matrix.rid }})
+    needs: rust-native
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - rid: linux-x64
+            os: ubuntu-latest
+          - rid: linux-arm64
+            os: ubuntu-24.04-arm
+          - rid: win-x64
+            os: windows-2025
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Run provider tests
+        run: dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release
+      - name: Verify Native AOT source rules
+        run: python tools/check_dotnet_aot_rules.py
+      - name: Publish and smoke-test all Native AOT components
+        run: python tools/ci/publish_native_aot.py --rid "${{ matrix.rid }}" --output-dir "${{ runner.temp }}/cyrene-dotnet-native/${{ matrix.rid }}"
+      - name: Upload Native AOT evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-dotnet-${{ matrix.rid }}-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-dotnet-native/${{ matrix.rid }}
+          if-no-files-found: error
+          compression-level: 0
+
+  java-spring:
+    name: public-ci / java-spring
+    needs:
+      - rust-native
+      - dotnet-native-aot
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-rust-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-rust-native
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-dotnet-linux-x64-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-dotnet-native-linux-x64
+      - name: Build Java client and Spring Boot 3/4 starters
+        env:
+          CYRENE_RUST_SERVER_BIN: ${{ runner.temp }}/cyrene-rust-native/bin/cyrene-plugin-server
+          CYRENE_RUST_CABI_SO: ${{ runner.temp }}/cyrene-rust-native/lib/librust_cyrene_plugin.so
+          CYRENE_NATIVE_AOT_HOST: ${{ runner.temp }}/cyrene-dotnet-native-linux-x64/bin/cyrene-plugin-host
+        run: mvn --batch-mode --no-transfer-progress clean verify -f sdk/java/pom.xml
+      - name: Reject skipped Java tests
+        run: python3 tools/ci/assert_no_test_skips.py sdk/java
+      - name: Stage Java packages and reports
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/cyrene-java"
+          mkdir -p "$output"
+          while IFS= read -r -d '' file; do
+            relative="${file#sdk/java/}"
+            mkdir -p "$output/$(dirname "$relative")"
+            cp "$file" "$output/$relative"
+          done < <(find sdk/java -type f \( -path '*/target/*.jar' -o -path '*/target/surefire-reports/*.xml' \) -print0)
+          test -n "$(find "$output" -type f -print -quit)"
+      - name: Upload Java packages and reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-java-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-java
+          if-no-files-found: error
+          compression-level: 0
+
+  release-handoff:
+    name: public-ci / immutable-release-handoff
+    needs:
+      - source-hygiene
+      - buf-contracts
+      - rust-native
+      - dotnet-native-aot
+      - java-spring
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cyrene-rust-*
+          path: ${{ runner.temp }}/release-input/rust
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cyrene-dotnet-*
+          path: ${{ runner.temp }}/release-input/dotnet
+          merge-multiple: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cyrene-java-*
+          path: ${{ runner.temp }}/release-input/java
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cyrene-source-sbom-*
+          path: ${{ runner.temp }}/release-input/sbom/source
+          merge-multiple: true
+      - name: Generate artifact SBOMs
+        run: |
+          set -euo pipefail
+          input="$RUNNER_TEMP/release-input"
+          generated="$RUNNER_TEMP/generated-artifact-sbom"
+          destination="$input/sbom/artifacts"
+          mkdir -p "$generated" "$destination"
+          docker run --rm \
+            -v "$input:/release-input:ro" \
+            -v "$generated:/output" \
+            ghcr.io/anchore/syft:v1.51.1@sha256:95fe0835e5bebc6f8b1f8acef68d47d63d594ef4c0f25c097ff853b23cbac74c \
+            scan dir:/release-input \
+            -o spdx-json=/output/artifacts.spdx.json \
+            -o cyclonedx-json=/output/artifacts.cdx.json
+          python3 - "$generated" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          spdx = json.loads((root / "artifacts.spdx.json").read_text(encoding="utf-8"))
+          cyclonedx = json.loads((root / "artifacts.cdx.json").read_text(encoding="utf-8"))
+          if spdx.get("spdxVersion") != "SPDX-2.3" or not spdx.get("packages"):
+              raise SystemExit("artifact SPDX SBOM is missing packages")
+          if cyclonedx.get("bomFormat") != "CycloneDX" or not cyclonedx.get("components"):
+              raise SystemExit("artifact CycloneDX SBOM is missing components")
+          PY
+          cp "$generated"/*.json "$destination/"
+      - name: Assemble immutable Azure handoff
+        env:
+          RELEASE_ARTIFACT_NAME: cyrene-release-${{ github.sha }}-${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          input="$RUNNER_TEMP/release-input"
+          output="$RUNNER_TEMP/release-output"
+          mkdir -p "$input" "$output"
+          cp source-manifest.json "$input/source-manifest.json"
+          python3 tools/ci/package_release_artifact.py \
+            --input-dir "$input" \
+            --output-dir "$output" \
+            --repository "$GITHUB_REPOSITORY" \
+            --workflow-run-id "$GITHUB_RUN_ID" \
+            --workflow-run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --commit-sha "$GITHUB_SHA" \
+            --artifact-name "$RELEASE_ARTIFACT_NAME" \
+            --abi-version "v1" \
+            --contract-version "v1" \
+            --rid "multi-rid"
+      - name: Upload immutable Azure handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-release-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-output
+          if-no-files-found: error
+          compression-level: 0

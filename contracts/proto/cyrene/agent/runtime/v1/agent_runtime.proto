@@ -1,0 +1,166 @@
+// SPDX-License-Identifier: Apache-2.0
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │ 📄 agent_runtime.proto                                                  │
+// │ Package: cyrene.agent.runtime.v1                                        │
+// │ Role: Canonical Agent Runtime payload contracts owned by Cyrene Plugins.│
+// │                                                                         │
+// │ 协议职责：定义由 Cyrene Plugins 拥有的 Agent 运行时类型化负载契约。    │
+// │ · 采用无状态轮次循环；会话与领域状态由 Product 拥有。                  │
+// │ · 流式事件严格按 sequence_number 单调递增排序。                         │
+// └─────────────────────────────────────────────────────────────────────────┘
+syntax = "proto3";
+
+package cyrene.agent.runtime.v1;
+
+option csharp_namespace = "Cyrene.Agent.Runtime.V1";
+option java_multiple_files = true;
+option java_outer_classname = "AgentRuntimeProto";
+option java_package = "io.cyrene.proto.agent.runtime.v1";
+
+// Direct plugin invocation identifiers:
+//   capability ID: agent.runtime.v1
+//   interface version: 1
+//   unary method: run
+//   streaming method: run_stream
+//   payload type URLs:
+//     type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest
+//     type.cyrene.io/cyrene.agent.runtime.v1.AgentRunResponse
+//     type.cyrene.io/cyrene.agent.runtime.v1.AgentStreamEvent
+
+enum AgentErrorCode {
+  AGENT_ERROR_CODE_UNSPECIFIED = 0;
+  AGENT_ERROR_CODE_INVALID_REQUEST = 1;
+  AGENT_ERROR_CODE_TURN_LIMIT_EXCEEDED = 2;
+  AGENT_ERROR_CODE_MODEL_UNAVAILABLE = 3;
+  AGENT_ERROR_CODE_TOOL_EXECUTION_FAILED = 4;
+  AGENT_ERROR_CODE_CONTEXT_WINDOW_EXCEEDED = 5;
+  AGENT_ERROR_CODE_CANCELLED = 6;
+  AGENT_ERROR_CODE_DEADLINE_EXCEEDED = 7;
+  AGENT_ERROR_CODE_INTERNAL = 8;
+}
+
+message ChatMessage {
+  // Role: "user", "assistant", "system", or "tool".
+  string role = 1;
+  string content = 2;
+  optional string name = 3;
+  optional string tool_call_id = 4;
+}
+
+message ToolDeclaration {
+  string name = 1;
+  string description = 2;
+  // Valid JSON Schema describing tool input parameters.
+  string parameters_json_schema = 3;
+}
+
+message ToolCall {
+  string call_id = 1;
+  string tool_name = 2;
+  string arguments_json = 3;
+}
+
+message ToolCallResult {
+  string call_id = 1;
+  string tool_name = 2;
+  string output_json = 3;
+  bool is_error = 4;
+}
+
+message AgentConfig {
+  // Max reasoning turns (default 10, max 50).
+  optional int32 max_turns = 1;
+  optional int64 timeout_ms = 2;
+  optional string model_selector = 3;
+  optional string system_instruction = 4;
+  optional float temperature = 5;
+  optional float top_p = 6;
+  optional int32 max_tool_concurrency = 7;
+}
+
+message UsageStats {
+  int32 prompt_tokens = 1;
+  int32 completion_tokens = 2;
+  int32 total_tokens = 3;
+  int32 model_call_count = 4;
+  int32 tool_call_count = 5;
+  int64 execution_duration_ms = 6;
+}
+
+message AgentRunRequest {
+  string run_id = 1;
+  string session_id = 2;
+  string prompt = 3;
+  repeated ChatMessage messages = 4;
+  repeated ToolDeclaration available_tools = 5;
+  optional AgentConfig config = 6;
+}
+
+message AgentRunResponse {
+  oneof result {
+    AgentRunSuccess success = 1;
+    AgentRunError error = 2;
+  }
+}
+
+message AgentRunSuccess {
+  string run_id = 1;
+  string output_text = 2;
+  int32 total_turns = 3;
+  string finish_reason = 4;
+  UsageStats usage = 5;
+}
+
+message AgentRunError {
+  AgentErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+  string domain_details = 4;
+}
+
+// Ordered streaming events emitted by run_stream.
+message AgentStreamEvent {
+  // Strictly monotonic sequence number starting at 1.
+  int64 sequence_number = 1;
+  // Unix timestamp in milliseconds.
+  int64 timestamp_ms = 2;
+
+  oneof event {
+    RunStartedEvent run_started = 3;
+    ContentDeltaEvent content_delta = 4;
+    ToolCallStartedEvent tool_call_started = 5;
+    ToolCallCompletedEvent tool_call_completed = 6;
+    RunCompletedEvent run_completed = 7;
+    RunFailedEvent run_failed = 8;
+  }
+}
+
+message RunStartedEvent {
+  string run_id = 1;
+  string resolved_model = 2;
+}
+
+message ContentDeltaEvent {
+  string text_delta = 1;
+}
+
+message ToolCallStartedEvent {
+  ToolCall tool_call = 1;
+}
+
+message ToolCallCompletedEvent {
+  ToolCallResult result = 1;
+}
+
+message RunCompletedEvent {
+  string finish_reason = 1;
+  string output_text = 2;
+  int32 total_turns = 3;
+  UsageStats usage = 4;
+}
+
+message RunFailedEvent {
+  AgentErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}

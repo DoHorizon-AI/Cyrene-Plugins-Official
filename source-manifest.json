@@ -1,0 +1,3172 @@
+{
+  "files": [
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": ".github/workflows/public-ci.yml",
+      "sha256": "3f45de1f6faaa2972812b027fd548dabc0dfe6030ba4d82fe8b66d2ca670fe2f",
+      "size_bytes": 13077
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": ".gitignore",
+      "sha256": "d222a91ddb4162ea1fff41a264bc9ccc7fcf5c220553956c54aad64b9e691e9b",
+      "size_bytes": 597
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "CONTRIBUTING.md",
+      "sha256": "468583c5c2ac0a4e41241b0a8eb082e19661e36052d07265ef2683d2003d30a0",
+      "size_bytes": 1767
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "LICENSE",
+      "sha256": "5adafe431a1d30e29dce59b305ce52b0624e83ce5502db99b4a13110bcb977fa",
+      "size_bytes": 542
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "LICENSING.md",
+      "sha256": "9ee70da3530648dba13da238993881ecbcad5302532e44c5301728f06f411ea0",
+      "size_bytes": 2518
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "README.md",
+      "sha256": "209a4662aed911728f65eeb7e3c03aa24bf964cc8767bdb8f75e7cc70f912589",
+      "size_bytes": 3144
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "SECURITY.md",
+      "sha256": "73d4d1fc26dae28b8353bdf62a01b9011b4a3a3f3c7e45587d08ec38f9e9ccf1",
+      "size_bytes": 1678
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "azure-pipelines.yml",
+      "sha256": "f19582cec4a71f07d99d4d8581c8039599808f3a90f39d14717fd0975adf0db8",
+      "size_bytes": 12338
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/README.md",
+      "sha256": "886c6336d6e38e6aff295a37563f7ab26d0c72613ef93adff949a20c4b5cc212",
+      "size_bytes": 4042
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/VERSIONING.md",
+      "sha256": "30b3361e09fbb8ed315f72a1b800b67b34f06720ce7c5f414597f6c6cc1f001b",
+      "size_bytes": 1825
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/buf.gen.yaml",
+      "sha256": "c64934d1e10b34c9de28e5b902e1222538cfd4e3bfc433579c4dd7ba547238b2",
+      "size_bytes": 209
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/buf.yaml",
+      "sha256": "0d19cee303251921a82c49c9fc31ec05da9483f5a0a6f8ea00c6fe538d72d639",
+      "size_bytes": 443
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/cabi/include/cyrene_plugin_abi_v1.h",
+      "sha256": "e3d205f245112d75267a59ae468731d3b70f75dadb4d460f4090da0a2959f4d1",
+      "size_bytes": 141
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/cabi/tests/cabi_harness.c",
+      "sha256": "1d308739735fb6d7be383b2cdcfdad0b7212e50d004c0fa3a29913ff28496d02",
+      "size_bytes": 18822
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/cabi/v1/README.md",
+      "sha256": "cea5152afef77201cd90a73b66b7773955df041a6a51b5f414795737b9ba7755",
+      "size_bytes": 2530
+    },
+    {
+      "kind": "symlink",
+      "mode": "120000",
+      "path": "contracts/cabi/v1/cyrene_plugin_abi.h",
+      "sha256": "7416be0974f1f88479478164b64d6ab305cfd248adc0f8675a6fc1c3ef1abfaf",
+      "size_bytes": 22,
+      "target": "cyrene_plugin_abi_v1.h"
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/cabi/v1/cyrene_plugin_abi_v1.h",
+      "sha256": "33617626ad416f7ce566bee1cd8497347e3ec67194c0c6ac029833cfd5891f27",
+      "size_bytes": 17539
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/dotnet/Cyrene.Plugin.Contracts/Cyrene.Plugin.Contracts.csproj",
+      "sha256": "5e1f483ff284cbddbf3f7b7b108b3704cb19bf2cff5c9de4584850eeb5be0451",
+      "size_bytes": 759
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/dotnet/Directory.Build.props",
+      "sha256": "10dd76e06e897001b3cfefa37d59dc0c74c2a07b0010c3f4c44c9a4c362baded",
+      "size_bytes": 375
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/golden/agent_run_request.bin",
+      "sha256": "655e12c7bd7e119c6c3f412f95178609fb54e930cc25384443c72c62ae61b647",
+      "size_bytes": 217
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/golden/agent_stream_events.bin",
+      "sha256": "0a98fadc48e6091fca41445b63e52b8bed028105433219713aafe795722eb43b",
+      "size_bytes": 141
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/golden/computer_command_request.bin",
+      "sha256": "5325f07b4eeb72d87ae7cfa395e64fbcdd503ee097b25a79f113e0e1801b6807",
+      "size_bytes": 63
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/golden/memory_recall_request.bin",
+      "sha256": "6cea4f775bcbb091bcf5b2a3b9d12d98feae6da3bbbaaad59dbfec9d8435f299",
+      "size_bytes": 65
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/golden/memory_store_request.bin",
+      "sha256": "c7f87fe1849e350aac91c5d8b7acbf8c10e5a37856c518370ba37fcdd261e87d",
+      "size_bytes": 182
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/providers/auth_failure_401.json",
+      "sha256": "a830be562f1cdbc3275a95582cb3623ebb84a5c481ef44d34013743c68bb3b03",
+      "size_bytes": 176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/providers/malformed_response.json",
+      "sha256": "3b7ad197d760d556340af6d7d74c5e22a96a49204c3d603fc6e2f31f126526d0",
+      "size_bytes": 206
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/providers/rate_limit_429.json",
+      "sha256": "b329485718ed8ebf0be6acbbfaa4731b33fc4c2601ef9410bebe64c102b555fb",
+      "size_bytes": 193
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/providers/retry_after_fact.json",
+      "sha256": "73c4984392fd1ec1e64cca656241d8851756c14dbcba00cc935690b50acd1c17",
+      "size_bytes": 190
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/fixtures/providers/stream_interrupted.sse",
+      "sha256": "a9aba1fa017c5c569d7e8c1ee22923cea4d53154c6feae9ec61b49c9656b21c9",
+      "size_bytes": 156
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/json/message-connector-v1-inbound-request.schema.json",
+      "sha256": "9393a0341bdbdb112a55f9bccd028848d5ee2a3a5fe1a641cc97b14f74c22a2e",
+      "size_bytes": 993
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/json/message-connector-v1-request-response.schema.json",
+      "sha256": "1ac2e62deb044d3f5184961688baabffdbed8181be5f1206a5560bb09c4bbe85",
+      "size_bytes": 1324
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/jvm/build.gradle.kts",
+      "sha256": "28fd80e8181b868e09ff5cea1c13deb2009cff3757f245bc632ad644fdccd81e",
+      "size_bytes": 741
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/jvm/settings.gradle.kts",
+      "sha256": "989eff6a9a039104463070cd578fa524c0663bee0a5a58c13f628d148b90f0c7",
+      "size_bytes": 148
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/legacy-spi-disposition.yaml",
+      "sha256": "66f944ed4b8c0c3994208a988e3b5734a46ec2a7e774792390de96d785bf05ff",
+      "size_bytes": 1886
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/proto/cyrene/agent/runtime/v1/agent_runtime.proto",
+      "sha256": "79682436be8a8fa14ec89338e318d65173c5983c1234fd235e5210d3c551a95b",
+      "size_bytes": 4850
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/proto/cyrene/computer/runtime/v1/computer_runtime.proto",
+      "sha256": "7ed246bad31fabd0e8a0a744c733588f2d3c911d5962abb3d2a0cc0bbf9c8b11",
+      "size_bytes": 4455
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/proto/cyrene/memory/provider/v1/memory_provider.proto",
+      "sha256": "b278039f1bcaf012f72c17353ff5a1d315209d67f3c890b74a7b5d21442b66d0",
+      "size_bytes": 4245
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/proto/cyrene/message/connector/v1/message_connector.proto",
+      "sha256": "62b042119777209d61132e9332079072f5afd12b2a393d00574b82feb8f434fd",
+      "size_bytes": 5705
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/proto/cyrene/model/provider/v1/model_provider.proto",
+      "sha256": "7d4919ccdc6f2a6e4a01cfe71713471b0e201737640e9782875fe5649d471580",
+      "size_bytes": 6669
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/proto/cyrene/plugin/runtime/v1/direct_plugin_runtime.proto",
+      "sha256": "84d6a186e972e5d80372ed3600557aff457055a7930e967acfc91ccaf08be68e",
+      "size_bytes": 2614
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/Cargo.lock",
+      "sha256": "9438eb472158aa6236e55e112f34ad2c4416dbd886186f5022a927858d34df0e",
+      "size_bytes": 11137
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/Cargo.toml",
+      "sha256": "ae4316be592628c98e5cf7dd33319990267cccec0c0ab87febbcb4291b722f67",
+      "size_bytes": 379
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/build.rs",
+      "sha256": "4a8b282b3ed3bd59f11c4f70c209f7d677d5d751fb29ce3fd95d00a9caa02457",
+      "size_bytes": 1628
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/agent_runtime.rs",
+      "sha256": "c50bff9d7826a77b6a38a153ee41aa34ccf220b62c177d015931029de7c421fa",
+      "size_bytes": 547
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/computer_runtime.rs",
+      "sha256": "28062c0f9ef2794c7ed589f8bb5b8bedca5ebb735fd04b6bbf08bceb1ae89c2c",
+      "size_bytes": 930
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/direct_plugin_runtime.rs",
+      "sha256": "d38a9bbdf8ef61a20af0d16ba6bdadbf5621b23e708f3eba39b375c9cb66cc22",
+      "size_bytes": 521
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/lib.rs",
+      "sha256": "7a28b13594598f59e181aa67354b8d98ba77a18b9a402580949cd566f3b9c671",
+      "size_bytes": 1388
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/memory_provider.rs",
+      "sha256": "9577ef6edf363b6d2a1e75941db6270155e1f1086f6368961d83366a3c657654",
+      "size_bytes": 918
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/message_connector.rs",
+      "sha256": "f27e6f270e4f88f9c093bc1c12501ac02b074046f6b73ad5f0dae079452be7ee",
+      "size_bytes": 2375
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/model_provider.rs",
+      "sha256": "26874a98255962c30e2fbc0956cdcae2968f9f51c60417936c80634a6cdbad71",
+      "size_bytes": 1637
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/agent_runtime_contract_tck.rs",
+      "sha256": "638ba1e3e7be929ceb97728364d8eaa771e919f0f9eaf497974f9df04df8f4e5",
+      "size_bytes": 7726
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/computer_runtime_contract_tck.rs",
+      "sha256": "5e0cb8ae4d9e93ac7783d1ba2740a82b052e8ff61b165f7bc9bad6d7f4f0170b",
+      "size_bytes": 6199
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/cross_language_golden_fixtures_tck.rs",
+      "sha256": "ef67076fb64c169314837782559ec8411d84cb377b60036c64d97c687482a57b",
+      "size_bytes": 7442
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/memory_provider_contract_tck.rs",
+      "sha256": "cf7c920e2eb4b143d43a392da3bdbed304539d31d125f41527b002254420c629",
+      "size_bytes": 5424
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/message_connector_contract_tck.rs",
+      "sha256": "b383a7580f43f03eb0b8a808fa337d4bc1b9b6db1be440fdd2a55805fe7ac1ee",
+      "size_bytes": 11265
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/model_provider_chat_contract_tck.rs",
+      "sha256": "a6a685bcca41791eed3a6a68e848fea857903983eaf7af5d24e870fbeafe32cf",
+      "size_bytes": 10087
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/model_provider_embedding_contract_tck.rs",
+      "sha256": "b15f71a1c03e459fc4e7d1868b4c38ba9bd870ff6da77f2c02397f12e924df8f",
+      "size_bytes": 7753
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/message-connector-v1/README.md",
+      "sha256": "db9e7efa7f47c127aca74714ccca6bf4a2fff1ff8fe892c915af4238ca1b6682",
+      "size_bytes": 755
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/message-connector-v1/dotnet/MessageConnectorContractTck.csproj",
+      "sha256": "1a6ccc4700bbc4ab4ddd9913c2903d8c8475756cec626adc6595b69cc2b7b71c",
+      "size_bytes": 618
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/message-connector-v1/dotnet/Program.cs",
+      "sha256": "17b971ebc5e57ef1ae0fc621644c81615604c954631ffb73f1872a9875b8640f",
+      "size_bytes": 1733
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/message-connector-v1/generate-bindings.ps1",
+      "sha256": "16e833c8f0657f2aa13947202b087bd4ed5dbf8046578a44cf6c8cfb4a824671",
+      "size_bytes": 4064
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "contracts/tck/message-connector-v1/generate-bindings.sh",
+      "sha256": "4dfef352462019a85de6437f6edfc1f45e8351a7a38c2fb8ebf2d4f1bb5f616c",
+      "size_bytes": 2447
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/message-connector-v1/python/pyproject.toml",
+      "sha256": "3d40e9d4908b0f90bba82d64efe71ca952101a419c83785c6c434f432ae516a3",
+      "size_bytes": 170
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/message-connector-v1/python/run_tck.py",
+      "sha256": "68664df0777162e1ab2e49fe08446ca98519dc542014e216dedf5b82d8a6e2f8",
+      "size_bytes": 1642
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/message-connector-v1/python/uv.lock",
+      "sha256": "79e0d3e240584274afc550b43aeb5b90fbb1915ef54e81fa644df172d31c58ac",
+      "size_bytes": 2532
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/README.md",
+      "sha256": "1429d8757936c0141c0137247ad3616703954f0ed9e39fd99c9b4bcc56bc1ca7",
+      "size_bytes": 752
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/dotnet/ModelProviderContractTck.csproj",
+      "sha256": "2696d7ec4349104319517c57049b29b7a7032a91b086d22b3dfe52a303110d9b",
+      "size_bytes": 612
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/dotnet/Program.cs",
+      "sha256": "3d7714d8cf65e05152202109fbc28dd94d37f9f0c914705c6c7bf61a645df608",
+      "size_bytes": 1756
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "contracts/tck/model-provider-v1/generate-bindings.sh",
+      "sha256": "880a558fd3eec118a8c851779245b06b2d45c41f7a8276b0cd9d514282df6da5",
+      "size_bytes": 2436
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/jvm/build.gradle.kts",
+      "sha256": "ceeb3a74f0b5d8ab8d40cacf975d9ff1a3f9ba9267aeaa7a28aab4db6f1306f3",
+      "size_bytes": 782
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/jvm/settings.gradle.kts",
+      "sha256": "2c6c0bead9ce8d19cec233abb61dd948599ab3c2bf3f7aca9eb05aab58df60d2",
+      "size_bytes": 148
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/jvm/src/test/kotlin/io/cyrene/tck/ModelProviderContractTck.kt",
+      "sha256": "3ae6c79d8cc272c8040cb0083863410e0d14d0f8b194a43d124497d498315f77",
+      "size_bytes": 2464
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/python/pyproject.toml",
+      "sha256": "544588a93bde89aa730abe778eea091bdc902edbdfe95b73055c22ead905f51a",
+      "size_bytes": 167
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/python/run_tck.py",
+      "sha256": "93c94ca96a5694bb11566ac318f0e8933108143ca9af04c80238308b980ead8e",
+      "size_bytes": 1949
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/python/uv.lock",
+      "sha256": "4267b039f86ac9530816b03249a32d7350b541c460cffc3b92a58c140b797579",
+      "size_bytes": 2529
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "contracts/tck/model-provider-v1/run-jvm-tck.sh",
+      "sha256": "c7eb3a539e90897b97153e5f05a2ff1c3d71b2a08160bcf9133244d95bca4c4e",
+      "size_bytes": 900
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "manifests/plugin.manifest.schema.json",
+      "sha256": "46c50d12e8a6524eb59999c98d227e748273804971a97b992828fd7125516d5b",
+      "size_bytes": 6442
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/QQ_API_PLAN.md",
+      "sha256": "c6a1f8072b8fd775e5fa7c3b9e3d7a26d9897eab078888a56f3eee1a046d92d5",
+      "size_bytes": 6334
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/QQ_SIDE_INTERFACES.md",
+      "sha256": "79e337b8517b7cfd9493b8a7560c325f336fb0bb5b5cb0e13edfdb4dc0185ceb",
+      "size_bytes": 13724
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/README.md",
+      "sha256": "c0c1691bcd72c1b24ae4e4cd80e70d0c10b87361182eaac49c92a1fb27d390f5",
+      "size_bytes": 4102
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/configuration.schema.json",
+      "sha256": "46618ff42ce0595fa687087bc9903938176b724fe514fbe353938ce201154025",
+      "size_bytes": 2235
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/package-descriptor.json",
+      "sha256": "71e9425d1229030bb6664953987d253a0074520551eb08efe2653419236fe08a",
+      "size_bytes": 1662
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/plugin.manifest.json",
+      "sha256": "827020b482380738abb8fcf53057434d3a40c65beb088171810b6e8af332769d",
+      "size_bytes": 1798
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/pyproject.toml",
+      "sha256": "3e1401e576c3e37c537e54cb78003ba9efe2e9b7b4e3d33f956f43fca315ede9",
+      "size_bytes": 787
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/requirements.lock",
+      "sha256": "01a18ad7ddf3cd1f7042b7be2fe1b0618ed5a2deef903a1f967ed5050973e5ca",
+      "size_bytes": 207
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/README.md",
+      "sha256": "d19233645730afe711b4ec937323ea85cb258e6b8a0e277a4404a4bfd64908dd",
+      "size_bytes": 1058
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/README.md",
+      "sha256": "099cdbecd4107d4a9af889ef3667379f9d70c26e258f31e5726c4ac17362dc33",
+      "size_bytes": 1225
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/__init__.py",
+      "sha256": "2e79ab07f016875a24ce22bebebc62042fdc566e26b1f1e76fb53a831d4f66c2",
+      "size_bytes": 2083
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/_generated/README.md",
+      "sha256": "c382002a0c8e6dced70cfc8e3b33db1ea23f91b01d2cc9875eedb9a66d9481dc",
+      "size_bytes": 1096
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/_generated/__init__.py",
+      "sha256": "00c23d04ad031e2cd90adf7a57909e0ba5dee9e013a3c9b011af44c2ca724783",
+      "size_bytes": 78
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/_generated/message_connector_pb2.py",
+      "sha256": "2236b0ac3215bfaa1be71e0ffecaacd697264c01b8af981356640f9e62f4dd17",
+      "size_bytes": 6945
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/connector.py",
+      "sha256": "e413e6bfba9fbc6bd6c418a79065488198e1425d817a635cb6c6d2878920d2c3",
+      "size_bytes": 62322
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/transport.py",
+      "sha256": "ee2ed675fc0cf7900ae39da4a8c34c2320601346228aea6869a909d5b1ec4292",
+      "size_bytes": 32245
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_connector.py",
+      "sha256": "0dfb5e4cc4f52a6de6d311df502fe6cb2737e1c8c917a9c8f7066bfb6ce1230b",
+      "size_bytes": 22249
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_transport.py",
+      "sha256": "3d1bf56f41679855d89ec65b843d9ffa782f308b4f6c01d8aaa5b91ad9f2b203",
+      "size_bytes": 21804
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
+      "sha256": "6cf86ab69237f098d861d6f16582b3af5dd245f69d430a7e3c40ef4a4003ec10",
+      "size_bytes": 2194
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/computer-runtime/plugin.manifest.json",
+      "sha256": "29ca45e173ebe8dadc528a018e914de403528c5db5a9e40d3c80c496da3e1c4e",
+      "size_bytes": 1578
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "repository-policy.yaml",
+      "sha256": "32f1b9fc7582218f420faaed5ad3729c2c4c31a52ab24ed9765ed3c155d02b9d",
+      "size_bytes": 1957
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/Cyrene.Plugin.Core.csproj",
+      "sha256": "a1626e369c7a2fa36827e680f949ef3bee065ccd3d8e8218d8d97bc76fae5157",
+      "size_bytes": 455
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
+      "sha256": "19eced085d9cdbbaf76c3da1c784b16e9da557505ac91860c00260849db5b47f",
+      "size_bytes": 5382
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginJsonContext.cs",
+      "sha256": "bcceeb04832fe1227644af1df42851f5f8e9b5d97dcb1f166a05c7ae845bf6a0",
+      "size_bytes": 1625
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginJsonModels.cs",
+      "sha256": "f7bda78509ab9b2046fc566c71e28f81fcc0fe4ab6ef21a76de964c4afa45e67",
+      "size_bytes": 2439
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/StatusCode.cs",
+      "sha256": "da511dd3a400f464d0c3e18f56504583fdb77bf319f1fbf546dcae2dcb0df219",
+      "size_bytes": 1438
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Host/Cyrene.Plugin.Host.csproj",
+      "sha256": "07e7b453eb7b6c8500db3e0f82600197616f25be23c21a1276f411ffd82bcfbf",
+      "size_bytes": 533
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Host/Program.cs",
+      "sha256": "93c5e3977eef6ae701b5f8e4b8e439d785c719d2d0b992c7c062286ca4175fc0",
+      "size_bytes": 12845
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.NativeLib/Cyrene.Plugin.NativeLib.csproj",
+      "sha256": "2ee20086d39a015273380e332b3d38e12fe0d26e3309374ac8583737027312cd",
+      "size_bytes": 678
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.NativeLib/PluginNativeAbi.cs",
+      "sha256": "d1b3ce99b63d63467dbe8cb7ace75312a062bc1238f4829e00287e203d24462b",
+      "size_bytes": 18713
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/AnthropicVendorAdapter.cs",
+      "sha256": "43b713305919880cee304887bcccffc7353df48cd9ddb1670284ff8408d70957",
+      "size_bytes": 4044
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/Cyrene.Provider.Anthropic.csproj",
+      "sha256": "0b94e93ace4e2c7e2d538bba2bf0e7d6648c46d353856e85469ed86793e17447",
+      "size_bytes": 489
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/Program.cs",
+      "sha256": "2bb127d1d0be4d5beead80b913c5faecf273cb39fa5bcdf316de2b2ed1f58981",
+      "size_bytes": 1157
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Capability/CapabilityProfiles.cs",
+      "sha256": "d936bd76baafa1e2e001a45a2d620bd110ad8707f1396dbfdc368d9dd86e24fe",
+      "size_bytes": 3730
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Cyrene.Provider.Infrastructure.csproj",
+      "sha256": "1add3811ce10147a6fd0fe4c89b85068ac860ff9ccd038ac689ca0a2fc9b75b8",
+      "size_bytes": 399
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Diagnostics/ProviderErrors.cs",
+      "sha256": "344fa0ecd61099511ff1198d5f733db4a85e37f9b86e4e779720557302b71c61",
+      "size_bytes": 2402
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Security/SecurityComponents.cs",
+      "sha256": "acca556ab4c10264a2c1514eea66f51c12ad10a29fe004d5b9e21aac7374b473",
+      "size_bytes": 2554
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Serialization/WireModels.cs",
+      "sha256": "a1fbcbe0b32bca9547316e9c74fe004ac44fe3187b8394988b2e82306d9cb747",
+      "size_bytes": 5291
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Transport/TransportComponents.cs",
+      "sha256": "0b0995c322cccd84ffcb854cdb1cbbe25c1db00190353331206fabc4954eb63a",
+      "size_bytes": 3628
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi/Cyrene.Provider.OpenAi.csproj",
+      "sha256": "5d921dfe096c8c5b5283ae55e10d177cd2cb32221eae8cde39e6edbc8a0301d6",
+      "size_bytes": 486
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi/OpenAiVendorAdapter.cs",
+      "sha256": "0adda9bc2ac63fddd3340f11b2d057bbe7099571c72fdfa8354b1a8fee45b5b3",
+      "size_bytes": 7648
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi/Program.cs",
+      "sha256": "bddf151ff8b5f9bd3e552c6e556f590f0633cfcc91fb17ed6e639af706792d62",
+      "size_bytes": 1151
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj",
+      "sha256": "8040c66682483549729157814454f60bee0f44400e5d2505597f74caf209b4f7",
+      "size_bytes": 825
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/ProviderTests.cs",
+      "sha256": "f2dda10803ae6d8ba0781e1c007b4a500766509ac471b4bd40d5430e74848dda",
+      "size_bytes": 15653
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Directory.Build.props",
+      "sha256": "59c6fc131ee108faab63f0f59ba5bd35a11cd49acd7189c2bc5064cbd3e9bccc",
+      "size_bytes": 1629
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/README.md",
+      "sha256": "b4a7489bedef8492d60e18ab24f5265736860c8bfd259818a315938c9bef8f29",
+      "size_bytes": 1492
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/Cargo.lock",
+      "sha256": "3b39d121c7121a521bbaa5c7adf396002818a57988d65d387c782f393aa2ee7c",
+      "size_bytes": 18802
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/Cargo.toml",
+      "sha256": "0bf22aad8dec4d307f30177c607969c2d0417bf087c106a15daf92fa67b6af2d",
+      "size_bytes": 619
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/benches/agent_bench.rs",
+      "sha256": "d8f52cf5837fc29297669ec8f91ea54dff86e4225d7a82b6e1983696b6d2b65d",
+      "size_bytes": 3541
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/adapter/memory_provider.rs",
+      "sha256": "45c87b89917bbf780404ffa76f6e161604a09c1895255d66deb1038afccd3dab",
+      "size_bytes": 1282
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/adapter/mod.rs",
+      "sha256": "4a33253d6dcf15bcfb0e7d07c22b8fb0f5396c6895fcf72da788f3a4b697cbb4",
+      "size_bytes": 272
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/adapter/model_provider.rs",
+      "sha256": "f4f3b1ff5712e2e930039f7da3641748984c915c7bdc505b1664d736d3b5fe76",
+      "size_bytes": 1393
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/adapter/rig_adapter.rs",
+      "sha256": "afa1468d6d27fade7cf031057b5210c4f33a26eb98054cb7a6399de28db010e1",
+      "size_bytes": 3411
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/adapter/tool_provider.rs",
+      "sha256": "c49684c6111f77072f4209cfea70cfa883a223e599f4bbac3af2c1c90d56fa1e",
+      "size_bytes": 1189
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/engine/cancel.rs",
+      "sha256": "a85782c9b8507e9111ebd03d3af236ee3b4400ef232b76491209f5f72873c875",
+      "size_bytes": 2106
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/engine/mod.rs",
+      "sha256": "885f505dc2e1ed4ef2213c0c91fbfb379698fbf9d747eb246aa94ca1f0bb030c",
+      "size_bytes": 113
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/engine/turn_loop.rs",
+      "sha256": "6843c902697c6e777a067239807ab57abaa020a0d8069e9480f784204fd8ef68",
+      "size_bytes": 26650
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/lib.rs",
+      "sha256": "7423008dc895a48dc3985702408d9bf10f90c445c33f15b9332e0b038b3add19",
+      "size_bytes": 1879
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/limits.rs",
+      "sha256": "0a1a3a718a5015e8e83961bafb732ee59ea923ffb069576fcfadb1012a56d8b0",
+      "size_bytes": 3705
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/src/tck/mod.rs",
+      "sha256": "13ce603d48f1e386829d92a866f5d16005bc80490a9d3bc4afe33ed5dbcf9470",
+      "size_bytes": 11942
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-agent-runtime/tests/agent_runtime_tests.rs",
+      "sha256": "eb8bd9b6ebe239933cc2f4431c0d79899f4e3d06a8fd22dfcba2665fc5efd308",
+      "size_bytes": 6779
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/Cargo.lock",
+      "sha256": "8e6731362bd867cdf636309619dd36d0ab663d10c7db17c5f118477ea96ff5b1",
+      "size_bytes": 17533
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/Cargo.toml",
+      "sha256": "9a3328c07469b270f008ea6a740cfc48ab9b02aa3470b822cd816346a81387aa",
+      "size_bytes": 489
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/artifact/artifact_store.rs",
+      "sha256": "558b339336b39e56ca4081863544555a326d0fdb12e9640b1a393ca8032238be",
+      "size_bytes": 9036
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/artifact/mod.rs",
+      "sha256": "532c99dcb0608d9de32371e57859a5164071b3430251586a69d3af70c0cd5ab2",
+      "size_bytes": 64
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/browser/browser_service.rs",
+      "sha256": "d109e986aeb6cee443f75667f67ebf432be38d242a5bd2f277451d7b12c1bf2f",
+      "size_bytes": 7096
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/browser/mod.rs",
+      "sha256": "bf277cbad7ca1bd7b310fb2a9c9af11841d02793ee1e38960a7cdcce6a505b94",
+      "size_bytes": 67
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/filesystem/fs_service.rs",
+      "sha256": "3790959b091b894bed8c9231b964857f3a160f16f6c7442d6da972170753aade",
+      "size_bytes": 8458
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/filesystem/mod.rs",
+      "sha256": "4faedb8c9094c1338838a434784191b53361e2e96d6d74987ce2b9389d17174c",
+      "size_bytes": 60
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/lib.rs",
+      "sha256": "2f66c1a066732f7c9053f9cc185a1d26492682ecce49dbb5753956ad8bb662be",
+      "size_bytes": 6163
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/mod.rs",
+      "sha256": "67408a37dd4e1fd53a533643b91883480d0e2fbb3e55b17617b955f6fba5087a",
+      "size_bytes": 127
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/provider.rs",
+      "sha256": "295c8d4457a3ad98e614982e4756e06861b4f4b90f64696e0c8910636fd5740c",
+      "size_bytes": 2480
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/security/env_filter.rs",
+      "sha256": "1054b22e92e76a55e2f126ed1cbb3f8fbd61ce1bb2e4568d2d5ff5f2d51001f3",
+      "size_bytes": 3052
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/security/mod.rs",
+      "sha256": "4f23451f5ece855cde162ca77405241165ad947038d50e41f4e04ba5c141a6a0",
+      "size_bytes": 243
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/security/output_limiter.rs",
+      "sha256": "1502dbdd82c8b363c8d05fdab6888d9c3fea0361c9a05a7ccba22492cbdc7b93",
+      "size_bytes": 2463
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/security/path_validator.rs",
+      "sha256": "f274d45400bd53f71271b567e814d46631c60b52e35492daafd5bdab091e3ab3",
+      "size_bytes": 5840
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/shell/mod.rs",
+      "sha256": "26e5c752c6b4a8a67ebc4fdbf8199bb20132a8b57c432e6af892f401cf9c1b66",
+      "size_bytes": 69
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/shell/process_runner.rs",
+      "sha256": "0eb5e53fe383c9c0b25502d0690484b34627e17e057a7b05c7b35fc7a04d76df",
+      "size_bytes": 17034
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/tests/computer_runtime_tests.rs",
+      "sha256": "b794b3f955fc690df063e138f3641e9e465bca8664bdf440685414c1d1db31be",
+      "size_bytes": 26599
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/Cargo.lock",
+      "sha256": "5be1f82bd877fe180bf02df0e68567026d4080ac7198667c1aec31016798d277",
+      "size_bytes": 22153
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/Cargo.toml",
+      "sha256": "3aeb3505f9093074e3eb19b7008c4ef6a40544f86aaa0d03bcb13cb983e434d2",
+      "size_bytes": 572
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/src/backend/mod.rs",
+      "sha256": "59c4357205119f51372614977a55cb1393cbf44f49b155acaf008226e43981d6",
+      "size_bytes": 2591
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/src/backend/pgvector.rs",
+      "sha256": "d958aa21d0d28098593f297e9ab82be5f6fde7674a65c0a4fcb4d797dbbe37b6",
+      "size_bytes": 3299
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/src/backend/sqlite.rs",
+      "sha256": "5d30af5b4f2206c57038cf6ec7d9bb442fbd29495ff1c6f60fec09f34c77faf8",
+      "size_bytes": 24250
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/src/embedding.rs",
+      "sha256": "1e3c186f927ec6297e8d9a79b0b99b721424d1c740061abbe7d064ce4ddcbdc6",
+      "size_bytes": 2230
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/src/lib.rs",
+      "sha256": "d0fd6d09a6b2ae0f9cae2c411252ee58e13e847549e8a4a6b08faa34dd7b92cb",
+      "size_bytes": 871
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/src/model.rs",
+      "sha256": "6af1accc58ebe4fabf1dab076e14d572ece1a95f1f24153380a104a780ee0286",
+      "size_bytes": 1947
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/src/service.rs",
+      "sha256": "f9741dc44dbbe2ca728522598118291c13e452c387b385292a9690b1c42b8d70",
+      "size_bytes": 18803
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-memory-runtime/tests/memory_runtime_tests.rs",
+      "sha256": "8695e9a976e36c80b84ecd9d17e16fe2276866e2d4ffd9e770a3dc2855884b4c",
+      "size_bytes": 21472
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-cabi/Cargo.lock",
+      "sha256": "c49fb085f17238a158ae9c137708b268008717e09d4159a46c369e2735e959a5",
+      "size_bytes": 16563
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-cabi/Cargo.toml",
+      "sha256": "5efe14d703671faa186f4a9b2cc653cbe258c3da3f86303e0f0d6647f7a946c7",
+      "size_bytes": 522
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-cabi/README.md",
+      "sha256": "8438fca8918405e0defcfc156a01f84bfcf4d012bd1fd2c0c248ffc37390e17a",
+      "size_bytes": 1502
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-cabi/src/lib.rs",
+      "sha256": "1168631f7eae01238aaf7fbffb6e1f835c609eaaaca15dcd1af38f1cff0c87c5",
+      "size_bytes": 29444
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/Cargo.lock",
+      "sha256": "8bb512e117ec71eff02491ccde580453fe0111291f883590345845bafc714bbb",
+      "size_bytes": 37878
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/Cargo.toml",
+      "sha256": "a230a5ae097f4aa57076122ad4955ca96ed8c4ac8be27d7793bb6bc487a6b9c3",
+      "size_bytes": 871
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/build.rs",
+      "sha256": "1c9fec1b143d27268b51de38f5aea4b5f3d605846c9eab3c1ca45aac48262d0a",
+      "size_bytes": 721
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/src/main.rs",
+      "sha256": "24c4ee002b1ad24af419bc86f70ee65456d72b4e9a5a77bbcaf2cb1a58799a92",
+      "size_bytes": 1833
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
+      "sha256": "0a0f7cd94328bbe4d49727bb03bf7b027dfaf5d1671fc334d25dd749cdb48dfa",
+      "size_bytes": 36856
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
+      "sha256": "c9b94b76491a79361d10611ae8f2a7774fd52e4f98cf50496b90a5a422f7f348",
+      "size_bytes": 19246
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-bom/pom.xml",
+      "sha256": "1c55f1eec177f0aa778f801e749044a611fd5a5f1f91cc70208c429ba0022b42",
+      "size_bytes": 1759
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/pom.xml",
+      "sha256": "fb692a0c9388581005d75237e32d9e04c66e3a26db9a2da9c345a204655f2535",
+      "size_bytes": 2378
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/channel/CyreneChannelManager.java",
+      "sha256": "c4cb1b6f298cf84790d898720322b37533af7aca6a78b6fce02b49dbe14f0d4d",
+      "size_bytes": 6986
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/context/CancellationToken.java",
+      "sha256": "c90ccec9fa5ee4b55d3173a669d44aac35db4e0133238a0382601448cb2642ef",
+      "size_bytes": 2370
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/context/InvocationContext.java",
+      "sha256": "04760ebc0fa913ff7b4797a4b4ff7405c2aa96b539fe060e4d81373f7212ec0e",
+      "size_bytes": 7487
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/policy/CyreneInvocationPolicy.java",
+      "sha256": "89c9967405cb8a97ce2fe9df4ee9afcd016b36cc9ed64db1d4dbdc5d9034b251",
+      "size_bytes": 4368
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/runtime/DirectPluginRuntimeClient.java",
+      "sha256": "5ea422dd25be2e2d9b24bd724a765baa7092d0def0dd7b7ffa41be971537191e",
+      "size_bytes": 9462
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/BindingResolution.java",
+      "sha256": "b16347bd5e2c866694167d3ac82a851afcb76aedaaacf6b8c59b6261f023989a",
+      "size_bytes": 3469
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/ConnectionRef.java",
+      "sha256": "cb536f46f48b0fb2cdcd33a24036a49d891a2080386a0aadaef0e56d420a364d",
+      "size_bytes": 4614
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/CyreneBindingResolver.java",
+      "sha256": "d7e317377903d3c6db7ceb7e5cf4a8bb31aa557f26326c0554a4b10a6bb9ab15",
+      "size_bytes": 1991
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/PlatformProjectionBindingResolver.java",
+      "sha256": "83d4813b2f0ff0310d0b2b979bd43bc9c950cce051bd428601c8dc5f5ee031f9",
+      "size_bytes": 3308
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/RuntimeGeneration.java",
+      "sha256": "d61f1e2d5e3bc4d0aebd2252226c112edca147d384b408f1398be4e633d2d0b6",
+      "size_bytes": 2769
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/StaticBindingResolver.java",
+      "sha256": "f659e64e05af1763e484d9ad75aa2afc53e71e6bf50146c6d14cbec212bafbe2",
+      "size_bytes": 3618
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/AgentClient.java",
+      "sha256": "287dfd549b67630867fa9b6497ad5605b7fdff08e24cfec51d52e93077feea67",
+      "size_bytes": 6132
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/ComputerClient.java",
+      "sha256": "eb041292c025068438f0e4172ba3e0b5adfafc57ecdd98ddab22a701192e1505",
+      "size_bytes": 9639
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/ConnectorClient.java",
+      "sha256": "00df1a99704b2f3b568760d4580f0ec10a027d585fd8c11f7a1fdee6f557ab15",
+      "size_bytes": 4320
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/MemoryClient.java",
+      "sha256": "a5b2059d65e5c87a5ab0ff7071d0ca26d8e4ab390bf79e900f971d84a2d28508",
+      "size_bytes": 7920
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/ModelClient.java",
+      "sha256": "a6a0272ebfb49e6ad127933326d363046e70dd5be7ccdf98a2c0012a2527719c",
+      "size_bytes": 5924
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/ToolClient.java",
+      "sha256": "afd1bc003c38aa03282bc7d594205037fef519aa764188ec2429cdfccbd6c7a4",
+      "size_bytes": 3013
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/CyreneChannelManagerTest.java",
+      "sha256": "218c84a362b50e5cc4397b5b8d384f76ca9e02403f909a314a1215e01ae71177",
+      "size_bytes": 4148
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/CyrenePolicyAndContextTest.java",
+      "sha256": "508f7e739e99fb33048e699c3fa6c576b0abbbfe1f85f0d0809447aa4b4f9515",
+      "size_bytes": 4002
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/DirectPluginRuntimeClientTest.java",
+      "sha256": "1f8cc3fdb1e9b5b75b8e74c8f840c482d94ec919e0eed9b1f0d5e984587a2d6c",
+      "size_bytes": 15798
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/VerticalIntegrationTest.java",
+      "sha256": "7dfded793923b0a7898d6e56d90802cfd345e78201b60cc7b8c7701fc8d0e012",
+      "size_bytes": 16749
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/pom.xml",
+      "sha256": "59072f01cc59c7e2a60c5aace2c75d25f3d3ae1def3d0fd7d5dab79445559e3f",
+      "size_bytes": 1409
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectInvocationError.java",
+      "sha256": "021e87e5a7104011f71164f55b235195b5cd1185dfd000b90762db24664f9e78",
+      "size_bytes": 33013
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectInvocationErrorOrBuilder.java",
+      "sha256": "1198b0c72ebd5fb594894b1a1c715452746fa0e0a66ec18101d5bc7ffec94628",
+      "size_bytes": 1386
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectInvocationRequest.java",
+      "sha256": "19b78cb0784e616745d75be401b4a9fb85ef92227d4f7f6fdbc1dffc23090db5",
+      "size_bytes": 42285
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectInvocationRequestOrBuilder.java",
+      "sha256": "9a990378046085065771c23af4f31037b6c84f6e89c368dd0fbceabca04dbf44",
+      "size_bytes": 2286
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectInvocationResponse.java",
+      "sha256": "af2efe755a885a5a48de244364f49acccb70bff7a2271e80f8ddd8ca829fe235",
+      "size_bytes": 31376
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectInvocationResponseOrBuilder.java",
+      "sha256": "67fecc0243036a12bd8575384017d9723ad4fd6c8dbb94a3616544e354a40809",
+      "size_bytes": 1471
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectPayload.java",
+      "sha256": "ea77fcc745d922c141f7da4fad325a0ac852bb0714a1822bf59afbe08c08e0d0",
+      "size_bytes": 24807
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectPayloadOrBuilder.java",
+      "sha256": "4dc8b39900f6156db0231e438764698994efec3c94cd9adf0675f2621f9cd97f",
+      "size_bytes": 1020
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectPluginRuntimeGrpc.java",
+      "sha256": "f782fe4b9b2a8f69c794b5e56a7b93c546c7d421dd1eeb4d9937da2f8a473643",
+      "size_bytes": 14943
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectPluginRuntimeOuterClass.java",
+      "sha256": "d5c98ebcaab37a27fa64b185d0e8f08e80af78ae7e26a1bebdd2864fcf108037",
+      "size_bytes": 10185
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectStreamEnd.java",
+      "sha256": "10b2c215c41901ddba9e82a773d0517fd730a68eb7929498ecb1db5c1c1bf96a",
+      "size_bytes": 14323
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectStreamEndOrBuilder.java",
+      "sha256": "53d5951f063b31084b94b0df5f4e2c31292abe93dd4a5ec70df46befbbb55473",
+      "size_bytes": 383
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectStreamItem.java",
+      "sha256": "bfcfdff9c8bc6b572a1f8dd1f0e05264026ec7f2dc86579d735513a7c5edb862",
+      "size_bytes": 37668
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectStreamItemOrBuilder.java",
+      "sha256": "9c62c0c133a5f13016ef6e3042faaf295388889508db53042ed562416c962b10",
+      "size_bytes": 1904
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectStreamMode.java",
+      "sha256": "4f16a9fcfd88252232eeae5eae271fcee04bafdb342c39417bc3928d604f4deb",
+      "size_bytes": 3778
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/HealthRequest.java",
+      "sha256": "48d90c2c5bc7ed9c3395b17361793e275b7aae88b3cb20dc3a3f032469f052a1",
+      "size_bytes": 14205
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/HealthRequestOrBuilder.java",
+      "sha256": "8c348c8946c47ef5a8c5e1587f3f8425350755c1a876d0ed72deba9f5946d843",
+      "size_bytes": 379
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/HealthResponse.java",
+      "sha256": "2bea245f1a90dc7363477380bda824ea648187d38df4776b269caa2e37a8f519",
+      "size_bytes": 36314
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/HealthResponseOrBuilder.java",
+      "sha256": "8fe40dbb96205a536ab213aef5d26c565a0d4fb15b3e9b14f86c22f01e59f7e2",
+      "size_bytes": 2068
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentConfig.java",
+      "sha256": "319330e8c89abaf329bd6ba475e76fbce2eec23023cf39a1f704e05991d55e38",
+      "size_bytes": 37882
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentConfigOrBuilder.java",
+      "sha256": "fbab6a04d9c15df20ac60dc38cc14db1f73552356dd52108c32ef89e387c6759",
+      "size_bytes": 2749
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentErrorCode.java",
+      "sha256": "2cc26d049c680066826a8ca8135bc3406cab321f1d8f5cfc017065246f1b717d",
+      "size_bytes": 5594
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunError.java",
+      "sha256": "76bcf3977378243c086a8522328128220d7384ac7a8a171c37ad3db909744ae5",
+      "size_bytes": 28180
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunErrorOrBuilder.java",
+      "sha256": "beb710a48600a3b50e6f4cb66cfa24d0eae516aef2f699cc657325669bfe9760",
+      "size_bytes": 1350
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunRequest.java",
+      "sha256": "e6b46448f567157288bbf85e4e779c6ae64b01dde4f03db4ba93e77e3d619214",
+      "size_bytes": 59962
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunRequestOrBuilder.java",
+      "sha256": "7d6e0e75f6fe9ae503e209070504fdd643432e2bcfe230f72879071b7283b617",
+      "size_bytes": 3436
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunResponse.java",
+      "sha256": "2cb69297289a59ffa127f6bf764a068fee3b2e42a935ab097db4b15c6afe71dc",
+      "size_bytes": 31069
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunResponseOrBuilder.java",
+      "sha256": "9c3e8e16bcc567f672bff7ca5fa475e17067c08eb43ae17af62f0033d49d8143",
+      "size_bytes": 1431
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunSuccess.java",
+      "sha256": "f9e829aac4ddc2c94e83e55d4065da24d1a9936956db0af75b204cd8f5dafa60",
+      "size_bytes": 35741
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRunSuccessOrBuilder.java",
+      "sha256": "7405b9343130c584199d530b99f6d112a49f0ff9e03e6ebac17fa54ce91f7441",
+      "size_bytes": 1745
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentRuntimeProto.java",
+      "sha256": "bf5c9cab9262ce3a82c60d60a541670f269eb29d85d7a82cc7eb832866daea3f",
+      "size_bytes": 19122
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentStreamEvent.java",
+      "sha256": "525379b569cad2bc3c2cbd69959bdaa1497c2679c5a8bb75f471ebd5c2d4afd3",
+      "size_bytes": 67737
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/AgentStreamEventOrBuilder.java",
+      "sha256": "2bff4b98390ed7b0a1ed595545136ad77eb077859a98366895210e9e3d8d3661",
+      "size_bytes": 4187
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ChatMessage.java",
+      "sha256": "76c2ad69d0ebb18d217faeb92e039db7b2e1794dbbbfd6f24e7cc9be268f1f2e",
+      "size_bytes": 32590
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ChatMessageOrBuilder.java",
+      "sha256": "2b3a798a2d9625f97680bc46eda8f896275bfbfd3c43bc456ec74df663fe9e25",
+      "size_bytes": 1832
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ContentDeltaEvent.java",
+      "sha256": "25772303ac4b2fcf162935910a05272a55c1a99b0cd2d7f726a88aea4dfdd2f7",
+      "size_bytes": 19038
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ContentDeltaEventOrBuilder.java",
+      "sha256": "c2d21418f14a34e0dcebbf319083e6a46183f5e60a2c115fe1451dae1ec1f71b",
+      "size_bytes": 650
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/RunCompletedEvent.java",
+      "sha256": "87a8107ceb777486408127612dcaaa1ba20a4d99ea66fec3ca5cceae8f9ec9a3",
+      "size_bytes": 31846
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/RunCompletedEventOrBuilder.java",
+      "sha256": "de9fefe7abc470b3c97a24e8934088a0a977d3922057c60a4edc04746ef643d4",
+      "size_bytes": 1505
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/RunFailedEvent.java",
+      "sha256": "2d7e2150e1ac82ae0e501dcda54e08099d6b55a29a6289d0633cf4dce41a45d4",
+      "size_bytes": 23817
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/RunFailedEventOrBuilder.java",
+      "sha256": "0fb84e929ccaf95f2024e182746e94076f8576b6524e7c5d53596b96ece21af6",
+      "size_bytes": 1060
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/RunStartedEvent.java",
+      "sha256": "f3637806cb77c09909cfb6535cc17987cdd3077e22e1e63be20a4de03b46dbd6",
+      "size_bytes": 23137
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/RunStartedEventOrBuilder.java",
+      "sha256": "d0d9a5519ed0bb1febba08d928cf106cba0767c3f28cc9b6c0c55d40c566b4f0",
+      "size_bytes": 914
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCall.java",
+      "sha256": "82fe8c89c8577f86dd8cf8f49c79f5133652b7b172f593167794b54625e7e273",
+      "size_bytes": 26936
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCallCompletedEvent.java",
+      "sha256": "56a0c74eb16f5779cc47fc8ee84f95ec41368424ba42a3b97218f0561ad9bc98",
+      "size_bytes": 21986
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCallCompletedEventOrBuilder.java",
+      "sha256": "8a7496f529a1e4503f3bfed33ead72cafdb199cf6cb805b96ecc80ef805848f0",
+      "size_bytes": 877
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCallOrBuilder.java",
+      "sha256": "e5df6fdd4120a4065129bb575a7a804e8330385d565aff98a5a9648ce454350a",
+      "size_bytes": 1168
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCallResult.java",
+      "sha256": "17d7d60bf110075fbb0882f1be8aee8525a62e84d14b10e399548cf73f1888f1",
+      "size_bytes": 28884
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCallResultOrBuilder.java",
+      "sha256": "4aa0edd51eb98128c4cc5317e467267220641a4e26d0e8be171747208fbffbc2",
+      "size_bytes": 1262
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCallStartedEvent.java",
+      "sha256": "0895e3e1cbb1a12d05ba2c9dcb639c22a429d042657d8cda5127f3ea103e89b0",
+      "size_bytes": 21844
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolCallStartedEventOrBuilder.java",
+      "sha256": "ce5b705ae297dd2c5a48fa3e1b1291883eb57299f17e4dd870b5746535cf6b32",
+      "size_bytes": 862
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolDeclaration.java",
+      "sha256": "de681e3788f33bf686b8bef5b8c69cf3337f8e4c5986ca055004f0b2215edde9",
+      "size_bytes": 28390
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/ToolDeclarationOrBuilder.java",
+      "sha256": "7a969d7e3369b7b7f4bb4bddea8131bbe81899c75121b83a3517b1239d8c9b52",
+      "size_bytes": 1398
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/UsageStats.java",
+      "sha256": "53c28b492bfd172f0a558e1400f0fabfbde605f8f3aec9457f5329a4d8ef7c29",
+      "size_bytes": 25811
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/agent/runtime/v1/UsageStatsOrBuilder.java",
+      "sha256": "e4195c000c192afd8aa7ab95845337e25b00c2df05d8b20c4871ebffc60d91f5",
+      "size_bytes": 1083
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ArtifactMetadata.java",
+      "sha256": "c529101fa22e324bb41753c5797e4f7e4143bf036ec62736e66055071a3ce518",
+      "size_bytes": 35236
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ArtifactMetadataOrBuilder.java",
+      "sha256": "70e77f27cd41d6d1effe9114d1f9e8a5dfc3829bd2d493935491139472fdc093",
+      "size_bytes": 1653
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ArtifactPayload.java",
+      "sha256": "583a5d636050e5ce194ff1242e6dd19d56e82cde6287755e99cabc7896a1b193",
+      "size_bytes": 24109
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ArtifactPayloadOrBuilder.java",
+      "sha256": "0f78fea4660cb8c742e4e37e5e26118b1c517bd3e9266160095de0b2cfe91736",
+      "size_bytes": 1030
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CommandExecutionRequest.java",
+      "sha256": "26b923854aa2baa8e6c1a54682dde862184d7a050ef81e8eec3d2b4d3850b900",
+      "size_bytes": 38542
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CommandExecutionRequestOrBuilder.java",
+      "sha256": "a558693ca015d9bfb1195db790490b194315be2b8b9670e6b196e10c79851eeb",
+      "size_bytes": 2356
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CommandExecutionResponse.java",
+      "sha256": "db27b073b8b2b91c340e7243ebf26c03e739a73dce7ad6e034a555f8ed56bc4c",
+      "size_bytes": 32167
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CommandExecutionResponseOrBuilder.java",
+      "sha256": "8a36d4ad970b68978bce2a7ea72f8528a10debafcd681329aacaf01006f3eee9",
+      "size_bytes": 1518
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CommandStreamEvent.java",
+      "sha256": "833ce171c977a9cef4ad73e51a72bde02460c56c94d8aa880b410100f6d9a52c",
+      "size_bytes": 45557
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CommandStreamEventOrBuilder.java",
+      "sha256": "07654ee469b857f62d62bfc1995c4aefcdcf3d870b13bb62c5cfdc1cca21073a",
+      "size_bytes": 2641
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ComputerError.java",
+      "sha256": "1c167c26a191d21108f5cef4d47a3aa904ab1efe6ad53ff05839a5101daf3d35",
+      "size_bytes": 24057
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ComputerErrorCode.java",
+      "sha256": "0e0ca8231e8d18f8aceb56ca15c2af323e5a24fe557c0ca4cb43318a503585a6",
+      "size_bytes": 4879
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ComputerErrorOrBuilder.java",
+      "sha256": "b465a0434af4abba369725225735d3b92dcd9a58e1f17f9225e5ae8316d3c93d",
+      "size_bytes": 1088
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ComputerRuntimeProto.java",
+      "sha256": "eddcab3e718c56e6b31faf8a790763f96ed9b1f6d3b39e78bb05562ca8952961",
+      "size_bytes": 22394
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CreateArtifactRequest.java",
+      "sha256": "f778ccd269df4f8324aabe5af4a92a908537f54381a760ba7ead6f0a5f842ed6",
+      "size_bytes": 25469
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CreateArtifactRequestOrBuilder.java",
+      "sha256": "94e4e3f88b3b1266cde3547b2c54314ee204725d2abb8ec6b46c0773fddb5612",
+      "size_bytes": 1014
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CreateArtifactResponse.java",
+      "sha256": "9a71ae68547d34f5d08141db17b3f5936ecdfd38616ede8bab0c6254fae07a37",
+      "size_bytes": 32000
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/CreateArtifactResponseOrBuilder.java",
+      "sha256": "c2d49cdb5237e07ebfba74e509e269f281409ffac7a20ade452d697b5f43aa4e",
+      "size_bytes": 1507
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/DirEntries.java",
+      "sha256": "87edb5bd16537581c587499e0a3dc926f29e5f75f2cc0d70c227438711dce0c0",
+      "size_bytes": 26901
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/DirEntriesOrBuilder.java",
+      "sha256": "b12b9e32e92f562c79839b682873e9b2f10bfda3f1e21500d3af69f34df0cb59",
+      "size_bytes": 1220
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/DirEntry.java",
+      "sha256": "a28ed3f33384ea8eae6abd636e1e71f2010da22203b48d1eb0414d1d20900407",
+      "size_bytes": 23954
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/DirEntryOrBuilder.java",
+      "sha256": "e7932f2b2d0c4d11bc5c4a1fbcfffaa0788a8fdf779e387ee2d62e02d0f9c5ad",
+      "size_bytes": 942
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ExecutionEvidence.java",
+      "sha256": "4811ee8d1f7a8cde9258063832448e14354bb9b5e032d217b504b3eaba872c0b",
+      "size_bytes": 42909
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ExecutionEvidenceOrBuilder.java",
+      "sha256": "d25dc78cfb7faffc966b1f57eeaa070bb5f142a3df9bd30c28e1b3ed0244b996",
+      "size_bytes": 2245
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ExecutionResourceUsage.java",
+      "sha256": "e8cdce638fc2e849ac759b9afa32e2d905c869b0fbf557cfd6a3a4fb0731f661",
+      "size_bytes": 19069
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ExecutionResourceUsageOrBuilder.java",
+      "sha256": "d00f2c1910eff71fe1da33a7f605fc0a8ffcab833e441008f21c453e84d98454",
+      "size_bytes": 632
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/GetArtifactRequest.java",
+      "sha256": "8bad64a7a68d4cd522815f199c85b317589b5b4a6f09bfc70f09f58b175d25c5",
+      "size_bytes": 19335
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/GetArtifactRequestOrBuilder.java",
+      "sha256": "256c72160ff41ae04ffcb0d3b306763968cae758fbc200e24d81358e739546e3",
+      "size_bytes": 670
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/GetArtifactResponse.java",
+      "sha256": "e749bba4cfff88ee2b2120c6d6e6497d72bb4a05da46679a73866522747b9110",
+      "size_bytes": 31711
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/GetArtifactResponseOrBuilder.java",
+      "sha256": "18ff0d5d264d02987d9c0109b8935a68f38a47a1925afad2b602bfdfeefdbc95",
+      "size_bytes": 1485
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ListDirRequest.java",
+      "sha256": "a6517304c5962cfc1b803822c5d7da07abeb187c4f0adcae47689eb31cd018ea",
+      "size_bytes": 21237
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ListDirRequestOrBuilder.java",
+      "sha256": "0b0cd4ba74c65fbbfdd4faa9b1391e93bc38a40ce01af3df104e47ab99865ec8",
+      "size_bytes": 866
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ListDirResponse.java",
+      "sha256": "d0175602440e2c2c01c9195bed5f0298cab8fd786f83336809466ff893eb11ee",
+      "size_bytes": 31242
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ListDirResponseOrBuilder.java",
+      "sha256": "f93114fee10c0652fcfdf92071f9b1f714d544c7ed7bf982e1c634317ab04aa1",
+      "size_bytes": 1448
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ReadFileRequest.java",
+      "sha256": "a0460a6c2d4e3a37b99c2bc519038f49837b073e355f5f6da5a62277947f3284",
+      "size_bytes": 23701
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ReadFileRequestOrBuilder.java",
+      "sha256": "cf44c9eaabbf73cbc60ce39f1be9d5314442b86d04ace0b59cd1663bc2aa35a1",
+      "size_bytes": 1084
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ReadFileResponse.java",
+      "sha256": "7bddf83817fbd65d3ef6327145e5025341bc5b68265c10e67c4fdcdae64f3af8",
+      "size_bytes": 26498
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/ReadFileResponseOrBuilder.java",
+      "sha256": "1131c5741090fe3d49b41c9b42734cb07cec48189bb383c2c4c1a4921eb0f58a",
+      "size_bytes": 1206
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/WriteFileRequest.java",
+      "sha256": "93aed1127a066667d600ca34240ec1aa76ada18ea6ed17c3b10f9793acec4fae",
+      "size_bytes": 22803
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/WriteFileRequestOrBuilder.java",
+      "sha256": "b0e74a030ebef01f59d751b5f80ff4d74713d9ab002654357ee5209460c18058",
+      "size_bytes": 856
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/WriteFileResponse.java",
+      "sha256": "c5c41a538c1f1b4a23a65b55d59da44457605838150e4971477691159d04ec9e",
+      "size_bytes": 26481
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/computer/runtime/v1/WriteFileResponseOrBuilder.java",
+      "sha256": "9cf3cb52000b5af855e123ec4ee42893555decbf566ff9dbcdda477e2f25a14e",
+      "size_bytes": 1215
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/DeleteMemoryRequest.java",
+      "sha256": "2e822f93f1a2cb882c05eb600fdf24cfa4c2147c5c3f4814352e9f245b312759",
+      "size_bytes": 23375
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/DeleteMemoryRequestOrBuilder.java",
+      "sha256": "ca5918a5aaf984cf495dbda317a984ff131c4e2ee5baa79cd168829431cc0399",
+      "size_bytes": 906
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/DeleteMemoryResponse.java",
+      "sha256": "2ea68410b26d64443ad8e15ec0847b20c7438677eae22eb17189046a2963f620",
+      "size_bytes": 26347
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/DeleteMemoryResponseOrBuilder.java",
+      "sha256": "392b8fab2b51b73a1eff432c9765ff04c75bf1f17ef64379c2543ba83624e82a",
+      "size_bytes": 1173
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ExportBatch.java",
+      "sha256": "2631a12b3fec0be9d49001c4cc0be291bb5b34ac8c0af84576a943d7523e3e9f",
+      "size_bytes": 26635
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ExportBatchOrBuilder.java",
+      "sha256": "bd9f7693282b36e0925eba2df353a636d1756e9ddb45febdbedc393f284c97e6",
+      "size_bytes": 1207
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ExportMemoryRequest.java",
+      "sha256": "705875617fd7ddf3eff3785d5ca875b5e8a77f53c054fcb56939787a675a0989",
+      "size_bytes": 26200
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ExportMemoryRequestOrBuilder.java",
+      "sha256": "0ac5eba1621cbfc93424edd77db81ab43b85bee3ce3993b37f2553d431b4969b",
+      "size_bytes": 1262
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ExportMemoryResponse.java",
+      "sha256": "b926c4ec97818ed3f3bfae649f4c2a23681ffe09eafe0329d9e28629e8122cb9",
+      "size_bytes": 31227
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ExportMemoryResponseOrBuilder.java",
+      "sha256": "658cf82662270315122aebb13d16949bcc2f29f7fae520184868f52ee1e30716",
+      "size_bytes": 1427
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/GetMemoryRequest.java",
+      "sha256": "706e3800b9edbb9fa16b06650f1c4b3f523f006e07a9b80a14d68fb02a92f26e",
+      "size_bytes": 23189
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/GetMemoryRequestOrBuilder.java",
+      "sha256": "39ac2c982d9bff8e8807eacde031206bffc84e68523957b36fc89cc5407b3a11",
+      "size_bytes": 900
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/GetMemoryResponse.java",
+      "sha256": "3b628c9b136ba3916ae6d33de63137c34be3556897be40a79da4f82d1d6c214f",
+      "size_bytes": 30938
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/GetMemoryResponseOrBuilder.java",
+      "sha256": "daf7ead6877019744695b7d7c2ffcf55602ec89ed2083bf691ecf603991bca2e",
+      "size_bytes": 1405
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ImportMemoryRequest.java",
+      "sha256": "89906b44fef8286c9322d197d4d4ccf432b9a12278cb933e74fc92581de762bd",
+      "size_bytes": 33182
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ImportMemoryRequestOrBuilder.java",
+      "sha256": "dab38c681a4322eb6973f383cc217813ea18880fb34735b51cb59da8e149d0cd",
+      "size_bytes": 1590
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ImportMemoryResponse.java",
+      "sha256": "8c86d624396d560b484e4c4f18717123ccc743c06622d29386244e365c1f5b1a",
+      "size_bytes": 26446
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/ImportMemoryResponseOrBuilder.java",
+      "sha256": "59a84f1ca75c90a776a11b85a93ce5da33261ba7da8162eb303be4376ea5b52f",
+      "size_bytes": 1209
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryError.java",
+      "sha256": "0b6c77e76ef413e432c0ebd4b69859d91318ba7a7986bc460bac3a8c1a2f7e23",
+      "size_bytes": 23817
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryErrorCode.java",
+      "sha256": "e2c7f8dee9c516d8daa745fa2a724498856a950bd8a793dced7073092c199862",
+      "size_bytes": 4716
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryErrorOrBuilder.java",
+      "sha256": "112ce40a42482df369fbf4ca0dec097677b56e52276812a353b092a17a6c2132",
+      "size_bytes": 1071
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryItem.java",
+      "sha256": "44697e1db5ba47b70bb02703747321c562779eb9696228f4ef9984aff63d7645",
+      "size_bytes": 58161
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryItemOrBuilder.java",
+      "sha256": "bd24179cd9400820b96964665efb36c78c53c625df34c63dc11f71229823c215",
+      "size_bytes": 3863
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryMatch.java",
+      "sha256": "ae662f23a0765e3275a1a44015ae2fab72230fc2ee2536dcd7fe880fae3c7735",
+      "size_bytes": 23261
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryMatchOrBuilder.java",
+      "sha256": "ee59c2a815767740f8a289d38f1414e6b5c8bd38de9565801df91e7bffc248f6",
+      "size_bytes": 993
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/MemoryProviderProto.java",
+      "sha256": "61e55fcc35fd5e12714023a2ef3b9e0fdad3ebc62d2f14de2cc346688f879258",
+      "size_bytes": 21975
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/PruneMemoryRequest.java",
+      "sha256": "f484d670b4eabb06da4bcd4e8895ad862831155d56877d3307908afb4860740c",
+      "size_bytes": 22139
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/PruneMemoryRequestOrBuilder.java",
+      "sha256": "6d91e94bc38d6e6954ea0459d93c81b4a2307eb95bc4dfdee0f40bf0b8a6f0d9",
+      "size_bytes": 953
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/PruneMemoryResponse.java",
+      "sha256": "ae9a3032466c1be39b17557b9a2556ab2bcf3cfe94337fdb9a89b3dc8fecc9cd",
+      "size_bytes": 26378
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/PruneMemoryResponseOrBuilder.java",
+      "sha256": "1da82b054619b27365ded14da0b753c35a51080425bf5486edd80961d1742e7d",
+      "size_bytes": 1195
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/RecallBatch.java",
+      "sha256": "63724c01ba1bd91414720c0a2f8876feefdf98194f81173056e4070d03097257",
+      "size_bytes": 27015
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/RecallBatchOrBuilder.java",
+      "sha256": "abfc71c4cc3af15ba3282faba7f3b2b9068278cdb5b7987128cb389c7d082b0c",
+      "size_bytes": 1236
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/RecallMemoryRequest.java",
+      "sha256": "af5c411d711083f3eeb117be5b11f360e2048674a537ef99d14e36a1be8a8cd7",
+      "size_bytes": 54702
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/RecallMemoryRequestOrBuilder.java",
+      "sha256": "482e59a68df3941c1354e0ba94c251efc8cb2252ed777e3baabdbae612eda069",
+      "size_bytes": 3833
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/RecallMemoryResponse.java",
+      "sha256": "1fca69c44afa4c60e38bd6989f1579b0041ad0947dce44d3507d146914a08dd6",
+      "size_bytes": 31349
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/RecallMemoryResponseOrBuilder.java",
+      "sha256": "596fcbfa49a33c444ac318e9de32a32d60bd6e4e2bbc6a49eccc1a0254141e60",
+      "size_bytes": 1443
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/StoreMemoryRequest.java",
+      "sha256": "ccdea2b317601006261af7830dbb3a687d10308fec2af3b32360c28b6426f360",
+      "size_bytes": 25862
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/StoreMemoryRequestOrBuilder.java",
+      "sha256": "20e5cd0d32222b4be53cc7af2e5165f049a6e40fb103e105bbcd1877df739dc4",
+      "size_bytes": 1113
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/StoreMemoryResponse.java",
+      "sha256": "0ed34e4619e4b44197fea29f80b7fa7edba7b6592115db773a40e5532b5680ce",
+      "size_bytes": 28630
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/memory/provider/v1/StoreMemoryResponseOrBuilder.java",
+      "sha256": "fe09c0e3ee2747d73e2f35f1ebb0c836b4974381781f441bb50f6ddd4728f34c",
+      "size_bytes": 1321
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/AttachmentReference.java",
+      "sha256": "fd839d24db8002a4133d75e2b9b5938a92270be7e807c047fe8417b038f031b9",
+      "size_bytes": 32826
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/AttachmentReferenceOrBuilder.java",
+      "sha256": "294bf560ba39cdf331a1d52f4d4724541f75a1eafe3101b0526d7b4a5babe555",
+      "size_bytes": 2281
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/ConversationKind.java",
+      "sha256": "d696a6b19be0191b0fa1757c83f9b63d68f7766508a71866adfe6732c14af94f",
+      "size_bytes": 3993
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/ConversationScope.java",
+      "sha256": "5761fd2b2d6b8cea41b5a24123b7fec9751f23e2873affbc485d381e59e40126",
+      "size_bytes": 33243
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/ConversationScopeOrBuilder.java",
+      "sha256": "492bdfb7ae188aeb7b9eba43e29f512139a7921b2a37331c62f6c6ee2c5e51dd",
+      "size_bytes": 2105
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/DeliveryResult.java",
+      "sha256": "0f8b827c813b1dc4bec51795529da790160bf1b16ab24c5ad16af383cf0c624a",
+      "size_bytes": 41063
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/DeliveryResultOrBuilder.java",
+      "sha256": "efce25d1f596ca1039d0f8ada984034592d9c13de67a607ef6e9e4dd030cc3fe",
+      "size_bytes": 2320
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/DeliveryStatus.java",
+      "sha256": "fe7696fba05936b3bd13e002599fbd0d27cebfa0b6fd06927884330d30c0aab1",
+      "size_bytes": 4266
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/FileContent.java",
+      "sha256": "d35486d8206a1b4deffa030ccdf4db28b12e7a33cd01fea6f0ec9cfdb6301b27",
+      "size_bytes": 30504
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/FileContentOrBuilder.java",
+      "sha256": "8a3370f7f84826af5cec9a4a7e13965c8317ab3fc035cc2fdee8562d6c384694",
+      "size_bytes": 1464
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/ImageContent.java",
+      "sha256": "45d498928b41bc633b8622e189fefda1f37eacc1414e08a9ed30ba2e574ee556",
+      "size_bytes": 26396
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/ImageContentOrBuilder.java",
+      "sha256": "1794f3056a9efb33304947a3d063b75c7e8d0f7ef15c951ad70a855d32028a04",
+      "size_bytes": 1204
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/InboundMessagePayload.java",
+      "sha256": "84b72f4691dc61187b3c2e4abdb94190387113c7ebbf039ecdf0bcfbdf8eb6a2",
+      "size_bytes": 65528
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/InboundMessagePayloadOrBuilder.java",
+      "sha256": "200d502db4d386a31cd3194da3b891e2c0c0788123f764c2b51364cefa092f7f",
+      "size_bytes": 4438
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/MentionContent.java",
+      "sha256": "5131957d81cc0c0b20f63ff02e404d82bf99c86eb27526abaafe33bf54912452",
+      "size_bytes": 27562
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/MentionContentOrBuilder.java",
+      "sha256": "3366c80239555a9295332cea71a68572f7d1a7b74b8250cdb97c77b8e708e4e3",
+      "size_bytes": 1490
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/MentionTarget.java",
+      "sha256": "0f89b53bcbc98e29b53e3f844e1819f26b3d87adbe31495a06c18867f129bb9b",
+      "size_bytes": 3644
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/MessageConnectorProto.java",
+      "sha256": "f727af9a010711754e30d8b85e3b676f8ea5110c3dcf6841bfcbe31e6c37840d",
+      "size_bytes": 16106
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/MessageContentPart.java",
+      "sha256": "8daf54c7417a3e1e1787493cc42f1d8a0ae8695fcdc73f282a4d74ab25303cc4",
+      "size_bytes": 45619
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/MessageContentPartOrBuilder.java",
+      "sha256": "ff70d062e29beee16ced50d7636d074f04d48e85acf3f4944356cdc87fb2b08f",
+      "size_bytes": 2431
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/ReplyReference.java",
+      "sha256": "79678899ca798dba954f79b9defa949b1d1db9a00665d9f8f9d835bfb77e9ce7",
+      "size_bytes": 19106
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/ReplyReferenceOrBuilder.java",
+      "sha256": "a3d238fde0285f2b81da8bbce32c2980a58ec80688c120c16c87437b81e5d089",
+      "size_bytes": 660
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/SendMessageRequest.java",
+      "sha256": "811fe429dd5ff112c1be4f8255ebd1a8a561b0290d77913361d46c1036355f6f",
+      "size_bytes": 49907
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/SendMessageRequestOrBuilder.java",
+      "sha256": "e6f8d8e009394b3dc2742bfb2576deedcf11bb8dfa833f40a16b4a6186ca0682",
+      "size_bytes": 2989
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/TextContent.java",
+      "sha256": "68885b8952d756a04ae07c8e9a2f725e928c3cdb9e88f86e5c9d44e644582218",
+      "size_bytes": 18662
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/TextContentOrBuilder.java",
+      "sha256": "e87dcb4c214e753636a6702ab73eeb064957c425d1187701bb45d658442b9546",
+      "size_bytes": 622
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/VendorExtension.java",
+      "sha256": "e9b5f7e84bf07a69c69a5da0353b1e95fa77d1d4b3b431cdf64b2924da11c1e8",
+      "size_bytes": 32094
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/VendorExtensionOrBuilder.java",
+      "sha256": "febdf8e3c3db8ec877c6eba7ff666b29397d74ccbf2375f54a973a2134f60c2c",
+      "size_bytes": 1489
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/VendorFact.java",
+      "sha256": "04f61a636db58dac862c5de00b9b7b72859fd824a63e4600214d3736a1139247",
+      "size_bytes": 22608
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/VendorFactOrBuilder.java",
+      "sha256": "a545ccc60d70cd698b2890e2675d875e3bb297f5f5668cbe96ebdd77e7c4020d",
+      "size_bytes": 862
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/VendorMediaReference.java",
+      "sha256": "5965a7f7eb353e6253d1d6f03d2ce1d83c0e0b4b3dd7bd7fe9fc4e0569293b00",
+      "size_bytes": 27640
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/message/connector/v1/VendorMediaReferenceOrBuilder.java",
+      "sha256": "7d55bcec55dfeee2ef4b5e944aafd866d397a5688a649abf85087893c530b38f",
+      "size_bytes": 1176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatCompletionChunk.java",
+      "sha256": "8c3067f731d1eb609a6fe334d92ee6f64600df62c91c8ea51af0699856cb7e22",
+      "size_bytes": 50312
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatCompletionChunkOrBuilder.java",
+      "sha256": "113dba8a51f362ce24c04f9716d91b402e0c59c92bf5e6851ead168e3e89afa1",
+      "size_bytes": 3504
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatCompletionRequest.java",
+      "sha256": "ff2ec6c20774fcd9b9c9405eab50affb0ddededd0a7d45ab9ebdd678c64e20ac",
+      "size_bytes": 66574
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatCompletionRequestOrBuilder.java",
+      "sha256": "85c7e11a64b3e9d3ef27ff47df2433735bf13fdf6b2e26cc6ad5d31a0f8156c4",
+      "size_bytes": 4673
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatCompletionResponse.java",
+      "sha256": "1715c10e389e8585023a04ce98f79bc24527cc97fdceb6ee671e4e0ce91d4775",
+      "size_bytes": 28388
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatCompletionResponseOrBuilder.java",
+      "sha256": "b71b5f25c5439a9659a9aeda96effc0cc3db850716deaf4134e0bbc76c6dfddb",
+      "size_bytes": 1307
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatFunction.java",
+      "sha256": "ffac98b440c679ee996a84436ff47ca535d468337eaafb27a59c52a98cc225c7",
+      "size_bytes": 31654
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatFunctionOrBuilder.java",
+      "sha256": "e835531012a98ca324a8016d1694b24758b541e41bb3ae549d1cff0c2ddc66b9",
+      "size_bytes": 1878
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatMessage.java",
+      "sha256": "58c005299b8ea1c71f2b660f61b92bafc43a9930eef47e51feb08d73c0880909",
+      "size_bytes": 52312
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatMessageOrBuilder.java",
+      "sha256": "6aab67c8c36774f0fa5ca172bde8bcf275fd0418c4fd3b76939f80c5e00c31ff",
+      "size_bytes": 3485
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatTool.java",
+      "sha256": "d0fb89dc77fa25b220d1d7111e73859df002e9c948f210a06c6d0e9ff4f08344",
+      "size_bytes": 25307
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolCall.java",
+      "sha256": "8f11e240d33746ea1331bd18569e398a5928ab9b4989107eb00b1839f4bbfff2",
+      "size_bytes": 29688
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolCallDelta.java",
+      "sha256": "dc2f30f10a4ab2dacf708bbcf1b190eef11f0f73a2aa72937b1f805243deef1a",
+      "size_bytes": 36047
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolCallDeltaOrBuilder.java",
+      "sha256": "bab931304d6b5d73ee5ac0e59f478b1852ef2431d83507e60767dd1901387862",
+      "size_bytes": 2154
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolCallFunction.java",
+      "sha256": "7b9124a86b2d03e3597ba9b202197e1b01acf4cd62ba32c1c0fa5e9b8fe7191f",
+      "size_bytes": 23226
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolCallFunctionOrBuilder.java",
+      "sha256": "fbf484a459ab188ab0719b786b53ea31edc21e84bf6f341b96976159ed7c5f52",
+      "size_bytes": 894
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolCallOrBuilder.java",
+      "sha256": "a24ac440cde7003810c159e9abc39fbfbaf5657eb0ae43b30d33a8cf97617da1",
+      "size_bytes": 1372
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolChoice.java",
+      "sha256": "10a4ae4ef0ad696e13341e1dc55766b32a9998d4bdfe494c0d7b12ff0ec21008",
+      "size_bytes": 23986
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolChoiceOrBuilder.java",
+      "sha256": "c81b2fe20f79f24026d0aca1b554be2bb11d5f27db518daffd71271c84aa9f73",
+      "size_bytes": 1066
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ChatToolOrBuilder.java",
+      "sha256": "ac26996c28ef9e057462c5abd35862311d14276546bf355a0e2d10916b1ef68a",
+      "size_bytes": 1100
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingBatch.java",
+      "sha256": "d2db877c6c3b55ade5d6eacb5e009849513f6b1d74942add6d39fc40df4a2ac8",
+      "size_bytes": 38600
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingBatchOrBuilder.java",
+      "sha256": "1450447b13da894918f3e0cad8f990a1e162db1f2acb08b060b5f1e39dbfa485",
+      "size_bytes": 2848
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingError.java",
+      "sha256": "67264f12cd1145bf20aab2cc3ce1387c9f993dcbfd21a12fe4d70a90b8a5744f",
+      "size_bytes": 34303
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingErrorOrBuilder.java",
+      "sha256": "1c24146b8b8e4ccf2424741ca73f31e1c99cd3e4615b51549d5fe677f346ae76",
+      "size_bytes": 1714
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingVector.java",
+      "sha256": "5137f65ab2c2eac8da43622739954ba7c742dd494efd623e3d9418389e704464",
+      "size_bytes": 20197
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingVectorOrBuilder.java",
+      "sha256": "ccf6b87f5debb75a9ed00103e02e75d0d8d2514f5f753680e1e8026625279ea1",
+      "size_bytes": 882
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingsRequest.java",
+      "sha256": "efe0989dade37548380207f20375311a85b746f590e7d9dd8ea652b646eab438",
+      "size_bytes": 30371
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingsRequestOrBuilder.java",
+      "sha256": "9ba05635a0262bc921c3febd9ef562a9570fab00f6ba52d3afba596c8fd63e8b",
+      "size_bytes": 3037
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingsResponse.java",
+      "sha256": "59e90b4d4b1a5b41361fe7d0752d9adbb84d4e2ccfda881be6cfb260f3d7f383",
+      "size_bytes": 31527
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/EmbeddingsResponseOrBuilder.java",
+      "sha256": "0cc8035523e1348b509c05d075705eb95814576fe3edacb7130beb3ed862a241",
+      "size_bytes": 1476
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/proto/model/provider/v1/ModelProviderProto.java",
+      "sha256": "1aeaea6e72360018bea26df420b659f2660add38568a47d43b2c526e0b1d3ef7",
+      "size_bytes": 17226
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot-starter/pom.xml",
+      "sha256": "65f83f500ca471baa1ffc9136eea3930fd7a6275a8e73ef401200316e4a30868",
+      "size_bytes": 2020
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/main/java/io/cyrene/plugin/spring/CyreneAutoConfiguration.java",
+      "sha256": "929f29f153c3389158b2f2c836e0f77c5b7b01589b7a3661541424ca3a891fc2",
+      "size_bytes": 5769
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/main/java/io/cyrene/plugin/spring/CyreneHealthIndicator.java",
+      "sha256": "61aa4208593bda8f4ca7574b187a1b68100228e42a8b39acbec9516f786f4c4c",
+      "size_bytes": 3523
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/main/java/io/cyrene/plugin/spring/CyrenePluginProperties.java",
+      "sha256": "4823369412b7d33f5a8ab7ef6bd55944e91078ff5f3a78a5c7a86a6b197cdc22",
+      "size_bytes": 3586
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+      "sha256": "e0268a908279edb624e3885f1aedc9cc89c2f97a5870d364c724ac4a686f8709",
+      "size_bytes": 48
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/test/java/io/cyrene/plugin/spring/CyreneAutoConfigurationTest.java",
+      "sha256": "6acbbda0419026cd788ccb52d6cc071d61c027d86b62500f715183f1eef868cb",
+      "size_bytes": 3013
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot4-starter/pom.xml",
+      "sha256": "c3de10f50ea30c44becab65d914ee15cce3385365356ee18e2c58ea8d411693d",
+      "size_bytes": 2458
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/main/java/io/cyrene/plugin/spring/CyreneAutoConfiguration.java",
+      "sha256": "e3dcc3c2a2c48a0d7c421475c4409b60afd8d270cb7fbf106c875bef788dbe55",
+      "size_bytes": 5773
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/main/java/io/cyrene/plugin/spring/CyreneHealthIndicator.java",
+      "sha256": "63db4f36812c9c9e05a743c10b5d5e08a782f712212de82e1921b5e543e4a3f1",
+      "size_bytes": 3531
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/main/java/io/cyrene/plugin/spring/CyrenePluginProperties.java",
+      "sha256": "4823369412b7d33f5a8ab7ef6bd55944e91078ff5f3a78a5c7a86a6b197cdc22",
+      "size_bytes": 3586
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/main/resources/META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports",
+      "sha256": "e0268a908279edb624e3885f1aedc9cc89c2f97a5870d364c724ac4a686f8709",
+      "size_bytes": 48
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/test/java/io/cyrene/plugin/spring/CyreneAutoConfigurationTest.java",
+      "sha256": "6acbbda0419026cd788ccb52d6cc071d61c027d86b62500f715183f1eef868cb",
+      "size_bytes": 3013
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-sample/pom.xml",
+      "sha256": "c78994e6c589a096f648c467c9bf807f7046895559a849dcaadc0998c8f0ef8c",
+      "size_bytes": 1343
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-sample/src/main/java/io/cyrene/plugin/sample/SampleApplication.java",
+      "sha256": "55500e424683da2d194e0d6531531aaab7056a7b902d652b462a41cf47913659",
+      "size_bytes": 1191
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-sample/src/main/java/io/cyrene/plugin/sample/SampleCapabilityService.java",
+      "sha256": "7c5da75ac40ae067ebec318e942a4bd9ace25669a00c4236a0aff0e49d4ad603",
+      "size_bytes": 3216
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-sample/src/main/resources/application.yml",
+      "sha256": "be45eafe89625f77b088665246b12940c7f5ad2fcbfd499f728dfae3b328a795",
+      "size_bytes": 311
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/cyrene-plugin-spring-sample/src/test/java/io/cyrene/plugin/sample/SampleApplicationExitGateTest.java",
+      "sha256": "2b96c1be6d5655507766d8c46f5d481aaaad343513527901502e65c354166444",
+      "size_bytes": 11030
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/docs/adr-001-legacy-starter-policy.md",
+      "sha256": "cd24b716117cca4c39f3754299c3d3422235f9fe9e8ce9a98d0d706ade56a0b4",
+      "size_bytes": 1271
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/java/pom.xml",
+      "sha256": "f206b60907147ff4c89aebe34ea9c481a4859e0de8f2100c3a6c3d82bc946164",
+      "size_bytes": 7376
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/README.md",
+      "sha256": "861ae12c529b9bde7c6825824eb483ba41ab4d6a0e03c7f581b2287712748f7e",
+      "size_bytes": 728
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/pyproject.toml",
+      "sha256": "b10d87354d2e03b07b4b7d70cdb81ce56df20c2b3b05e6e0fea7569e0a42bc8d",
+      "size_bytes": 435
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/__init__.py",
+      "sha256": "f32d893b5d5a18e042dd0249acbfc7bd2277ef8e97e42b7270943765e460b0c8",
+      "size_bytes": 2284
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/_wire.py",
+      "sha256": "490485dbadb40622040ff5f86ce259adb2e33c398dab3895174dd81c7d910db9",
+      "size_bytes": 5936
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/chat.py",
+      "sha256": "08090b7af9958ab30c98c2f71184a8b76795d22c7685590f39d90662d72dab08",
+      "size_bytes": 41568
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/README.md",
+      "sha256": "10ef6078485ed359924e15c0084af9a6f7c8ea89e3564e195ac4af5fa59cd5c2",
+      "size_bytes": 3035
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/pyproject.toml",
+      "sha256": "3aa7ca3e31eb3e632faad70e76d979de820740ca65a8c99c0db779914dada982",
+      "size_bytes": 732
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/scripts/generate_bindings.py",
+      "sha256": "2433728c5f9bfe252005dc2ac9d93784439605e2a350b530336ec92794a93f06",
+      "size_bytes": 1153
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/README.md",
+      "sha256": "2ca3a86fbe53211c77394cc3fd099ee7bd97f01613103f92db622b1c86272d8f",
+      "size_bytes": 1065
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/__init__.py",
+      "sha256": "f9eaeea57a83907985630124d62304df053465e6bf2be9d555c2cd50bb464c01",
+      "size_bytes": 1234
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/_generated/__init__.py",
+      "sha256": "edac10b684126c59f013caf5c3e5fb031d9d5d71b6fd502e150a918b21b0fa92",
+      "size_bytes": 51
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/_generated/direct_plugin_runtime_pb2.py",
+      "sha256": "050be1bcb458055968be0a012915581e410de5fd713c6255b6dd083329cc8bd8",
+      "size_bytes": 5185
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/_generated/direct_plugin_runtime_pb2_grpc.py",
+      "sha256": "8847f215cb4c833261641d36a12229a3e308a846985319dd13a884a6b493e637",
+      "size_bytes": 6367
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/bootstrap.py",
+      "sha256": "7ce80932b07d83bcbb3c3a83545e21ab0f96bdcb51bbf3fe22ea59a5a4e0ebd9",
+      "size_bytes": 1170
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/client.py",
+      "sha256": "f4efd2f85ec231aee4656e764b0f983fc91a8a9a9e42bbe518a9d69dde3aaa3e",
+      "size_bytes": 10720
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/configuration.py",
+      "sha256": "4e0eae9199ca8abf6d7a5dbf03cd5db2a0d3e3d950564b3464afbe0b2d3276dc",
+      "size_bytes": 1436
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/dependency_preparer.py",
+      "sha256": "32109424b2719b6def0dfc10957ca99df9ed4cdc2614805a5031a3e465a6a7b8",
+      "size_bytes": 6414
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/execution_engine.py",
+      "sha256": "2229021d4f7f71c66c25719afb43ba358f2dbc52c1aacb63f0f891b05e51feb1",
+      "size_bytes": 11068
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/server.py",
+      "sha256": "02c576a5d3de3ebe4180867986f871f4ab275d75c7820de30c8039e8112ca155",
+      "size_bytes": 15513
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_configuration.py",
+      "sha256": "9efc271152e2b5a92526b6879bdb4f9687b02615c15fbe96ccbc5115246c1a72",
+      "size_bytes": 1248
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_dependency_preparer.py",
+      "sha256": "cdc0292734de1655832c44dc51cb58e4a843ed011b8414f549457a1295e0de9d",
+      "size_bytes": 1813
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_direct_runtime.py",
+      "sha256": "12d4d72dd6d7be6a1a5a5c889f480ee7a92acb9693778c92376bd5620f701c67",
+      "size_bytes": 10835
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/check_dotnet_aot_rules.py",
+      "sha256": "85e69130e2e5d6b10e53665aa7a49ca6f22e436acd1bc3401c054defb0aa6d5e",
+      "size_bytes": 3323
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/assert_no_test_skips.py",
+      "sha256": "2b7b25772e76bf48a68936b198ed8efc4268d1bfc60a2013c09c0e6fc7a34e3a",
+      "size_bytes": 2847
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/check_public_repository.py",
+      "sha256": "ddbcc71deef416cac3f94895ec8cfefef982aac0363b6454ea1115d4c3fbc4b6",
+      "size_bytes": 3655
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/package_release_artifact.py",
+      "sha256": "1d248a506588bfae386613c32415f73c1deb8393e3fdcef4eb7838d328afd40d",
+      "size_bytes": 5860
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/publish_native_aot.py",
+      "sha256": "a826832c7b5e2ec68be15548b0616635c9a290b1927cb025c7643e7e378f8a44",
+      "size_bytes": 9684
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/verify_source_manifest.py",
+      "sha256": "4dc94bf90337ded8868a63d2bb37352feb8974754bc3365043930b70630143a7",
+      "size_bytes": 12047
+    }
+  ],
+  "history_policy": "EMPTY_HISTORY_REQUIRED",
+  "license": {
+    "path": "LICENSE",
+    "sha256": "5adafe431a1d30e29dce59b305ce52b0624e83ce5502db99b4a13110bcb977fa"
+  },
+  "policy_sha256": "292cbc1cb7019e36a077efc7ca1e040b67077cb85c7e2b193c1faa119bfe7ec5",
+  "protected_files": [
+    {
+      "path": "plugins/connectors/im/QQ_API_PLAN.md",
+      "sha256": "c6a1f8072b8fd775e5fa7c3b9e3d7a26d9897eab078888a56f3eee1a046d92d5"
+    },
+    {
+      "path": "plugins/connectors/im/QQ_SIDE_INTERFACES.md",
+      "sha256": "79e337b8517b7cfd9493b8a7560c325f336fb0bb5b5cb0e13edfdb4dc0185ceb"
+    },
+    {
+      "path": "plugins/connectors/onebot-v11/README.md",
+      "sha256": "c0c1691bcd72c1b24ae4e4cd80e70d0c10b87361182eaac49c92a1fb27d390f5"
+    }
+  ],
+  "schema_version": "cyrene.public-source-manifest.v1",
+  "source_commit": "a92dbe8b533db270b3fafa25cb525fd959e51bca",
+  "source_ref": "a92dbe8b533db270b3fafa25cb525fd959e51bca",
+  "source_repository": "Cyrene-Plugins-Official"
+}

@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Description>Shared core business and protocol abstraction for Cyrene Native plugins.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../../contracts/dotnet/Cyrene.Plugin.Contracts/Cyrene.Plugin.Contracts.csproj" />
+  </ItemGroup>
+</Project>
