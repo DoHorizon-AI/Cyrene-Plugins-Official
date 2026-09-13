@@ -35,6 +35,8 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Install manifest validation dependency
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.23.0
       - name: Verify exported source manifest
         run: >-
           python3 tools/ci/verify_source_manifest.py
@@ -138,6 +140,7 @@ jobs:
       - uses: bufbuild/buf-setup-action@v1
         with:
           version: "1.45.0"
+          github_token: ${{ github.token }}
       - name: Lint and format protobuf contracts
         working-directory: contracts
         run: |
