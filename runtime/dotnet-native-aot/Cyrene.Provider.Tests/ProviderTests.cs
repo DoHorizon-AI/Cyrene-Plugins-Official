@@ -6,7 +6,9 @@
 
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Cyrene.Provider.Anthropic;
+using Cyrene.Provider.Gemini;
 using Cyrene.Provider.Infrastructure.Capability;
 using Cyrene.Provider.Infrastructure.Diagnostics;
 using Cyrene.Provider.Infrastructure.Security;
@@ -685,5 +687,321 @@ public class ProviderTests
         Assert.NotNull(openAiAdapter);
         Assert.NotNull(anthropicAdapter);
         Assert.NotSame(openAiAdapter, anthropicAdapter);
+    }
+    // ── W6-2: Gemini Native Provider Wire Translation ──────────────────────
+
+    private const string GeminiStreamSse = """
+        data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Hel"}]},"index":0}],"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":1,"totalTokenCount":8}}
+
+        data: {"candidates":[{"content":{"role":"model","parts":[{"text":"lo Cyrene"}]},"index":0}],"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":3,"totalTokenCount":10}}
+
+        data: {"candidates":[{"content":{"role":"model","parts":[{"functionCall":{"name":"get_weather","args":{"city":"Paris"}}}]},"finishReason":"STOP","index":0}],"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":9,"totalTokenCount":16}}
+
+        data: {"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":9,"totalTokenCount":16}}
+        """;
+
+    private static GeminiVendorAdapter NewGeminiAdapter(MockHttpMessageHandler handler)
+    {
+        var config = new ProviderBindingConfiguration(
+            new Uri("https://generativelanguage.googleapis.com"),
+            "gemini-test-key"
+        );
+        return new GeminiVendorAdapter(config, new HttpTransportClient(new HttpClient(handler)));
+    }
+
+    [Fact]
+    public async Task Test_W6_Gemini_WireTranslation_SystemInstructionAndUsage()
+    {
+        const string mockResponseJson = "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"Hello Cyrene\"}]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":10,\"candidatesTokenCount\":5,\"totalTokenCount\":15}}";
+
+        string? capturedPath = null;
+        string? capturedKey = null;
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            capturedPath = request.RequestUri!.PathAndQuery;
+            capturedKey = request.Headers.GetValues("x-goog-api-key").First();
+            capturedBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var adapter = NewGeminiAdapter(handler);
+
+        var result = await adapter.CompleteChatAsync(new ChatCompletionParameters(
+            Model: "gemini-2.0-flash",
+            Messages: new List<ChatMessage>
+            {
+                new("system", "Be concise."),
+                new("user", "Hi")
+            },
+            Temperature: 0.2f,
+            MaxTokens: 64
+        ));
+
+        Assert.Equal("/v1beta/models/gemini-2.0-flash:generateContent", capturedPath);
+        Assert.Equal("gemini-test-key", capturedKey);
+        // Gemini native responses carry no message id.
+        Assert.Equal(string.Empty, result.Id);
+        Assert.Equal("Hello Cyrene", result.Content);
+        Assert.Equal("STOP", result.FinishReason);
+        Assert.Equal(10, result.PromptTokens);
+        Assert.Equal(5, result.CompletionTokens);
+        Assert.Equal(15, result.TotalTokens);
+
+        Assert.NotNull(capturedBody);
+        Assert.Contains("\"systemInstruction\":{\"parts\":[{\"text\":\"Be concise.\"}]}", capturedBody);
+        Assert.Contains("\"generationConfig\":{", capturedBody);
+        Assert.Contains("\"maxOutputTokens\":64", capturedBody);
+        // System messages are hoisted out of contents into systemInstruction.
+        Assert.DoesNotContain("\"role\":\"system\"", capturedBody);
+    }
+
+    [Fact]
+    public async Task Test_W6_Gemini_ToolCallingRoundTrip()
+    {
+        const string mockResponseJson = "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"Paris\"}}}]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":42,\"candidatesTokenCount\":9,\"totalTokenCount\":51}}";
+
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            capturedBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var adapter = NewGeminiAdapter(handler);
+
+        var tools = new List<ChatTool>
+        {
+            new("function", new ChatFunctionDefinition(
+                Name: "get_weather",
+                Description: "Get the weather for a city",
+                ParametersJson: "{\"type\":\"object\",\"properties\":{\"city\":{\"type\":\"string\"}},\"required\":[\"city\"]}"
+            ))
+        };
+        var messages = new List<ChatMessage>
+        {
+            new("user", "What is the weather in Paris?"),
+            new("assistant", string.Empty, ToolCalls: new List<ChatToolCall>
+            {
+                new("call_1", "function", new ChatToolCallFunction("get_weather", "{\"city\":\"Paris\"}"))
+            }),
+            new("tool", "{\"temp_c\":21}", ToolCallId: "call_1")
+        };
+
+        var result = await adapter.CompleteChatAsync(new ChatCompletionParameters(
+            Model: "gemini-2.0-flash",
+            Messages: messages,
+            Tools: tools,
+            ToolChoice: new ChatToolChoice("function", "get_weather")
+        ));
+
+        var call = Assert.Single(result.ToolCalls!);
+        Assert.Equal("gemini-call-0", call.Id);
+        Assert.Equal("function", call.Type);
+        Assert.Equal("get_weather", call.Function.Name);
+        Assert.Equal("{\"city\":\"Paris\"}", call.Function.Arguments);
+        Assert.Equal(51, result.TotalTokens);
+
+        Assert.NotNull(capturedBody);
+        using var request = JsonDocument.Parse(capturedBody);
+
+        var declaration = request.RootElement
+            .GetProperty("tools")[0]
+            .GetProperty("functionDeclarations")[0];
+        Assert.Equal("get_weather", declaration.GetProperty("name").GetString());
+        Assert.Equal("Get the weather for a city", declaration.GetProperty("description").GetString());
+        Assert.Equal("object", declaration.GetProperty("parameters").GetProperty("type").GetString());
+
+        var functionConfig = request.RootElement
+            .GetProperty("toolConfig")
+            .GetProperty("functionCallingConfig");
+        Assert.Equal("ANY", functionConfig.GetProperty("mode").GetString());
+        Assert.Equal(
+            "get_weather",
+            functionConfig.GetProperty("allowedFunctionNames")[0].GetString()
+        );
+
+        var contents = request.RootElement.GetProperty("contents");
+        Assert.Equal("model", contents[1].GetProperty("role").GetString());
+        var functionCall = contents[1].GetProperty("parts")[0].GetProperty("functionCall");
+        Assert.Equal("get_weather", functionCall.GetProperty("name").GetString());
+        Assert.Equal("Paris", functionCall.GetProperty("args").GetProperty("city").GetString());
+
+        // Tool responses correlate by function name, not by call id.
+        var functionResponse = contents[2]
+            .GetProperty("parts")[0]
+            .GetProperty("functionResponse");
+        Assert.Equal("get_weather", functionResponse.GetProperty("name").GetString());
+        Assert.Equal(21, functionResponse.GetProperty("response").GetProperty("temp_c").GetInt32());
+    }
+
+    [Fact]
+    public async Task Test_W6_Gemini_PlainTextToolResponseWrapsAndUnknownIdFailsClosed()
+    {
+        const string mockResponseJson = "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"text\":\"ok\"}]},\"finishReason\":\"STOP\",\"index\":0}]}";
+
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            capturedBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var adapter = NewGeminiAdapter(handler);
+
+        var messages = new List<ChatMessage>
+        {
+            new("user", "weather?"),
+            new("assistant", string.Empty, ToolCalls: new List<ChatToolCall>
+            {
+                new("call_1", "function", new ChatToolCallFunction("get_weather", "{\"city\":\"Paris\"}"))
+            }),
+            new("tool", "all good", ToolCallId: "call_1")
+        };
+
+        await adapter.CompleteChatAsync(new ChatCompletionParameters("gemini-2.0-flash", messages));
+
+        Assert.NotNull(capturedBody);
+        using var request = JsonDocument.Parse(capturedBody);
+        var response = request.RootElement
+            .GetProperty("contents")[2]
+            .GetProperty("parts")[0]
+            .GetProperty("functionResponse")
+            .GetProperty("response");
+        // functionResponse requires a JSON object; plain text is wrapped deterministically.
+        Assert.Equal("all good", response.GetProperty("output").GetString());
+
+        // A tool message whose tool_call_id has no matching assistant tool call is rejected
+        // before any network call, because Gemini correlates by function name.
+        var unroutable = new List<ChatMessage> { new("tool", "x", ToolCallId: "missing") };
+        var exception = await Assert.ThrowsAsync<ProviderException>(() => adapter.CompleteChatAsync(
+            new ChatCompletionParameters("gemini-2.0-flash", unroutable)
+        ));
+        Assert.Equal(ProviderErrorCode.WireProtocolViolation, exception.ErrorCode);
+    }
+
+    [Fact]
+    public async Task Test_W6_Gemini_StreamingSSE_DeltasToolCallAndUsage()
+    {
+        string? capturedPath = null;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            capturedPath = request.RequestUri!.PathAndQuery;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(GeminiStreamSse, Encoding.UTF8, "text/event-stream")
+            };
+        });
+
+        var adapter = NewGeminiAdapter(handler);
+
+        var chunks = new List<ChatCompletionChunk>();
+        await foreach (var chunk in adapter.StreamChatAsync(new ChatCompletionParameters(
+            Model: "gemini-2.0-flash",
+            Messages: new List<ChatMessage> { new("user", "Weather in Paris?") },
+            IncludeUsage: true
+        )))
+        {
+            chunks.Add(chunk);
+        }
+
+        Assert.Equal(
+            "/v1beta/models/gemini-2.0-flash:streamGenerateContent?alt=sse",
+            capturedPath
+        );
+        Assert.Equal(4, chunks.Count);
+        Assert.Equal("Hel", chunks[0].Delta);
+        Assert.Equal("lo Cyrene", chunks[1].Delta);
+        Assert.Equal("STOP", chunks[2].FinishReason);
+        var delta = Assert.Single(chunks[2].ToolCalls!);
+        Assert.Equal(0, delta.Index);
+        Assert.Equal("gemini-call-0", delta.Id);
+        Assert.Equal("get_weather", delta.FunctionName);
+        Assert.Equal("{\"city\":\"Paris\"}", delta.FunctionArguments);
+        Assert.Equal(string.Empty, chunks[3].Delta);
+        Assert.Equal(7, chunks[3].PromptTokens);
+        Assert.Equal(9, chunks[3].CompletionTokens);
+        Assert.Equal(16, chunks[3].TotalTokens);
+    }
+
+    [Fact]
+    public async Task Test_W6_Gemini_Embeddings_BatchRequestAndVectorOrder()
+    {
+        const string mockResponseJson = "{\"embeddings\":[{\"values\":[0.1,0.2]},{\"values\":[0.3,0.4]}]}";
+
+        string? capturedBody = null;
+        var handler = new MockHttpMessageHandler(request =>
+        {
+            capturedBody = request.Content!.ReadAsStringAsync().GetAwaiter().GetResult();
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = new StringContent(mockResponseJson, Encoding.UTF8, "application/json")
+            };
+        });
+
+        var adapter = NewGeminiAdapter(handler);
+
+        var result = await adapter.GenerateEmbeddingsAsync(new EmbeddingParameters(
+            Model: "text-embedding-004",
+            Inputs: new List<string> { "alpha", "beta" },
+            Dimensions: 768
+        ));
+
+        Assert.Equal("text-embedding-004", result.Model);
+        Assert.Equal(2, result.Embeddings.Count);
+        Assert.Equal(0, result.Embeddings[0].Index);
+        Assert.Equal(0.1f, result.Embeddings[0].Values[0]);
+        Assert.Equal(0.2f, result.Embeddings[0].Values[1]);
+        Assert.Equal(1, result.Embeddings[1].Index);
+        Assert.Equal(0.3f, result.Embeddings[1].Values[0]);
+        Assert.Equal(0.4f, result.Embeddings[1].Values[1]);
+
+        Assert.NotNull(capturedBody);
+        using var request = JsonDocument.Parse(capturedBody);
+        var entries = request.RootElement.GetProperty("requests");
+        Assert.Equal(2, entries.GetArrayLength());
+        Assert.Equal("models/text-embedding-004", entries[0].GetProperty("model").GetString());
+        Assert.Equal(768, entries[0].GetProperty("outputDimensionality").GetInt32());
+        Assert.Equal(
+            "alpha",
+            entries[0].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString()
+        );
+        Assert.Equal(
+            "beta",
+            entries[1].GetProperty("content").GetProperty("parts")[0].GetProperty("text").GetString()
+        );
+    }
+
+    [Fact]
+    public void Test_W6_Gemini_Readiness_FailsClosedWithoutGrpcHost()
+    {
+        using var sw = new StringWriter();
+        var original = Console.Out;
+        Console.SetOut(sw);
+        int exitCode;
+        try
+        {
+            exitCode = Cyrene.Provider.Gemini.Program.Main(ReadinessArgs);
+        }
+        finally
+        {
+            Console.SetOut(original);
+        }
+
+        Assert.Equal(2, exitCode);
+        var output = sw.ToString();
+        Assert.Contains("\"status\":\"NOT_SERVING\"", output);
+        Assert.Contains("\"provider\":\"gemini\"", output);
+        Assert.Contains("\"reason\":\"DIRECT_RUNTIME_HOST_NOT_CONFIGURED\"", output);
+        Assert.DoesNotContain("key", output, StringComparison.OrdinalIgnoreCase);
     }
 }

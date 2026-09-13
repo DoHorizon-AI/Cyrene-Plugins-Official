@@ -16,5 +16,6 @@
     <ProjectReference Include="../Cyrene.Provider.Infrastructure/Cyrene.Provider.Infrastructure.csproj" />
     <ProjectReference Include="../Cyrene.Provider.OpenAi/Cyrene.Provider.OpenAi.csproj" />
     <ProjectReference Include="../Cyrene.Provider.Anthropic/Cyrene.Provider.Anthropic.csproj" />
+    <ProjectReference Include="../Cyrene.Provider.Gemini/Cyrene.Provider.Gemini.csproj" />
   </ItemGroup>
 </Project>

@@ -6,7 +6,7 @@
 >
 > **基线 / Baseline**: `Cyrene-Plugins-Official@develop`；v1.0 阶段落于 `1b8255a` 之后
 >
-> **状态 / Status**: `ACTIVE` — Wave 0 / 1 / 2 已落地到本地 `develop`（证据见各 Wave 的 Evidence 块）；Wave 3 前置决策已固定；W2-3 晋升与 W1-4 解禁均为 owner 决策。
+> **状态 / Status**: `ACTIVE` — Wave 0–5 已落地到本地 `develop`（W5-2 / W5-3 待启动；证据见各 Wave 的 Evidence 块）；Wave 6 进行中（W6-2 已完成）；W2-3 晋升与 W1-4 解禁均为 owner 决策。
 >
 > **范围 / Scope**: 仅本仓库。Platform 与 Product 仓库不变更；不新增架构层。
 
@@ -219,7 +219,12 @@ pairwise comparison 放入 LLM judge 路径。
 
 Evidence / 证据:
 
-- （待填）
+- W4-1：`plugins/evaluation/evaluator-pack` 落盘 5 个确定性 evaluator（含 owner-scoped
+  `contracts/v1/schema.json`，未抽共享 proto）；`python3 -m pytest -q plugins/evaluation/evaluator-pack/tests`
+  → `9 passed`；`contracts/capability-verification.json` 记 `IMPLEMENTATION_VERIFIED / REAL`。
+- W4-2：`plugins/evaluation/llm-judge` 落盘 `llm_judge.v1` + `llm_pairwise.v1`（模型仅经
+  `model.provider.v1` 编解码器）；`python3 -m pytest -q plugins/evaluation/llm-judge/tests` → `8 passed`；
+  证据记 `IMPLEMENTATION_VERIFIED / SIMULATED`（scripted model provider over real gRPC）。
 
 ## 10. Wave 5 — Connector Ecosystem
 
@@ -231,19 +236,31 @@ Evidence / 证据:
 
 Evidence / 证据:
 
-- （待填）
+- W5-1：`plugins/connectors/wecom` 落盘出站 `send_message`（应用消息 API、token 缓存与一次性刷新、
+  errcode → DeliveryStatus 映射、text/markdown/提及；入站回调明确不在 v1）；
+  `python3 -m pytest -q plugins/connectors/wecom/tests` → `13 passed`（10 connector + 3 真实 loopback
+  transport）；证据记 `IMPLEMENTATION_VERIFIED / SIMULATED`（无真实租户）。
 
 ## 11. Wave 6 — Provider / Retrieval Backlog（有消费者或决策后启动）
 
 - [ ] W6-1 `rerank.v1` 契约 + 首个实现（Cohere / Jina / Voyage / 本地 reranker）。
-- [ ] W6-2 Gemini native provider（`model.provider.v1` 的又一实现，无新契约）。
+- [x] W6-2 Gemini native provider（`model.provider.v1` 的又一实现，无新契约）：`runtime/dotnet-native-aot/Cyrene.Provider.Gemini` 实现 native generateContent / streamGenerateContent?alt=sse / batchEmbedContents，工具声明与 functionResponse 按函数名关联。
 - [ ] W6-3 capability 命名统一，含 `speech.provider.v1` / `rerank.provider.v1` 无契约声明的处理，以及 contract/dispatch 大小写差异。
 - [ ] W6-4 memory hybrid search（运行时特性，非新插件）。
 - [ ] W6-5 MCP HTTP/SSE transport（原 W3-3；首个远程 MCP server 场景出现时启动）。
 
 Evidence / 证据:
 
-- （待填）
+- W6-2：新增 `runtime/dotnet-native-aot/Cyrene.Provider.Gemini`（Native AOT，`model.provider.v1` +
+  embedding 剖面）：generateContent / streamGenerateContent?alt=sse / batchEmbedContents、
+  systemInstruction 提升、toolConfig 映射（AUTO/ANY/NONE/ANY+allowed）、functionResponse 按函数名关联
+  （tool_call_id 无法解析时 fail closed）、确定性 `gemini-call-{n}` 本地 id；
+  `dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests --configuration Release` → `25 passed`
+  （新增 6 个 Gemini 用例）；`python3 tools/ci/publish_native_aot.py --rid linux-x64` 本地通过，产物含
+  `providers/gemini/Cyrene.Provider.Gemini` 且 readiness 失败关闭；
+  `contracts/runtime-implementations.json` 记为 `cyrene.runtime.dotnet-native-aot-gemini`，
+  证据记 `IMPLEMENTATION_VERIFIED / SIMULATED`（transport doubles；W1-4 stop gate 不变）。
+- W6-1 / W6-3 / W6-4 / W6-5：未启动（待消费者或 owner 决策）。
 
 ## 12. 保持不变的决策 / Standing Decisions
 

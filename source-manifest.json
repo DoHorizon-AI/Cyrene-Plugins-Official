@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "b9ceca33cdfb8d4bf51bb32358bb1bbd15ce1c9f1bd22a25aa0efe721b2a0692",
-      "size_bytes": 11052
+      "sha256": "56cee00f85e1f765711ece44c3111961c687d0441459ea426d45437722d15190",
+      "size_bytes": 11452
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "f8bea5dd2a04f8f94da031d234f3f5219f9a1a1ef0ca62900153fd9a6067e459",
-      "size_bytes": 12847
+      "sha256": "e76958ffae381763329354888b34983e0fd894d627a76a902bae6d98ad8709c0",
+      "size_bytes": 13691
     },
     {
       "kind": "file",
@@ -313,8 +313,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/runtime-implementations.json",
-      "sha256": "003ba326fbfb280ac691dd2719e63377c351a29d51f75c8950089ffc1281ba9e",
-      "size_bytes": 3946
+      "sha256": "09e09a39b9d177185e8f2fc9eeb6d9273f55fcb2ca6ddc886706d78fa0c9b9e2",
+      "size_bytes": 4530
     },
     {
       "kind": "file",
@@ -614,8 +614,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "564e100e85ff2999215dffb68ab35293b335f9e45b117b0f8b9647a72cb8e826",
-      "size_bytes": 27862
+      "sha256": "7e196e2148a6649747b8c4d4b50db6fca0b8011ea8c14df4ef7777fc7911fdfc",
+      "size_bytes": 30046
     },
     {
       "kind": "file",
@@ -1208,6 +1208,27 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/Cyrene.Provider.Gemini.csproj",
+      "sha256": "c726c2d2c5139a849bfd1bb555e6c96f3e2bfef5e732f3b15c3145324811e3f4",
+      "size_bytes": 492
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/GeminiVendorAdapter.cs",
+      "sha256": "bd41eb29b9aac5da185cc0f3228b327a8840460113fd1f6307cfd7198842262e",
+      "size_bytes": 18790
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/Program.cs",
+      "sha256": "83df05dd2d29998c8694c1bb8da8089197eb0c476ab93331da6e8a3e1fefcec2",
+      "size_bytes": 1151
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Capability/CapabilityProfiles.cs",
       "sha256": "93e310e093f841bb69db0aa2251e55430873f3e324599969b971ccf47396508f",
       "size_bytes": 5025
@@ -1237,8 +1258,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Serialization/WireModels.cs",
-      "sha256": "da119063041a55368d67fdbe9d01369aa99b061abe693e22ed54c1219ab5af35",
-      "size_bytes": 10376
+      "sha256": "90c2a08273904c6412773b3bfd8e6b9d7fa741f783664726cf211148f710475f",
+      "size_bytes": 14673
     },
     {
       "kind": "file",
@@ -1272,15 +1293,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj",
-      "sha256": "8040c66682483549729157814454f60bee0f44400e5d2505597f74caf209b4f7",
-      "size_bytes": 825
+      "sha256": "a63aa40d96e519c3d76ca5d34fa3b93437223d16c5a4a6ae28c035474f96efc5",
+      "size_bytes": 916
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/ProviderTests.cs",
-      "sha256": "ef1f40aefe12be79f46b3122d351b507265bdf1a607956bd044fb6c3e56ba985",
-      "size_bytes": 31601
+      "sha256": "927a94d736570e8b4ebb0f5847ad9b82a04ff4c420eab9498d08150b92142f8a",
+      "size_bytes": 45804
     },
     {
       "kind": "file",
@@ -3638,8 +3659,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/publish_native_aot.py",
-      "sha256": "a826832c7b5e2ec68be15548b0616635c9a290b1927cb025c7643e7e378f8a44",
-      "size_bytes": 9684
+      "sha256": "254db6b612323cd991023e6c2bec05a9636a6f4cf6868514a218553b66045dd6",
+      "size_bytes": 10268
     },
     {
       "kind": "file",

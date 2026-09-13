@@ -206,6 +206,100 @@ public sealed record AnthropicStreamEvent(
     [property: JsonPropertyName("error")] AnthropicStreamError? Error = null
 );
 
+// ── Gemini Wire Models ────────────────────────────────────────────────
+
+public sealed record GeminiFunctionCall(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("args")] JsonElement? Args = null
+);
+
+public sealed record GeminiFunctionResponse(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("response")] JsonElement? Response = null
+);
+
+public sealed record GeminiPart(
+    [property: JsonPropertyName("text")] string? Text = null,
+    [property: JsonPropertyName("functionCall")] GeminiFunctionCall? FunctionCall = null,
+    [property: JsonPropertyName("functionResponse")] GeminiFunctionResponse? FunctionResponse = null
+);
+
+public sealed record GeminiContent(
+    [property: JsonPropertyName("role")] string? Role = null,
+    [property: JsonPropertyName("parts")] IReadOnlyList<GeminiPart>? Parts = null
+);
+
+public sealed record GeminiGenerationConfig(
+    [property: JsonPropertyName("temperature")] float? Temperature = null,
+    [property: JsonPropertyName("maxOutputTokens")] int? MaxOutputTokens = null,
+    [property: JsonPropertyName("stopSequences")] IReadOnlyList<string>? StopSequences = null
+);
+
+public sealed record GeminiFunctionDeclaration(
+    [property: JsonPropertyName("name")] string Name,
+    [property: JsonPropertyName("description")] string? Description = null,
+    [property: JsonPropertyName("parameters")] JsonElement? Parameters = null
+);
+
+public sealed record GeminiTool(
+    [property: JsonPropertyName("functionDeclarations")]
+        IReadOnlyList<GeminiFunctionDeclaration> FunctionDeclarations
+);
+
+public sealed record GeminiFunctionCallingConfig(
+    [property: JsonPropertyName("mode")] string Mode,
+    [property: JsonPropertyName("allowedFunctionNames")]
+        IReadOnlyList<string>? AllowedFunctionNames = null
+);
+
+public sealed record GeminiToolConfig(
+    [property: JsonPropertyName("functionCallingConfig")]
+        GeminiFunctionCallingConfig FunctionCallingConfig
+);
+
+public sealed record GeminiGenerateContentRequest(
+    [property: JsonPropertyName("contents")] IReadOnlyList<GeminiContent> Contents,
+    [property: JsonPropertyName("systemInstruction")] GeminiContent? SystemInstruction = null,
+    [property: JsonPropertyName("generationConfig")] GeminiGenerationConfig? GenerationConfig = null,
+    [property: JsonPropertyName("tools")] IReadOnlyList<GeminiTool>? Tools = null,
+    [property: JsonPropertyName("toolConfig")] GeminiToolConfig? ToolConfig = null
+);
+
+public sealed record GeminiCandidate(
+    [property: JsonPropertyName("content")] GeminiContent? Content = null,
+    [property: JsonPropertyName("finishReason")] string? FinishReason = null,
+    [property: JsonPropertyName("index")] int? Index = null
+);
+
+public sealed record GeminiUsageMetadata(
+    [property: JsonPropertyName("promptTokenCount")] int? PromptTokenCount = null,
+    [property: JsonPropertyName("candidatesTokenCount")] int? CandidatesTokenCount = null,
+    [property: JsonPropertyName("totalTokenCount")] int? TotalTokenCount = null
+);
+
+public sealed record GeminiGenerateContentResponse(
+    [property: JsonPropertyName("candidates")] IReadOnlyList<GeminiCandidate>? Candidates = null,
+    [property: JsonPropertyName("usageMetadata")] GeminiUsageMetadata? UsageMetadata = null
+);
+
+public sealed record GeminiEmbeddingRequestItem(
+    [property: JsonPropertyName("model")] string Model,
+    [property: JsonPropertyName("content")] GeminiContent Content,
+    [property: JsonPropertyName("outputDimensionality")] int? OutputDimensionality = null
+);
+
+public sealed record GeminiBatchEmbedRequest(
+    [property: JsonPropertyName("requests")] IReadOnlyList<GeminiEmbeddingRequestItem> Requests
+);
+
+public sealed record GeminiEmbeddingValues(
+    [property: JsonPropertyName("values")] IReadOnlyList<float> Values
+);
+
+public sealed record GeminiBatchEmbedResponse(
+    [property: JsonPropertyName("embeddings")] IReadOnlyList<GeminiEmbeddingValues> Embeddings
+);
+
 [JsonSerializable(typeof(OpenAiChatRequest))]
 [JsonSerializable(typeof(OpenAiChatResponse))]
 [JsonSerializable(typeof(OpenAiEmbeddingRequest))]
@@ -213,6 +307,10 @@ public sealed record AnthropicStreamEvent(
 [JsonSerializable(typeof(AnthropicMessagesRequest))]
 [JsonSerializable(typeof(AnthropicMessagesResponse))]
 [JsonSerializable(typeof(AnthropicStreamEvent))]
+[JsonSerializable(typeof(GeminiGenerateContentRequest))]
+[JsonSerializable(typeof(GeminiGenerateContentResponse))]
+[JsonSerializable(typeof(GeminiBatchEmbedRequest))]
+[JsonSerializable(typeof(GeminiBatchEmbedResponse))]
 [JsonSourceGenerationOptions(PropertyNamingPolicy = JsonKnownNamingPolicy.Unspecified, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull)]
 public partial class ProviderJsonSerializerContext : JsonSerializerContext
 {

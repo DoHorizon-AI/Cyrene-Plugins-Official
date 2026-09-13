@@ -283,6 +283,17 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-09-13
+      - ref: cyrene.runtime.dotnet-native-aot-gemini
+        source: contracts/runtime-implementations.json
+        language: csharp
+        protocol: cyrene.plugin.cabi.v1
+        publication: in-repo-unpublished
+        methods:
+          - chat_completion
+          - embeddings
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-13
       - ref: cyrene.runtime.dotnet-native-aot-openai
         source: contracts/runtime-implementations.json
         language: csharp

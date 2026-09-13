@@ -78,6 +78,24 @@
       ]
     },
     {
+      "id": "cyrene.runtime.dotnet-native-aot-gemini",
+      "package": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini",
+      "language": "csharp",
+      "protocol": "cyrene.plugin.cabi.v1",
+      "publication": "in-repo-unpublished",
+      "notes": "Native AOT provider adapter; DirectPluginRuntime host wiring is not published as a Plugin package.",
+      "capabilities": [
+        {
+          "id": "model.provider.v1",
+          "interfaceVersion": "1",
+          "methods": [
+            "chat_completion",
+            "embeddings"
+          ]
+        }
+      ]
+    },
+    {
       "id": "cyrene.runtime.mcp-tool-provider",
       "package": "runtime/rust/cyrene-mcp-provider",
       "language": "rust",

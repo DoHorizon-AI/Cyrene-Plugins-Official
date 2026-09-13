@@ -106,6 +106,21 @@
       ]
     },
     {
+      "capability": "model.provider.v1",
+      "implementation": "cyrene.runtime.dotnet-native-aot-gemini",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / .NET 10 / MockHttpMessageHandler transport doubles",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release",
+          "result": "25 passed including Gemini generateContent, toolConfig, functionResponse correlation, SSE streaming, and batchEmbedContents",
+          "notes": "W1-4 stop gate: no real host/binding/DirectPluginRuntime dispatch is connected, so this record must not exceed IMPLEMENTATION_VERIFIED while SIMULATED."
+        }
+      ]
+    },
+    {
       "capability": "dataset.preparation.v1",
       "implementation": "cyrene.tools.dataset-preparation",
       "verification_level": "IMPLEMENTATION_VERIFIED",
