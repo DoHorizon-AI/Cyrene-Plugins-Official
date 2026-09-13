@@ -6,7 +6,7 @@
 >
 > **基线 / Baseline**: `Cyrene-Plugins-Official@develop 1b8255a`
 >
-> **状态 / Status**: `ACTIVE`
+> **状态 / Status**: `ACTIVE` — Wave 0 / 1 / 2 已落地到本地 `develop`（证据见各 Wave 的 Evidence 块）；W2-3 maturity 与 Wave 3 前置决策待 owner 确认；W1-4 暂缓（见决策记录）。
 >
 > **范围 / Scope**: 仅本仓库。Platform 与 Product 仓库不变更；不新增架构层。
 
