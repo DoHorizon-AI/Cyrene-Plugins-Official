@@ -9,6 +9,7 @@ pub mod direct_plugin_runtime;
 pub mod memory_provider;
 pub mod message_connector;
 pub mod model_provider;
+pub mod tool_provider;
 
 /// Generated `cyrene.plugin.runtime.v1` carrier messages.
 pub mod direct_plugin_runtime_v1 {
@@ -38,4 +39,9 @@ pub mod memory_provider_v1 {
 /// Generated `cyrene.computer.runtime.v1` payload messages.
 pub mod computer_runtime_v1 {
     include!(concat!(env!("OUT_DIR"), "/cyrene.computer.runtime.v1.rs"));
+}
+
+/// Generated `cyrene.tool.provider.v1` payload messages.
+pub mod tool_provider_v1 {
+    include!(concat!(env!("OUT_DIR"), "/cyrene.tool.provider.v1.rs"));
 }

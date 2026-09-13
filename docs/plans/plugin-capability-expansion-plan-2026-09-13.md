@@ -34,6 +34,7 @@
 | `agent.runtime.v1` | proto | `runtime/rust/cyrene-plugin-server` | none | 未见已接通消费者（observed_at=2026-09-13） | Rust TCK |
 | `memory.provider.v1` | proto | `runtime/rust/cyrene-plugin-server` | none | Navigator 文档：not connected（observed_at=2026-09-13） | Rust TCK |
 | `computer.runtime.v1` | proto（含 `list_dir`） | `plugins/tools/computer-runtime` | yes（maturity: migrating） | 未发现（observed_at=2026-09-13） | `contracts/tck/computer-runtime-v1` + Rust TCK |
+| `tool.provider.v1` | proto（v1，contract-only） | 无（MCP provider 待 W3-2） | none | 无（observed_at=2026-09-13） | `contracts/tck/tool-provider-v1` + Rust TCK |
 | `model.analyzer.v1` | owner-scoped | `plugins/models/hf-model-analyzer` | yes | Yield（observed_at=2026-09-13） | 插件 tests |
 | `compatibility.evaluator.v1` | owner-scoped | `plugins/policy/compat-rules` | yes | Yield（observed_at=2026-09-13） | 插件 tests |
 | `evaluation.runner.v1` | owner-scoped | `plugins/evaluation/exact-match` | yes | Echo（`Cyrene-Services/Cyrene-Echo@603511c`）已通过 `EvaluationExecutionPort` 直连消费（observed_at=2026-09-13） | 插件 tests |
@@ -178,7 +179,7 @@ Evidence / 证据:
   C# 与 Python 投影 TCK 补齐同一组 round-trip 断言并执行通过。
 - [ ] W3-0c2 Gate hardening：JVM/Kotlin 投影 v2 七字段检查（本环境无 gradle，未执行；不写无法运行的测试）。
 - [x] W3-0d Gate hardening：protected surface 可见性（`--accept-protected-changes` 时打印 old → new digest；CI/review 可见）。
-- [ ] W3-1 `tool.provider.v1` 契约：proto 载荷、method id、interface version、TCK 骨架。
+- [x] W3-1 `tool.provider.v1` 契约：proto 载荷、method id、interface version、TCK 骨架。
 - [ ] W3-2 MCP stdio provider：`tools/list` / `tools/call` / schema 转换 / 超时 / 取消 / 类型化错误（按 §8.1 A-D）。
 - [ ] W3-3 MCP HTTP/SSE transport。
 - [ ] W3-4 agent runtime 接入真实 `ToolProvider` 主机路径 + TCK。
@@ -190,6 +191,7 @@ Evidence / 证据:
 - W3-0b：`python3 tools/ci/validate_manifests.py --root .` → `MANIFEST_SCHEMA: PASS manifests=7`；`jsonschema==4.23.0` 为 pinned CI/dev 依赖，catalog 生成前强制校验（生产 runtime 无新依赖）。
 - W3-0c1：Rust 既有 `structured_chat_v2_round_trip_preserves_tools_history_and_usage` 覆盖七字段；C# TCK `dotnet run --project contracts/tck/model-provider-v1/dotnet/ModelProviderContractTck.csproj` → `PASS`；Python TCK `bash contracts/tck/model-provider-v1/generate-bindings.sh` → `model.provider.v1 generated Python payload TCK: PASS` 且四语言生成 PASS。
 - W3-0d：实测 updater `--accept-protected-changes` 输出 `SOURCE_MANIFEST_PROTECTED: plugins/connectors/onebot-v11/README.md c0c1691bcd72... -> a3c0f3345c41...`；verifier 现在每次 PASS 打印 pinned protected surface（path + sha256）。
+- W3-1：新增 `contracts/proto/cyrene/tool/provider/v1/tool_provider.proto` + Rust 投影/标识 + `contracts/tck/tool-provider-v1/`（含 `tool_provider_contract_tck.rs`）；buf 1.45.0（与 CI 同版本）`lint` / `format --diff --exit-code` / `build` 全通过；`cargo test --manifest-path contracts/rust/cyrene-plugin-contracts/Cargo.toml` → 3 个 tool_provider 契约测试通过，fmt/clippy 干净；catalog → `capabilities=11`，`tool.provider.v1` 以 contract-only 形式出现。
 
 ## 9. Wave 4 — Evaluation Pack
 

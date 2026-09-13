@@ -283,6 +283,20 @@ capabilities:
         execution_mode: REAL
         verified_at: 2026-09-13
     tck: []
+  - id: tool.provider.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/tool/provider/v1/tool_provider.proto
+    contract_methods:
+      - call_tool
+      - list_tools
+    implementations: []
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs
+      - contracts/tck/tool-provider-v1
 declared_without_contract:
   - id: rerank.provider.v1
     declared_by: runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs

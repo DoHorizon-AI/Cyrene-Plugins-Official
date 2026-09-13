@@ -28,6 +28,10 @@ _SCRIPT_DIR = Path(__file__).resolve().parent
 if str(_SCRIPT_DIR) not in sys.path:
     sys.path.insert(0, str(_SCRIPT_DIR))
 
+# Keep the exported tree free of __pycache__ payloads; the source manifest
+# inventory walks the filesystem and would otherwise register bytecode.
+sys.dont_write_bytecode = True
+
 import validate_manifests
 
 INDEX_PATH = "contracts/capabilities.yaml"

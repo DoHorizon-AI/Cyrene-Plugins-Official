@@ -1,0 +1,139 @@
+// SPDX-License-Identifier: Apache-2.0
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │ 📄 tool_provider.proto                                                  │
+// │ Package: cyrene.tool.provider.v1                                        │
+// │ Role: Canonical tool-provider payload contracts owned by Cyrene Plugins.│
+// │                                                                         │
+// │ 协议职责：定义由 Cyrene Plugins 所有的工具提供方类型化负载。            │
+// │ · Canonical tool identity is (binding_id, provider_tool_id); display     │
+// │   names are presentation facts and never an identity.                   │
+// │ · A Product takes one tool catalog snapshot per AgentRun; mid-run       │
+// │   catalog changes are not observed by the running Agent.                │
+// │ · v1 exposes tools/list and tools/call only; resources and prompts are  │
+// │   intentionally out of scope.                                           │
+// └─────────────────────────────────────────────────────────────────────────┘
+syntax = "proto3";
+
+package cyrene.tool.provider.v1;
+
+option csharp_namespace = "Cyrene.Tool.Provider.V1";
+option java_multiple_files = true;
+option java_outer_classname = "ToolProviderProto";
+option java_package = "io.cyrene.proto.tool.provider.v1";
+
+// Canonical typed payloads for tool.provider.v1.
+//
+// Direct plugin invocation identifiers:
+//   capability ID: tool.provider.v1
+//   interface version: 1
+//   catalog method: list_tools
+//   execution method: call_tool
+//
+// This payload contract is transport-neutral. A Product sends these messages
+// directly to the selected Plugin endpoint. Platform may resolve and authorize
+// that endpoint, but it does not carry or interpret these payloads. Tool
+// arguments and results are opaque JSON owned by the caller and the provider.
+
+enum ToolProviderErrorCode {
+  TOOL_PROVIDER_ERROR_CODE_UNSPECIFIED = 0;
+  TOOL_PROVIDER_ERROR_CODE_TOOL_NOT_FOUND = 1;
+  TOOL_PROVIDER_ERROR_CODE_INVALID_ARGUMENTS = 2;
+  TOOL_PROVIDER_ERROR_CODE_EXECUTION_FAILED = 3;
+  TOOL_PROVIDER_ERROR_CODE_PROVIDER_ERROR = 4;
+}
+
+message ListToolsRequest {
+  // Optional binding filter. An omitted binding_id asks the endpoint for the
+  // tools of every binding configured on this plugin instance.
+  optional string binding_id = 1;
+}
+
+// One callable tool. Identity is the (binding_id, provider_tool_id) pair;
+// display_name and description are presentation facts only.
+message ToolDescriptor {
+  string binding_id = 1;
+
+  // Provider-stable identifier within the binding. It is the value carried by
+  // CallToolRequest and never changes meaning while the binding is configured.
+  string provider_tool_id = 2;
+
+  string display_name = 3;
+  string description = 4;
+
+  // JSON-encoded JSON Schema for the tool input. The schema remains
+  // caller/provider-owned and is opaque to the Platform control plane.
+  string input_schema_json = 5;
+
+  // JSON-encoded JSON Schema for the tool output when the provider publishes
+  // one. Providers that return free-form content omit this field.
+  optional string output_schema_json = 6;
+}
+
+// One snapshot of the tools a Product may expose during a single AgentRun.
+message ToolCatalog {
+  // Provider-defined opaque snapshot version. Products record it with run
+  // evidence; they do not diff or interpret it.
+  string catalog_version = 1;
+
+  repeated ToolDescriptor tools = 2;
+}
+
+message ListToolsResponse {
+  oneof result {
+    ToolCatalog catalog = 1;
+    ToolProviderError error = 2;
+  }
+}
+
+message CallToolRequest {
+  // Canonical tool identity: the binding that owns the tool.
+  string binding_id = 1;
+
+  // Canonical tool identity: the provider-stable tool identifier.
+  string provider_tool_id = 2;
+
+  // JSON-encoded tool arguments. Empty string means the tool takes no input.
+  string arguments_json = 3;
+
+  // Optional echo of the catalog snapshot this call was planned against. It
+  // is an observability fact; providers must not reject a call because the
+  // snapshot moved on.
+  optional string catalog_version = 4;
+}
+
+message ToolTextContent {
+  string text = 1;
+}
+
+message ToolJsonContent {
+  // JSON-encoded content produced by the tool.
+  string json = 1;
+}
+
+message ToolContentPart {
+  oneof content {
+    ToolTextContent text = 1;
+    ToolJsonContent json = 2;
+  }
+}
+
+message ToolCallOutcome {
+  repeated ToolContentPart content = 1;
+
+  // True when the tool executed and reported a domain-level failure. Transport
+  // and provider failures use ToolProviderError instead.
+  bool is_error = 2;
+}
+
+message CallToolResponse {
+  oneof result {
+    ToolCallOutcome outcome = 1;
+    ToolProviderError error = 2;
+  }
+}
+
+message ToolProviderError {
+  ToolProviderErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
