@@ -234,12 +234,13 @@ def _collect_manifests(root: Path) -> tuple[list[dict], dict[str, dict]]:
         for capability in capabilities:
             if not isinstance(capability, str) or not capability:
                 raise CatalogError(f"{manifest_path}: capability entry is not a string")
-            if capability in contract_hints:
-                raise CatalogError(f"Capability declared by two manifests: {capability}")
-            contract_hints[capability] = {
-                "owner_paths": sorted(set(owner_paths)),
-                "shared_paths": sorted(set(shared_paths)),
-            }
+            # Several implementations may share one capability; the catalog
+            # records each implementation and merges their contract hints.
+            hint = contract_hints.setdefault(
+                capability, {"owner_paths": set(), "shared_paths": set()}
+            )
+            hint["owner_paths"].update(owner_paths)
+            hint["shared_paths"].update(shared_paths)
     return implementations, contract_hints
 
 
@@ -428,7 +429,7 @@ def build_catalog(root: Path) -> dict:
                     "interface_versions": record["interface_versions"],
                     "contract": {
                         "kind": "owner-scoped",
-                        "paths": hint["owner_paths"],
+                        "paths": sorted(hint["owner_paths"]),
                     },
                     "contract_methods": record["methods"],
                     "implementations": [],
@@ -437,7 +438,9 @@ def build_catalog(root: Path) -> dict:
                 rows[capability_id] = row
             else:
                 shared = [
-                    path for path in hint["shared_paths"] if path not in row["contract"]["paths"]
+                    path
+                    for path in sorted(hint["shared_paths"])
+                    if path not in row["contract"]["paths"]
                 ]
                 row["contract"]["paths"] = sorted(row["contract"]["paths"] + shared)
             entry = {

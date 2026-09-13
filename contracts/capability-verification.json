@@ -185,6 +185,21 @@
           "result": "6 passed; one logical session serves list_tools and every later call_tool, a broken transport re-opens a fresh session, a timeout leaves the session usable, and shutdown releases the child process"
         }
       ]
+    },
+    {
+      "capability": "evaluation.runner.v1",
+      "implementation": "cyrene.evaluation.evaluator-pack",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / python 3.12 venv / pure deterministic evaluators, direct runtime round trip",
+          "command": "python3 -m pytest -q plugins/evaluation/evaluator-pack/tests",
+          "result": "9 passed; contains/regex/JSON structural/JSON Schema/numeric tolerance semantics, request-level fail-closed behaviour, schema validation of responses, determinism, and a DirectPluginRuntime round trip",
+          "notes": "No Product consumer is bound to this pack yet; Echo would declare a new runner binding when it adopts these evaluators."
+        }
+      ]
     }
   ]
 }

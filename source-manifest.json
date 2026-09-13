@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "d1ca948d843e583e9fb978d396fb63725605d28b39150ab5db091b84720981b8",
-      "size_bytes": 15154
+      "sha256": "52c6f2a90be0c0c8ddb017accb884e0e59919ad74c23f187abbc63cb57e8c279",
+      "size_bytes": 15305
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "13f89f782393b66009ae69a785b5befaa74d140ea0fe3a26bfc7b421bf1832df",
-      "size_bytes": 9733
+      "sha256": "e83454a6b579caf435eef65be0215ff4158db874aeab221cb3f0e8021d25876f",
+      "size_bytes": 10202
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "448f0acd41aa1a0ae8c033a13f6e97a593c69d25445828e2fed4909565137476",
-      "size_bytes": 10169
+      "sha256": "8ce44383fb185f8a9a466ebe7a6e2a9d0ca6861665df6b465c2f16c2eab40263",
+      "size_bytes": 11022
     },
     {
       "kind": "file",
@@ -614,8 +614,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/plans/plugin-capability-expansion-plan-2026-09-13.md",
-      "sha256": "4473c486736f54ff4582e8e3961860bdaabd622b9eb793e1a1d7d3e67e8507a7",
-      "size_bytes": 26007
+      "sha256": "7b8412a26ff7e061dcb77a57b9ddfef243b96fa1f101073116c86c5470d0cda4",
+      "size_bytes": 27060
     },
     {
       "kind": "file",
@@ -756,6 +756,48 @@
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
       "sha256": "6cf86ab69237f098d861d6f16582b3af5dd245f69d430a7e3c40ef4a4003ec10",
       "size_bytes": 2194
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/README.md",
+      "sha256": "b2940a1086dac104cfb1f9fbb22fabf86c78e18dc833ba6c58ceda7418312492",
+      "size_bytes": 2070
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/contracts/v1/schema.json",
+      "sha256": "4b0cb7aeba31cfca25e1656a419510cdf424ae8fd3f62cdee4a63dfaa02b883d",
+      "size_bytes": 5898
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/evaluator_pack.py",
+      "sha256": "bd1d0a84056ca06de21e3ff516cc24742d11752b221d2a96143524b86e6e647b",
+      "size_bytes": 13845
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/plugin.manifest.json",
+      "sha256": "cff265b365dd336213be3fa7e0ee61bd61338f8d9296e50ad8ed33c6d6d56e24",
+      "size_bytes": 1322
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/pyproject.toml",
+      "sha256": "53854c4a55cfe9bee552200d5afd8b60895f9cb2d2657ac3145b6c4828abf541",
+      "size_bytes": 644
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/evaluation/evaluator-pack/tests/test_evaluator_pack.py",
+      "sha256": "35ca01a43d7daa5efc956de371a60e4bdf3eedd501592c4c310f255275abb346",
+      "size_bytes": 11042
     },
     {
       "kind": "file",
@@ -3456,8 +3498,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/capability_catalog.py",
-      "sha256": "c4c62a0f35a1ce39bb234b53cdc7f37e822326214e00bbabe095c7baf6e54a1a",
-      "size_bytes": 25273
+      "sha256": "f4f9de77a2a0aa5a7cd799d2359115a00fed01363197b5011d91d524c76760b1",
+      "size_bytes": 25412
     },
     {
       "kind": "file",

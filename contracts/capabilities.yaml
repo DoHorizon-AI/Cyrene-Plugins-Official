@@ -118,10 +118,23 @@ capabilities:
     contract:
       kind: owner-scoped
       paths:
+        - plugins/evaluation/evaluator-pack/contracts/v1/schema.json
         - plugins/evaluation/exact-match/contracts/v1/schema.json
     contract_methods:
       - evaluate
     implementations:
+      - ref: cyrene.evaluation.evaluator-pack
+        source: plugins/evaluation/evaluator-pack/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - evaluate
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-09-13
       - ref: cyrene.evaluation.exact-match
         source: plugins/evaluation/exact-match/plugin.manifest.json
         kind: capability-plugin
