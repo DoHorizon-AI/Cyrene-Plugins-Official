@@ -13,6 +13,7 @@
 //! - Corrupted or unparseable Protobuf payloads
 
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -929,26 +930,46 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 let computer = self.computer.clone();
                 tokio::spawn(async move {
                     let (event_tx, mut event_rx) = mpsc::channel::<CommandStreamEvent>(64);
+                    let cancel_flag = Arc::new(AtomicBool::new(false));
 
                     let comp = computer.clone();
+                    let command_cancel = Arc::clone(&cancel_flag);
                     tokio::spawn(async move {
-                        let _ = comp.execute_command_stream(cmd_req, None, event_tx).await;
+                        let _ = comp
+                            .execute_command_stream(cmd_req, Some(command_cancel), event_tx)
+                            .await;
                     });
 
-                    while let Some(event) = event_rx.recv().await {
-                        let mut buf = Vec::new();
-                        event.encode(&mut buf).unwrap();
-                        let item = DirectStreamItem {
-                            event: Some(Event::Payload(DirectPayload {
-                                type_url:
-                                    "type.cyrene.io/cyrene.computer.runtime.v1.CommandStreamEvent"
-                                        .into(),
-                                value: buf,
-                                event_type: String::new(),
-                            })),
-                        };
-                        if tx.send(Ok(item)).await.is_err() {
-                            break;
+                    loop {
+                        tokio::select! {
+                            event = event_rx.recv() => {
+                                let Some(event) = event else {
+                                    break;
+                                };
+                                let mut buf = Vec::new();
+                                event.encode(&mut buf).unwrap();
+                                let item = DirectStreamItem {
+                                    event: Some(Event::Payload(DirectPayload {
+                                        type_url:
+                                            "type.cyrene.io/cyrene.computer.runtime.v1.CommandStreamEvent"
+                                                .into(),
+                                        value: buf,
+                                        event_type: String::new(),
+                                    })),
+                                };
+                                if tx.send(Ok(item)).await.is_err() {
+                                    // The client dropped the stream: stop the managed
+                                    // command instead of orphaning its process group.
+                                    cancel_flag.store(true, Ordering::SeqCst);
+                                    break;
+                                }
+                            }
+                            _ = tx.closed() => {
+                                // The client dropped the stream: stop the managed
+                                // command instead of orphaning its process group.
+                                cancel_flag.store(true, Ordering::SeqCst);
+                                break;
+                            }
                         }
                     }
 

@@ -41,7 +41,7 @@
     {
       "capability": "computer.runtime.v1",
       "implementation": "cyrene.tools.computer-runtime",
-      "verification_level": "DISPATCH_VERIFIED",
+      "verification_level": "INTEGRATION_VERIFIED",
       "execution_mode": "REAL",
       "evidence": [
         {
@@ -50,6 +50,13 @@
           "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml",
           "result": "7 passed; ExecuteCommand, artifacts, and ListDir dispatch verified; path traversal denied",
           "notes": "Packaged-runtime acceptance (install/start, cancellation, timeout, descendant process cleanup, environment filtering) not performed; maturity stays migrating."
+        },
+        {
+          "observed_at": "2026-09-13",
+          "environment": "linux / cargo test / packaged cyrene-plugin-server binary started per the manifest launch contract, driven over DirectPluginRuntime gRPC",
+          "command": "cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml --test packaged_runtime_acceptance",
+          "result": "4 passed; start/health, ExecuteCommand, ListDir, traversal denial, env filtering, artifact roundtrip, timeout and stream-cancellation process-group reaping all verified",
+          "notes": "No Product consumer is exercised and Windows is not covered; the managed-runtime full chain in a controlled environment is what this level records. Maturity promotion remains an owner decision."
         }
       ]
     },

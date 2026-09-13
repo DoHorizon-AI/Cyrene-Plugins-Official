@@ -33,7 +33,7 @@
 | `model.provider.v1` | proto (v1 + v2) | `runtime/dotnet-native-aot` (OpenAI, Anthropic) | none | Navigator 文档：not connected（observed_at=2026-09-13） | `contracts/tck/model-provider-v1` + Rust TCK |
 | `agent.runtime.v1` | proto | `runtime/rust/cyrene-plugin-server` | none | 未见已接通消费者（observed_at=2026-09-13） | Rust TCK |
 | `memory.provider.v1` | proto | `runtime/rust/cyrene-plugin-server` | none | Navigator 文档：not connected（observed_at=2026-09-13） | Rust TCK |
-| `computer.runtime.v1` | proto（含 `list_dir`） | `plugins/tools/computer-runtime` | yes（maturity: migrating） | 未发现（observed_at=2026-09-13） | `contracts/tck/computer-runtime-v1` + Rust TCK |
+| `computer.runtime.v1` | proto（含 `list_dir`） | `plugins/tools/computer-runtime` | yes（maturity: migrating，待 owner） | 未发现（observed_at=2026-09-13） | `contracts/tck/computer-runtime-v1` + Rust TCK + packaged acceptance |
 | `tool.provider.v1` | proto（v1） | `runtime/rust/cyrene-mcp-provider`（DISPATCH_VERIFIED / SIMULATED；未接外部 MCP server 与消费者） | none | 无（observed_at=2026-09-13） | `contracts/tck/tool-provider-v1` + Rust TCK + provider/server 测试 |
 | `model.analyzer.v1` | owner-scoped | `plugins/models/hf-model-analyzer` | yes | Yield（observed_at=2026-09-13） | 插件 tests |
 | `compatibility.evaluator.v1` | owner-scoped | `plugins/policy/compat-rules` | yes | Yield（observed_at=2026-09-13） | 插件 tests |
@@ -135,24 +135,23 @@ Evidence / 证据:
 
 - [x] W2-1 computer runtime `list_dir` 全链路补齐：plugin server 增加 `ListDir` 分派（此前仅 crate 与 proto 已声明）→ manifest 声明 → 集成测试。
 - [x] W2-2 建立 `contracts/tck/computer-runtime-v1/`：dotnet 投影 TCK + Rust 契约 TCK + host 集成测试构成覆盖（无 Java/Python 投影，因此不建对应 runner）。
-- [ ] W2-3 packaged-runtime acceptance（**晋升 supported 的前置**，v1.1 扩写）：
-  - install / start（按 manifest 启停 packaged runtime）
-  - direct dispatch（经 DirectPluginRuntime 调用，而非直接函数调用）
-  - `ExecuteCommand`
-  - `ListDir`
-  - cancellation
-  - timeout
-  - descendant process cleanup（超时/取消后子进程组清理）
-  - path traversal denial
-  - environment filtering
-  - artifact roundtrip
-  - 尽量覆盖 Linux + Windows；**通过后由 owner 决定**是否 `migrating → supported`。在此之前 `maturity` 保持 `migrating`。
+- [x] W2-3 packaged-runtime acceptance（**晋升 supported 的前置**，v1.1 扩写）：
+  - install / start：以打包二进制按 manifest launch 启动并完成 health 握手（真实安装/放置属 Platform launcher 职责，本仓库不伪造）
+  - direct dispatch（经 DirectPluginRuntime gRPC，而非直接函数调用）
+  - `ExecuteCommand` / `ListDir` / path traversal denial / environment filtering / artifact roundtrip
+  - cancellation（客户端断开 stream → server 取消并回收进程组）
+  - timeout（`CommandTimeout` + 进程组回收）
+  - descendant process cleanup（后台孙进程在超时与取消后均被回收）
+  - **Linux 全项通过**；Windows 待验收环境，记为缺口（测试以 `#![cfg(unix)]` 显式限定）
+  - **`migrating → supported` 仍由 owner 决定**；acceptance 通过不自动改变 maturity。
 - [x] W2-4 Browser 决策记录：不扩展 `computer.runtime.v1`，未来按独立 `browser.runtime.v1` 处理（见决策记录）。
 
 Evidence / 证据:
 
 - W2-1：`cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml` → `7 passed`（含 `test_w2_list_dir_roundtrip_and_traversal_denied`）；`cargo clippy --all-targets -- -D warnings` 与 `cargo fmt --check` 通过。
 - W2-1：`plugins/tools/computer-runtime/plugin.manifest.json` 声明 `ListDir`；catalog 重新生成后 implementation 方法与契约方法对齐（大小写差异保留可见，Wave 6 处理）。
+- W2-3：`cargo test --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml` → 14 passed（10 集成 + 4 packaged acceptance）；acceptance 直接启动打包二进制、经 gRPC 驱动 10 项清单，超时与取消均验证后台孙进程被回收（`/proc` 轮询）。
+- W2-3 附带修复：stream 客户端断开（`tx.closed()` / send 失败）现在会置取消标志并回收受管命令的进程组，此前会留下孤儿进程；断连检测依赖客户端连接驱动正常运行（单线程测试 runtime 中阻塞等待曾掩盖该检测，测试已改为全异步等待）。
 - W2-2：`dotnet run --project contracts/tck/computer-runtime-v1/dotnet/ComputerRuntimeContractTck.csproj` → `computer.runtime.v1 generated C# payload TCK: PASS`。
 - W2-2：catalog TCK 来源扩展为 `contracts/tck/*` + `contracts/rust/.../tests/*_tck.rs`。
 

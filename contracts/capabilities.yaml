@@ -79,7 +79,7 @@ capabilities:
         interface_versions:
           - "1"
         maturity: migrating
-        verification_level: DISPATCH_VERIFIED
+        verification_level: INTEGRATION_VERIFIED
         execution_mode: REAL
         verified_at: 2026-09-13
     tck:
