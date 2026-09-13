@@ -1426,8 +1426,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "c9b94b76491a79361d10611ae8f2a7774fd52e4f98cf50496b90a5a422f7f348",
-      "size_bytes": 19246
+      "sha256": "5b3accc693b3e9eca63bb4eaf52ec82a66a6e8f7dfb9da6b29b3865205ed873b",
+      "size_bytes": 19286
     },
     {
       "kind": "file",
