@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.dataset.validator.v1/schema.json",
+  "title": "tool.dataset.validator.v1",
+  "$defs": {
+    "ValidationError": {
+      "type": "object",
+      "required": ["row_index", "field", "message", "value"],
+      "properties": {
+        "row_index": {"type": ["integer", "null"], "minimum": 0},
+        "field": {"type": ["string", "null"]},
+        "message": {"type": "string", "minLength": 1},
+        "value": {}
+      },
+      "additionalProperties": false
+    },
+    "ValidateRequest": {
+      "type": "object",
+      "required": ["file_path"],
+      "properties": {
+        "file_path": {"type": "string", "minLength": 1},
+        "format": {"enum": ["auto", "jsonl", "json", "parquet", "csv"]},
+        "schema": {
+          "type": ["string", "null"],
+          "enum": ["instruction", "conversation", "sharegpt", null]
+        },
+        "sample_size": {"type": "integer", "minimum": 0, "maximum": 100},
+        "max_errors": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "max_sequence_length": {"type": "integer", "minimum": 1, "maximum": 1000000}
+      },
+      "additionalProperties": false
+    },
+    "ValidateResponse": {
+      "type": "object",
+      "required": [
+        "valid",
+        "row_count",
+        "columns",
+        "errors",
+        "warnings",
+        "sample_rows",
+        "detected_format",
+        "detected_schema",
+        "metrics"
+      ],
+      "properties": {
+        "valid": {"type": "boolean"},
+        "row_count": {"type": "integer", "minimum": 0},
+        "columns": {
+          "type": "array",
+          "items": {"type": "string"},
+          "uniqueItems": true
+        },
+        "errors": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/ValidationError"}
+        },
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "sample_rows": {"type": "array", "items": {"type": "object"}},
+        "detected_format": {"type": ["string", "null"]},
+        "detected_schema": {"type": ["string", "null"]},
+        "metrics": {
+          "type": "object",
+          "required": [
+            "average_characters",
+            "empty_prompts",
+            "empty_responses",
+            "truncation_risks"
+          ],
+          "properties": {
+            "average_characters": {"type": "number", "minimum": 0},
+            "empty_prompts": {"type": "integer", "minimum": 0},
+            "empty_responses": {"type": "integer", "minimum": 0},
+            "truncation_risks": {"type": "integer", "minimum": 0}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -5,10 +5,12 @@ on:
     branches:
       - main
       - develop
+      - release
   pull_request:
     branches:
       - main
       - develop
+      - release
   workflow_dispatch:
 
 concurrency:
@@ -84,20 +86,32 @@ jobs:
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_plugin_runtime \
-            -e plugins/connectors/onebot-v11
-      - name: Lint Python runtime and OneBot sources
+            -e plugins/connectors/onebot-v11 \
+            -e plugins/evaluation/exact-match \
+            -e plugins/models/hf-model-analyzer \
+            -e plugins/policy/compat-rules \
+            -e plugins/tools/dataset-preparation \
+            -e plugins/tools/dataset-validator
+      - name: Lint Python runtime and official Plugin sources
         run: |
           python3 -m ruff check \
             --exclude '**/_generated/**' \
             sdk/python/cyrene_model_provider_contracts/src \
             sdk/python/cyrene_plugin_runtime/src \
             plugins/connectors/onebot-v11/src \
+            plugins/evaluation/exact-match \
+            plugins/models/hf-model-analyzer \
+            plugins/policy/compat-rules \
+            plugins/tools/dataset-preparation \
+            plugins/tools/dataset-validator \
             tools/ci/verify_source_manifest.py
-      - name: Run Python runtime and OneBot tests
+      - name: Run Python runtime and official Plugin tests
         run: |
           python3 -m pytest -q \
             sdk/python/cyrene_plugin_runtime/tests \
-            plugins/connectors/onebot-v11/tests
+            plugins/connectors/onebot-v11/tests \
+            plugins/tools/dataset-preparation/tests \
+            plugins/tools/dataset-validator/tests
 
   buf-contracts:
     name: public-ci / buf-contracts
@@ -184,6 +198,19 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+      - name: Add MSVC symbol tools to PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+          $dumpbin = & $vswhere -latest -products * `
+            -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+            -find 'VC\Tools\MSVC\**\bin\Hostx64\x64\dumpbin.exe' |
+            Select-Object -First 1
+          if (-not $dumpbin) {
+            throw 'dumpbin.exe was not found in the hosted Visual Studio installation.'
+          }
+          Split-Path -Parent $dumpbin | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Run provider tests
         run: dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release
       - name: Verify Native AOT source rules
@@ -219,6 +246,12 @@ jobs:
         with:
           name: cyrene-dotnet-linux-x64-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/cyrene-dotnet-native-linux-x64
+      - name: Restore executable permissions on downloaded native artifacts
+        run: |
+          chmod +x \
+            "${RUNNER_TEMP}/cyrene-rust-native/bin/cyrene-plugin-server" \
+            "${RUNNER_TEMP}/cyrene-rust-native/tests/cabi_harness" \
+            "${RUNNER_TEMP}/cyrene-dotnet-native-linux-x64/bin/cyrene-plugin-host"
       - name: Build Java client and Spring Boot 3/4 starters
         env:
           CYRENE_RUST_SERVER_BIN: ${{ runner.temp }}/cyrene-rust-native/bin/cyrene-plugin-server

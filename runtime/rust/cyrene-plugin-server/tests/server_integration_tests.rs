@@ -12,6 +12,7 @@ use prost::Message;
 
 // Proto generated client & types
 pub mod proto {
+    #![allow(clippy::result_large_err)]
     tonic::include_proto!("cyrene.plugin.runtime.v1");
 }
 

@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-compat-rules"
+version = "0.2.0"
+description = "Pure compatibility rule evaluator"
+requires-python = ">=3.11"
+dependencies = ["cyrene-plugin-runtime>=0.2,<0.3"]
+
+[tool.setuptools]
+py-modules = ["compat_rules"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.policy.compat-rules" = ["plugin.manifest.json"]

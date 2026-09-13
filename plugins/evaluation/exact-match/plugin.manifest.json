@@ -1,0 +1,49 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.evaluation.exact-match",
+  "name": "Exact Match Evaluation Runner",
+  "version": "0.1.0",
+  "description": "Stateless exact-match evaluation over Product-supplied JSON records.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "evaluation.runner.v1"
+  ],
+  "methods": [
+    {
+      "name": "evaluate",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/EvaluateRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/EvaluateResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "exact_match_evaluator:ExactMatchEvaluationRunner",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "exact_match_evaluator:ExactMatchEvaluationRunner"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": [
+      "linux",
+      "windows",
+      "darwin"
+    ]
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-dataset-validator"
+version = "0.2.0"
+description = "JSON, JSONL, and CSV dataset validation plugin"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "duckdb>=1.4,<2",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools]
+py-modules = ["dataset_validator"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.tools.dataset-validator" = [
+  "plugin.manifest.json",
+  "contracts/v1/schema.json",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

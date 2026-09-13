@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/dataset.preparation.v1/schema.json",
+  "title": "dataset.preparation.v1",
+  "$defs": {
+    "AbsolutePath": {"type": "string", "minLength": 1},
+    "ResultReceipt": {
+      "type": "object",
+      "required": ["result_digest", "result_size"],
+      "properties": {
+        "result_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "result_size": {"type": "integer", "minimum": 0}
+      }
+    },
+    "InspectRequest": {
+      "type": "object",
+      "required": ["source_path", "result_path"],
+      "properties": {
+        "source_path": {"$ref": "#/$defs/AbsolutePath"},
+        "result_path": {"$ref": "#/$defs/AbsolutePath"}
+      },
+      "additionalProperties": false
+    },
+    "InspectResponse": {
+      "allOf": [
+        {"$ref": "#/$defs/ResultReceipt"},
+        {
+          "type": "object",
+          "required": ["format", "row_count", "detected_fields"],
+          "properties": {
+            "format": {"enum": ["JSONL", "JSON", "TEXT"]},
+            "row_count": {"type": "integer", "minimum": 0},
+            "detected_fields": {"type": "array", "items": {"type": "string"}}
+          }
+        }
+      ]
+    },
+    "PrepareRequest": {
+      "type": "object",
+      "required": ["source_path", "source_format", "mapping", "normalization", "result_path"],
+      "properties": {
+        "source_path": {"$ref": "#/$defs/AbsolutePath"},
+        "source_format": {"enum": ["JSONL", "JSON", "TEXT"]},
+        "mapping": {"type": "object"},
+        "normalization": {"type": "object"},
+        "split": {"type": ["object", "null"]},
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "output_dir": {"$ref": "#/$defs/AbsolutePath"}
+      },
+      "additionalProperties": false
+    },
+    "PrepareResponse": {
+      "allOf": [
+        {"$ref": "#/$defs/ResultReceipt"},
+        {
+          "type": "object",
+          "required": [
+            "row_count", "unique_samples", "error_samples", "duplicate_samples",
+            "group_count", "files"
+          ],
+          "properties": {
+            "row_count": {"type": "integer", "minimum": 0},
+            "unique_samples": {"type": "integer", "minimum": 0},
+            "error_samples": {"type": "integer", "minimum": 0},
+            "duplicate_samples": {"type": "integer", "minimum": 0},
+            "group_count": {"type": "integer", "minimum": 0},
+            "files": {"type": "object"}
+          }
+        }
+      ]
+    },
+    "TransformRequest": {
+      "type": "object",
+      "required": ["source_path", "destination_path"],
+      "properties": {
+        "source_path": {"$ref": "#/$defs/AbsolutePath"},
+        "destination_path": {"$ref": "#/$defs/AbsolutePath"}
+      },
+      "additionalProperties": false
+    },
+    "TransformResponse": {
+      "type": "object",
+      "required": ["row_count", "schema_fields", "output_digest", "output_size"],
+      "properties": {
+        "row_count": {"type": "integer", "minimum": 0},
+        "schema_fields": {"type": "array", "items": {"type": "string"}},
+        "output_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "output_size": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -5,6 +5,9 @@
 //! over standard tonic gRPC DirectPluginRuntimeService.
 
 pub mod proto {
+    // Tonic generates Result signatures whose error type is intentionally
+    // fixed by the gRPC API; downstream code cannot box or shrink it.
+    #![allow(clippy::result_large_err)]
     tonic::include_proto!("cyrene.plugin.runtime.v1");
 }
 

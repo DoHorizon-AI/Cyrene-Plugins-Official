@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/compatibility.evaluator.v1/schema.json",
+  "title": "compatibility.evaluator.v1",
+  "$defs": {
+    "EvaluateRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "hardware_facts",
+        "model_spec",
+        "workload"
+      ],
+      "properties": {
+        "hardware_facts": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "model_spec": {
+          "type": "object"
+        },
+        "workload": {
+          "type": "object"
+        }
+      }
+    },
+    "EvaluateResponse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "compatible",
+        "summary",
+        "decisions"
+      ],
+      "properties": {
+        "compatible": {
+          "type": "boolean"
+        },
+        "summary": {
+          "type": "string"
+        },
+        "decisions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "subject",
+              "verdict",
+              "rationale",
+              "evidence"
+            ],
+            "properties": {
+              "subject": {
+                "type": "string"
+              },
+              "verdict": {
+                "enum": [
+                  "chosen",
+                  "rejected",
+                  "warning",
+                  "unknown"
+                ]
+              },
+              "rationale": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "severity",
+              "message",
+              "source",
+              "evidence",
+              "remediation"
+            ],
+            "properties": {
+              "code": {
+                "type": "string"
+              },
+              "severity": {
+                "enum": [
+                  "unknown",
+                  "warning",
+                  "blocked"
+                ]
+              },
+              "message": {
+                "type": "string"
+              },
+              "source": {
+                "type": "string"
+              },
+              "evidence": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "remediation": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          }
+        },
+        "evidence": {
+          "type": "object"
+        }
+      }
+    }
+  }
+}

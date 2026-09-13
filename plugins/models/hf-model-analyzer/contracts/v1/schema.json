@@ -1,0 +1,179 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/model.analyzer.v1/schema.json",
+  "title": "model.analyzer.v1",
+  "$defs": {
+    "AnalyzeRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_info",
+        "workload_intent"
+      ],
+      "properties": {
+        "model_info": {
+          "type": "object"
+        },
+        "workload_intent": {
+          "type": "object"
+        }
+      }
+    },
+    "AnalyzeResponse": {
+      "type": "object",
+      "required": [
+        "model_id",
+        "model_family",
+        "parameter_count",
+        "params_billion",
+        "weight_precision",
+        "estimated_vram_gb",
+        "vram_estimate",
+        "tensor_parallelism_recommendation",
+        "evidence"
+      ],
+      "properties": {
+        "model_id": {
+          "type": "string"
+        },
+        "model_family": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "parameter_count": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "params_billion": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "weight_precision": {
+          "type": "string"
+        },
+        "estimated_vram_gb": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "vram_estimate": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "lower_bytes",
+                "upper_bytes",
+                "confidence",
+                "uncertainty",
+                "train_gb",
+                "infer_gb"
+              ],
+              "properties": {
+                "lower_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "upper_bytes": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "confidence": {
+                  "type": "string"
+                },
+                "uncertainty": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "train_gb": {
+                  "type": "number"
+                },
+                "infer_gb": {
+                  "type": "number"
+                }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "tensor_parallelism_recommendation": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "ValidateShardsRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "model_directory"
+      ],
+      "properties": {
+        "model_directory": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verify_checksums": {
+          "type": "boolean",
+          "default": false
+        }
+      }
+    },
+    "ValidateShardsResponse": {
+      "type": "object",
+      "required": [
+        "valid"
+      ],
+      "properties": {
+        "valid": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "ComputeSha256Request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file_path"
+      ],
+      "properties": {
+        "file_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "chunk_size": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 65536
+        }
+      }
+    },
+    "ComputeSha256Response": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    }
+  }
+}

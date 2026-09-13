@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/evaluation.runner.v1/schema.json",
+  "title": "evaluation.runner.v1",
+  "$defs": {
+    "Usage": {
+      "type": ["object", "null"],
+      "required": ["prompt_tokens", "completion_tokens", "total_tokens", "source"],
+      "properties": {
+        "prompt_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "completion_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "total_tokens": {"type": ["integer", "null"], "minimum": 0},
+        "source": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "EvaluateRequest": {
+      "type": "object",
+      "required": ["records", "evaluator", "expected_field", "actual_field"],
+      "properties": {
+        "records": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": ["sample_index", "record"],
+            "properties": {
+              "sample_index": {"type": "integer", "minimum": 1},
+              "record": {"type": "object"}
+            },
+            "additionalProperties": false
+          }
+        },
+        "evaluator": {"const": "exact_match.v1"},
+        "expected_field": {"type": "string", "minLength": 1},
+        "actual_field": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "Sample": {
+      "type": "object",
+      "required": [
+        "sample_index",
+        "input_record",
+        "expected",
+        "actual",
+        "raw_output",
+        "passed",
+        "score",
+        "model_ref",
+        "endpoint_ref",
+        "usage",
+        "judge_identity"
+      ],
+      "properties": {
+        "sample_index": {"type": "integer", "minimum": 1},
+        "input_record": {"type": "object"},
+        "expected": {},
+        "actual": {},
+        "raw_output": {"type": ["string", "null"]},
+        "passed": {"type": "boolean"},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "model_ref": {"type": ["string", "null"]},
+        "endpoint_ref": {"type": ["string", "null"]},
+        "usage": {"$ref": "#/$defs/Usage"},
+        "judge_identity": {"type": "null"}
+      },
+      "additionalProperties": false
+    },
+    "EvaluateResponse": {
+      "type": "object",
+      "required": ["evaluator", "passed_count", "record_count", "score", "samples"],
+      "properties": {
+        "evaluator": {"const": "exact_match.v1"},
+        "passed_count": {"type": "integer", "minimum": 0},
+        "record_count": {"type": "integer", "minimum": 1},
+        "score": {"type": "number", "minimum": 0, "maximum": 1},
+        "samples": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"$ref": "#/$defs/Sample"}
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}
