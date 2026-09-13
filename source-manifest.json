@@ -1412,8 +1412,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/main.rs",
-      "sha256": "24c4ee002b1ad24af419bc86f70ee65456d72b4e9a5a77bbcaf2cb1a58799a92",
-      "size_bytes": 1833
+      "sha256": "ba31eb89771263618d8325a558b203561620ebe01488bba408ec0b567d134f26",
+      "size_bytes": 2019
     },
     {
       "kind": "file",
@@ -3335,7 +3335,7 @@
     },
     {
       "kind": "file",
-      "mode": "100644",
+      "mode": "100755",
       "path": "tools/ci/verify_source_manifest.py",
       "sha256": "a1e47b97378f162facfd8aa8f1d27ad6c794ca23bdd67e989724d2a63fddec80",
       "size_bytes": 12140
