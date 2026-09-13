@@ -3636,7 +3636,7 @@
     },
     {
       "kind": "file",
-      "mode": "100644",
+      "mode": "100755",
       "path": "tools/ci/capability_catalog.py",
       "sha256": "f4f9de77a2a0aa5a7cd799d2359115a00fed01363197b5011d91d524c76760b1",
       "size_bytes": 25412
@@ -3671,7 +3671,7 @@
     },
     {
       "kind": "file",
-      "mode": "100644",
+      "mode": "100755",
       "path": "tools/ci/validate_manifests.py",
       "sha256": "7b436ded24d9ffe6714f1b5ce8081ded7c45ccaf7ef0761248831ca0d7553d66",
       "size_bytes": 3079
