@@ -10,7 +10,14 @@
 
 from __future__ import annotations
 
+import math
+from collections.abc import Mapping
 from dataclasses import dataclass
+from typing import Any
+
+
+class QQOperationValidationError(ValueError):
+    """Raised when a fixed QQ operation payload violates its public schema."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -884,3 +891,279 @@ def get_qq_operation(name: str) -> QQOperation | None:
     """Return a fixed operation definition, never an arbitrary native call."""
 
     return QQ_OPERATION_BY_NAME.get(name)
+
+
+_IDENTIFIER_PARAMETER_FIELDS = frozenset(
+    {
+        "account_id",
+        "uin",
+        "uid",
+        "user_id",
+        "user_uid",
+        "user_uin",
+        "peer_uid",
+        "conversation_id",
+        "group_id",
+        "group_code",
+        "message_id",
+        "request_id",
+        "device_id",
+        "like_id",
+        "target_id",
+        "member_uid",
+        "member_uin",
+        "file_id",
+        "media_id",
+        "folder_id",
+        "file_uuid",
+        "model_id",
+        "element_id",
+        "notify_id",
+        "session_id",
+        "login_id",
+        "source_id",
+    }
+)
+_NON_NEGATIVE_INTEGER_PARAMETER_FIELDS = frozenset(
+    {
+        "sequence",
+        "random",
+        "timestamp",
+        "count",
+        "offset",
+        "page",
+        "page_size",
+        "start_time",
+        "end_time",
+    }
+)
+_NON_NEGATIVE_NUMBER_PARAMETER_FIELDS = frozenset({"duration_seconds", "duration"})
+_POSITIVE_NUMBER_PARAMETER_FIELDS = frozenset({"poll_interval_seconds"})
+_BOOLEAN_PARAMETER_FIELDS = frozenset({"approve", "download", "short_link"})
+_STRING_PARAMETER_FIELDS = frozenset(
+    {
+        "comment",
+        "request_kind",
+        "sub_type",
+        "scope",
+        "query",
+        "keywords",
+        "name",
+        "remark",
+        "nickname",
+        "long_nick",
+        "birthday",
+        "gender",
+        "header",
+        "status",
+        "like_type",
+        "file_name",
+        "mime_type",
+        "media_type",
+        "codec",
+        "local_result_reference",
+        "secret_ref",
+        "login_policy",
+        "platform",
+        "data_dir",
+        "client_version",
+        "qr_code",
+        "folder_name",
+        "role",
+    }
+)
+_STRING_LIST_PARAMETER_FIELDS = frozenset({"events"})
+_IDENTIFIER_LIST_PARAMETER_FIELDS = frozenset({"message_ids"})
+_OBJECT_LIST_PARAMETER_FIELDS = frozenset({"elements", "messages"})
+_OBJECT_PARAMETER_FIELDS = frozenset(
+    {
+        "peer",
+        "source",
+        "destination",
+        "attributes",
+        "reply",
+        "message",
+        "filter",
+        "profile",
+        "vendor_request",
+        "permissions",
+    }
+)
+_RESERVED_PARAMETER_FIELDS = frozenset(
+    {"service", "method", "raw_payload", "binding_id", "generation"}
+)
+_MAX_PARAMETER_DEPTH = 8
+_MAX_PARAMETER_ITEMS = 4_096
+_MAX_PARAMETER_STRING_BYTES = 64 * 1024
+
+
+def validate_qq_parameters(
+    operation: str, params: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Validate and copy one fixed operation's bounded JSON parameter object.
+
+    The public JSON Schema is checked in CI, but the runtime cannot assume a
+    schema validator is installed in the production package.  This small
+    standard-library validator therefore enforces the same primitive kinds,
+    finite numeric values, collection bounds, and closed top-level vocabulary
+    before a request reaches the native Host.
+    """
+
+    spec = get_qq_operation(operation)
+    if spec is None:
+        raise QQOperationValidationError(f"unsupported QQ operation {operation}")
+    if not spec.requestable:
+        raise QQOperationValidationError(f"QQ operation {operation} is callback-only")
+    if not isinstance(params, Mapping):
+        raise QQOperationValidationError("QQ operation params must be an object")
+    if len(params) > 128:
+        raise QQOperationValidationError("QQ operation params have too many fields")
+    if any(not isinstance(field, str) for field in params):
+        raise QQOperationValidationError("QQ operation parameter names must be text")
+    if _RESERVED_PARAMETER_FIELDS.intersection(params):
+        raise QQOperationValidationError(
+            "QQ operation params contain reserved fields"
+        )
+    allowed = allowed_qq_parameter_fields(operation)
+    unknown = set(params).difference(allowed)
+    if unknown:
+        raise QQOperationValidationError(
+            f"QQ operation params contain undeclared fields: {sorted(unknown)}"
+        )
+    for field, value in params.items():
+        _validate_parameter_value(field, value)
+    return dict(params)
+
+
+def _validate_parameter_value(field: str, value: Any) -> None:
+    """Validate one parameter value against the shared operation schema."""
+
+    _validate_json_value(value, field, depth=0)
+    if field in _IDENTIFIER_PARAMETER_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, (str, int)):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a string or integer"
+            )
+        if isinstance(value, int) and value < 1:
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be positive"
+            )
+        if isinstance(value, str) and not value.strip():
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be non-empty"
+            )
+    elif field in _NON_NEGATIVE_INTEGER_PARAMETER_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a non-negative integer"
+            )
+    elif field in _NON_NEGATIVE_NUMBER_PARAMETER_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a non-negative number"
+            )
+        if value < 0:
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a non-negative number"
+            )
+    elif field in _POSITIVE_NUMBER_PARAMETER_FIELDS:
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a positive number"
+            )
+        if value <= 0:
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a positive number"
+            )
+    elif field in _BOOLEAN_PARAMETER_FIELDS:
+        if not isinstance(value, bool):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be boolean"
+            )
+    elif field in _STRING_PARAMETER_FIELDS:
+        if not isinstance(value, str):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be text"
+            )
+        if field == "comment" and len(value) > 2_048:
+            raise QQOperationValidationError(
+                "QQ operation parameter comment exceeds 2048 characters"
+            )
+    elif field in _STRING_LIST_PARAMETER_FIELDS:
+        if not isinstance(value, (list, tuple)) or any(
+            not isinstance(item, str) or not item for item in value
+        ):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a list of non-empty text"
+            )
+    elif field in _IDENTIFIER_LIST_PARAMETER_FIELDS:
+        if not isinstance(value, (list, tuple)):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a list"
+            )
+        for item in value:
+            _validate_parameter_value("message_id", item)
+    elif field in _OBJECT_LIST_PARAMETER_FIELDS:
+        if not isinstance(value, (list, tuple)) or any(
+            not isinstance(item, Mapping) for item in value
+        ):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be a list of objects"
+            )
+    elif field in _OBJECT_PARAMETER_FIELDS:
+        if not isinstance(value, Mapping):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be an object"
+            )
+
+
+def _validate_json_value(value: Any, field: str, *, depth: int) -> None:
+    """Reject non-JSON values and unbounded nested structures."""
+
+    if depth > _MAX_PARAMETER_DEPTH:
+        raise QQOperationValidationError(
+            f"QQ operation parameter {field} is nested too deeply"
+        )
+    if value is None:
+        raise QQOperationValidationError(
+            f"QQ operation parameter {field} must not be null"
+        )
+    if isinstance(value, bool):
+        return
+    if isinstance(value, int):
+        return
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} must be finite"
+            )
+        return
+    if isinstance(value, str):
+        if len(value.encode("utf-8")) > _MAX_PARAMETER_STRING_BYTES:
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} is too large"
+            )
+        return
+    if isinstance(value, Mapping):
+        if len(value) > _MAX_PARAMETER_ITEMS:
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} has too many object fields"
+            )
+        for key, item in value.items():
+            if not isinstance(key, str) or not key:
+                raise QQOperationValidationError(
+                    f"QQ operation parameter {field} has an invalid object key"
+                )
+            _validate_json_value(item, f"{field}.{key}", depth=depth + 1)
+        return
+    if isinstance(value, (list, tuple)):
+        if len(value) > _MAX_PARAMETER_ITEMS:
+            raise QQOperationValidationError(
+                f"QQ operation parameter {field} has too many list items"
+            )
+        for index, item in enumerate(value):
+            _validate_json_value(item, f"{field}[{index}]", depth=depth + 1)
+        return
+    raise QQOperationValidationError(
+        f"QQ operation parameter {field} contains a non-JSON value"
+    )

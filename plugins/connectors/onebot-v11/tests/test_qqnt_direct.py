@@ -304,6 +304,55 @@ def test_direct_extension_rejects_cross_family_parameter_names(tmp_path: Path) -
 
 
 @pytest.mark.parametrize(
+    ("operation", "params"),
+    [
+        ("qq.group.list", {"account_id": True}),
+        ("qq.group.list", {"account_id": []}),
+        ("qq.group.list", {"account_id": "10001", "count": -1}),
+        ("qq.group.list", {"account_id": "10001", "binding_id": "other"}),
+        (
+            "qq.message.search",
+            {"account_id": "10001", "query": "x" * (64 * 1024 + 1)},
+        ),
+    ],
+)
+def test_direct_extension_rejects_invalid_typed_parameters_before_host_start(
+    tmp_path: Path, operation: str, params: dict[str, Any]
+) -> None:
+    """Reject schema-invalid scalar values without starting a native process."""
+
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-typed-params"))
+    try:
+        with pytest.raises(ConnectorError, match="parameter|reserved"):
+            connector.invoke_extension(operation, params)
+        assert connector.generation == 0
+    finally:
+        connector.close()
+
+
+def test_direct_extension_rejects_deep_nested_json_before_host_start(
+    tmp_path: Path,
+) -> None:
+    """Keep nested vendor envelopes bounded even when their field names are valid."""
+
+    nested: dict[str, Any] = {}
+    current = nested
+    for _ in range(9):
+        current["next"] = {}
+        current = current["next"]
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-deep-params"))
+    try:
+        with pytest.raises(ConnectorError, match="nested too deeply"):
+            connector.invoke_extension(
+                "qq.message.search",
+                {"account_id": "10001", "filter": nested},
+            )
+        assert connector.generation == 0
+    finally:
+        connector.close()
+
+
+@pytest.mark.parametrize(
     "mode",
     [
         "wrong_version",
