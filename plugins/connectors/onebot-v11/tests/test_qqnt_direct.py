@@ -123,6 +123,19 @@ def test_direct_extension_rejects_undeclared_parameter_names(tmp_path: Path) -> 
         connector.close()
 
 
+def test_direct_extension_rejects_cross_family_parameter_names(tmp_path: Path) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-scoped-params"))
+    try:
+        with pytest.raises(ConnectorError, match="undeclared fields"):
+            connector.invoke_extension(
+                "qq.group.list",
+                {"account_id": "10001", "secret_ref": "secret://wrong-scope"},
+            )
+        assert connector.generation == 0
+    finally:
+        connector.close()
+
+
 @pytest.mark.parametrize(
     "mode",
     ["wrong_version", "wrong_binding", "wrong_generation", "malformed_hello"],
@@ -246,6 +259,23 @@ def test_login_failure_and_account_mismatch_fail_closed(tmp_path: Path) -> None:
     finally:
         failed_login.close()
         mismatched.close()
+
+
+def test_password_login_updates_session_readiness(tmp_path: Path) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-password-state"))
+    try:
+        ok, result = connector.on_invoke(
+            QQ_CAPABILITY_ID,
+            "qq.login.password",
+            json.dumps(
+                {"params": {"secret_ref": "secret://test/qq-password"}}
+            ).encode(),
+            request_type_url=QQ_REQUEST_TYPE_URL,
+        )
+        assert ok, result
+        assert connector.state == "READY"
+    finally:
+        connector.close()
 
 
 def test_fake_host_start_send_receive_and_shutdown_without_tcp_listener(
@@ -434,6 +464,40 @@ def test_two_bindings_and_restart_keep_generation_and_events_isolated(
         assert first.send_message(_send_request())["vendor_message_id"].startswith(
             "qq-first-2-"
         )
+    finally:
+        first.close()
+        second.close()
+
+
+def test_binding_data_directory_cannot_be_reused_by_another_binding(
+    tmp_path: Path,
+) -> None:
+    first = QQNTDirectConnector(_config(tmp_path, "qq-owner-first"))
+    second_config = _config(tmp_path, "qq-owner-second")
+    second_config["data_dir"] = str(tmp_path / "qq-owner-first")
+    second = QQNTDirectConnector(second_config)
+    try:
+        assert (
+            first.on_subscribe(
+                "sub-first", "message.connector.v1", b"{}", RecordingEmitter()
+            )
+            is None
+        )
+        error = second.on_subscribe(
+            "sub-second", "message.connector.v1", b"{}", RecordingEmitter()
+        )
+        assert error is not None
+        assert "CAPABILITY_UNAVAILABLE" in error
+        assert second.state == "FAILED"
+        assert first.invoke_extension("qq.group.list", {"account_id": "10001"})[
+            "status"
+        ] == "accepted"
+        marker = tmp_path / "qq-owner-first" / ".cyrene-binding-owner.json"
+        metadata = json.loads(marker.read_text(encoding="utf-8"))
+        assert metadata == {
+            "binding_id": "qq-owner-first",
+            "schema": "cyrene.qq.binding-owner.v1",
+        }
     finally:
         first.close()
         second.close()

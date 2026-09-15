@@ -386,101 +386,218 @@ QQ_OPERATION_NAMES = tuple(operation.name for operation in QQ_OPERATIONS)
 
 # These are the only top-level parameter names that may cross the worker/Host
 # boundary.  The native Host still owns exact overload validation for the
-# configured QQ build, but the worker rejects undeclared fields before IPC.
-# This keeps the operation allow-list meaningful without inventing a generic
-# service/method or raw-payload escape hatch.
-_COMMON_PARAMETER_FIELDS = frozenset(
-    {
-        "account_id",
-        "uin",
-        "uid",
-        "user_id",
-        "user_uid",
-        "user_uin",
-        "peer_uid",
-        "conversation_id",
-        "group_id",
-        "group_code",
-        "message_id",
-        "sequence",
-        "random",
-        "timestamp",
-        "request_id",
-        "request_kind",
-        "sub_type",
-        "count",
-        "offset",
-        "page",
-        "page_size",
-        "scope",
-        "biz_key",
-        "start_time",
-        "end_time",
-        "comment",
-        "approve",
-        "secret_ref",
-        "events",
-        "event",
-        "peer",
-        "source",
-        "destination",
-        "elements",
-        "attributes",
-        "reply",
-        "message",
-        "messages",
-        "message_ids",
-        "filter",
-        "query",
-        "keywords",
-        "text",
-        "name",
-        "remark",
-        "nickname",
-        "long_nick",
-        "birthday",
-        "gender",
-        "header",
-        "status",
-        "device_id",
-        "like_id",
-        "like_type",
-        "target_id",
-        "file_id",
-        "media_id",
-        "folder_id",
-        "file_uuid",
-        "file_name",
-        "mime_type",
-        "model_id",
-        "element_id",
-        "media_type",
-        "codec",
-        "download",
-        "short_link",
-        "source_id",
-        "profile",
-        "vendor_request",
-        "login_policy",
-        "platform",
-        "data_dir",
-        "client_version",
-        "qr_code",
-        "poll_interval_seconds",
-        "folder_name",
-        "duration_seconds",
-        "duration",
-        "permissions",
-        "card_name",
-        "role",
-        "member_uid",
-        "member_uin",
-        "notify_id",
-        "session_id",
-        "login_id",
-        "local_result_reference",
-    }
-)
+# configured QQ build, but the worker rejects fields from unrelated operation
+# families before IPC.  This keeps the operation allow-list meaningful without
+# inventing a generic service/method or raw-payload escape hatch.
+_PARAMETER_FIELDS_BY_MAPPING = {
+    "session": frozenset(
+        {
+            "account_id",
+            "platform",
+            "client_version",
+            "data_dir",
+            "login_policy",
+            "session_id",
+        }
+    ),
+    "login": frozenset(
+        {
+            "account_id",
+            "uin",
+            "uid",
+            "secret_ref",
+            "qr_code",
+            "poll_interval_seconds",
+            "login_id",
+        }
+    ),
+    "account": frozenset({"account_id", "uid", "uin", "user_uid", "user_uin"}),
+    "message": frozenset(
+        {
+            "account_id",
+            "peer",
+            "source",
+            "destination",
+            "message_id",
+            "message_ids",
+            "sequence",
+            "random",
+            "timestamp",
+            "comment",
+            "messages",
+            "events",
+            "filter",
+            "request_id",
+        }
+    ),
+    "send_message": frozenset(
+        {
+            "account_id",
+            "peer",
+            "elements",
+            "attributes",
+            "reply",
+            "message",
+            "message_id",
+            "request_id",
+            "peer_uid",
+            "sequence",
+            "random",
+            "timestamp",
+        }
+    ),
+    "peer": frozenset(
+        {
+            "account_id",
+            "uid",
+            "uin",
+            "user_uid",
+            "user_uin",
+            "peer_uid",
+        }
+    ),
+    "lookup": frozenset(
+        {
+            "account_id",
+            "peer",
+            "message_id",
+            "message_ids",
+            "sequence",
+            "random",
+            "offset",
+            "count",
+            "page",
+            "page_size",
+            "filter",
+            "query",
+            "start_time",
+            "end_time",
+        }
+    ),
+    "read": frozenset(
+        {"account_id", "peer", "message_id", "message_ids", "sequence"}
+    ),
+    "emoji": frozenset(
+        {"account_id", "peer", "message_id", "like_id", "like_type"}
+    ),
+    "group": frozenset(
+        {
+            "account_id",
+            "group_id",
+            "group_code",
+            "member_uid",
+            "member_uin",
+            "offset",
+            "count",
+            "page",
+            "page_size",
+        }
+    ),
+    "friend": frozenset(
+        {"account_id", "uid", "uin", "offset", "count", "page", "page_size"}
+    ),
+    "media": frozenset(
+        {
+            "account_id",
+            "peer",
+            "message_id",
+            "element_id",
+            "media_id",
+            "file_id",
+            "media_type",
+            "codec",
+            "download",
+            "model_id",
+            "file_uuid",
+            "local_result_reference",
+        }
+    ),
+    "file": frozenset(
+        {
+            "account_id",
+            "group_id",
+            "folder_id",
+            "file_id",
+            "file_uuid",
+            "file_name",
+            "query",
+            "source",
+            "destination",
+            "offset",
+            "count",
+            "page",
+            "page_size",
+            "local_result_reference",
+        }
+    ),
+    "group_mutation": frozenset(
+        {
+            "account_id",
+            "group_id",
+            "group_code",
+            "member_uid",
+            "member_uin",
+            "user_id",
+            "request_id",
+            "name",
+            "remark",
+            "duration_seconds",
+            "duration",
+            "approve",
+            "comment",
+            "sub_type",
+            "notify_id",
+            "vendor_request",
+        }
+    ),
+    "friend_mutation": frozenset(
+        {
+            "account_id",
+            "request_id",
+            "uid",
+            "uin",
+            "user_id",
+            "approve",
+            "comment",
+            "remark",
+            "vendor_request",
+        }
+    ),
+    "profile": frozenset(
+        {
+            "account_id",
+            "profile",
+            "nickname",
+            "long_nick",
+            "birthday",
+            "gender",
+            "header",
+        }
+    ),
+    "search": frozenset(
+        {
+            "account_id",
+            "query",
+            "keywords",
+            "scope",
+            "offset",
+            "count",
+            "page",
+            "page_size",
+            "filter",
+        }
+    ),
+    "online": frozenset(
+        {
+            "account_id",
+            "status",
+            "device_id",
+            "like_id",
+            "like_type",
+            "target_id",
+        }
+    ),
+}
 
 
 def allowed_qq_parameter_fields(operation: str) -> frozenset[str]:
@@ -494,7 +611,7 @@ def allowed_qq_parameter_fields(operation: str) -> frozenset[str]:
     spec = get_qq_operation(operation)
     if spec is None:
         return frozenset()
-    return _COMMON_PARAMETER_FIELDS
+    return _PARAMETER_FIELDS_BY_MAPPING.get(spec.mapping, frozenset())
 
 
 def get_qq_operation(name: str) -> QQOperation | None:
