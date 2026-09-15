@@ -1,0 +1,71 @@
+name: qq-real-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_version:
+        description: Exact authorized QQ client build installed on the protected runner
+        required: true
+        type: string
+      host_abi:
+        description: Exact authorized QQ Host ABI returned by hello
+        required: true
+        type: string
+
+concurrency:
+  group: qq-real-smoke-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  linux-x64:
+    name: qq-real-smoke / linux-x64
+    if: github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, x64, qq-real]
+    environment:
+      name: qq-real-smoke
+    timeout-minutes: 45
+    env:
+      QQNT_HOST_EXECUTABLE: ${{ vars.QQNT_HOST_EXECUTABLE }}
+      QQNT_HOST_ARGS_JSON: ${{ vars.QQNT_HOST_ARGS_JSON }}
+      QQNT_DATA_DIR: ${{ vars.QQNT_DATA_DIR }}
+      QQNT_ACCOUNT_ID: ${{ vars.QQNT_ACCOUNT_ID }}
+      QQNT_SMOKE_SCENARIO_PATH: ${{ vars.QQNT_SMOKE_SCENARIO_PATH }}
+      QQNT_REAL_SMOKE_APPROVED: ${{ vars.QQNT_REAL_SMOKE_APPROVED }}
+      QQNT_REQUIRED_CLIENT_VERSION: ${{ inputs.client_version }}
+      QQNT_REQUIRED_HOST_ABI: ${{ inputs.host_abi }}
+      QQNT_SMOKE_BINDING_ID: qq-real-smoke-${{ github.run_id }}-${{ github.run_attempt }}
+      QQNT_SMOKE_EVIDENCE_PATH: ${{ runner.temp }}/qqnt-real-smoke/evidence.json
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify protected Linux x64 runner
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = "Linux"
+          test "$(uname -m)" = "x86_64"
+          test -n "$QQNT_HOST_EXECUTABLE"
+          test -x "$QQNT_HOST_EXECUTABLE"
+          test -n "$QQNT_DATA_DIR"
+          test -d "$QQNT_DATA_DIR"
+          test -n "$QQNT_SMOKE_SCENARIO_PATH"
+          test -f "$QQNT_SMOKE_SCENARIO_PATH"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install direct connector runtime dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check \
+            'grpcio>=1.62,<1.63' \
+            'protobuf>=4.21,<5'
+      - name: Run authorized QQNT direct smoke
+        run: python3 tools/ci/qqnt_direct_real_smoke.py
+      - name: Upload redacted smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-qq-real-smoke-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/qqnt-real-smoke/evidence.json
+          if-no-files-found: warn
+          compression-level: 0
