@@ -474,12 +474,8 @@ _PARAMETER_FIELDS_BY_MAPPING = {
             "end_time",
         }
     ),
-    "read": frozenset(
-        {"account_id", "peer", "message_id", "message_ids", "sequence"}
-    ),
-    "emoji": frozenset(
-        {"account_id", "peer", "message_id", "like_id", "like_type"}
-    ),
+    "read": frozenset({"account_id", "peer", "message_id", "message_ids", "sequence"}),
+    "emoji": frozenset({"account_id", "peer", "message_id", "like_id", "like_type"}),
     "group": frozenset(
         {
             "account_id",
