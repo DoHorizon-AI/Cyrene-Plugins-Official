@@ -41,7 +41,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_session_create_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -49,7 +49,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_session_init_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -57,7 +57,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_session_start_nt_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -65,7 +65,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_connect_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -73,7 +73,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_online_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -81,7 +81,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_offline_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -89,7 +89,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_list_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -97,7 +97,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_quick_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -105,7 +105,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_password_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -113,7 +113,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_qr_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -121,7 +121,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_poll_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -129,7 +129,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_login_self_status_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -137,7 +137,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_account_core_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -145,7 +145,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_account_simple_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -153,7 +153,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_subscribe_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -161,7 +161,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_send_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -169,7 +169,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_send_completion_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -177,7 +177,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_peer_uid_by_uin_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -185,7 +185,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_peer_uin_by_uid_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -193,7 +193,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_peer_uid_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -201,7 +201,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_peer_uin_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -209,7 +209,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_history_include_self_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -217,7 +217,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_history_by_seq_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -225,7 +225,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_by_id_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -233,7 +233,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_single_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -241,7 +241,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_search_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -249,7 +249,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_recall_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -257,7 +257,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_forward_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -265,7 +265,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_forward_comment_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -273,7 +273,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_multi_forward_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -281,7 +281,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_read_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -289,7 +289,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_read_all_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -297,7 +297,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_emoji_likes_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -305,7 +305,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_message_emoji_likes_list_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -313,7 +313,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_list_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -321,7 +321,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_detail_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -329,7 +329,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_members_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -337,7 +337,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_member_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -345,7 +345,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_list_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -353,7 +353,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_cached_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -361,7 +361,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_requests_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -369,7 +369,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_media_element_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -377,7 +377,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_media_download_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -385,7 +385,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_media_video_url_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -393,7 +393,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_media_download_complete_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -401,7 +401,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_file_list_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -409,7 +409,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_file_search_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -417,7 +417,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_file_download_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -425,7 +425,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_file_forward_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -433,7 +433,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_file_save_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -441,7 +441,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_modify_name_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -449,7 +449,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_modify_remark_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -457,7 +457,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_mute_member_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -465,7 +465,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_mute_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -473,7 +473,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_kick_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -481,7 +481,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_quit_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -489,7 +489,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_group_approve_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -497,7 +497,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_approve_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -505,7 +505,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_approve_doubt_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -513,7 +513,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_doubt_requests_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -521,7 +521,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_add_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -529,7 +529,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_delete_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -537,7 +537,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_friend_set_remark_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -545,7 +545,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_profile_modify_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -553,7 +553,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_profile_nickname_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -561,7 +561,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_profile_long_nick_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -569,7 +569,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_profile_birthday_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -577,7 +577,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_profile_gender_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -585,7 +585,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_profile_header_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -593,7 +593,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_search_stranger_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -601,7 +601,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_search_group_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -609,7 +609,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_search_contact_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -617,7 +617,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_search_message_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -625,7 +625,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_search_file_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -633,7 +633,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_online_status_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -641,7 +641,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_online_devices_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -649,7 +649,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_online_likes_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -657,7 +657,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_online_set_like_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     },
     {
@@ -665,7 +665,7 @@
       "capability": "qq.client.v1",
       "interfaceVersion": "1",
       "executionMode": "service",
-      "inputSchema": "contracts/v1/schema.json#/$defs/request",
+      "inputSchema": "contracts/v1/schema.json#/$defs/qq_online_check_like_request",
       "outputSchema": "contracts/v1/schema.json#/$defs/response"
     }
   ],
@@ -684,7 +684,7 @@
         "name": "qqnt-direct",
         "connectorFamily": "qq",
         "compatibilityProfile": "onebot-v11",
-        "external": false,
+        "external": true,
         "ipc": "inherited-stdio",
         "hostProcess": "configured-child"
       }

@@ -348,6 +348,7 @@ class QQHostClient:
         *,
         timeout_seconds: float | None = None,
         cancellation: Any | None = None,
+        request_id_sink: Callable[[str], None] | None = None,
     ) -> Any:
         """Send one fixed operation and await its generation-scoped response."""
 
@@ -395,6 +396,8 @@ class QQHostClient:
             request_id = f"{self.binding_id}:{generation}:{self._request_counter}"
             pending = _PendingRequest(threading.Event())
             self._pending[request_id] = pending
+        if request_id_sink is not None:
+            request_id_sink(request_id)
         message = {
             "type": "request",
             "request_id": request_id,

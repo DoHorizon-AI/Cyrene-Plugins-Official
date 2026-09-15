@@ -436,7 +436,7 @@ def _config(
         "binding_id": binding_id,
         "websocket_url": f"ws://127.0.0.1:{peer.port}/onebot",
         "transport_profile": "forward_websocket",
-        "runtime_profile": "qq-client",
+        "runtime_profile": "onebot-v11",
         "access_token": access_token,
         "self_account_id": account_id,
         "timeout_seconds": timeout_seconds,

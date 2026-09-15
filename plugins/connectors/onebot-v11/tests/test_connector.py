@@ -151,7 +151,7 @@ def config(binding_id: str, account_id: str) -> dict[str, Any]:
     return {
         "binding_id": binding_id,
         "http_base_url": f"http://{binding_id}.invalid",
-        "runtime_profile": "qq-client",
+        "runtime_profile": "onebot-v11",
         "self_account_id": account_id,
         "timeout_seconds": 1.25,
     }
@@ -232,6 +232,7 @@ def test_manifest_and_package_descriptor_project_both_connector_profiles() -> No
     assert descriptor["runtime"]["external"]["kind"] == "onebot_v11_runtime"
     assert descriptor["profiles"][1]["name"] == "qqnt-direct"
     assert descriptor["profiles"][1]["runtime"]["ipc"] == "inherited-stdio"
+    assert descriptor["profiles"][1]["runtime"]["external"]["required"] is True
 
 
 def test_worker_activation_can_receive_one_binding_from_environment(
@@ -243,7 +244,7 @@ def test_worker_activation_can_receive_one_binding_from_environment(
         json.dumps(
             {
                 "http_base_url": "http://127.0.0.1:18080",
-                "runtime_profile": "qq-client",
+                "runtime_profile": "onebot-v11",
                 "self_account_id": "10001",
                 "timeout_seconds": "2.5",
             }
@@ -253,7 +254,7 @@ def test_worker_activation_can_receive_one_binding_from_environment(
     connector = OneBotV11Connector(transport=MemoryTransport("main"))
 
     assert connector.configured_binding_id == "qq-main"
-    assert connector.runtime_profile == "qq-client"
+    assert connector.runtime_profile == "onebot-v11"
     connector.send_message(send_request())
     assert connector._transport.calls[0]["timeout_seconds"] == 2.5  # noqa: SLF001
 
@@ -561,7 +562,9 @@ def test_binding_identity_survives_a_worker_runtime_restart() -> None:
 
     assert generation_one.configured_binding_id == generation_two.configured_binding_id
     assert (
-        generation_one.runtime_profile == generation_two.runtime_profile == "qq-client"
+        generation_one.runtime_profile
+        == generation_two.runtime_profile
+        == "onebot-v11"
     )
     assert generation_one._transport is not generation_two._transport  # noqa: SLF001
 

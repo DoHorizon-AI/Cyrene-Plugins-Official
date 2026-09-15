@@ -24,6 +24,7 @@ import pytest
 
 from onebot_v11_connector import (
     CALLBACK_ONLY_OPERATION_NAMES,
+    QQ_CALLBACK_TYPE_URL,
     QQ_CAPABILITY_ID,
     QQ_OPERATION_NAMES,
     QQ_REQUEST_TYPE_URL,
@@ -40,7 +41,10 @@ from onebot_v11_connector import (
     read_frame,
 )
 from onebot_v11_connector._generated import message_connector_pb2 as message_contract
-from onebot_v11_connector.qqnt_direct_operations import get_qq_operation
+from onebot_v11_connector.qqnt_direct_operations import (
+    allowed_qq_parameter_fields,
+    get_qq_operation,
+)
 
 
 class RecordingEmitter:
@@ -204,6 +208,31 @@ def test_api_matrix_covers_every_fixed_operation() -> None:
     )
     documented = set(re.findall(r"`(qq\.[a-z0-9_.]+)`", matrix))
     assert set(QQ_OPERATION_NAMES).issubset(documented)
+
+
+def test_operation_schema_fields_match_the_executable_allow_list() -> None:
+    package_root = Path(__file__).parents[1]
+    schema = json.loads(
+        (package_root / "contracts/v1/schema.json").read_text(encoding="utf-8")
+    )
+    manifest = json.loads(
+        (package_root / "plugin.manifest.json").read_text(encoding="utf-8")
+    )
+    methods = {
+        method["name"]: method
+        for method in manifest["methods"]
+        if method.get("name", "").startswith("qq.")
+    }
+    assert set(methods) == set(QQ_OPERATION_NAMES)
+    for operation in QQ_OPERATION_NAMES:
+        definition_name = operation.replace(".", "_") + "_request"
+        assert methods[operation]["inputSchema"].endswith(
+            f"#/$defs/{definition_name}"
+        )
+        fields = set(
+            schema["$defs"][definition_name]["properties"]["params"]["properties"]
+        )
+        assert fields == set(allowed_qq_parameter_fields(operation))
 
 
 def test_self_status_and_callback_operation_metadata_match_the_qq_docs() -> None:
@@ -673,6 +702,133 @@ def test_canonical_protobuf_send_maps_directly_to_native_message(
         response = message_contract.DeliveryResult.FromString(result.value)
         assert response.status == message_contract.DELIVERY_STATUS_ACCEPTED
         assert response.vendor_message_id.startswith("qq-proto-1-")
+    finally:
+        connector.close()
+
+
+def test_canonical_send_preserves_qq_peer_and_delivery_facts(
+    tmp_path: Path,
+) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-proto-facts"))
+    request = message_contract.SendMessageRequest(
+        conversation=message_contract.ConversationScope(
+            vendor="qq",
+            account_id="10001",
+            conversation_id="20001",
+            kind=message_contract.CONVERSATION_KIND_GROUP,
+        ),
+        content=[
+            message_contract.MessageContentPart(
+                text=message_contract.TextContent(text="proto")
+            )
+        ],
+    )
+    request.vendor_extension.vendor = "qq"
+    fact = request.vendor_extension.facts.add()
+    fact.name = "qq_peer_uid"
+    fact.value = "native-group-peer"
+    try:
+        ok, result = connector.on_invoke(
+            "message.connector.v1",
+            "send_message",
+            request.SerializeToString(),
+            request_type_url="type.cyrene.io/cyrene.message.connector.v1.SendMessageRequest",
+        )
+        assert ok
+        response = message_contract.DeliveryResult.FromString(result.value)
+        assert response.vendor_extension.vendor == "qq"
+        assert {
+            item.name: item.value for item in response.vendor_extension.facts
+        } == {
+            "qq_sequence": "7",
+            "qq_random": "11",
+            "qq_peer_uid": "native-group-peer",
+        }
+    finally:
+        connector.close()
+
+
+def test_session_actions_are_not_duplicated_by_implicit_bootstrap(
+    tmp_path: Path,
+) -> None:
+    operation_log = tmp_path / "operations.log"
+    config = _config(tmp_path, "qq-session-actions")
+    config["host_args"].append(f"--operation-log={operation_log}")
+    connector = QQNTDirectConnector(config)
+    try:
+        connector.invoke_extension("qq.session.create", {"account_id": "10001"})
+        connector.invoke_extension("qq.session.init", {"account_id": "10001"})
+        connector.invoke_extension("qq.session.start_nt", {"account_id": "10001"})
+        connector.send_message(_send_request())
+        assert operation_log.read_text(encoding="utf-8").splitlines() == [
+            "qq.session.create",
+            "qq.session.init",
+            "qq.session.start_nt",
+            "qq.message.send",
+        ]
+    finally:
+        connector.close()
+
+
+def test_send_completion_callback_is_typed_and_request_correlated(
+    tmp_path: Path,
+) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-callbacks", mode="callbacks"))
+    emitter = RecordingEmitter()
+    try:
+        assert (
+            connector.on_subscribe(
+                "callback-sub",
+                "qq.client.v1",
+                json.dumps({"event_type": "qq_callback"}).encode("utf-8"),
+                emitter,
+            )
+            is None
+        )
+        result = connector.send_message(_send_request())
+        assert result["status"] == "accepted"
+        deadline = time.monotonic() + 1.0
+        while not emitter.events and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert len(emitter.events) == 1
+        event_type, raw_payload, type_url = emitter.events[0]
+        assert event_type == "qq_callback"
+        assert type_url == QQ_CALLBACK_TYPE_URL
+        assert json.loads(raw_payload.decode("utf-8")) == {
+            "operation": "qq.message.send_completion",
+            "request_id": "qq-callbacks:1:6",
+            "event_id": "qq-callbacks:1:6-completion",
+            "message_id": "qq-callbacks-1-message-1",
+            "sequence": 7,
+            "random": 11,
+            "peer_uid": "peer-1",
+            "status": "completed",
+        }
+        assert connector.publish_inbound_event(
+            {
+                "event": "message.send_completion",
+                "event_id": "unrelated",
+                "request_id": "qq-callbacks:1:999",
+                "payload": {"message_id": "wrong"},
+            }
+        ) == 0
+    finally:
+        connector.close()
+
+
+def test_malformed_canonical_protobuf_is_rejected_at_invoke_boundary(
+    tmp_path: Path,
+) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-malformed-proto"))
+    try:
+        ok, error = connector.on_invoke(
+            "message.connector.v1",
+            "send_message",
+            b"\x80",
+            request_type_url="type.cyrene.io/cyrene.message.connector.v1.SendMessageRequest",
+        )
+        assert not ok
+        assert error.startswith("INVALID_REQUEST: malformed send_message payload")
     finally:
         connector.close()
 
