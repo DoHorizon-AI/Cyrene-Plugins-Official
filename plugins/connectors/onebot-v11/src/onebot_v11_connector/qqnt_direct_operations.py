@@ -604,6 +604,266 @@ _PARAMETER_FIELDS_BY_MAPPING = {
 }
 
 
+def _fields(*names: str) -> frozenset[str]:
+    """Build one immutable operation-specific parameter vocabulary."""
+
+    return frozenset(names)
+
+
+# The matrix describes families, but a public operation must not inherit every
+# field from its family.  This table is intentionally conservative: it only
+# exposes names declared by QQ_API_PLAN.md/QQ_SIDE_INTERFACES.md and leaves
+# exact version-specific overload validation to the authorized Host.
+_OPERATION_PARAMETER_FIELDS = {
+    "qq.session.create": _fields(
+        "account_id",
+        "platform",
+        "client_version",
+        "data_dir",
+        "login_policy",
+        "session_id",
+    ),
+    "qq.session.init": _fields(
+        "account_id",
+        "platform",
+        "client_version",
+        "data_dir",
+        "login_policy",
+        "session_id",
+    ),
+    "qq.session.start_nt": _fields("account_id", "login_policy", "session_id"),
+    "qq.login.connect": _fields("account_id", "uin", "uid", "login_id"),
+    "qq.login.online": _fields("account_id", "login_id"),
+    "qq.login.offline": _fields("account_id", "login_id"),
+    "qq.login.list": _fields("account_id"),
+    "qq.login.quick": _fields("account_id", "uin", "login_id"),
+    "qq.login.password": _fields("account_id", "uin", "secret_ref"),
+    "qq.login.qr": _fields("account_id", "login_id"),
+    "qq.login.poll": _fields(
+        "account_id", "login_id", "qr_code", "poll_interval_seconds"
+    ),
+    "qq.login.self_status": _fields("account_id"),
+    "qq.account.core": _fields("account_id", "uid", "uin", "user_uid", "user_uin"),
+    "qq.account.simple": _fields("account_id", "uid", "uin", "user_uid", "user_uin"),
+    "qq.message.subscribe": _fields("account_id", "events", "filter"),
+    "qq.message.send": _fields(
+        "account_id", "peer", "elements", "attributes", "reply", "message"
+    ),
+    "qq.message.send_completion": frozenset(),
+    "qq.peer.uid_by_uin": _fields("account_id", "uin", "user_uin"),
+    "qq.peer.uin_by_uid": _fields("account_id", "uid", "user_uid"),
+    "qq.peer.uid": _fields("account_id", "uin", "user_uin"),
+    "qq.peer.uin": _fields("account_id", "uid", "user_uid"),
+    "qq.message.history_include_self": _fields(
+        "account_id", "peer", "offset", "count", "page", "page_size"
+    ),
+    "qq.message.history_by_seq": _fields(
+        "account_id", "peer", "sequence", "count", "offset"
+    ),
+    "qq.message.by_id": _fields("account_id", "peer", "message_id"),
+    "qq.message.single": _fields("account_id", "peer", "message_id"),
+    "qq.message.search": _fields(
+        "account_id", "peer", "filter", "query", "offset", "count", "page", "page_size",
+        "start_time", "end_time"
+    ),
+    "qq.message.recall": _fields(
+        "account_id", "peer", "message_id", "sequence", "random"
+    ),
+    "qq.message.forward": _fields("account_id", "source", "destination", "message_id"),
+    "qq.message.forward_comment": _fields(
+        "account_id", "source", "destination", "message_id", "comment"
+    ),
+    "qq.message.multi_forward": _fields(
+        "account_id", "source", "destination", "messages", "message_ids"
+    ),
+    "qq.message.read": _fields(
+        "account_id", "peer", "message_id", "message_ids", "sequence"
+    ),
+    "qq.message.read_all": _fields("account_id"),
+    "qq.message.emoji_likes": _fields(
+        "account_id", "peer", "message_id", "like_id", "like_type"
+    ),
+    "qq.message.emoji_likes_list": _fields(
+        "account_id", "peer", "message_id", "like_id", "like_type"
+    ),
+    "qq.group.list": _fields("account_id", "offset", "count", "page", "page_size"),
+    "qq.group.detail": _fields("account_id", "group_id", "group_code"),
+    "qq.group.members": _fields(
+        "account_id", "group_id", "group_code", "offset", "count", "page", "page_size"
+    ),
+    "qq.group.member": _fields(
+        "account_id", "group_id", "group_code", "member_uid", "member_uin"
+    ),
+    "qq.friend.list": _fields("account_id", "offset", "count", "page", "page_size"),
+    "qq.friend.cached": _fields("account_id", "offset", "count", "page", "page_size"),
+    "qq.friend.requests": _fields("account_id", "offset", "count", "page", "page_size"),
+    "qq.media.element": _fields(
+        "account_id", "peer", "message_id", "element_id", "media_id", "media_type"
+    ),
+    "qq.media.download": _fields(
+        "account_id", "peer", "message_id", "element_id", "media_id", "media_type",
+        "download", "model_id", "file_uuid", "local_result_reference"
+    ),
+    "qq.media.video_url": _fields(
+        "account_id",
+        "peer",
+        "message_id",
+        "element_id",
+        "media_id",
+        "codec",
+        "download",
+    ),
+    "qq.media.download_complete": frozenset(),
+    "qq.file.list": _fields(
+        "account_id", "group_id", "folder_id", "offset", "count", "page", "page_size"
+    ),
+    "qq.file.search": _fields(
+        "account_id", "group_id", "folder_id", "query", "file_name", "offset", "count",
+        "page", "page_size"
+    ),
+    "qq.file.download": _fields(
+        "account_id",
+        "group_id",
+        "file_id",
+        "file_uuid",
+        "file_name",
+        "local_result_reference",
+    ),
+    "qq.file.forward": _fields(
+        "account_id", "group_id", "file_id", "file_uuid", "source", "destination"
+    ),
+    "qq.file.save": _fields(
+        "account_id", "group_id", "file_id", "file_uuid", "file_name", "folder_id"
+    ),
+    "qq.group.modify_name": _fields("account_id", "group_id", "group_code", "name"),
+    "qq.group.modify_remark": _fields("account_id", "group_id", "group_code", "remark"),
+    "qq.group.mute_member": _fields(
+        "account_id",
+        "group_id",
+        "group_code",
+        "member_uid",
+        "member_uin",
+        "duration_seconds",
+        "duration",
+    ),
+    "qq.group.mute": _fields(
+        "account_id", "group_id", "group_code", "duration_seconds", "duration"
+    ),
+    "qq.group.kick": _fields(
+        "account_id",
+        "group_id",
+        "group_code",
+        "member_uid",
+        "member_uin",
+        "user_id",
+        "comment",
+    ),
+    "qq.group.quit": _fields("account_id", "group_id", "group_code"),
+    "qq.group.approve": _fields(
+        "account_id",
+        "request_id",
+        "group_id",
+        "group_code",
+        "user_id",
+        "approve",
+        "comment",
+        "sub_type", "notify_id", "vendor_request"
+    ),
+    "qq.friend.approve": _fields(
+        "account_id",
+        "request_id",
+        "uid",
+        "uin",
+        "user_id",
+        "approve",
+        "comment",
+        "vendor_request",
+    ),
+    "qq.friend.approve_doubt": _fields(
+        "account_id",
+        "request_id",
+        "uid",
+        "uin",
+        "user_id",
+        "approve",
+        "comment",
+        "vendor_request",
+    ),
+    "qq.friend.doubt_requests": _fields(
+        "account_id", "offset", "count", "page", "page_size"
+    ),
+    "qq.friend.add": _fields("account_id", "uid", "uin", "user_id", "comment"),
+    "qq.friend.delete": _fields("account_id", "uid", "uin", "user_id"),
+    "qq.friend.set_remark": _fields("account_id", "uid", "uin", "user_id", "remark"),
+    "qq.profile.modify": _fields("account_id", "profile"),
+    "qq.profile.nickname": _fields("account_id", "nickname"),
+    "qq.profile.long_nick": _fields("account_id", "long_nick"),
+    "qq.profile.birthday": _fields("account_id", "birthday"),
+    "qq.profile.gender": _fields("account_id", "gender"),
+    "qq.profile.header": _fields("account_id", "header"),
+    "qq.search.stranger": _fields(
+        "account_id",
+        "query",
+        "keywords",
+        "scope",
+        "offset",
+        "count",
+        "page",
+        "page_size",
+        "filter",
+    ),
+    "qq.search.group": _fields(
+        "account_id",
+        "query",
+        "keywords",
+        "scope",
+        "offset",
+        "count",
+        "page",
+        "page_size",
+        "filter",
+    ),
+    "qq.search.contact": _fields(
+        "account_id",
+        "query",
+        "keywords",
+        "scope",
+        "offset",
+        "count",
+        "page",
+        "page_size",
+        "filter",
+    ),
+    "qq.search.message": _fields(
+        "account_id",
+        "query",
+        "keywords",
+        "scope",
+        "offset",
+        "count",
+        "page",
+        "page_size",
+        "filter",
+    ),
+    "qq.search.file": _fields(
+        "account_id",
+        "query",
+        "keywords",
+        "scope",
+        "offset",
+        "count",
+        "page",
+        "page_size",
+        "filter",
+    ),
+    "qq.online.status": _fields("account_id", "status"),
+    "qq.online.devices": _fields("account_id", "device_id"),
+    "qq.online.likes": _fields("account_id", "target_id", "like_id", "like_type"),
+    "qq.online.set_like": _fields("account_id", "target_id", "like_id", "like_type"),
+    "qq.online.check_like": _fields("account_id", "target_id", "like_id", "like_type"),
+}
+
+
 def allowed_qq_parameter_fields(operation: str) -> frozenset[str]:
     """Return the declared top-level parameter fields for one operation.
 
@@ -615,7 +875,9 @@ def allowed_qq_parameter_fields(operation: str) -> frozenset[str]:
     spec = get_qq_operation(operation)
     if spec is None:
         return frozenset()
-    return _PARAMETER_FIELDS_BY_MAPPING.get(spec.mapping, frozenset())
+    return _OPERATION_PARAMETER_FIELDS.get(
+        operation, _PARAMETER_FIELDS_BY_MAPPING.get(spec.mapping, frozenset())
+    )
 
 
 def get_qq_operation(name: str) -> QQOperation | None:

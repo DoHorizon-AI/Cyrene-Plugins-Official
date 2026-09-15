@@ -55,7 +55,7 @@
         "protocol": "cyrene.qq.host.v1",
         "ipc": "inherited-stdio",
         "external": {
-          "required": false,
+          "required": true,
           "kind": "official_qq_host_child",
           "artifact_ref": null
         }

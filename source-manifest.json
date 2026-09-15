@@ -698,15 +698,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_API_MATRIX.md",
-      "sha256": "79f5110e90adce637b0ad252a456b682f35e71a7dc4405f57776e52ed2d7200a",
-      "size_bytes": 16102
+      "sha256": "4efa783e136f47cb317429107203fafe87c7e266361591e301fc1dfb7cf8ed5f",
+      "size_bytes": 17022
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_PROTOCOL.md",
-      "sha256": "d09cd65f21561b0c22943b355098762838dcbb612960055f4da6d6a71ee7f735",
-      "size_bytes": 6761
+      "sha256": "e3a4ea304e6bd5343262a6c920ec4dde06c29cd8768499c0ed8dbcf1b146bcb8",
+      "size_bytes": 8799
     },
     {
       "kind": "file",
@@ -726,29 +726,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/configuration.schema.json",
-      "sha256": "67b59af8ab022d47d755065518f57e9cb29b413039a5a0d36198c4a1d62a56da",
-      "size_bytes": 5574
+      "sha256": "49a9c14e8ce3b7d2eb5048295795e8c7611fd42bfe13777b8015275d6b4fe3a2",
+      "size_bytes": 6669
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/contracts/v1/schema.json",
-      "sha256": "1aaa2dbc559eb12651cda023f228065bfce93a6950dcaac6c9cc0cc4eb345a84",
-      "size_bytes": 8703
+      "sha256": "63f190ebb6720eb7739b611c67bd266f01763406fbc6fac974fcabc02a7b5c4a",
+      "size_bytes": 80606
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/package-descriptor.json",
-      "sha256": "f34a739a2f4d0660938cb6ca75e0c53fab7a8562702201bf0d43b548b6a30dfe",
-      "size_bytes": 2889
+      "sha256": "97a75d9c55a01543d6b6aedeb6a462639f69d7067594d063e91a6abb2324ba1f",
+      "size_bytes": 2888
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/plugin.manifest.json",
-      "sha256": "8c87aa0424f2248042e5d7b1b45e389e75b32c79dacd73ddd9ef9c047bd4d432",
-      "size_bytes": 24678
+      "sha256": "f8178d5c469208a89706105923a619fe58cb04270d29f97baf1d91bdea76899c",
+      "size_bytes": 26126
     },
     {
       "kind": "file",
@@ -782,8 +782,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/__init__.py",
-      "sha256": "8e0ad756b106c36e304cc163e9cc5fe49b7c30a294c722d94de1e11b81b71be5",
-      "size_bytes": 3522
+      "sha256": "49dd5bbe772997bb34823d144fd0111832b8e9157929eb6a541a74df25dfb160",
+      "size_bytes": 3576
     },
     {
       "kind": "file",
@@ -810,8 +810,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/connector.py",
-      "sha256": "e413e6bfba9fbc6bd6c418a79065488198e1425d817a635cb6c6d2878920d2c3",
-      "size_bytes": 62322
+      "sha256": "16abfe78a025696ccb2dbba7890764baa7688440302854e6c17e397b6aee7cbd",
+      "size_bytes": 63428
     },
     {
       "kind": "file",
@@ -824,8 +824,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct.py",
-      "sha256": "f810f7d66b5a3e3baef9eb94e1a012bc86e66c39e0927bfcca23313b524ea042",
-      "size_bytes": 60729
+      "sha256": "bd94895808adb74825c0e721e5bf694b9f697152ddb3faceb0926d94bdd5953f",
+      "size_bytes": 68401
     },
     {
       "kind": "file",
@@ -838,15 +838,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_host.py",
-      "sha256": "a0ad0b6c9511a736eda770fd3b4ddb83105b44f85bc29e161c65ad3be895ece0",
-      "size_bytes": 31487
+      "sha256": "b0fea5ac89b612a433fdb2adf2f58f27248f3bd89ec040161928aee00c820742",
+      "size_bytes": 31629
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_operations.py",
-      "sha256": "4a963511944d2d2182c0a36838832310dd5b1c627d0510783c1876d44bb81556",
-      "size_bytes": 16975
+      "sha256": "40cf4f6b865a53d2d44a5af7251b4e64e7658cb5608e407d66e92e07b578f5ce",
+      "size_bytes": 25933
     },
     {
       "kind": "file",
@@ -866,29 +866,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py",
-      "sha256": "f6d281f51de4f328b66c09978ee2ee8c41abcbd1d12091042eb8fa3d564b3350",
-      "size_bytes": 10839
+      "sha256": "a576120688694373f51f9ad49c11fd4c37157278b6140aa3d7d94f6ad5a0497b",
+      "size_bytes": 13202
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_connector.py",
-      "sha256": "7bdaab79667f34e0d574e82d6e6074a5c1469c4532a267207c00802b71cb7342",
-      "size_bytes": 22431
+      "sha256": "76f935178e1e3b25fe8b13edcf2d62f61122b6bf47632a5d3a1561bbf53e6297",
+      "size_bytes": 22531
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
-      "sha256": "de2aa7ff0bab67284b6e9f30e47d6ff121b15f0c7ffe3205ed28a5eee9955b3c",
-      "size_bytes": 35484
+      "sha256": "72268efeb059a0229d65288e6edad8c376ee1aabd7188bbeda73897fffb9a86e",
+      "size_bytes": 41018
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_transport.py",
-      "sha256": "3d1bf56f41679855d89ec65b843d9ffa782f308b4f6c01d8aaa5b91ad9f2b203",
-      "size_bytes": 21804
+      "sha256": "9f24b1cfe550469019ef6d82f042ed3ae896a55445eec66504b20dafa7ae882d",
+      "size_bytes": 21805
     },
     {
       "kind": "file",

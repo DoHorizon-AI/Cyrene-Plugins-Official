@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://contracts.cyrene.io/qq.client.v1/qq-client.schema.json",
+  "$id": "https://contracts.cyrene.io/qq.client.v1/qq-client-extension.schema.json",
   "title": "Cyrene QQ client extension contract",
   "description": "Fixed QQ operation requests and responses. The operation is selected by the direct method name; service/method passthrough is forbidden.",
   "$defs": {
@@ -215,6 +215,2621 @@
           "properties": {
             "service": {"type": "string"},
             "method": {"type": "string"}
+          }
+        }
+      }
+    },
+    "qq_parameter": {
+      "$comment": "Shared field definitions for operation-specific request schemas.",
+      "type": "object",
+      "properties": {
+        "account_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "approve": {
+          "type": "boolean"
+        },
+        "attributes": {
+          "type": "object"
+        },
+        "birthday": {
+          "type": "string"
+        },
+        "client_version": {
+          "type": "string"
+        },
+        "codec": {
+          "type": "string"
+        },
+        "comment": {
+          "type": "string",
+          "maxLength": 2048
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "data_dir": {
+          "type": "string"
+        },
+        "destination": {
+          "type": "object"
+        },
+        "device_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "download": {
+          "type": "boolean"
+        },
+        "duration": {
+          "type": "number",
+          "minimum": 0
+        },
+        "duration_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "element_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "elements": {
+          "type": "array"
+        },
+        "end_time": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "file_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "file_name": {
+          "type": "string"
+        },
+        "file_uuid": {
+          "$ref": "#/$defs/identifier"
+        },
+        "filter": {
+          "type": "object"
+        },
+        "folder_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "gender": {
+          "type": "string"
+        },
+        "group_code": {
+          "$ref": "#/$defs/identifier"
+        },
+        "group_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "header": {
+          "type": "string"
+        },
+        "keywords": {
+          "type": "string"
+        },
+        "like_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "like_type": {
+          "type": "string"
+        },
+        "local_result_reference": {
+          "type": "string"
+        },
+        "login_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "login_policy": {
+          "type": "string"
+        },
+        "long_nick": {
+          "type": "string"
+        },
+        "media_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "media_type": {
+          "type": "string"
+        },
+        "member_uid": {
+          "$ref": "#/$defs/identifier"
+        },
+        "member_uin": {
+          "$ref": "#/$defs/identifier"
+        },
+        "message": {
+          "type": "object"
+        },
+        "message_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "message_ids": {
+          "type": "array"
+        },
+        "messages": {
+          "type": "array"
+        },
+        "model_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "name": {
+          "type": "string"
+        },
+        "nickname": {
+          "type": "string"
+        },
+        "notify_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "offset": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "page": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "page_size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peer": {
+          "type": "object"
+        },
+        "platform": {
+          "type": "string"
+        },
+        "poll_interval_seconds": {
+          "type": "number",
+          "minimum": 0
+        },
+        "profile": {
+          "type": "object"
+        },
+        "qr_code": {
+          "type": "string"
+        },
+        "query": {
+          "type": "string"
+        },
+        "random": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "remark": {
+          "type": "string"
+        },
+        "reply": {
+          "type": "object"
+        },
+        "request_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "scope": {
+          "type": "string"
+        },
+        "secret_ref": {
+          "type": "string"
+        },
+        "sequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "session_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "source": {
+          "type": "object"
+        },
+        "start_time": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "type": "string"
+        },
+        "sub_type": {
+          "$ref": "#/$defs/identifier"
+        },
+        "target_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "uid": {
+          "$ref": "#/$defs/identifier"
+        },
+        "uin": {
+          "$ref": "#/$defs/identifier"
+        },
+        "user_id": {
+          "$ref": "#/$defs/identifier"
+        },
+        "user_uid": {
+          "$ref": "#/$defs/identifier"
+        },
+        "user_uin": {
+          "$ref": "#/$defs/identifier"
+        },
+        "vendor_request": {
+          "type": "object"
+        }
+      }
+    },
+    "qq_session_create_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "platform": {
+              "$ref": "#/$defs/qq_parameter/properties/platform"
+            },
+            "client_version": {
+              "$ref": "#/$defs/qq_parameter/properties/client_version"
+            },
+            "data_dir": {
+              "$ref": "#/$defs/qq_parameter/properties/data_dir"
+            },
+            "login_policy": {
+              "$ref": "#/$defs/qq_parameter/properties/login_policy"
+            },
+            "session_id": {
+              "$ref": "#/$defs/qq_parameter/properties/session_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_session_init_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "platform": {
+              "$ref": "#/$defs/qq_parameter/properties/platform"
+            },
+            "client_version": {
+              "$ref": "#/$defs/qq_parameter/properties/client_version"
+            },
+            "data_dir": {
+              "$ref": "#/$defs/qq_parameter/properties/data_dir"
+            },
+            "login_policy": {
+              "$ref": "#/$defs/qq_parameter/properties/login_policy"
+            },
+            "session_id": {
+              "$ref": "#/$defs/qq_parameter/properties/session_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_session_start_nt_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "login_policy": {
+              "$ref": "#/$defs/qq_parameter/properties/login_policy"
+            },
+            "session_id": {
+              "$ref": "#/$defs/qq_parameter/properties/session_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_connect_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "login_id": {
+              "$ref": "#/$defs/qq_parameter/properties/login_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_online_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "login_id": {
+              "$ref": "#/$defs/qq_parameter/properties/login_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_offline_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "login_id": {
+              "$ref": "#/$defs/qq_parameter/properties/login_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_list_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_quick_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "login_id": {
+              "$ref": "#/$defs/qq_parameter/properties/login_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_password_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "secret_ref": {
+              "$ref": "#/$defs/qq_parameter/properties/secret_ref"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_qr_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "login_id": {
+              "$ref": "#/$defs/qq_parameter/properties/login_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_poll_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "login_id": {
+              "$ref": "#/$defs/qq_parameter/properties/login_id"
+            },
+            "qr_code": {
+              "$ref": "#/$defs/qq_parameter/properties/qr_code"
+            },
+            "poll_interval_seconds": {
+              "$ref": "#/$defs/qq_parameter/properties/poll_interval_seconds"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_self_status_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_account_core_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_uid": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uid"
+            },
+            "user_uin": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uin"
+            }
+          }
+        }
+      }
+    },
+    "qq_account_simple_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_uid": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uid"
+            },
+            "user_uin": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uin"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_subscribe_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "events": {
+              "$ref": "#/$defs/qq_parameter/properties/events"
+            },
+            "filter": {
+              "$ref": "#/$defs/qq_parameter/properties/filter"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_send_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "elements": {
+              "$ref": "#/$defs/qq_parameter/properties/elements"
+            },
+            "attributes": {
+              "$ref": "#/$defs/qq_parameter/properties/attributes"
+            },
+            "reply": {
+              "$ref": "#/$defs/qq_parameter/properties/reply"
+            },
+            "message": {
+              "$ref": "#/$defs/qq_parameter/properties/message"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_send_completion_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {}
+        }
+      }
+    },
+    "qq_peer_uid_by_uin_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_uin": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uin"
+            }
+          }
+        }
+      }
+    },
+    "qq_peer_uin_by_uid_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "user_uid": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uid"
+            }
+          }
+        }
+      }
+    },
+    "qq_peer_uid_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_uin": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uin"
+            }
+          }
+        }
+      }
+    },
+    "qq_peer_uin_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "user_uid": {
+              "$ref": "#/$defs/qq_parameter/properties/user_uid"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_history_include_self_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_history_by_seq_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "sequence": {
+              "$ref": "#/$defs/qq_parameter/properties/sequence"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_by_id_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_single_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_search_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "filter": {
+              "$ref": "#/$defs/qq_parameter/properties/filter"
+            },
+            "query": {
+              "$ref": "#/$defs/qq_parameter/properties/query"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            },
+            "start_time": {
+              "$ref": "#/$defs/qq_parameter/properties/start_time"
+            },
+            "end_time": {
+              "$ref": "#/$defs/qq_parameter/properties/end_time"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_recall_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "sequence": {
+              "$ref": "#/$defs/qq_parameter/properties/sequence"
+            },
+            "random": {
+              "$ref": "#/$defs/qq_parameter/properties/random"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_forward_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "source": {
+              "$ref": "#/$defs/qq_parameter/properties/source"
+            },
+            "destination": {
+              "$ref": "#/$defs/qq_parameter/properties/destination"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_forward_comment_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "source": {
+              "$ref": "#/$defs/qq_parameter/properties/source"
+            },
+            "destination": {
+              "$ref": "#/$defs/qq_parameter/properties/destination"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "comment": {
+              "$ref": "#/$defs/qq_parameter/properties/comment"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_multi_forward_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "source": {
+              "$ref": "#/$defs/qq_parameter/properties/source"
+            },
+            "destination": {
+              "$ref": "#/$defs/qq_parameter/properties/destination"
+            },
+            "messages": {
+              "$ref": "#/$defs/qq_parameter/properties/messages"
+            },
+            "message_ids": {
+              "$ref": "#/$defs/qq_parameter/properties/message_ids"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_read_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "message_ids": {
+              "$ref": "#/$defs/qq_parameter/properties/message_ids"
+            },
+            "sequence": {
+              "$ref": "#/$defs/qq_parameter/properties/sequence"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_read_all_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_emoji_likes_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "like_id": {
+              "$ref": "#/$defs/qq_parameter/properties/like_id"
+            },
+            "like_type": {
+              "$ref": "#/$defs/qq_parameter/properties/like_type"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_emoji_likes_list_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "like_id": {
+              "$ref": "#/$defs/qq_parameter/properties/like_id"
+            },
+            "like_type": {
+              "$ref": "#/$defs/qq_parameter/properties/like_type"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_list_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_detail_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_members_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_member_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "member_uid": {
+              "$ref": "#/$defs/qq_parameter/properties/member_uid"
+            },
+            "member_uin": {
+              "$ref": "#/$defs/qq_parameter/properties/member_uin"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_list_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_cached_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_requests_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_element_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "element_id": {
+              "$ref": "#/$defs/qq_parameter/properties/element_id"
+            },
+            "media_id": {
+              "$ref": "#/$defs/qq_parameter/properties/media_id"
+            },
+            "media_type": {
+              "$ref": "#/$defs/qq_parameter/properties/media_type"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_download_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "element_id": {
+              "$ref": "#/$defs/qq_parameter/properties/element_id"
+            },
+            "media_id": {
+              "$ref": "#/$defs/qq_parameter/properties/media_id"
+            },
+            "media_type": {
+              "$ref": "#/$defs/qq_parameter/properties/media_type"
+            },
+            "download": {
+              "$ref": "#/$defs/qq_parameter/properties/download"
+            },
+            "model_id": {
+              "$ref": "#/$defs/qq_parameter/properties/model_id"
+            },
+            "file_uuid": {
+              "$ref": "#/$defs/qq_parameter/properties/file_uuid"
+            },
+            "local_result_reference": {
+              "$ref": "#/$defs/qq_parameter/properties/local_result_reference"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_video_url_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "peer": {
+              "$ref": "#/$defs/qq_parameter/properties/peer"
+            },
+            "message_id": {
+              "$ref": "#/$defs/qq_parameter/properties/message_id"
+            },
+            "element_id": {
+              "$ref": "#/$defs/qq_parameter/properties/element_id"
+            },
+            "media_id": {
+              "$ref": "#/$defs/qq_parameter/properties/media_id"
+            },
+            "codec": {
+              "$ref": "#/$defs/qq_parameter/properties/codec"
+            },
+            "download": {
+              "$ref": "#/$defs/qq_parameter/properties/download"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_download_complete_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {}
+        }
+      }
+    },
+    "qq_file_list_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "folder_id": {
+              "$ref": "#/$defs/qq_parameter/properties/folder_id"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_search_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "folder_id": {
+              "$ref": "#/$defs/qq_parameter/properties/folder_id"
+            },
+            "query": {
+              "$ref": "#/$defs/qq_parameter/properties/query"
+            },
+            "file_name": {
+              "$ref": "#/$defs/qq_parameter/properties/file_name"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_download_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "file_id": {
+              "$ref": "#/$defs/qq_parameter/properties/file_id"
+            },
+            "file_uuid": {
+              "$ref": "#/$defs/qq_parameter/properties/file_uuid"
+            },
+            "file_name": {
+              "$ref": "#/$defs/qq_parameter/properties/file_name"
+            },
+            "local_result_reference": {
+              "$ref": "#/$defs/qq_parameter/properties/local_result_reference"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_forward_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "file_id": {
+              "$ref": "#/$defs/qq_parameter/properties/file_id"
+            },
+            "file_uuid": {
+              "$ref": "#/$defs/qq_parameter/properties/file_uuid"
+            },
+            "source": {
+              "$ref": "#/$defs/qq_parameter/properties/source"
+            },
+            "destination": {
+              "$ref": "#/$defs/qq_parameter/properties/destination"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_save_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "file_id": {
+              "$ref": "#/$defs/qq_parameter/properties/file_id"
+            },
+            "file_uuid": {
+              "$ref": "#/$defs/qq_parameter/properties/file_uuid"
+            },
+            "file_name": {
+              "$ref": "#/$defs/qq_parameter/properties/file_name"
+            },
+            "folder_id": {
+              "$ref": "#/$defs/qq_parameter/properties/folder_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_modify_name_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "name": {
+              "$ref": "#/$defs/qq_parameter/properties/name"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_modify_remark_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "remark": {
+              "$ref": "#/$defs/qq_parameter/properties/remark"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_mute_member_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "member_uid": {
+              "$ref": "#/$defs/qq_parameter/properties/member_uid"
+            },
+            "member_uin": {
+              "$ref": "#/$defs/qq_parameter/properties/member_uin"
+            },
+            "duration_seconds": {
+              "$ref": "#/$defs/qq_parameter/properties/duration_seconds"
+            },
+            "duration": {
+              "$ref": "#/$defs/qq_parameter/properties/duration"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_mute_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "duration_seconds": {
+              "$ref": "#/$defs/qq_parameter/properties/duration_seconds"
+            },
+            "duration": {
+              "$ref": "#/$defs/qq_parameter/properties/duration"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_kick_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "member_uid": {
+              "$ref": "#/$defs/qq_parameter/properties/member_uid"
+            },
+            "member_uin": {
+              "$ref": "#/$defs/qq_parameter/properties/member_uin"
+            },
+            "user_id": {
+              "$ref": "#/$defs/qq_parameter/properties/user_id"
+            },
+            "comment": {
+              "$ref": "#/$defs/qq_parameter/properties/comment"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_quit_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_approve_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "request_id": {
+              "$ref": "#/$defs/qq_parameter/properties/request_id"
+            },
+            "group_id": {
+              "$ref": "#/$defs/qq_parameter/properties/group_id"
+            },
+            "group_code": {
+              "$ref": "#/$defs/qq_parameter/properties/group_code"
+            },
+            "user_id": {
+              "$ref": "#/$defs/qq_parameter/properties/user_id"
+            },
+            "approve": {
+              "$ref": "#/$defs/qq_parameter/properties/approve"
+            },
+            "comment": {
+              "$ref": "#/$defs/qq_parameter/properties/comment"
+            },
+            "sub_type": {
+              "$ref": "#/$defs/qq_parameter/properties/sub_type"
+            },
+            "notify_id": {
+              "$ref": "#/$defs/qq_parameter/properties/notify_id"
+            },
+            "vendor_request": {
+              "$ref": "#/$defs/qq_parameter/properties/vendor_request"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_approve_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "request_id": {
+              "$ref": "#/$defs/qq_parameter/properties/request_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_id": {
+              "$ref": "#/$defs/qq_parameter/properties/user_id"
+            },
+            "approve": {
+              "$ref": "#/$defs/qq_parameter/properties/approve"
+            },
+            "comment": {
+              "$ref": "#/$defs/qq_parameter/properties/comment"
+            },
+            "vendor_request": {
+              "$ref": "#/$defs/qq_parameter/properties/vendor_request"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_approve_doubt_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "request_id": {
+              "$ref": "#/$defs/qq_parameter/properties/request_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_id": {
+              "$ref": "#/$defs/qq_parameter/properties/user_id"
+            },
+            "approve": {
+              "$ref": "#/$defs/qq_parameter/properties/approve"
+            },
+            "comment": {
+              "$ref": "#/$defs/qq_parameter/properties/comment"
+            },
+            "vendor_request": {
+              "$ref": "#/$defs/qq_parameter/properties/vendor_request"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_doubt_requests_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_add_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_id": {
+              "$ref": "#/$defs/qq_parameter/properties/user_id"
+            },
+            "comment": {
+              "$ref": "#/$defs/qq_parameter/properties/comment"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_delete_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_id": {
+              "$ref": "#/$defs/qq_parameter/properties/user_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_set_remark_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "uid": {
+              "$ref": "#/$defs/qq_parameter/properties/uid"
+            },
+            "uin": {
+              "$ref": "#/$defs/qq_parameter/properties/uin"
+            },
+            "user_id": {
+              "$ref": "#/$defs/qq_parameter/properties/user_id"
+            },
+            "remark": {
+              "$ref": "#/$defs/qq_parameter/properties/remark"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_modify_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "profile": {
+              "$ref": "#/$defs/qq_parameter/properties/profile"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_nickname_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "nickname": {
+              "$ref": "#/$defs/qq_parameter/properties/nickname"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_long_nick_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "long_nick": {
+              "$ref": "#/$defs/qq_parameter/properties/long_nick"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_birthday_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "birthday": {
+              "$ref": "#/$defs/qq_parameter/properties/birthday"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_gender_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "gender": {
+              "$ref": "#/$defs/qq_parameter/properties/gender"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_header_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "header": {
+              "$ref": "#/$defs/qq_parameter/properties/header"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_stranger_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "query": {
+              "$ref": "#/$defs/qq_parameter/properties/query"
+            },
+            "keywords": {
+              "$ref": "#/$defs/qq_parameter/properties/keywords"
+            },
+            "scope": {
+              "$ref": "#/$defs/qq_parameter/properties/scope"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            },
+            "filter": {
+              "$ref": "#/$defs/qq_parameter/properties/filter"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_group_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "query": {
+              "$ref": "#/$defs/qq_parameter/properties/query"
+            },
+            "keywords": {
+              "$ref": "#/$defs/qq_parameter/properties/keywords"
+            },
+            "scope": {
+              "$ref": "#/$defs/qq_parameter/properties/scope"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            },
+            "filter": {
+              "$ref": "#/$defs/qq_parameter/properties/filter"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_contact_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "query": {
+              "$ref": "#/$defs/qq_parameter/properties/query"
+            },
+            "keywords": {
+              "$ref": "#/$defs/qq_parameter/properties/keywords"
+            },
+            "scope": {
+              "$ref": "#/$defs/qq_parameter/properties/scope"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            },
+            "filter": {
+              "$ref": "#/$defs/qq_parameter/properties/filter"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_message_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "query": {
+              "$ref": "#/$defs/qq_parameter/properties/query"
+            },
+            "keywords": {
+              "$ref": "#/$defs/qq_parameter/properties/keywords"
+            },
+            "scope": {
+              "$ref": "#/$defs/qq_parameter/properties/scope"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            },
+            "filter": {
+              "$ref": "#/$defs/qq_parameter/properties/filter"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_file_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "query": {
+              "$ref": "#/$defs/qq_parameter/properties/query"
+            },
+            "keywords": {
+              "$ref": "#/$defs/qq_parameter/properties/keywords"
+            },
+            "scope": {
+              "$ref": "#/$defs/qq_parameter/properties/scope"
+            },
+            "offset": {
+              "$ref": "#/$defs/qq_parameter/properties/offset"
+            },
+            "count": {
+              "$ref": "#/$defs/qq_parameter/properties/count"
+            },
+            "page": {
+              "$ref": "#/$defs/qq_parameter/properties/page"
+            },
+            "page_size": {
+              "$ref": "#/$defs/qq_parameter/properties/page_size"
+            },
+            "filter": {
+              "$ref": "#/$defs/qq_parameter/properties/filter"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_status_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "status": {
+              "$ref": "#/$defs/qq_parameter/properties/status"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_devices_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "device_id": {
+              "$ref": "#/$defs/qq_parameter/properties/device_id"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_likes_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "target_id": {
+              "$ref": "#/$defs/qq_parameter/properties/target_id"
+            },
+            "like_id": {
+              "$ref": "#/$defs/qq_parameter/properties/like_id"
+            },
+            "like_type": {
+              "$ref": "#/$defs/qq_parameter/properties/like_type"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_set_like_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "target_id": {
+              "$ref": "#/$defs/qq_parameter/properties/target_id"
+            },
+            "like_id": {
+              "$ref": "#/$defs/qq_parameter/properties/like_id"
+            },
+            "like_type": {
+              "$ref": "#/$defs/qq_parameter/properties/like_type"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_check_like_request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "params"
+      ],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": false,
+          "maxProperties": 128,
+          "properties": {
+            "account_id": {
+              "$ref": "#/$defs/qq_parameter/properties/account_id"
+            },
+            "target_id": {
+              "$ref": "#/$defs/qq_parameter/properties/target_id"
+            },
+            "like_id": {
+              "$ref": "#/$defs/qq_parameter/properties/like_id"
+            },
+            "like_type": {
+              "$ref": "#/$defs/qq_parameter/properties/like_type"
+            }
           }
         }
       }

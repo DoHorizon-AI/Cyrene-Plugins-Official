@@ -215,6 +215,37 @@ class OneBotInstanceConfig:
                 "INVALID_REQUEST",
                 "runtime_profile must be a non-empty string",
             )
+        runtime_profile = runtime_profile.strip()
+        if runtime_profile != "onebot-v11":
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                "unsupported OneBot runtime_profile; use onebot-v11 or qqnt-direct",
+            )
+        direct_only = {
+            "host_executable",
+            "host_args",
+            "data_dir",
+            "required_client_version",
+            "required_host_abi",
+            "installation_manifest",
+            "account_id",
+            "login_policy",
+            "platform",
+            "startup_timeout_seconds",
+            "shutdown_timeout_seconds",
+            "secret_refs",
+            "max_restart_attempts",
+            "restart_window_seconds",
+            "restart_backoff_seconds",
+            "restart_backoff_max_seconds",
+            "crash_circuit_cooldown_seconds",
+        }
+        present_direct_only = direct_only.intersection(value)
+        if present_direct_only:
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                "OneBot config contains qqnt-direct-only fields",
+            )
 
         account_id = value.get("self_account_id")
         if account_id is not None:
@@ -242,7 +273,7 @@ class OneBotInstanceConfig:
             binding_id=binding_id,
             http_base_url=base_url.rstrip("/") if base_url is not None else None,
             access_token=access_token,
-            runtime_profile=runtime_profile.strip(),
+            runtime_profile=runtime_profile,
             transport_profile=transport_profile,
             websocket_url=websocket_url,
             reverse_listen_host=reverse_listen_host.strip(),
