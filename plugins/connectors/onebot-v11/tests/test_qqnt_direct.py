@@ -723,6 +723,107 @@ def test_every_registered_qq_operation_has_a_fixed_fake_host_dispatch(
         connector.close()
 
 
+def test_semantic_fake_host_preserves_planned_mapping_shapes(
+    tmp_path: Path,
+) -> None:
+    """Exercise representative P1/P2 result shapes and both chat kinds."""
+
+    connector = QQNTDirectConnector(
+        _config(tmp_path, "qq-semantic-mapping", mode="semantic_mapping")
+    )
+    emitter = RecordingEmitter()
+    try:
+        assert (
+            connector.on_subscribe(
+                "semantic-sub", "message.connector.v1", b"{}", emitter
+            )
+            is None
+        )
+        deadline = time.monotonic() + 1.0
+        while len(emitter.events) < 2 and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert len(emitter.events) == 2
+        inbound = [
+            message_contract.InboundMessagePayload.FromString(payload)
+            for event_type, payload, _type_url in emitter.events
+            if event_type == "inbound_message"
+        ]
+        assert {message.conversation.kind for message in inbound} == {
+            message_contract.CONVERSATION_KIND_PRIVATE,
+            message_contract.CONVERSATION_KIND_GROUP,
+        }
+
+        query = connector.invoke_extension(
+            "qq.message.history_by_seq",
+            {
+                "account_id": "10001",
+                "peer": {"peer_uid": "peer-1"},
+                "sequence": 20,
+                "count": 1,
+            },
+        )
+        assert query["result"]["messages"][0]["message_id"] == "history-message-1"
+        assert query["result"]["messages"][0]["sequence"] == 21
+
+        recall = connector.invoke_extension(
+            "qq.message.recall",
+            {
+                "account_id": "10001",
+                "peer": {"peer_uid": "peer-1"},
+                "message_id": "history-message-1",
+            },
+        )
+        assert recall["result"] == {
+            "status": "accepted",
+            "message_id": "mutated-message-1",
+            "source_peer_uid": "peer-1",
+        }
+
+        forward = connector.invoke_extension(
+            "qq.message.forward_comment",
+            {
+                "account_id": "10001",
+                "source": {"peer_uid": "peer-1"},
+                "destination": {"peer_uid": "peer-2"},
+                "message_id": "history-message-1",
+                "comment": "forward",
+            },
+        )
+        assert forward["result"]["status"] == "accepted"
+
+        group = connector.invoke_extension(
+            "qq.group.modify_name",
+            {"account_id": "10001", "group_id": "20001", "name": "fixture"},
+        )
+        assert group["result"]["target_id"] == "20001"
+        friend = connector.invoke_extension(
+            "qq.friend.approve",
+            {
+                "account_id": "10001",
+                "request_id": "friend-request-1",
+                "uid": "uid-20002",
+                "approve": True,
+            },
+        )
+        assert friend["result"]["target_id"] == "uid-20002"
+
+        media = connector.invoke_extension(
+            "qq.media.download",
+            {"account_id": "10001", "media_id": "media-1"},
+        )
+        assert media["result"]["local_result_reference"] == (
+            "qq://binding-local/media-1"
+        )
+        file_result = connector.invoke_extension(
+            "qq.file.download",
+            {"account_id": "10001", "file_id": "file-1"},
+        )
+        assert file_result["result"]["file_id"] == "file-1"
+        assert file_result["result"]["remote_uri"].startswith("https://")
+    finally:
+        connector.close()
+
+
 def test_canonical_protobuf_send_maps_directly_to_native_message(
     tmp_path: Path,
 ) -> None:
