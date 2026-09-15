@@ -406,7 +406,6 @@ jobs:
       QQNT_REQUIRED_CLIENT_VERSION: ${{ vars.QQNT_REQUIRED_CLIENT_VERSION }}
       QQNT_REQUIRED_HOST_ABI: ${{ vars.QQNT_REQUIRED_HOST_ABI }}
       QQNT_SMOKE_BINDING_ID: qq-real-smoke-${{ github.run_id }}-${{ github.run_attempt }}
-      QQNT_SMOKE_EVIDENCE_PATH: ${{ runner.temp }}/qqnt-real-smoke/evidence.json
     steps:
       - uses: actions/checkout@v5
       - name: Verify protected Linux x64 runner
@@ -429,6 +428,8 @@ jobs:
             'grpcio>=1.62,<1.63' \
             'protobuf>=4.21,<5'
       - name: Run authorized QQNT direct smoke
+        env:
+          QQNT_SMOKE_EVIDENCE_PATH: ${{ runner.temp }}/qqnt-real-smoke/evidence.json
         run: python3 tools/ci/qqnt_direct_real_smoke.py
       - name: Upload redacted smoke evidence
         if: always()
