@@ -50,6 +50,10 @@ jobs:
         run: python3 tools/ci/capability_catalog.py --root . --check
       - name: Verify public repository metadata and hygiene
         run: python3 tools/ci/check_public_repository.py
+      - name: Verify QQNT direct dependency boundary
+        run: >-
+          python3 plugins/connectors/onebot-v11/tools/verify_direct_dependency_boundary.py
+          --root .
       - name: Scan the exported source for credentials
         run: >-
           docker run --rm
