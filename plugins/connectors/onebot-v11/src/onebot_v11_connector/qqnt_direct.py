@@ -69,6 +69,13 @@ _CALLBACK_OPERATION_BY_EVENT = {
         {"qq.media.download", "qq.file.download"},
     ),
 }
+_QQ_PEER_FACT_TO_NATIVE_FIELD = {
+    "qq_peer_uid": "peer_uid",
+    "qq_peer_uin": "peer_uin",
+    "qq_group_code": "group_code",
+    "qq_user_uid": "user_uid",
+    "qq_user_uin": "user_uin",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -1195,13 +1202,48 @@ def _conversation_for_send(
         "kind": kind,
         "conversation_id": conversation_id,
     }
-    extension = request.get("vendor_extension", {})
-    if isinstance(extension, Mapping):
-        for fact in extension.get("facts", ()):
-            if isinstance(fact, Mapping) and fact.get("name") == "qq_peer_uid":
-                result["peer_uid"] = _required_identifier(
-                    fact.get("value"), "qq_peer_uid"
-                )
+    for native_field, value in _qq_peer_identity_facts(request).items():
+        result[native_field] = value
+    return result
+
+
+def _qq_peer_identity_facts(request: Mapping[str, Any]) -> dict[str, str]:
+    """Extract the explicitly supplied QQ peer identities for native send.
+
+    ``conversation_id`` remains the canonical connector identifier.  These
+    optional vendor facts carry the independent QQ UID/UIN/peerUid/group-code
+    values when the caller has them, so the adapter never has to guess which
+    native identifier a generic conversation ID represents.
+    """
+
+    extension = request.get("vendor_extension")
+    if extension is None:
+        return {}
+    extension_map = _mapping(extension, "vendor_extension")
+    if extension_map.get("vendor") != QQ_VENDOR:
+        raise ConnectorError("INVALID_REQUEST", "vendor_extension.vendor must be qq")
+    facts = extension_map.get("facts", ())
+    if not isinstance(facts, Sequence) or isinstance(facts, (str, bytes)):
+        raise ConnectorError("INVALID_REQUEST", "vendor_extension.facts must be a list")
+    result: dict[str, str] = {}
+    for index, raw_fact in enumerate(facts):
+        fact = _mapping(raw_fact, f"vendor_extension.facts[{index}]")
+        if set(fact) != {"name", "value"}:
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                f"vendor_extension.facts[{index}] must contain name and value",
+            )
+        name = _required_text(fact.get("name"), f"vendor_extension.facts[{index}].name")
+        native_field = _QQ_PEER_FACT_TO_NATIVE_FIELD.get(name)
+        if native_field is None:
+            continue
+        if native_field in result:
+            raise ConnectorError(
+                "INVALID_REQUEST", f"duplicate QQ identity fact {name}"
+            )
+        result[native_field] = _required_identifier(
+            fact.get("value"), f"vendor_extension.facts[{index}].value"
+        )
     return result
 
 
@@ -1383,6 +1425,17 @@ def _normalize_native_message(
         {"name": "qq_worker_generation", "value": str(generation)},
         {"name": "qq_peer_uid", "value": peer_uid},
     ]
+    for fact_name, peer_field in (
+        ("qq_peer_uin", "peer_uin"),
+        ("qq_group_code", "group_code"),
+        ("qq_user_uid", "user_uid"),
+        ("qq_user_uin", "user_uin"),
+    ):
+        value = peer.get(peer_field)
+        if value is not None:
+            facts.append(
+                {"name": fact_name, "value": _required_identifier(value, peer_field)}
+            )
     for name, value in (
         ("qq_sender_uid", sender_uid),
         ("qq_sender_uin", sender_uin),
@@ -1560,7 +1613,15 @@ def _facts_from_result(result: Mapping[str, Any]) -> list[dict[str, str]]:
     """Keep only bounded identity facts from a native send result."""
 
     facts: list[dict[str, str]] = []
-    for name in ("sequence", "random", "peer_uid"):
+    for name in (
+        "sequence",
+        "random",
+        "peer_uid",
+        "peer_uin",
+        "group_code",
+        "user_uid",
+        "user_uin",
+    ):
         value = result.get(name)
         if value is not None:
             facts.append({"name": f"qq_{name}", "value": str(value)[:2_048]})

@@ -859,7 +859,10 @@ def test_canonical_protobuf_send_maps_directly_to_native_message(
 def test_canonical_send_preserves_qq_peer_and_delivery_facts(
     tmp_path: Path,
 ) -> None:
-    connector = QQNTDirectConnector(_config(tmp_path, "qq-proto-facts"))
+    request_log = tmp_path / "native-requests.jsonl"
+    config = _config(tmp_path, "qq-proto-facts")
+    config["host_args"].append(f"--request-log={request_log}")
+    connector = QQNTDirectConnector(config)
     request = message_contract.SendMessageRequest(
         conversation=message_contract.ConversationScope(
             vendor="qq",
@@ -877,6 +880,13 @@ def test_canonical_send_preserves_qq_peer_and_delivery_facts(
     fact = request.vendor_extension.facts.add()
     fact.name = "qq_peer_uid"
     fact.value = "native-group-peer"
+    for name, value in (
+        ("qq_peer_uin", "20001"),
+        ("qq_group_code", "30001"),
+    ):
+        fact = request.vendor_extension.facts.add()
+        fact.name = name
+        fact.value = value
     try:
         ok, result = connector.on_invoke(
             "message.connector.v1",
@@ -890,10 +900,101 @@ def test_canonical_send_preserves_qq_peer_and_delivery_facts(
         assert {
             item.name: item.value for item in response.vendor_extension.facts
         } == {
+            "qq_group_code": "30001",
+            "qq_peer_uin": "20001",
             "qq_sequence": "7",
             "qq_random": "11",
             "qq_peer_uid": "native-group-peer",
         }
+        native_send = next(
+            json.loads(line)
+            for line in request_log.read_text(encoding="utf-8").splitlines()
+            if json.loads(line).get("operation") == "qq.message.send"
+        )
+        assert native_send["params"]["peer"] == {
+            "kind": "group",
+            "conversation_id": "20001",
+            "peer_uid": "native-group-peer",
+            "peer_uin": "20001",
+            "group_code": "30001",
+        }
+    finally:
+        connector.close()
+
+
+def test_inbound_preserves_all_qq_peer_identity_facts(tmp_path: Path) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-peer-facts"))
+    emitter = RecordingEmitter()
+    try:
+        assert (
+            connector.on_subscribe("peer-sub", "message.connector.v1", b"{}", emitter)
+            is None
+        )
+        assert (
+            connector.publish_inbound_event(
+                {
+                    "event": "message.received",
+                    "event_id": "private-peer-facts",
+                    "payload": {
+                        "account_id": "10001",
+                        "message_id": "private-message-1",
+                        "peer": {
+                            "kind": "private",
+                            "peer_uid": "peer-uid-1",
+                            "user_uid": "user-uid-1",
+                            "user_uin": "20003",
+                        },
+                        "sender": {
+                            "uid": "sender-uid-1",
+                            "uin": "20003",
+                            "display_name": "private-member",
+                        },
+                        "elements": [{"type": "text", "text": "private"}],
+                    },
+                }
+            )
+            == 1
+        )
+        payload = message_contract.InboundMessagePayload.FromString(
+            emitter.events[-1][1]
+        )
+        assert payload.conversation.conversation_id == "user-uid-1"
+        facts = {item.name: item.value for item in payload.vendor_extension.facts}
+        assert {
+            "qq_peer_uid": "peer-uid-1",
+            "qq_user_uid": "user-uid-1",
+            "qq_user_uin": "20003",
+        }.items() <= facts.items()
+    finally:
+        connector.close()
+
+
+@pytest.mark.parametrize(
+    "vendor_extension",
+    [
+        {
+            "vendor": "other",
+            "facts": [{"name": "qq_peer_uid", "value": "peer-1"}],
+        },
+        {
+            "vendor": "qq",
+            "facts": [
+                {"name": "qq_peer_uid", "value": "peer-1"},
+                {"name": "qq_peer_uid", "value": "peer-2"},
+            ],
+        },
+    ],
+)
+def test_outbound_qq_peer_identity_facts_are_closed_and_unique(
+    tmp_path: Path, vendor_extension: dict[str, Any]
+) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-invalid-peer-facts"))
+    request = _send_request()
+    request["vendor_extension"] = vendor_extension
+    try:
+        with pytest.raises(ConnectorError, match="vendor_extension|duplicate"):
+            connector.send_message(request)
+        assert connector.generation == 0
     finally:
         connector.close()
 
