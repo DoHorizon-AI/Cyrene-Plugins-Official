@@ -12,15 +12,6 @@ on:
       - develop
       - release
   workflow_dispatch:
-    inputs:
-      client_version:
-        description: Exact authorized QQ client build installed on the protected runner
-        required: false
-        type: string
-      host_abi:
-        description: Exact authorized QQ Host ABI returned by hello
-        required: false
-        type: string
 
 concurrency:
   group: public-ci-${{ github.workflow }}-${{ github.ref }}
@@ -410,8 +401,8 @@ jobs:
       QQNT_ACCOUNT_ID: ${{ vars.QQNT_ACCOUNT_ID }}
       QQNT_SMOKE_SCENARIO_PATH: ${{ vars.QQNT_SMOKE_SCENARIO_PATH }}
       QQNT_REAL_SMOKE_APPROVED: ${{ vars.QQNT_REAL_SMOKE_APPROVED }}
-      QQNT_REQUIRED_CLIENT_VERSION: ${{ inputs.client_version }}
-      QQNT_REQUIRED_HOST_ABI: ${{ inputs.host_abi }}
+      QQNT_REQUIRED_CLIENT_VERSION: ${{ vars.QQNT_REQUIRED_CLIENT_VERSION }}
+      QQNT_REQUIRED_HOST_ABI: ${{ vars.QQNT_REQUIRED_HOST_ABI }}
       QQNT_SMOKE_BINDING_ID: qq-real-smoke-${{ github.run_id }}-${{ github.run_attempt }}
       QQNT_SMOKE_EVIDENCE_PATH: ${{ runner.temp }}/qqnt-real-smoke/evidence.json
     steps:
