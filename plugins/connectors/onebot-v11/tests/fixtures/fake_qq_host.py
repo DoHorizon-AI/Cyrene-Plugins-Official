@@ -39,6 +39,15 @@ def _operation_log() -> str | None:
     return os.environ.get("CYRENE_QQ_OPERATION_LOG")
 
 
+def _request_log() -> str | None:
+    """Read an optional fixture-only full request log path."""
+
+    for argument in sys.argv[1:]:
+        if argument.startswith("--request-log="):
+            return argument.partition("=")[2]
+    return os.environ.get("CYRENE_QQ_REQUEST_LOG")
+
+
 def _read_frame() -> dict[str, Any] | None:
     """Read one bounded frame using only inherited stdin."""
 
@@ -101,6 +110,10 @@ def _response(
             if isinstance(peer, dict)
             else "peer-1",
         }
+        if isinstance(peer, dict):
+            for key in ("peer_uin", "group_code", "user_uid", "user_uin"):
+                if key in peer:
+                    result[key] = peer[key]
     elif mode == "semantic_mapping":
         result = _semantic_result(operation, params)
     elif mode == "media_file" and operation.startswith(("qq.media.", "qq.file.")):
@@ -429,6 +442,15 @@ def main() -> int:
         if operation_log:
             with open(operation_log, "a", encoding="utf-8") as log:
                 log.write(f"{operation}\n")
+        request_log = _request_log()
+        if request_log:
+            with open(request_log, "a", encoding="utf-8") as log:
+                log.write(
+                    json.dumps(
+                        message, ensure_ascii=False, separators=(",", ":")
+                    )
+                )
+                log.write("\n")
         if mode in {"timeout", "cancel"} and operation == "qq.group.detail":
             continue
         if mode == "out_of_order" and operation in {

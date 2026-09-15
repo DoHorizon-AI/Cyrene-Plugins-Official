@@ -95,6 +95,20 @@ in that row; the native Host remains responsible for exact overload validation.
 | `search` | search operations | account, query/keywords/scope/filter/page | typed identity-preserving result list |
 | `online` | online state and likes | account, status/device/like target | status/device/like result |
 
+For canonical `message.connector.v1` sends, the optional `vendor_extension`
+with `vendor=qq` may carry these identity facts: `qq_peer_uid`, `qq_peer_uin`,
+`qq_group_code`, `qq_user_uid`, and `qq_user_uin`. The direct adapter copies
+only these recognized facts into the native `peer` object and rejects duplicate
+values; `conversation_id` remains the canonical connector identifier. Inbound
+messages and accepted send results expose the same values as separate QQ facts
+when the native Host supplies them.
+
+对于 canonical `message.connector.v1` 发送请求，`vendor_extension` 可在
+`vendor=qq` 时携带 `qq_peer_uid`、`qq_peer_uin`、`qq_group_code`、`qq_user_uid`、
+`qq_user_uin` 这些身份事实。直连适配器只把已登记的事实复制到原生 `peer` 对象，重复值会被
+拒绝；`conversation_id` 仍是 canonical connector 标识，不会被猜测成某一种 QQ ID。原生
+Host 提供这些值时，入站消息和发送结果也会以独立 QQ fact 暴露。
+
 ## Shared safety rules / 共享安全规则
 
 | Area / 领域 | Rule / 规则 | Evidence state / 证据状态 |
