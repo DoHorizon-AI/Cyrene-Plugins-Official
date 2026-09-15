@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/qq.client.v1/qq-client.schema.json",
+  "title": "Cyrene QQ client extension contract",
+  "description": "Fixed QQ operation requests and responses. The operation is selected by the direct method name; service/method passthrough is forbidden.",
+  "$defs": {
+    "request": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["params"],
+      "properties": {
+        "params": {
+          "type": "object",
+          "additionalProperties": true,
+          "maxProperties": 128
+        }
+      }
+    },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["operation", "status", "result"],
+      "properties": {
+        "operation": {
+          "type": "string",
+          "enum": [
+            "qq.session.create",
+            "qq.session.init",
+            "qq.session.start_nt",
+            "qq.login.connect",
+            "qq.login.online",
+            "qq.login.offline",
+            "qq.login.list",
+            "qq.login.quick",
+            "qq.login.password",
+            "qq.login.qr",
+            "qq.login.poll",
+            "qq.login.self_status",
+            "qq.account.core",
+            "qq.account.simple",
+            "qq.message.subscribe",
+            "qq.message.send",
+            "qq.message.send_completion",
+            "qq.peer.uid_by_uin",
+            "qq.peer.uin_by_uid",
+            "qq.peer.uid",
+            "qq.peer.uin",
+            "qq.message.history_include_self",
+            "qq.message.history_by_seq",
+            "qq.message.by_id",
+            "qq.message.single",
+            "qq.message.search",
+            "qq.message.recall",
+            "qq.message.forward",
+            "qq.message.forward_comment",
+            "qq.message.multi_forward",
+            "qq.message.read",
+            "qq.message.read_all",
+            "qq.message.emoji_likes",
+            "qq.message.emoji_likes_list",
+            "qq.group.list",
+            "qq.group.detail",
+            "qq.group.members",
+            "qq.group.member",
+            "qq.friend.list",
+            "qq.friend.cached",
+            "qq.friend.requests",
+            "qq.media.element",
+            "qq.media.download",
+            "qq.media.video_url",
+            "qq.media.download_complete",
+            "qq.file.list",
+            "qq.file.search",
+            "qq.file.download",
+            "qq.file.forward",
+            "qq.file.save",
+            "qq.group.modify_name",
+            "qq.group.modify_remark",
+            "qq.group.mute_member",
+            "qq.group.mute",
+            "qq.group.kick",
+            "qq.group.quit",
+            "qq.group.approve",
+            "qq.friend.approve",
+            "qq.friend.approve_doubt",
+            "qq.friend.doubt_requests",
+            "qq.friend.add",
+            "qq.friend.delete",
+            "qq.friend.set_remark",
+            "qq.profile.modify",
+            "qq.profile.nickname",
+            "qq.profile.long_nick",
+            "qq.profile.birthday",
+            "qq.profile.gender",
+            "qq.profile.header",
+            "qq.search.stranger",
+            "qq.search.group",
+            "qq.search.contact",
+            "qq.search.message",
+            "qq.search.file",
+            "qq.online.status",
+            "qq.online.devices",
+            "qq.online.likes",
+            "qq.online.set_like",
+            "qq.online.check_like"
+          ]
+        },
+        "status": {
+          "const": "accepted"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["P0", "P1", "P2"]
+        },
+        "result": {},
+        "mapping": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["service", "method"],
+          "properties": {
+            "service": {"type": "string"},
+            "method": {"type": "string"}
+          }
+        }
+      }
+    }
+  }
+}

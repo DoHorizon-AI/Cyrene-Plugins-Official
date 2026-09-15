@@ -32,7 +32,7 @@ out/
 .gradle/
 *.class
 *.jar
-!plugins/gateway/spring/gradle/wrapper/gradle-wrapper.jar
+!contracts/**/gradle/wrapper/gradle-wrapper.jar
 *.user
 
 # Local secrets & Logs

@@ -140,7 +140,9 @@ def _collect_contracts(root: Path) -> dict[str, dict]:
             continue
         parsed = _parse_identifiers(proto.read_text(encoding="utf-8"), relative)
         if parsed["id"] in contracts:
-            raise CatalogError(f"Duplicate proto contract for {parsed['id']}: {relative}")
+            raise CatalogError(
+                f"Duplicate proto contract for {parsed['id']}: {relative}"
+            )
         contracts[parsed["id"]] = {
             "kind": "proto",
             "paths": [relative],
@@ -195,29 +197,47 @@ def _collect_manifests(root: Path) -> tuple[list[dict], dict[str, dict]]:
             raise CatalogError(f"{manifest_path}: manifest declares no capabilities")
         if not isinstance(methods, list) or not methods:
             raise CatalogError(f"{manifest_path}: manifest declares no methods")
+        if len(capabilities) > 1 and any(
+            not isinstance(method, dict) or "capability" not in method
+            for method in methods
+        ):
+            raise CatalogError(
+                f"{manifest_path}: multi-capability manifests must scope every method"
+            )
         if plugin_id in seen_ids:
             raise CatalogError(f"Duplicate plugin ID: {plugin_id}")
         seen_ids.add(plugin_id)
 
         relative = manifest_path.relative_to(root).as_posix()
-        method_names = sorted(
-            method["name"] for method in methods if isinstance(method, dict)
-        )
-        versions = sorted(
-            {
-                str(method.get("interfaceVersion", ""))
+        methods_by_capability = {
+            capability: sorted(
+                method["name"]
                 for method in methods
-                if isinstance(method, dict) and method.get("interfaceVersion")
-            }
-        )
+                if isinstance(method, dict)
+                and method.get("capability", capabilities[0]) == capability
+            )
+            for capability in capabilities
+        }
+        versions_by_capability = {
+            capability: sorted(
+                {
+                    str(method.get("interfaceVersion", ""))
+                    for method in methods
+                    if isinstance(method, dict)
+                    and method.get("capability", capabilities[0]) == capability
+                    and method.get("interfaceVersion")
+                }
+            )
+            for capability in capabilities
+        }
         record = {
             "ref": plugin_id,
             "source": relative,
             "kind": manifest.get("kind", ""),
             "language": manifest.get("runtime", {}).get("language", ""),
             "publication": "published",
-            "methods": method_names,
-            "interface_versions": versions,
+            "methods_by_capability": methods_by_capability,
+            "interface_versions_by_capability": versions_by_capability,
         }
         if manifest.get("maturity"):
             record["maturity"] = manifest["maturity"]
@@ -244,7 +264,9 @@ def _collect_manifests(root: Path) -> tuple[list[dict], dict[str, dict]]:
     return implementations, contract_hints
 
 
-def _collect_registry(root: Path) -> tuple[list[dict], dict[str, list[dict]], list[dict]]:
+def _collect_registry(
+    root: Path,
+) -> tuple[list[dict], dict[str, list[dict]], list[dict]]:
     """Collect runtime implementations, their capabilities, and unbacked declarations."""
 
     registry = _read_json(root / REGISTRY_PATH)
@@ -259,7 +281,9 @@ def _collect_registry(root: Path) -> tuple[list[dict], dict[str, list[dict]], li
     seen_ids: set[str] = set()
     for entry in implementations:
         if not isinstance(entry, dict):
-            raise CatalogError(f"{REGISTRY_PATH}: implementation entry is not an object")
+            raise CatalogError(
+                f"{REGISTRY_PATH}: implementation entry is not an object"
+            )
         entry_id = entry.get("id")
         package = entry.get("package")
         capabilities = entry.get("capabilities")
@@ -269,13 +293,19 @@ def _collect_registry(root: Path) -> tuple[list[dict], dict[str, list[dict]], li
             raise CatalogError(f"Duplicate runtime implementation ID: {entry_id}")
         seen_ids.add(entry_id)
         if not isinstance(package, str) or not (root / package).is_dir():
-            raise CatalogError(f"{REGISTRY_PATH}: package directory missing for {entry_id}")
+            raise CatalogError(
+                f"{REGISTRY_PATH}: package directory missing for {entry_id}"
+            )
         if not isinstance(capabilities, list) or not capabilities:
             raise CatalogError(f"{REGISTRY_PATH}: {entry_id} declares no capabilities")
         records.append({"id": entry_id, "package": package})
         for capability in capabilities:
-            if not isinstance(capability, dict) or not isinstance(capability.get("id"), str):
-                raise CatalogError(f"{REGISTRY_PATH}: {entry_id} has a malformed capability")
+            if not isinstance(capability, dict) or not isinstance(
+                capability.get("id"), str
+            ):
+                raise CatalogError(
+                    f"{REGISTRY_PATH}: {entry_id} has a malformed capability"
+                )
             record = {
                 "ref": entry_id,
                 "source": REGISTRY_PATH,
@@ -292,7 +322,9 @@ def _collect_registry(root: Path) -> tuple[list[dict], dict[str, list[dict]], li
     unbacked = []
     for entry in declared:
         if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
-            raise CatalogError(f"{REGISTRY_PATH}: malformed declaredWithoutContract entry")
+            raise CatalogError(
+                f"{REGISTRY_PATH}: malformed declaredWithoutContract entry"
+            )
         unbacked.append(
             {
                 "id": entry["id"],
@@ -322,7 +354,9 @@ def _collect_verification(root: Path) -> dict[tuple[str, str], dict]:
         mode = record.get("execution_mode")
         evidence = record.get("evidence", [])
         if not isinstance(capability, str) or not isinstance(implementation, str):
-            raise CatalogError(f"{VERIFICATION_PATH}: record needs capability and implementation")
+            raise CatalogError(
+                f"{VERIFICATION_PATH}: record needs capability and implementation"
+            )
         key = (capability, implementation)
         if key in collected:
             raise CatalogError(
@@ -333,7 +367,9 @@ def _collect_verification(root: Path) -> dict[tuple[str, str], dict]:
                 f"{VERIFICATION_PATH}: invalid verification_level for {capability}: {level!r}"
             )
         if not isinstance(evidence, list):
-            raise CatalogError(f"{VERIFICATION_PATH}: evidence must be a list for {capability}")
+            raise CatalogError(
+                f"{VERIFICATION_PATH}: evidence must be a list for {capability}"
+            )
         if level == "DECLARED":
             if evidence or mode is not None:
                 raise CatalogError(
@@ -363,7 +399,9 @@ def _collect_verification(root: Path) -> dict[tuple[str, str], dict]:
                     raise CatalogError(
                         f"{VERIFICATION_PATH}: evidence needs observed_at, command, and result: {capability}"
                     )
-        verified_at = max((item.get("observed_at", "") for item in evidence), default="")
+        verified_at = max(
+            (item.get("observed_at", "") for item in evidence), default=""
+        )
         collected[key] = {
             "verification_level": level,
             "execution_mode": mode,
@@ -426,12 +464,14 @@ def build_catalog(root: Path) -> dict:
                     )
                 row = {
                     "id": capability_id,
-                    "interface_versions": record["interface_versions"],
+                    "interface_versions": record["interface_versions_by_capability"][
+                        capability_id
+                    ],
                     "contract": {
                         "kind": "owner-scoped",
                         "paths": sorted(hint["owner_paths"]),
                     },
-                    "contract_methods": record["methods"],
+                    "contract_methods": record["methods_by_capability"][capability_id],
                     "implementations": [],
                     "tck": [],
                 }
@@ -449,8 +489,10 @@ def build_catalog(root: Path) -> dict:
                 "kind": record["kind"],
                 "language": record["language"],
                 "publication": record["publication"],
-                "methods": record["methods"],
-                "interface_versions": record["interface_versions"],
+                "methods": record["methods_by_capability"][capability_id],
+                "interface_versions": record["interface_versions_by_capability"][
+                    capability_id
+                ],
             }
             if record.get("maturity"):
                 entry["maturity"] = record["maturity"]
@@ -485,7 +527,9 @@ def build_catalog(root: Path) -> dict:
         for capability, implementation in implemented_pairs - set(verification)
     )
     if missing:
-        raise CatalogError(f"{VERIFICATION_PATH}: missing records for: {', '.join(missing)}")
+        raise CatalogError(
+            f"{VERIFICATION_PATH}: missing records for: {', '.join(missing)}"
+        )
     unknown = sorted(
         f"{capability} / {implementation}"
         for capability, implementation in set(verification) - implemented_pairs
@@ -504,7 +548,11 @@ def build_catalog(root: Path) -> dict:
                 implementation["verified_at"] = record["verified_at"]
 
     for row in rows.values():
-        duplicates = [item for item in row["implementations"] if row["implementations"].count(item) > 1]
+        duplicates = [
+            item
+            for item in row["implementations"]
+            if row["implementations"].count(item) > 1
+        ]
         if duplicates:
             raise CatalogError(f"Duplicate implementation record for {row['id']}")
         row["implementations"].sort(key=lambda item: item["ref"])
@@ -516,7 +564,9 @@ def build_catalog(root: Path) -> dict:
         "capabilities": [rows[key] for key in sorted(rows)],
     }
     if unbacked:
-        document["declared_without_contract"] = sorted(unbacked, key=lambda item: item["id"])
+        document["declared_without_contract"] = sorted(
+            unbacked, key=lambda item: item["id"]
+        )
     return document
 
 
@@ -555,7 +605,7 @@ def _render_yaml(node: object, indent: int = 0) -> list[str]:
             if isinstance(item, dict) and item:
                 rendered = _render_yaml(item, indent + 1)
                 prefix = "  " * (indent + 1)
-                lines.append(f"{pad}- {rendered[0][len(prefix):]}")
+                lines.append(f"{pad}- {rendered[0][len(prefix) :]}")
                 lines.extend(rendered[1:])
             elif isinstance(item, str):
                 lines.append(f"{pad}- {_yaml_scalar(item)}")
