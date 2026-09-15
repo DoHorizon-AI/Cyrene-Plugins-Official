@@ -384,6 +384,118 @@ QQ_OPERATIONS = (
 QQ_OPERATION_BY_NAME = {operation.name: operation for operation in QQ_OPERATIONS}
 QQ_OPERATION_NAMES = tuple(operation.name for operation in QQ_OPERATIONS)
 
+# These are the only top-level parameter names that may cross the worker/Host
+# boundary.  The native Host still owns exact overload validation for the
+# configured QQ build, but the worker rejects undeclared fields before IPC.
+# This keeps the operation allow-list meaningful without inventing a generic
+# service/method or raw-payload escape hatch.
+_COMMON_PARAMETER_FIELDS = frozenset(
+    {
+        "account_id",
+        "uin",
+        "uid",
+        "user_id",
+        "user_uid",
+        "user_uin",
+        "peer_uid",
+        "conversation_id",
+        "group_id",
+        "group_code",
+        "message_id",
+        "sequence",
+        "random",
+        "timestamp",
+        "request_id",
+        "request_kind",
+        "sub_type",
+        "count",
+        "offset",
+        "page",
+        "page_size",
+        "scope",
+        "biz_key",
+        "start_time",
+        "end_time",
+        "comment",
+        "approve",
+        "secret_ref",
+        "events",
+        "event",
+        "peer",
+        "source",
+        "destination",
+        "elements",
+        "attributes",
+        "reply",
+        "message",
+        "messages",
+        "message_ids",
+        "filter",
+        "query",
+        "keywords",
+        "text",
+        "name",
+        "remark",
+        "nickname",
+        "long_nick",
+        "birthday",
+        "gender",
+        "header",
+        "status",
+        "device_id",
+        "like_id",
+        "like_type",
+        "target_id",
+        "file_id",
+        "media_id",
+        "folder_id",
+        "file_uuid",
+        "file_name",
+        "mime_type",
+        "model_id",
+        "element_id",
+        "media_type",
+        "codec",
+        "download",
+        "short_link",
+        "source_id",
+        "profile",
+        "vendor_request",
+        "login_policy",
+        "platform",
+        "data_dir",
+        "client_version",
+        "qr_code",
+        "poll_interval_seconds",
+        "folder_name",
+        "duration_seconds",
+        "duration",
+        "permissions",
+        "card_name",
+        "role",
+        "member_uid",
+        "member_uin",
+        "notify_id",
+        "session_id",
+        "login_id",
+        "local_result_reference",
+    }
+)
+
+
+def allowed_qq_parameter_fields(operation: str) -> frozenset[str]:
+    """Return the declared top-level parameter fields for one operation.
+
+    The exact native overload remains a version-specific Host concern.  This
+    worker-level envelope nevertheless has a closed vocabulary, so callers
+    cannot smuggle arbitrary native requests through an allow-listed action.
+    """
+
+    spec = get_qq_operation(operation)
+    if spec is None:
+        return frozenset()
+    return _COMMON_PARAMETER_FIELDS
+
 
 def get_qq_operation(name: str) -> QQOperation | None:
     """Return a fixed operation definition, never an arbitrary native call."""
