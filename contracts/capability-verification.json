@@ -87,6 +87,13 @@
           "command": "python3 -m pytest -q plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
           "result": "protocol framing, direct mapping, multi-binding isolation, generation restart, cancellation, and shutdown exercised",
           "notes": "No authorized exact QQ build or official native Host was available; all real QQ API rows remain NOT_RUN."
+        },
+        {
+          "observed_at": "2026-09-15",
+          "environment": "linux / Python 3.12 / independently authored fake QQ Host over inherited stdio / public-ci qq-host-tck",
+          "command": "python3 -m pytest -q plugins/connectors/onebot-v11/tests/test_qqnt_host_tck.py",
+          "result": "fixed operation dispatch, passthrough rejection, callback correlation, cancellation and late-response handling, fail-closed hello validation, and generation restart exercised",
+          "notes": "This is a protocol contract TCK, not an official QQ runtime smoke; no authorized exact QQ build or native Host was available, so all real QQ API rows remain NOT_RUN."
         }
       ]
     },
