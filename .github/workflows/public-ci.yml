@@ -15,11 +15,11 @@ on:
     inputs:
       client_version:
         description: Exact authorized QQ client build installed on the protected runner
-        required: true
+        required: false
         type: string
       host_abi:
         description: Exact authorized QQ Host ABI returned by hello
-        required: true
+        required: false
         type: string
 
 concurrency:

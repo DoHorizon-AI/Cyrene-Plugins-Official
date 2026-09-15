@@ -21,6 +21,9 @@ The `public-ci` workflow is manual-capable and the smoke job only runs from
   one Host executable that implements `cyrene.qq.host.v1` over inherited stdio,
   and a dedicated test account/session;
 - the workflow accepts the exact client build and Host ABI as dispatch inputs;
+- the input fields are schema-optional to avoid GitHub Actions' false push
+  validation behavior; the protected runner script hard-requires both exact
+  values and returns `NOT_RUN` when either is absent;
 - the existing workflow already handles push and pull-request events; the smoke
   job explicitly rejects every non-`workflow_dispatch` event;
 - the scenario JSON stays on the protected runner and is not committed to this
@@ -29,7 +32,8 @@ The `public-ci` workflow is manual-capable and the smoke job only runs from
 `public-ci` 已有 push/PR 触发，真实烟测 job 只允许从 `main` 手工触发，并要求受保护
 Environment、专用 Linux x64 runner、精确 QQ build、实现 `cyrene.qq.host.v1` 继承 stdio
 协议的 Host，以及专用测试账号。job 会拒绝非 `workflow_dispatch`，脚本仍强制要求两个
-精确 build/ABI 值。
+精确 build/ABI 值；schema 层输入可省略只是为了规避 GitHub Actions 的错误 push 校验，
+缺失时脚本返回 `NOT_RUN`。
 场景 JSON 只放在受保护 runner，不提交到公共仓库。
 
 Environment variables / Environment 变量：
