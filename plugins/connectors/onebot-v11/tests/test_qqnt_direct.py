@@ -23,6 +23,7 @@ from typing import Any
 import pytest
 
 from onebot_v11_connector import (
+    CALLBACK_ONLY_OPERATION_NAMES,
     QQ_CAPABILITY_ID,
     QQ_OPERATION_NAMES,
     QQ_REQUEST_TYPE_URL,
@@ -39,6 +40,7 @@ from onebot_v11_connector import (
     read_frame,
 )
 from onebot_v11_connector._generated import message_connector_pb2 as message_contract
+from onebot_v11_connector.qqnt_direct_operations import get_qq_operation
 
 
 class RecordingEmitter:
@@ -204,6 +206,17 @@ def test_api_matrix_covers_every_fixed_operation() -> None:
     assert set(QQ_OPERATION_NAMES).issubset(documented)
 
 
+def test_self_status_and_callback_operation_metadata_match_the_qq_docs() -> None:
+    self_status = get_qq_operation("qq.login.self_status")
+    assert self_status is not None
+    assert self_status.service == "NodeIKernelProfileService"
+    assert self_status.method == "getSelfStatus"
+    assert {
+        "qq.message.send_completion",
+        "qq.media.download_complete",
+    } == CALLBACK_ONLY_OPERATION_NAMES
+
+
 def test_direct_config_rejects_onebot_transport_fields(tmp_path: Path) -> None:
     config = _config(tmp_path, "qq-main")
     config["http_base_url"] = "http://127.0.0.1:8080"
@@ -283,6 +296,21 @@ def test_hello_incompatibility_fails_closed(tmp_path: Path, mode: str) -> None:
             code in error for code in ("PROTOCOL_MISMATCH", "UNSUPPORTED_VERSION")
         )
         assert connector.state == "FAILED"
+    finally:
+        connector.close()
+
+
+def test_failed_subscription_does_not_leave_a_stale_emitter(tmp_path: Path) -> None:
+    connector = QQNTDirectConnector(
+        _config(tmp_path, "qq-subscribe-failed", mode="subscribe_failed")
+    )
+    try:
+        error = connector.on_subscribe(
+            "stale-subscription", "message.connector.v1", b"{}", RecordingEmitter()
+        )
+        assert error is not None
+        assert "CAPABILITY_UNAVAILABLE" in error
+        assert connector._subscriptions == {}  # noqa: SLF001 - rollback assertion
     finally:
         connector.close()
 
@@ -505,6 +533,40 @@ def test_plugin_entrypoint_routes_qqnt_direct_profile_to_direct_adapter(
         plugin.close()
 
 
+def test_plugin_reconfiguration_closes_the_previous_direct_host(
+    tmp_path: Path,
+) -> None:
+    plugin = ConnectorPlugin(_config(tmp_path, "qq-plugin-before"))
+    previous_host: Any | None = None
+    try:
+        ok, result = plugin.on_invoke(
+            QQ_CAPABILITY_ID,
+            "qq.group.list",
+            json.dumps({"params": {"account_id": "10001"}}).encode("utf-8"),
+            request_type_url=QQ_REQUEST_TYPE_URL,
+        )
+        assert ok, result
+        previous_host = plugin._delegate._host  # noqa: SLF001 - lifecycle assertion
+        replacement_config = _config(tmp_path, "qq-plugin-after")
+        error = plugin.on_configure(
+            {
+                "binding_id": replacement_config["binding_id"],
+                "config": json.dumps(replacement_config),
+            }
+        )
+        assert error is None
+        assert previous_host.state == "STOPPED"
+        ok, result = plugin.on_invoke(
+            QQ_CAPABILITY_ID,
+            "qq.group.list",
+            json.dumps({"params": {"account_id": "10001"}}).encode("utf-8"),
+            request_type_url=QQ_REQUEST_TYPE_URL,
+        )
+        assert ok, result
+    finally:
+        plugin.close()
+
+
 def test_extension_is_fixed_and_uses_explicit_qq_client_contract(
     tmp_path: Path,
 ) -> None:
@@ -565,6 +627,10 @@ def test_every_registered_qq_operation_has_a_fixed_fake_host_dispatch(
             params: dict[str, Any] = {"account_id": "10001"}
             if operation == "qq.login.password":
                 params = {"secret_ref": "secret://test/qq-password"}
+            if operation in CALLBACK_ONLY_OPERATION_NAMES:
+                with pytest.raises(ConnectorError, match="callback-only"):
+                    connector.invoke_extension(operation, params)
+                continue
             ok, result = connector.on_invoke(
                 QQ_CAPABILITY_ID,
                 operation,
@@ -841,6 +907,30 @@ def test_media_and_file_references_remain_bounded_and_typed(tmp_path: Path) -> N
             payload.content[0].image.reference.remote_uri == "https://example.invalid/a"
         )
         assert payload.content[1].file.reference.vendor_media.media_id == "file-1"
+        before_rejected_event = len(emitter.events)
+        assert (
+            connector.publish_inbound_event(
+                {
+                    "event": "message.received",
+                    "event_id": "invalid-media-event",
+                    "payload": {
+                        "account_id": "10001",
+                        "message_id": "invalid-media-message",
+                        "peer": {
+                            "kind": "private",
+                            "peer_uid": "peer-1",
+                            "user_uid": "20001",
+                        },
+                        "sender": {"uid": "uid-20001"},
+                        "elements": [
+                            {"type": "image", "remote_uri": "file:///not-allowed"}
+                        ],
+                    },
+                }
+            )
+            == 0
+        )
+        assert len(emitter.events) == before_rejected_event
     finally:
         connector.close()
 

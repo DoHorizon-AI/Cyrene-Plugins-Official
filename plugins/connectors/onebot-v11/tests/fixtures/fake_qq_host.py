@@ -264,6 +264,21 @@ def main() -> int:
                     _write_frame(_response(pending, binding_id, generation, mode=mode))
                 buffered.clear()
             continue
+        if mode == "subscribe_failed" and operation == "qq.message.subscribe":
+            _write_frame(
+                {
+                    "type": "response",
+                    "request_id": message.get("request_id"),
+                    "binding_id": binding_id,
+                    "generation": generation,
+                    "ok": False,
+                    "error": {
+                        "code": "CAPABILITY_UNAVAILABLE",
+                        "message": "fixture subscription failed",
+                    },
+                }
+            )
+            continue
         response = _response(message, binding_id, generation, mode=mode)
         _write_frame(response)
         if mode == "duplicate_response":

@@ -61,11 +61,15 @@ class ConnectorPlugin:
 
         if _settings_profile(settings) == "qqnt-direct":
             try:
-                self._delegate = QQNTDirectConnector(
-                    QQNTDirectConfig.from_settings(settings)
-                )
+                parsed = QQNTDirectConfig.from_settings(settings)
+                replacement = QQNTDirectConnector(parsed)
             except Exception as exc:  # noqa: BLE001 - worker seam returns typed text.
                 return str(exc)
+            previous = self._delegate
+            self._delegate = replacement
+            close = getattr(previous, "close", None)
+            if callable(close):
+                close()
             return None
         return self._delegate.on_configure(settings)
 
