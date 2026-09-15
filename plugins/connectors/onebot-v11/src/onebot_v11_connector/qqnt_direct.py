@@ -803,22 +803,25 @@ class QQNTDirectConnector:
 
         if self._host is None:
             raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is not configured")
+        recovered = False
         if self._host.state == "FAILED":
             recover = getattr(self._host, "recover", None)
             if not callable(recover):
                 raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is unavailable")
             try:
                 recover()
+                recovered = True
             except QQHostError as exc:
                 self._state = "FAILED"
                 raise _connector_host_error(exc) from exc
         elif self._host.state == "STOPPED":
             raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is unavailable")
-        try:
-            self._host.start()
-        except QQHostError as exc:
-            self._state = "FAILED"
-            raise _connector_host_error(exc) from exc
+        if not recovered:
+            try:
+                self._host.start()
+            except QQHostError as exc:
+                self._state = "FAILED"
+                raise _connector_host_error(exc) from exc
         if self._session_generation != self._host.generation:
             self._session_started = False
             self._session_bootstrap_stage = 0

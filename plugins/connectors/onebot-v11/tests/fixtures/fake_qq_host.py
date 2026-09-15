@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -210,6 +211,12 @@ def main() -> int:
         report["binding_id"] = f"{binding_id}-other"
     elif mode == "wrong_generation":
         report["generation"] = generation + 1
+    listener: socket.socket | None = None
+    if mode == "tcp_listener":
+        listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        listener.bind(("127.0.0.1", 0))
+        listener.listen(1)
     if mode == "malformed_hello":
         _write_frame({"type": "hello_ack", "ok": True})
     else:
@@ -251,6 +258,8 @@ def main() -> int:
             return 0
         message_type = message.get("type")
         if message_type == "shutdown":
+            if listener is not None:
+                listener.close()
             return 0
         if message_type == "cancel":
             if mode in {"timeout", "cancel"}:
@@ -294,6 +303,11 @@ def main() -> int:
             continue
         response = _response(message, binding_id, generation, mode=mode)
         _write_frame(response)
+        if mode == "late_tcp_listener" and operation == "qq.group.list":
+            listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            listener.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(1)
         if mode == "duplicate_response":
             _write_frame(response)
         if mode == "callbacks" and operation == "qq.message.send":

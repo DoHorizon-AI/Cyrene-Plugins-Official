@@ -712,8 +712,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_PROTOCOL.md",
-      "sha256": "e3a4ea304e6bd5343262a6c920ec4dde06c29cd8768499c0ed8dbcf1b146bcb8",
-      "size_bytes": 8799
+      "sha256": "5d832aec6e466abf037fde57a3096afc49f0dcf672c352ee1981fb0d742ebc06",
+      "size_bytes": 9058
     },
     {
       "kind": "file",
@@ -831,8 +831,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct.py",
-      "sha256": "c42f4a58c9e48f9666c16bd2a96b6736a763ccc183d06a4f4a2c62dc19d19d54",
-      "size_bytes": 68147
+      "sha256": "1e9bae9c616a35f6533fa0b465cf58557016a91f41442d8fdea4df0163664167",
+      "size_bytes": 68252
     },
     {
       "kind": "file",
@@ -845,8 +845,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_host.py",
-      "sha256": "d093dcd8ae90e1639cdd8d3333071c30202a644b0bfcca6aa3334cea60742f1b",
-      "size_bytes": 31458
+      "sha256": "5c05c75cd3bd851573ce05048de514cfe04380071e4888a0c024525814de9502",
+      "size_bytes": 35918
     },
     {
       "kind": "file",
@@ -873,8 +873,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py",
-      "sha256": "a576120688694373f51f9ad49c11fd4c37157278b6140aa3d7d94f6ad5a0497b",
-      "size_bytes": 13202
+      "sha256": "4182a805cd14802e5326792f8d03ed537da8a1ee6478b6fd713ae09559035981",
+      "size_bytes": 13862
     },
     {
       "kind": "file",
@@ -908,8 +908,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_qqnt_host_tck.py",
-      "sha256": "d325d446e6ac9ffdf6254756472071927e530f31996c8246928c02abf563db3d",
-      "size_bytes": 8794
+      "sha256": "5437e389e2d586e6aacf875ff539668bcf6e7327a4d2d8f0ca7d058c37d8036b",
+      "size_bytes": 10060
     },
     {
       "kind": "file",

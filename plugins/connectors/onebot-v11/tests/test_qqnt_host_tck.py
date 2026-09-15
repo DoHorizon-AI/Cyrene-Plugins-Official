@@ -258,3 +258,39 @@ def test_qq_host_tck_assigns_a_new_generation_after_restart(tmp_path: Path) -> N
         assert client.generation == 2
     finally:
         client.close()
+
+
+def test_qq_host_tck_rejects_a_child_tcp_listener(tmp_path: Path) -> None:
+    """The inherited-stdio Host boundary must remain portless at runtime."""
+
+    client = QQHostClient(
+        _launch_config(tmp_path, "qq-host-tck-portless", mode="tcp_listener")
+    )
+    try:
+        with pytest.raises(QQHostError) as error:
+            client.start()
+        assert error.value.code == "PROTOCOL_MISMATCH"
+        assert "listener" in error.value.message
+        assert client.state == "STOPPED"
+    finally:
+        client.close()
+
+
+def test_qq_host_tck_stops_a_listener_opened_after_startup(tmp_path: Path) -> None:
+    """The watchdog continues enforcing portless operation after hello."""
+
+    client = QQHostClient(
+        _launch_config(tmp_path, "qq-host-tck-late-portless", mode="late_tcp_listener")
+    )
+    try:
+        client.start()
+        assert client.request("qq.group.list", {"account_id": "10001"})[
+            "operation"
+        ] == "qq.group.list"
+        deadline = time.monotonic() + 2.0
+        while client.state != "FAILED" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert client.state == "FAILED"
+        assert client.supervision["failure_code"] == "PROTOCOL_MISMATCH"
+    finally:
+        client.close()
