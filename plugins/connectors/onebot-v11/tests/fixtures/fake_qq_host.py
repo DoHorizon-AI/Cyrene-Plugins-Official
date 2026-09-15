@@ -29,6 +29,15 @@ def _mode() -> str:
     return "normal"
 
 
+def _operation_log() -> str | None:
+    """Read an optional fixture-only operation log path."""
+
+    for argument in sys.argv[1:]:
+        if argument.startswith("--operation-log="):
+            return argument.partition("=")[2]
+    return os.environ.get("CYRENE_QQ_OPERATION_LOG")
+
+
 def _read_frame() -> dict[str, Any] | None:
     """Read one bounded frame using only inherited stdin."""
 
@@ -252,6 +261,10 @@ def main() -> int:
         if message_type != "request":
             return 2
         operation = message.get("operation")
+        operation_log = _operation_log()
+        if operation_log:
+            with open(operation_log, "a", encoding="utf-8") as log:
+                log.write(f"{operation}\n")
         if mode in {"timeout", "cancel"} and operation == "qq.group.detail":
             continue
         if mode == "out_of_order" and operation in {
@@ -283,6 +296,47 @@ def main() -> int:
         _write_frame(response)
         if mode == "duplicate_response":
             _write_frame(response)
+        if mode == "callbacks" and operation == "qq.message.send":
+            send_result = response.get("result", {})
+            _write_frame(
+                {
+                    "type": "event",
+                    "event": "message.send_completion",
+                    "event_id": f"{message.get('request_id')}-completion",
+                    "request_id": message.get("request_id"),
+                    "binding_id": binding_id,
+                    "generation": generation,
+                    "payload": {
+                        "message_id": send_result.get("message_id"),
+                        "sequence": send_result.get("sequence"),
+                        "random": send_result.get("random"),
+                        "peer_uid": send_result.get("peer_uid"),
+                        "status": "completed",
+                    },
+                }
+            )
+        if mode == "media_file" and operation == "qq.media.download":
+            media_result = response.get("result", {})
+            _write_frame(
+                {
+                    "type": "event",
+                    "event": "media.download_complete",
+                    "event_id": f"{message.get('request_id')}-download-complete",
+                    "request_id": message.get("request_id"),
+                    "binding_id": binding_id,
+                    "generation": generation,
+                    "payload": {
+                        "media_id": media_result.get("media_id"),
+                        "file_id": media_result.get("file_id"),
+                        "element_id": media_result.get("element_id"),
+                        "local_result_reference": media_result.get(
+                            "local_result_reference"
+                        ),
+                        "status": "completed",
+                        "progress": 1.0,
+                    },
+                }
+            )
         if operation == "qq.message.subscribe":
             event = _message_event(
                 binding_id,

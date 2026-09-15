@@ -14,13 +14,14 @@ from __future__ import annotations
 import json
 import math
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
 
 from cyrene_plugin_runtime.configuration import read_environment_settings
+from google.protobuf.message import DecodeError
 
 from ._generated import message_connector_pb2 as message_contract
 from .connector import (
@@ -49,10 +50,24 @@ QQ_VENDOR = "qq"
 QQ_RUNTIME_PROFILE = "qqnt-direct"
 QQ_REQUEST_TYPE_URL = "type.cyrene.io/qq.client.v1.Request"
 QQ_RESPONSE_TYPE_URL = "type.cyrene.io/qq.client.v1.Response"
+QQ_CALLBACK_TYPE_URL = "type.cyrene.io/qq.client.v1.Callback"
 _BINDING_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _MAX_EVENT_IDS = 2_048
+_MAX_CALLBACK_REQUESTS = 2_048
 _MAX_EXTENSION_RESPONSE_BYTES = 8 * 1024 * 1024
 _MAX_MEDIA_REFERENCE_BYTES = 4 * 1024
+_CALLBACK_OPERATION_BY_EVENT = {
+    "message.send_completion": ("qq.message.send_completion", {"qq.message.send"}),
+    "qq.message.send_completion": ("qq.message.send_completion", {"qq.message.send"}),
+    "media.download_complete": (
+        "qq.media.download_complete",
+        {"qq.media.download", "qq.file.download"},
+    ),
+    "qq.media.download_complete": (
+        "qq.media.download_complete",
+        {"qq.media.download", "qq.file.download"},
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -348,9 +363,11 @@ class QQNTDirectConnector:
         self._config: QQNTDirectConfig | None = None
         self._host = host
         self._session_started = False
+        self._session_bootstrap_stage = 0
         self._session_generation: int | None = None
         self._subscriptions: dict[str, _Subscription] = {}
         self._subscription_generation: int | None = None
+        self._callback_requests: dict[str, str] = {}
         self._seen_events: set[tuple[str, int, str]] = set()
         self._state = "CREATED"
         if config is not None:
@@ -570,13 +587,31 @@ class QQNTDirectConnector:
                 "password",
             )
         _raise_if_cancelled(cancellation)
-        self._ensure_started()
+        if spec.mapping == "session":
+            # Explicit lifecycle actions are authoritative. Do not invoke the
+            # complete bootstrap sequence before the action requested by the
+            # caller, otherwise create/init/startNT would be duplicated.
+            self._ensure_host_started()
+        else:
+            self._ensure_started()
         if spec.priority != "P0" or spec.mapping not in {"session", "login"}:
             self._ensure_ready()
         result = self._call_operation(
             operation, dict(params), cancellation=cancellation
         )
         _raise_if_cancelled(cancellation)
+        if spec.mapping == "session":
+            stage_by_operation = {
+                "qq.session.create": 1,
+                "qq.session.init": 2,
+                "qq.session.start_nt": 3,
+            }
+            self._session_bootstrap_stage = max(
+                self._session_bootstrap_stage, stage_by_operation[operation]
+            )
+            self._session_started = self._session_bootstrap_stage >= 3
+            if operation == "qq.session.start_nt":
+                self._update_session_state(result)
         if operation == "qq.login.offline":
             self._state = "LOGIN_REQUIRED"
         elif operation in {
@@ -673,7 +708,7 @@ class QQNTDirectConnector:
             )
         except ConnectorError as exc:
             return False, f"{exc.code}: {exc.message}"
-        except (ValueError, TypeError) as exc:
+        except (DecodeError, ValueError, TypeError) as exc:
             return False, f"INVALID_REQUEST: malformed {action} payload: {exc}"
 
     def on_subscribe(
@@ -744,6 +779,34 @@ class QQNTDirectConnector:
 
     def _ensure_started(self) -> None:
         config = self._require_configured()
+        self._ensure_host_started()
+        if not self._session_started:
+            stages = (
+                "qq.session.create",
+                "qq.session.init",
+                "qq.session.start_nt",
+            )
+            for index, operation in enumerate(stages, start=1):
+                if self._session_bootstrap_stage >= index:
+                    continue
+                try:
+                    result = self._host.request(
+                        operation,
+                        {"login_policy": config.login_policy},
+                        timeout_seconds=config.startup_timeout_seconds,
+                    )
+                except QQHostError as exc:
+                    self._state = "FAILED"
+                    raise _connector_host_error(exc) from exc
+                self._session_bootstrap_stage = index
+                if operation == "qq.session.start_nt":
+                    self._update_session_state(result)
+            self._session_started = self._session_bootstrap_stage >= len(stages)
+        self._finish_startup()
+
+    def _ensure_host_started(self) -> None:
+        """Start or recover the Host without implicitly bootstrapping QQ."""
+
         if self._host is None:
             raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is not configured")
         if self._host.state == "FAILED":
@@ -764,27 +827,15 @@ class QQNTDirectConnector:
             raise _connector_host_error(exc) from exc
         if self._session_generation != self._host.generation:
             self._session_started = False
+            self._session_bootstrap_stage = 0
             self._session_generation = self._host.generation
             self._subscription_generation = None
+            self._callback_requests.clear()
             self._state = "NATIVE_READY"
-        if not self._session_started:
-            for operation in (
-                "qq.session.create",
-                "qq.session.init",
-                "qq.session.start_nt",
-            ):
-                try:
-                    result = self._host.request(
-                        operation,
-                        {"login_policy": config.login_policy},
-                        timeout_seconds=config.startup_timeout_seconds,
-                    )
-                except QQHostError as exc:
-                    self._state = "FAILED"
-                    raise _connector_host_error(exc) from exc
-                if operation == "qq.session.start_nt":
-                    self._update_session_state(result)
-            self._session_started = True
+
+    def _finish_startup(self) -> None:
+        """Restore subscriptions after a generation has completed startup."""
+
         if (
             self._state == "READY"
             and self._subscriptions
@@ -821,17 +872,38 @@ class QQNTDirectConnector:
             )
         if self._host is None:
             raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is not configured")
+        request_id_sink: Callable[[str], None] | None = None
+        if operation in {
+            "qq.message.send",
+            "qq.media.download",
+            "qq.file.download",
+        }:
+            def remember_request(request_id: str) -> None:
+                self._remember_callback_request(request_id, operation)
+
+            request_id_sink = remember_request
         try:
             return self._host.request(
                 operation,
                 params,
                 timeout_seconds=self._config.timeout_seconds if self._config else None,
                 cancellation=cancellation,
+                request_id_sink=request_id_sink,
             )
         except QQHostError as exc:
             if exc.code in {"LOGIN_FAILED", "ACCOUNT_MISMATCH"}:
                 self._state = "FAILED"
             raise _connector_host_error(exc) from exc
+
+    def _remember_callback_request(self, request_id: str, operation: str) -> None:
+        """Remember callback-capable request identities for this generation."""
+
+        if not isinstance(request_id, str) or not request_id:
+            return
+        self._callback_requests[request_id] = operation
+        overflow = len(self._callback_requests) - _MAX_CALLBACK_REQUESTS
+        for old_request_id in tuple(self._callback_requests)[: max(0, overflow)]:
+            del self._callback_requests[old_request_id]
 
     def _update_session_state(self, result: Any) -> None:
         if not isinstance(result, Mapping):
@@ -903,6 +975,26 @@ class QQNTDirectConnector:
                     INBOUND_REQUEST_EVENT_TYPE,
                     normalized_request,
                     "type.cyrene.io/message.connector.v1.InboundRequestPayload",
+                )
+            callback_spec = _CALLBACK_OPERATION_BY_EVENT.get(event_name)
+            if callback_spec is not None:
+                callback_operation, originating_operations = callback_spec
+                request_id = event.get("request_id")
+                if not isinstance(request_id, str):
+                    request_id = payload.get("request_id")
+                if (
+                    not isinstance(request_id, str)
+                    or self._callback_requests.get(request_id)
+                    not in originating_operations
+                ):
+                    # A callback without a generation-scoped originating
+                    # request is ambiguous; never expose it as a generic event.
+                    return 0
+                normalized_callback = _normalize_callback(
+                    callback_operation, request_id, event.get("event_id"), payload
+                )
+                return self._emit(
+                    "qq_callback", normalized_callback, QQ_CALLBACK_TYPE_URL
                 )
         except ConnectorError:
             return 0
@@ -1014,6 +1106,14 @@ def _canonical_send_request(
     }
     if request.HasField("reply"):
         result["reply"] = {"message_id": request.reply.message_id}
+    if request.HasField("vendor_extension"):
+        result["vendor_extension"] = {
+            "vendor": request.vendor_extension.vendor,
+            "facts": [
+                {"name": fact.name, "value": fact.value}
+                for fact in request.vendor_extension.facts
+            ],
+        }
     return result
 
 
@@ -1024,7 +1124,11 @@ def _reference_from_proto(
 
     which = reference.WhichOneof("location")
     if which == "remote_uri":
-        return {"remote_uri": reference.remote_uri}
+        return {
+            "remote_uri": _validated_remote_uri(
+                reference.remote_uri, "attachment.reference.remote_uri"
+            )
+        }
     if which == "vendor_media":
         return {
             "vendor_media": {
@@ -1043,6 +1147,26 @@ def _delivery_payload(result: Mapping[str, Any]) -> bytes:
         status=message_contract.DELIVERY_STATUS_ACCEPTED,
         vendor_message_id=str(result.get("vendor_message_id", "")),
     )
+    extension = result.get("vendor_extension")
+    if extension is not None:
+        extension_map = _mapping(extension, "vendor_extension")
+        response.vendor_extension.vendor = _required_text(
+            extension_map.get("vendor"), "vendor_extension.vendor"
+        )
+        facts = extension_map.get("facts", ())
+        if not isinstance(facts, Sequence) or isinstance(facts, (str, bytes)):
+            raise ConnectorError(
+                "INVALID_REQUEST", "vendor_extension.facts must be a list"
+            )
+        for index, raw_fact in enumerate(facts):
+            fact = _mapping(raw_fact, f"vendor_extension.facts[{index}]")
+            target = response.vendor_extension.facts.add()
+            target.name = _required_text(
+                fact.get("name"), f"vendor_extension.facts[{index}].name"
+            )
+            target.value = _required_text(
+                fact.get("value"), f"vendor_extension.facts[{index}].value"
+            )
     return response.SerializeToString()
 
 
@@ -1443,6 +1567,72 @@ def _facts_from_result(result: Mapping[str, Any]) -> list[dict[str, str]]:
         if value is not None:
             facts.append({"name": f"qq_{name}", "value": str(value)[:2_048]})
     return facts
+
+
+def _normalize_callback(
+    operation: str,
+    request_id: str,
+    event_id: Any,
+    payload: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Normalize only typed callback facts correlated to an originating call."""
+
+    result: dict[str, Any] = {
+        "operation": operation,
+        "request_id": _required_text(request_id, "callback.request_id"),
+    }
+    if event_id is not None:
+        result["event_id"] = _required_identifier(event_id, "callback.event_id")
+    identifier_fields = {
+        "account_id",
+        "message_id",
+        "peer_uid",
+        "media_id",
+        "file_id",
+        "element_id",
+    }
+    for key in (
+        "account_id",
+        "message_id",
+        "peer_uid",
+        "media_id",
+        "file_id",
+        "element_id",
+        "sequence",
+        "random",
+        "status",
+        "progress",
+        "local_result_reference",
+    ):
+        value = payload.get(key)
+        if value is None:
+            continue
+        if key in identifier_fields:
+            result[key] = _required_identifier(value, f"callback.{key}")
+        elif isinstance(value, bool):
+            result[key] = value
+        elif isinstance(value, (int, float)):
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ConnectorError("INVALID_REQUEST", f"callback.{key} is not finite")
+            result[key] = value
+        elif isinstance(value, str):
+            result[key] = value[:2_048]
+        else:
+            raise ConnectorError("INVALID_REQUEST", f"callback.{key} has invalid type")
+    if payload.get("remote_uri") is not None:
+        result["remote_uri"] = _validated_remote_uri(
+            payload["remote_uri"], "callback.remote_uri"
+        )
+    error = payload.get("error")
+    if error is not None:
+        error_map = _mapping(error, "callback.error")
+        result["error"] = {
+            "code": _required_text(error_map.get("code"), "callback.error.code")[:128],
+            "message": _required_text(
+                error_map.get("message"), "callback.error.message"
+            )[:512],
+        }
+    return result
 
 
 def _bounded_event_payload(value: Mapping[str, Any]) -> dict[str, Any]:

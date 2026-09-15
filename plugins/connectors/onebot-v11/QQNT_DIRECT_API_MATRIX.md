@@ -99,7 +99,7 @@ in that row; the native Host remains responsible for exact overload validation.
 
 | Area / 领域 | Rule / 规则 | Evidence state / 证据状态 |
 | --- | --- | --- |
-| Correlation | `binding_id + generation + request_id`; UID, UIN, peer UID, group code, message ID, sequence, and random remain separate values. | Fake Host tested; real `NOT_RUN` |
+| Correlation | `binding_id + generation + request_id`; UID, UIN, peer UID, group code, message ID, sequence, and random remain separate values. Callback records require a matching originating request and are typed. | Fake Host tested; real `NOT_RUN` |
 | Timeout/cancel | Bounded deadline; cancellation sends a control frame; removed requests ignore late responses; no implicit side-effect retry. | Fake Host tested; real `NOT_RUN` |
 | Account/session | Exact configured platform/build/ABI and optional expected account; missing or mismatched ready account fails closed. | Fake Host tested; real `NOT_RUN` |
 | Media/files | Only HTTP(S) URI or binding-private QQ media reference crosses the canonical seam; no Product-local path or unbounded content. | Schema and mapper tested; real `NOT_RUN` |
@@ -107,6 +107,21 @@ in that row; the native Host remains responsible for exact overload validation.
 | Process isolation | One binding owns one data directory and process group; shutdown reaps binding-local descendants and does not use TCP/WS/OneBot transport. | Fake Host tested; real `NOT_RUN` |
 | Installation selection | Linux x86_64 operator path or one exact installation manifest; zero/multiple candidates and build drift fail closed. | Discovery tests; real `NOT_RUN` |
 | Crash supervision | Unexpected exit uses a bounded binding-local restart budget and circuit; failed operations are never implicitly replayed. | Fake Host recovery/circuit tests; real `NOT_RUN` |
+
+## Operation schemas / 操作 Schema
+
+Every one of the 79 operation entries has its own request schema reference in
+`plugin.manifest.json` under
+`contracts/v1/schema.json#/$defs/<operation>_request`. The executable worker
+allow-list and these schema property sets are checked for parity. The fields
+are the conservative public envelope from `QQ_API_PLAN.md`; the authorized
+Host remains responsible for exact target-client overload validation and native
+message shapes.
+
+`plugin.manifest.json` 中 79 个 operation 都有独立的 request Schema 引用，格式为
+`contracts/v1/schema.json#/$defs/<operation>_request`。可执行 Worker allow-list 与这些
+Schema 字段会做 parity 校验。字段只取 `QQ_API_PLAN.md` 定义的保守公共 envelope；准确的
+目标客户端 overload 校验与原生消息形状仍由授权 Host 负责。
 
 The additional getters in `../im/QQ_SIDE_INTERFACES.md` (collection, album,
 robot, ticket, setting, mini-app, third-party signature, and similar services)

@@ -38,6 +38,7 @@ from .connector import (
 )
 from .plugin import ConnectorPlugin
 from .qqnt_direct import (
+    QQ_CALLBACK_TYPE_URL,
     QQ_CAPABILITY_ID,
     QQ_REQUEST_TYPE_URL,
     QQ_RESPONSE_TYPE_URL,
@@ -99,6 +100,7 @@ __all__ = [
     "OneBotReverseWebSocketServer",
     "ConnectorPlugin",
     "QQ_CAPABILITY_ID",
+    "QQ_CALLBACK_TYPE_URL",
     "QQNTDirectConfig",
     "QQNTDirectConnector",
     "QQ_REQUEST_TYPE_URL",

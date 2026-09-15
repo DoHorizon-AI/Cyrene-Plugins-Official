@@ -117,6 +117,51 @@ JSON envelope.
 `payload`。`message.received` 直接映射到 `message.connector.v1`，不会先序列化为
 OneBot JSON 再解析。
 
+Completion callbacks use the originating request ID and are accepted only for
+the two fixed callback records declared in the operation matrix:
+`message.send_completion` and `media.download_complete`.
+
+完成回调必须携带发起调用的 request ID，并且只接受矩阵中登记的两个固定回调：
+`message.send_completion` 与 `media.download_complete`。
+
+```json
+{
+  "type": "event",
+  "event": "message.send_completion",
+  "event_id": "qq-main:1:9-completion",
+  "request_id": "qq-main:1:9",
+  "binding_id": "qq-main",
+  "generation": 1,
+  "payload": {
+    "message_id": "<native-message-id>",
+    "sequence": 7,
+    "random": 11,
+    "peer_uid": "<native-peer-uid>",
+    "status": "completed"
+  }
+}
+```
+
+`media.download_complete` uses the same correlation rule and may carry only
+bounded media/file/element identity, progress, a local result reference, a
+validated HTTP(S) URI, status, and structured error fields. Missing,
+cross-generation, or mismatched request IDs are dropped and never exposed as
+generic QQ events. The callback record is published as typed
+`type.cyrene.io/qq.client.v1.Callback` data; it is not requestable.
+
+`media.download_complete` 同样按 request ID 关联，只能携带有界的媒体/文件/元素身份、
+进度、本地结果引用、经过校验的 HTTP(S) URI、状态和结构化错误。缺失、跨 generation 或
+不匹配的 request ID 会被丢弃，不会降级成通用 QQ 事件。回调记录通过类型化的
+`type.cyrene.io/qq.client.v1.Callback` 发布，不能作为请求调用。
+
+The three `qq.session.*` operations are explicit lifecycle actions. Calling
+one does not implicitly execute the other two; ordinary message or extension
+operations perform the missing ordered bootstrap stages once per Host
+generation.
+
+三个 `qq.session.*` 操作是显式生命周期动作。调用其中一个不会隐式执行另外两个；普通消息
+或扩展操作只会在每个 Host generation 内按顺序补齐尚未完成的启动阶段，并且每阶段只执行一次。
+
 ## Host responsibilities / Host 责任
 
 The configured Host adapter owns the version-specific official QQ integration

@@ -16,7 +16,6 @@
       "type": "string",
       "enum": [
         "onebot-v11",
-        "qq-client",
         "qqnt-direct"
       ],
       "default": "onebot-v11"
@@ -191,16 +190,43 @@
         }
       },
       "else": {
-        "anyOf": [
-          {"required": ["http_base_url"]},
-          {"required": ["websocket_url"]},
+        "allOf": [
           {
-            "required": ["transport_profile"],
-            "properties": {
-              "transport_profile": {
-                "const": "reverse_websocket"
-              }
+            "not": {
+              "anyOf": [
+                {"required": ["host_executable"]},
+                {"required": ["host_args"]},
+                {"required": ["data_dir"]},
+                {"required": ["required_client_version"]},
+                {"required": ["required_host_abi"]},
+                {"required": ["installation_manifest"]},
+                {"required": ["account_id"]},
+                {"required": ["login_policy"]},
+                {"required": ["platform"]},
+                {"required": ["startup_timeout_seconds"]},
+                {"required": ["shutdown_timeout_seconds"]},
+                {"required": ["secret_refs"]},
+                {"required": ["max_restart_attempts"]},
+                {"required": ["restart_window_seconds"]},
+                {"required": ["restart_backoff_seconds"]},
+                {"required": ["restart_backoff_max_seconds"]},
+                {"required": ["crash_circuit_cooldown_seconds"]}
+              ]
             }
+          },
+          {
+            "anyOf": [
+              {"required": ["http_base_url"]},
+              {"required": ["websocket_url"]},
+              {
+                "required": ["transport_profile"],
+                "properties": {
+                  "transport_profile": {
+                    "const": "reverse_websocket"
+                  }
+                }
+              }
+            ]
           }
         ]
       }
