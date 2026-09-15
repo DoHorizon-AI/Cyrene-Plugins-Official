@@ -15,15 +15,17 @@ calls.
 
 The first supported real target is Linux x86_64. A deployment must provide a
 written authorization record, the exact QQ client build string, and the exact
-Host ABI. Configuration carries the build string as `required_client_version`;
-the Host hello carries `client_version` and `abi`. Because this repository does
+Host ABI. Configuration carries the build string as `required_client_version`
+and the ABI as `required_host_abi`; the Host hello carries `client_version`
+and `abi`. Because this repository does
 not contain an authorized QQ build or native Host, every real API row is
 currently `NOT_RUN`. Fake Host tests prove only the worker boundary, mapping
 mechanics, and failure handling.
 
 首个真实目标是 Linux x86_64。部署必须提供书面授权、准确 QQ client build 字符串和准确 Host
-ABI。配置中的 `required_client_version` 固定 build 字符串，Host hello 返回 `client_version`
-与 `abi`。当前仓库没有获授权的 QQ build 或原生 Host，因此所有真实 API 行仍为 `NOT_RUN`；
+ABI。配置中的 `required_client_version` 固定 build 字符串，`required_host_abi` 固定 Host
+ABI，Host hello 返回 `client_version` 与 `abi`。当前仓库没有获授权的 QQ build 或原生
+Host，因此所有真实 API 行仍为 `NOT_RUN`；
 Fake Host 只证明 worker 边界、映射机制和失败处理。
 
 The request/result columns below describe the normalized `qq.client.v1`
