@@ -11,15 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "373e940e6a7175c98e9ce756b7a1a0743097755a1180cae0c769e16ddaa7c070",
-      "size_bytes": 15745
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": ".github/workflows/qq-real-smoke.yml",
-      "sha256": "b9b2e7f00de3941115dfb383d0e9229cc2eac77708c54ea9b36a75139834f35c",
-      "size_bytes": 2546
+      "sha256": "a7e28eba39df415d27e00b1c294d40a674bf50694d67639aae24f6b2d5b923ae",
+      "size_bytes": 18139
     },
     {
       "kind": "file",
@@ -719,8 +712,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_REAL_SMOKE.md",
-      "sha256": "aa9babdf61231b9cb870e5bdfb49eb4c6a512d74d6af43b33a5c097fff45608b",
-      "size_bytes": 6486
+      "sha256": "eeae92f442284bd9967f1d7af3b379dc7e236beae6db7a4141c488c8196b90bf",
+      "size_bytes": 6338
     },
     {
       "kind": "file",

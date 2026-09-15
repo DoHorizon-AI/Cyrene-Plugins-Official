@@ -1,15 +1,17 @@
 # QQNT Direct Real Smoke / QQNT 直连真实烟测
 
 This document describes the protected-environment smoke gate for the
-`qqnt-direct` profile. It is separate from the fake Host TCK and must never be
-reported as passed from a fake Host or a local simulation.
+`qqnt-direct` profile. The gate is a manual job in the existing `public-ci`
+workflow. It is separate from the fake Host TCK and must never be reported as
+passed from a fake Host or a local simulation.
 
 本文档描述 `qqnt-direct` 的受保护环境真实烟测。它与 fake Host TCK 分离，不能用
 fake Host 或本地模拟结果替代真实通过。
 
 ## Gate shape / 门禁形态
 
-The workflow is manual and only runs from `main`:
+The `public-ci` workflow is manual-capable and the smoke job only runs from
+`main`:
 
 - GitHub Environment: `qq-real-smoke`, with required reviewers;
 - runner labels: `self-hosted`, `linux`, `x64`, `qq-real`;
@@ -19,17 +21,15 @@ The workflow is manual and only runs from `main`:
   one Host executable that implements `cyrene.qq.host.v1` over inherited stdio,
   and a dedicated test account/session;
 - the workflow accepts the exact client build and Host ABI as dispatch inputs;
-- the dispatch input fields are schema-optional because GitHub can emit a false
-  push validation run for a manual-only workflow when those fields are schema-
-  required; the job explicitly rejects every non-`workflow_dispatch` event,
-  and the runner script still hard-requires both exact values;
+- the existing workflow already handles push and pull-request events; the smoke
+  job explicitly rejects every non-`workflow_dispatch` event;
 - the scenario JSON stays on the protected runner and is not committed to this
   public repository.
 
-工作流只允许从 `main` 手工触发，并要求受保护 Environment、专用 Linux x64 runner、
-精确 QQ build、实现 `cyrene.qq.host.v1` 继承 stdio 协议的 Host，以及专用测试账号。
-由于 GitHub 对带有必填 dispatch input 的纯手工 workflow 可能错误生成 push 校验运行，
-输入在 schema 层可省略，但 job 会拒绝非 `workflow_dispatch`，脚本仍强制要求两个精确值。
+`public-ci` 已有 push/PR 触发，真实烟测 job 只允许从 `main` 手工触发，并要求受保护
+Environment、专用 Linux x64 runner、精确 QQ build、实现 `cyrene.qq.host.v1` 继承 stdio
+协议的 Host，以及专用测试账号。job 会拒绝非 `workflow_dispatch`，脚本仍强制要求两个
+精确 build/ABI 值。
 场景 JSON 只放在受保护 runner，不提交到公共仓库。
 
 Environment variables / Environment 变量：
