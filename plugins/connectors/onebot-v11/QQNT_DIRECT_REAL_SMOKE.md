@@ -1,15 +1,17 @@
 # QQNT Direct Real Smoke / QQNT 直连真实烟测
 
 This document describes the protected-environment smoke gate for the
-`qqnt-direct` profile. It is separate from the fake Host TCK and must never be
-reported as passed from a fake Host or a local simulation.
+`qqnt-direct` profile. The gate is an operator-dispatched job in the existing
+`public-ci` workflow. It is separate from the fake Host TCK and must never be reported as
+passed from a fake Host or a local simulation.
 
 本文档描述 `qqnt-direct` 的受保护环境真实烟测。它与 fake Host TCK 分离，不能用
 fake Host 或本地模拟结果替代真实通过。
 
 ## Gate shape / 门禁形态
 
-The workflow is manual and only runs from `main`:
+The `public-ci` workflow exposes a protected `repository_dispatch` event and
+the smoke job only runs from `main`:
 
 - GitHub Environment: `qq-real-smoke`, with required reviewers;
 - runner labels: `self-hosted`, `linux`, `x64`, `qq-real`;
@@ -18,18 +20,19 @@ The workflow is manual and only runs from `main`:
 - the runner must already contain one authorized exact QQ Linux x86_64 build,
   one Host executable that implements `cyrene.qq.host.v1` over inherited stdio,
   and a dedicated test account/session;
-- the workflow accepts the exact client build and Host ABI as dispatch inputs;
-- the dispatch input fields are schema-optional because GitHub can emit a false
-  push validation run for a manual-only workflow when those fields are schema-
-  required; the job explicitly rejects every non-`workflow_dispatch` event,
-  and the runner script still hard-requires both exact values;
+- the exact client build and Host ABI are protected Environment variables;
+  the runner script hard-requires both exact values and returns `NOT_RUN` when
+  either is absent;
+- the existing workflow already handles push and pull-request events; the smoke
+  job explicitly rejects every non-`repository_dispatch` event;
 - the scenario JSON stays on the protected runner and is not committed to this
   public repository.
 
-工作流只允许从 `main` 手工触发，并要求受保护 Environment、专用 Linux x64 runner、
-精确 QQ build、实现 `cyrene.qq.host.v1` 继承 stdio 协议的 Host，以及专用测试账号。
-由于 GitHub 对带有必填 dispatch input 的纯手工 workflow 可能错误生成 push 校验运行，
-输入在 schema 层可省略，但 job 会拒绝非 `workflow_dispatch`，脚本仍强制要求两个精确值。
+`public-ci` 已有 push/PR 触发，真实烟测 job 只允许通过受权限控制的
+`repository_dispatch` 从 `main` 触发，并要求受保护
+Environment、专用 Linux x64 runner、精确 QQ build、实现 `cyrene.qq.host.v1` 继承 stdio
+协议的 Host，以及专用测试账号。job 会拒绝非 `repository_dispatch`，脚本仍强制要求受保护
+Environment 中的两个精确 build/ABI 值；缺失时脚本返回 `NOT_RUN`。
 场景 JSON 只放在受保护 runner，不提交到公共仓库。
 
 Environment variables / Environment 变量：
@@ -42,12 +45,32 @@ Environment variables / Environment 变量：
 | `QQNT_ACCOUNT_ID` | Dedicated smoke account identity. |
 | `QQNT_SMOKE_SCENARIO_PATH` | Absolute path to the protected scenario JSON. |
 | `QQNT_REAL_SMOKE_APPROVED` | Must be exactly `yes`, set only in the protected Environment. |
+| `QQNT_REQUIRED_CLIENT_VERSION` | Exact authorized QQ client build expected by the Host handshake. |
+| `QQNT_REQUIRED_HOST_ABI` | Exact authorized Host ABI expected by the handshake. |
 
-The dispatch inputs `client_version` and `host_abi` become
-`QQNT_REQUIRED_CLIENT_VERSION` and `QQNT_REQUIRED_HOST_ABI`. The handshake must
-return both exact values. Passwords are not accepted; a pre-authorized session
-or an operator-run QR login must establish the account before this automated
-gate.
+The handshake must return the exact protected `QQNT_REQUIRED_CLIENT_VERSION` and
+`QQNT_REQUIRED_HOST_ABI` values. Passwords are not accepted; a pre-authorized
+session or an operator-run QR login must establish the account before this
+automated gate.
+
+An authorized operator can dispatch the gate from the repository's default
+`main` branch with the GitHub CLI:
+
+```bash
+gh api repos/DoHorizon-AI/Cyrene-Plugins-Official/dispatches \
+  -f event_type=qq-real-smoke
+```
+
+The `qq-real-smoke` Environment reviewers remain the final approval boundary.
+
+授权运维可以使用 GitHub CLI 从仓库默认 `main` 触发：
+
+```bash
+gh api repos/DoHorizon-AI/Cyrene-Plugins-Official/dispatches \
+  -f event_type=qq-real-smoke
+```
+
+最终审批边界仍是 `qq-real-smoke` Environment 的 reviewer。
 
 ## Scenario contract / 场景契约
 
