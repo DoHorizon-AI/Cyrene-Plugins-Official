@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "0360b1ebda022f84168912acff14e5b204d5aadaa4a07829dc5aa045329db278",
-      "size_bytes": 17923
+      "sha256": "643b35982db9bc9446632c76fae60112ee477828653065f4a49883bc9138edd7",
+      "size_bytes": 17973
     },
     {
       "kind": "file",
@@ -697,6 +697,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
+      "sha256": "a72ceb7de05ac8208ca6f5b613090233fc539ca19b96a397d00ded19bea74cbd",
+      "size_bytes": 1603
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_API_MATRIX.md",
       "sha256": "4efa783e136f47cb317429107203fafe87c7e266361591e301fc1dfb7cf8ed5f",
       "size_bytes": 17022
@@ -754,8 +761,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/pyproject.toml",
-      "sha256": "a03f272fb19a545b7adb4795b5132f36af6bc4676ee9103831be56d7306d195f",
-      "size_bytes": 950
+      "sha256": "cc668bfd6b98cf20a2216c3f0722587cd8ab2206f18ea282577fbf2c20ee74de",
+      "size_bytes": 994
     },
     {
       "kind": "file",
@@ -879,6 +886,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_package.py",
+      "sha256": "1020ef9c71a84c3584ae7c342d646d8f3834b28c895db20cb7a0916e5836854b",
+      "size_bytes": 3891
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
       "sha256": "72268efeb059a0229d65288e6edad8c376ee1aabd7188bbeda73897fffb9a86e",
       "size_bytes": 41018
@@ -889,6 +903,13 @@
       "path": "plugins/connectors/onebot-v11/tests/test_transport.py",
       "sha256": "9f24b1cfe550469019ef6d82f042ed3ae896a55445eec66504b20dafa7ae882d",
       "size_bytes": 21805
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tools/assemble_package.py",
+      "sha256": "e7b581e9f371c24501bfa12839456feb72805a66533867f48ee0413baf52f95e",
+      "size_bytes": 7554
     },
     {
       "kind": "file",

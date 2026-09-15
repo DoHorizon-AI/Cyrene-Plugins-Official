@@ -110,6 +110,7 @@ jobs:
             sdk/python/cyrene_model_provider_contracts/src \
             sdk/python/cyrene_plugin_runtime/src \
             plugins/connectors/onebot-v11/src \
+            plugins/connectors/onebot-v11/tools \
             plugins/connectors/wecom \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \

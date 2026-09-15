@@ -7,7 +7,11 @@ name = "cyrene-onebot-v11-connector"
 version = "0.2.0"
 description = "OneBot v11 and direct QQNT implementations of Cyrene connector capabilities"
 requires-python = ">=3.11"
-dependencies = ["grpcio>=1.62,<1.63", "protobuf>=4.21,<5"]
+dependencies = [
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "grpcio>=1.62,<1.63",
+  "protobuf>=4.21,<5",
+]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
