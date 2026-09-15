@@ -18,13 +18,16 @@ UTF-8 JSON object
 ```
 
 The maximum payload is 8 MiB. The connector creates no TCP listener, Unix
-socket, WebSocket endpoint, or OneBot endpoint. The QQ Host's own outbound
-network activity remains outside this connector IPC boundary.
+socket, WebSocket endpoint, or OneBot endpoint. The worker also probes the
+Linux x86_64 Host process tree and fails closed if it observes an IPv4 or IPv6
+TCP socket in `LISTEN`; outbound QQ connections remain allowed and outside
+this connector IPC boundary.
 
 子进程通过继承的二进制 stdin/stdout 启动。每帧由 4 字节大端长度和 UTF-8 JSON
 对象组成，单帧上限为 8 MiB。Connector 不创建 TCP listener、Unix socket、
-WebSocket 或 OneBot endpoint。QQ Host 自身的外联网络行为不属于本 Connector 的
-IPC 边界。
+WebSocket 或 OneBot endpoint。Worker 还会检查 Linux x86_64 Host 进程树；发现 IPv4 或
+IPv6 TCP socket 处于 `LISTEN` 时会 fail closed。QQ Host 自身的外联网络行为仍然允许，且
+不属于本 Connector 的 IPC 边界。
 
 ## Installation selection / 安装选择
 
