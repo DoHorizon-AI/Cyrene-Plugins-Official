@@ -72,6 +72,19 @@ gh api repos/DoHorizon-AI/Cyrene-Plugins-Official/dispatches \
 
 最终审批边界仍是 `qq-real-smoke` Environment 的 reviewer。
 
+## Protected preflight / 受保护环境预检
+
+Before dispatching, the operator must verify that the runner uses a dedicated
+QQ account and data directory, that the Host executable is the authorized
+Linux x86_64 build, and that the two protected version/ABI variables describe
+that same installation. The account must already be authorized or be ready
+for an operator-controlled QR login; credentials must never be placed in the
+repository, scenario JSON, event payload, or evidence artifact.
+
+触发前，运维必须确认 runner 使用专用 QQ 账号和数据目录，Host 可执行文件是授权的
+Linux x86_64 构建，并且两个受保护版本/ABI 变量与同一安装完全一致。账号必须已经授权，
+或准备好由运维控制二维码登录；凭据不得放入仓库、场景 JSON、事件 payload 或证据产物。
+
 ## Scenario contract / 场景契约
 
 The scenario must contain two dedicated targets, two inbound assertions, a
