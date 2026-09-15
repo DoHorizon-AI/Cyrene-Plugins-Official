@@ -102,6 +102,8 @@ in that row; the native Host remains responsible for exact overload validation.
 | Media/files | Only HTTP(S) URI or binding-private QQ media reference crosses the canonical seam; no Product-local path or unbounded content. | Schema and mapper tested; real `NOT_RUN` |
 | Security | `qq.login.password` accepts `secret_ref`, never `password`; diagnostics redact credential-like fields and are bounded. | Static/test boundary; real `NOT_RUN` |
 | Process isolation | One binding owns one data directory and process group; shutdown reaps binding-local descendants and does not use TCP/WS/OneBot transport. | Fake Host tested; real `NOT_RUN` |
+| Installation selection | Linux x86_64 operator path or one exact installation manifest; zero/multiple candidates and build drift fail closed. | Discovery tests; real `NOT_RUN` |
+| Crash supervision | Unexpected exit uses a bounded binding-local restart budget and circuit; failed operations are never implicitly replayed. | Fake Host recovery/circuit tests; real `NOT_RUN` |
 
 The additional getters in `../im/QQ_SIDE_INTERFACES.md` (collection, album,
 robot, ticket, setting, mini-app, third-party signature, and similar services)

@@ -23,6 +23,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .qqnt_direct_discovery import (
+    QQInstallationError,
+    discover_explicit,
+    discover_manifest,
+)
 from .qqnt_direct_operations import allowed_qq_parameter_fields, get_qq_operation
 from .qqnt_direct_protocol import QQHostProtocolError, read_frame, write_frame
 
@@ -55,6 +60,12 @@ class QQHostLaunchConfig:
     timeout_seconds: float
     startup_timeout_seconds: float
     shutdown_timeout_seconds: float
+    max_restart_attempts: int = 2
+    restart_window_seconds: float = 60.0
+    restart_backoff_seconds: float = 0.25
+    restart_backoff_max_seconds: float = 5.0
+    crash_circuit_cooldown_seconds: float = 60.0
+    installation_manifest: Path | None = None
 
 
 @dataclass(slots=True)
@@ -95,6 +106,11 @@ class QQHostClient:
         self._state = "CREATED"
         self._compatibility: dict[str, Any] = {}
         self._diagnostics: list[str] = []
+        self._failure_code: str | None = None
+        self._failure_message = ""
+        self._restart_history: list[float] = []
+        self._circuit_open_until = 0.0
+        self._binding_lock_handle: Any | None = None
 
     @property
     def binding_id(self) -> str:
@@ -130,6 +146,21 @@ class QQHostClient:
         with self._state_lock:
             return tuple(self._diagnostics)
 
+    @property
+    def supervision(self) -> Mapping[str, Any]:
+        """Return bounded restart and crash-circuit state for diagnostics."""
+
+        with self._state_lock:
+            self._prune_restart_history(time.monotonic())
+            now = time.monotonic()
+            return {
+                "state": self._state,
+                "failure_code": self._failure_code,
+                "restart_attempts_in_window": len(self._restart_history),
+                "max_restart_attempts": self._config.max_restart_attempts,
+                "circuit_open": now < self._circuit_open_until,
+            }
+
     def start(self) -> Mapping[str, Any]:
         """Start the child, negotiate protocol compatibility, and return its report.
 
@@ -146,16 +177,50 @@ class QQHostClient:
             generation = self._generation
             self._state = "STARTING"
             try:
-                if self._config.data_dir.is_symlink():
-                    raise OSError("binding data directory must not be a symlink")
-                self._config.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-                if not self._config.data_dir.is_dir():
+                if self._config.installation_manifest is not None:
+                    installation = discover_manifest(
+                        self._config.installation_manifest,
+                        required_client_version=self._config.required_client_version,
+                    )
+                    explicit = discover_explicit(
+                        self._config.command[0],
+                        self._config.data_dir,
+                        self._config.required_client_version,
+                        expected_platform=self._config.platform,
+                    )
+                    if (
+                        installation.host_executable != explicit.host_executable
+                        or installation.data_dir != explicit.data_dir
+                    ):
+                        raise QQInstallationError(
+                            "INVALID_REQUEST",
+                            "QQ installation manifest does not match configured paths",
+                        )
+                else:
+                    installation = discover_explicit(
+                        self._config.command[0],
+                        self._config.data_dir,
+                        self._config.required_client_version,
+                        expected_platform=self._config.platform,
+                    )
+                data_dir = installation.data_dir
+                data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+                if not data_dir.is_dir():
                     raise OSError("binding data path is not a directory")
                 if os.name == "posix":
-                    os.chmod(self._config.data_dir, 0o700)
-                _claim_binding_data_dir(self._config.data_dir, self.binding_id)
+                    os.chmod(data_dir, 0o700)
+                self._binding_lock_handle = _claim_binding_data_dir(
+                    data_dir, self.binding_id
+                )
+            except QQInstallationError as exc:
+                self._state = "FAILED"
+                self._failure_code = exc.code
+                self._failure_message = exc.message
+                raise QQHostError(exc.code, exc.message) from exc
             except OSError as exc:
                 self._state = "FAILED"
+                self._failure_code = "CAPABILITY_UNAVAILABLE"
+                self._failure_message = "QQ Host data directory is unusable"
                 raise QQHostError(
                     "CAPABILITY_UNAVAILABLE", "QQ Host data directory is unusable"
                 ) from exc
@@ -164,12 +229,12 @@ class QQHostClient:
                 {
                     "CYRENE_QQ_BINDING_ID": self.binding_id,
                     "CYRENE_QQ_BINDING_GENERATION": str(generation),
-                    "CYRENE_QQ_BINDING_DATA_DIR": str(self._config.data_dir),
+                    "CYRENE_QQ_BINDING_DATA_DIR": str(data_dir),
                 }
             )
             try:
                 popen_kwargs: dict[str, Any] = {
-                    "cwd": self._config.data_dir,
+                    "cwd": data_dir,
                     "env": environment,
                     "stdin": subprocess.PIPE,
                     "stdout": subprocess.PIPE,
@@ -180,14 +245,20 @@ class QQHostClient:
                     popen_kwargs["start_new_session"] = True
                 elif hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
                     popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-                process = subprocess.Popen(list(self._config.command), **popen_kwargs)
+                command = (str(installation.host_executable), *self._config.command[1:])
+                process = subprocess.Popen(list(command), **popen_kwargs)
             except (OSError, ValueError) as exc:
                 self._state = "FAILED"
+                self._failure_code = "CAPABILITY_UNAVAILABLE"
+                self._failure_message = "QQ Host could not be started"
+                self._release_binding_lock()
                 raise QQHostError(
                     "CAPABILITY_UNAVAILABLE", "QQ Host could not be started"
                 ) from exc
             self._process = process
             self._compatibility = {}
+            self._failure_code = None
+            self._failure_message = ""
             self._reader_thread = threading.Thread(
                 target=self._reader_loop,
                 name=f"qq-host-reader-{self.binding_id}-{generation}",
@@ -223,6 +294,48 @@ class QQHostClient:
     def restart(self) -> Mapping[str, Any]:
         """Drain the current child and start a new generation for this binding."""
 
+        self.close()
+        return self.start()
+
+    def recover(self) -> Mapping[str, Any]:
+        """Perform one bounded crash recovery without retrying a QQ operation.
+
+        Only an unexpected process/stdio exit is restartable.  The operation
+        that observed the failure is never replayed; the caller may retry a
+        later operation after the new generation has initialized its session.
+        """
+
+        with self._state_lock:
+            if self._state != "FAILED":
+                raise QQHostError(
+                    "CAPABILITY_UNAVAILABLE", "QQ Host is not awaiting recovery"
+                )
+            if self._failure_code not in {"PROCESS_EXITED", "STDIO_CLOSED"}:
+                raise QQHostError(
+                    "CAPABILITY_UNAVAILABLE",
+                    "QQ Host failure is not eligible for automatic recovery",
+                )
+            now = time.monotonic()
+            self._prune_restart_history(now)
+            if now < self._circuit_open_until:
+                raise QQHostError(
+                    "CAPABILITY_UNAVAILABLE", "QQ Host crash circuit is open"
+                )
+            if len(self._restart_history) >= self._config.max_restart_attempts:
+                self._circuit_open_until = (
+                    now + self._config.crash_circuit_cooldown_seconds
+                )
+                raise QQHostError(
+                    "CAPABILITY_UNAVAILABLE", "QQ Host crash restart budget exhausted"
+                )
+            attempt = len(self._restart_history)
+            self._restart_history.append(now)
+            delay = min(
+                self._config.restart_backoff_seconds * (2**attempt),
+                self._config.restart_backoff_max_seconds,
+            )
+        if delay > 0:
+            time.sleep(delay)
         self.close()
         return self.start()
 
@@ -267,6 +380,7 @@ class QQHostClient:
         if state in {"FAILED", "DRAINING", "STOPPED"}:
             raise QQHostError("CAPABILITY_UNAVAILABLE", "QQ Host is unavailable")
         if process is None or process.poll() is not None:
+            self._mark_failed("PROCESS_EXITED", "QQ Host is not running", process)
             raise QQHostError("CAPABILITY_UNAVAILABLE", "QQ Host is not running")
         with self._pending_lock:
             self._request_counter += 1
@@ -285,6 +399,10 @@ class QQHostClient:
             self._send(message)
         except (BrokenPipeError, OSError, QQHostProtocolError) as exc:
             self._remove_pending(request_id)
+            if process.poll() is not None:
+                self._mark_failed(
+                    "PROCESS_EXITED", "QQ Host stdio write failed", process
+                )
             raise QQHostError(
                 "CAPABILITY_UNAVAILABLE", "QQ Host stdio write failed"
             ) from exc
@@ -315,6 +433,7 @@ class QQHostClient:
             process = self._process
             if process is None:
                 self._state = "STOPPED"
+                self._release_binding_lock()
                 return
             self._state = "DRAINING"
         if process.poll() is None:
@@ -353,6 +472,7 @@ class QQHostClient:
             self._reader_thread = None
             self._stderr_thread = None
             self._state = "STOPPED"
+        self._release_binding_lock()
 
     def _validate_hello(self, report: Any, generation: int) -> None:
         if not isinstance(report, Mapping):
@@ -429,16 +549,24 @@ class QQHostClient:
                     raise QQHostProtocolError("QQ Host sent an unknown message type")
         except (QQHostProtocolError, OSError) as exc:
             self._fail_pending(QQHostError("PROTOCOL_MISMATCH", str(exc)))
+            self._mark_failed("PROTOCOL_MISMATCH", str(exc), process)
         finally:
             self._fail_pending(
                 QQHostError("CAPABILITY_UNAVAILABLE", "QQ Host closed stdio")
             )
             with self._state_lock:
-                if (
-                    self._process is process
-                    and self._state not in {"DRAINING", "STOPPED"}
-                ):
+                if self._process is process and self._state not in {
+                    "DRAINING",
+                    "STOPPED",
+                }:
                     self._state = "FAILED"
+                    if self._failure_code is None:
+                        self._failure_code = (
+                            "PROCESS_EXITED"
+                            if process.poll() is not None
+                            else "STDIO_CLOSED"
+                        )
+                        self._failure_message = "QQ Host closed stdio"
 
     def _handle_response(self, message: Mapping[str, Any]) -> None:
         request_id = message.get("request_id")
@@ -503,6 +631,46 @@ class QQHostClient:
         with self._pending_lock:
             self._pending.pop(request_id, None)
 
+    def _mark_failed(
+        self, code: str, message: str, process: subprocess.Popen[bytes] | None
+    ) -> None:
+        """Mark one still-current Host generation failed without touching others."""
+
+        with self._state_lock:
+            if process is not None and self._process is not process:
+                return
+            if self._state in {"DRAINING", "STOPPED"}:
+                return
+            self._state = "FAILED"
+            self._failure_code = code
+            self._failure_message = message
+
+    def _prune_restart_history(self, now: float) -> None:
+        """Discard recovery attempts outside the configured rolling window."""
+
+        cutoff = now - self._config.restart_window_seconds
+        self._restart_history[:] = [
+            timestamp for timestamp in self._restart_history if timestamp >= cutoff
+        ]
+
+    def _release_binding_lock(self) -> None:
+        """Unlock and close this binding's active owner-marker handle."""
+
+        handle = self._binding_lock_handle
+        self._binding_lock_handle = None
+        if handle is None:
+            return
+        try:
+            if os.name == "posix":
+                import fcntl
+
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            self._record_diagnostic("QQ Host binding lock unlock failed")
+        finally:
+            with suppress(OSError):
+                handle.close()
+
     def _fail_pending(self, error: QQHostError) -> None:
         with self._pending_lock:
             pending = tuple(self._pending.values())
@@ -534,13 +702,14 @@ def _terminate_process_tree(
         return
 
 
-def _claim_binding_data_dir(data_dir: Path, binding_id: str) -> None:
+def _claim_binding_data_dir(data_dir: Path, binding_id: str) -> Any:
     """Claim one data directory for a single binding identity.
 
     The marker is deliberately small and contains no account secret or QQ
     session material.  Existing QQ data may remain in the directory, but a
     second binding cannot silently reuse the same root after the first binding
-    has claimed it.
+    has claimed it.  The open marker handle also carries the active lock for
+    the lifetime of the worker, so no separate lock file is left behind.
     """
 
     marker = data_dir / _BINDING_OWNER_FILE
@@ -565,18 +734,36 @@ def _claim_binding_data_dir(data_dir: Path, binding_id: str) -> None:
         except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise OSError("binding owner marker is invalid") from exc
         if not isinstance(existing, dict) or existing.get("binding_id") != binding_id:
-            raise OSError(
-                "binding data directory belongs to another binding"
-            ) from None
+            raise OSError("binding data directory belongs to another binding") from None
         if os.name == "posix":
             os.chmod(marker, 0o600)
-        return
+    else:
+        try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(encoded)
+        except OSError:
+            with suppress(OSError):
+                marker.unlink()
+            raise
+        if os.name == "posix":
+            os.chmod(marker, 0o600)
+    flags = os.O_RDWR
+    if hasattr(os, "O_NOFOLLOW"):
+        flags |= os.O_NOFOLLOW
     try:
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(encoded)
-    except OSError:
+        descriptor = os.open(marker, flags)
+    except OSError as exc:
+        raise OSError("binding owner marker cannot be locked") from exc
+    handle = os.fdopen(descriptor, "a+b", closefd=True)
+    try:
+        if os.name == "posix":
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        else:
+            raise OSError("binding locks require the supported Linux target")
+    except (BlockingIOError, OSError) as exc:
         with suppress(OSError):
-            marker.unlink()
-        raise
-    if os.name == "posix":
-        os.chmod(marker, 0o600)
+            handle.close()
+        raise OSError("binding data directory is already active") from exc
+    return handle
