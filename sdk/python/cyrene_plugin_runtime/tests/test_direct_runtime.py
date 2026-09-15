@@ -81,6 +81,28 @@ class EchoPlugin:
         self.unsubscribed.append(subscription_id)
 
 
+class MultiCapabilityPlugin:
+    """Minimal plugin fixture for a shared direct endpoint."""
+
+    plugin_id = "test.direct.multi"
+    version = "1.0.0"
+    capabilities = ("test.echo.v1", "test.other.v1")
+
+    def on_invoke(
+        self,
+        capability: str,
+        method: str,
+        payload: bytes,
+        *,
+        cancellation: object,
+        request_id: str,
+        request_type_url: str,
+        stream_results: bool,
+    ) -> tuple[bool, object]:
+        del method, cancellation, request_id, request_type_url, stream_results
+        return True, TypedPayload(payload, f"type.googleapis.com/{capability}.Response")
+
+
 class _OneBotTransport:
     def call(
         self,
@@ -228,6 +250,33 @@ def test_endpoint_accepts_each_explicitly_bound_interface_version() -> None:
             deadline_seconds=2,
         )
         assert response.value == b"hello"
+    finally:
+        client.close()
+        server.stop(grace=None).wait()
+
+
+def test_endpoint_can_bind_multiple_capabilities_without_cross_routing() -> None:
+    server, connection_ref = serve(
+        MultiCapabilityPlugin(),
+        ("test.echo.v1", "test.other.v1"),
+        {"test.echo.v1": "1", "test.other.v1": "1"},
+        "127.0.0.1:0",
+    )
+    client = DirectPluginClient.for_local_connection_ref(connection_ref)
+    try:
+        response = client.invoke(
+            capability="test.other.v1",
+            interface_version="1",
+            method="echo",
+            request=DirectPayload(
+                "type.googleapis.com/test.other.v1.Request", b"other"
+            ),
+            request_id="multi-1",
+            deadline_seconds=2,
+        )
+        assert response == DirectPayload(
+            "type.googleapis.com/test.other.v1.Response", b"other"
+        )
     finally:
         client.close()
         server.stop(grace=None).wait()

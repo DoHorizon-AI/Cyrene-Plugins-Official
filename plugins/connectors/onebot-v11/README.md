@@ -1,12 +1,37 @@
-# Official OneBot v11 Connector / 官方 OneBot v11 Connector
+# Official OneBot v11 and QQNT Direct Connector / 官方 OneBot v11 与 QQNT Direct Connector
 
 This package implements the Plugins-owned `message.connector.v1` capability.
-It maps canonical ordered message parts to OneBot v11 actions and normalizes
-inbound events back to the same contract. It owns no Product session, reply,
-persona, command, or persistence policy.
+The original OneBot v11 transport remains available, and the `qqnt-direct`
+profile adds a direct QQ Host adapter without changing the generic OneBot path.
+It owns no Product session, reply, persona, command, or persistence policy.
 
-本包实现由 Plugins 所有的 `message.connector.v1` 能力，负责规范消息与 OneBot v11 action
-之间的转换，不拥有 Product 的会话、回复、人格、命令或持久化策略。
+本包实现由 Plugins 所有的 `message.connector.v1` 能力。原有 OneBot v11 传输保持可用，
+`qqnt-direct` profile 新增直接连接 QQ Host 的适配器，不改变通用 OneBot 路径。本包不拥有
+Product 的会话、回复、人格、命令或持久化策略。
+
+## QQNT direct profile / QQNT direct profile
+
+`qqnt-direct` starts one explicitly configured QQ Host executable as a child
+and exchanges Cyrene-owned length-delimited JSON frames over inherited stdio.
+It rejects OneBot endpoint/token settings, requires an exact allow-listed QQ
+client version and Linux x86_64 target, and keeps one data directory and
+generation per binding. It creates no connector-owned TCP listener and never
+round-trips native events through OneBot JSON.
+
+`qqnt-direct` 将一个明确配置的 QQ Host 可执行文件作为子进程启动，通过继承 stdio 交换
+Cyrene 自有长度分帧 JSON。它拒绝 OneBot endpoint/token 配置，要求精确 allow-list QQ
+版本和 Linux x86_64 目标，并为每个 binding 保持独立数据目录与 generation。它不创建
+Connector 自有 TCP listener，也不会把原生事件绕行 OneBot JSON。
+
+The fixed QQ extension operations are documented in
+[`QQNT_DIRECT_API_MATRIX.md`](QQNT_DIRECT_API_MATRIX.md), and the frame
+contract is documented in [`QQNT_DIRECT_PROTOCOL.md`](QQNT_DIRECT_PROTOCOL.md).
+The matrix intentionally keeps real API rows at `NOT_RUN` until an authorized
+exact QQ build is exercised; the committed fake Host only proves mechanics.
+
+固定 QQ 扩展操作见 [`QQNT_DIRECT_API_MATRIX.md`](QQNT_DIRECT_API_MATRIX.md)，分帧契约见
+[`QQNT_DIRECT_PROTOCOL.md`](QQNT_DIRECT_PROTOCOL.md)。在获授权的精确 QQ build 实测前，
+矩阵中的真实 API 行有意保持 `NOT_RUN`；仓库 fake Host 只证明机制。
 
 ## Direct data plane / 直连数据平面
 

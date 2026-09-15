@@ -76,6 +76,21 @@
       ]
     },
     {
+      "capability": "qq.client.v1",
+      "implementation": "cyrene.connectors.onebot-v11",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-15",
+          "environment": "linux / Python 3.12 / independently authored fake QQ Host over inherited stdio",
+          "command": "python3 -m pytest -q plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
+          "result": "protocol framing, direct mapping, multi-binding isolation, generation restart, cancellation, and shutdown exercised",
+          "notes": "No authorized exact QQ build or official native Host was available; all real QQ API rows remain NOT_RUN."
+        }
+      ]
+    },
+    {
       "capability": "model.provider.v1",
       "implementation": "cyrene.runtime.dotnet-native-aot-openai",
       "verification_level": "IMPLEMENTATION_VERIFIED",

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-onebot-v11-connector"
-version = "0.1.0"
-description = "Generic OneBot v11 implementation of the Cyrene message connector capability"
+version = "0.2.0"
+description = "OneBot v11 and direct QQNT implementations of Cyrene connector capabilities"
 requires-python = ">=3.11"
 dependencies = ["grpcio>=1.62,<1.63", "protobuf>=4.21,<5"]
 
@@ -13,7 +13,14 @@ dependencies = ["grpcio>=1.62,<1.63", "protobuf>=4.21,<5"]
 package-dir = {"" = "src"}
 
 [tool.setuptools.data-files]
-"share/cyrene/plugins/cyrene.connectors.onebot-v11" = ["plugin.manifest.json"]
+"share/cyrene/plugins/cyrene.connectors.onebot-v11" = [
+  "plugin.manifest.json",
+  "package-descriptor.json",
+  "configuration.schema.json"
+]
+"share/cyrene/plugins/cyrene.connectors.onebot-v11/contracts/v1" = [
+  "contracts/v1/schema.json"
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

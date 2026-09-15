@@ -1,62 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://cyrene.dev/schemas/onebot-v11-connector-configuration-v0.1.json",
-  "title": "Cyrene OneBot v11 Connector Configuration",
+  "$id": "https://cyrene.dev/schemas/onebot-v11-and-qqnt-direct-configuration-v0.2.json",
+  "title": "Cyrene OneBot v11 and QQNT Direct Connector Configuration",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "binding_id"
   ],
-  "allOf": [
-    {
-      "anyOf": [
-        {
-          "required": ["http_base_url"]
-        },
-        {
-          "required": ["websocket_url"]
-        },
-        {
-          "required": ["transport_profile"],
-          "properties": {
-            "transport_profile": {
-              "const": "reverse_websocket"
-            }
-          }
-        }
-      ]
-    },
-    {
-      "if": {
-        "required": ["transport_profile"],
-        "properties": {
-          "transport_profile": {
-            "const": "http_api"
-          }
-        }
-      },
-      "then": {
-        "required": ["http_base_url"]
-      }
-    },
-    {
-      "if": {
-        "required": ["transport_profile"],
-        "properties": {
-          "transport_profile": {
-            "const": "forward_websocket"
-          }
-        }
-      },
-      "then": {
-        "required": ["websocket_url"]
-      }
-    }
-  ],
   "properties": {
     "binding_id": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "runtime_profile": {
+      "type": "string",
+      "enum": [
+        "onebot-v11",
+        "qq-client",
+        "qqnt-direct"
+      ],
+      "default": "onebot-v11"
     },
     "http_base_url": {
       "type": "string",
@@ -91,10 +54,6 @@
     "access_token": {
       "type": "string"
     },
-    "runtime_profile": {
-      "type": "string",
-      "minLength": 1
-    },
     "self_account_id": {
       "type": "string",
       "minLength": 1
@@ -102,6 +61,128 @@
     "timeout_seconds": {
       "type": "number",
       "exclusiveMinimum": 0
+    },
+    "host_executable": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to the authorized QQ Host child executable."
+    },
+    "host_args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute binding-private data directory."
+    },
+    "required_client_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "account_id": {
+      "type": [
+        "string",
+        "integer"
+      ],
+      "minimum": 1
+    },
+    "login_policy": {
+      "type": "string",
+      "enum": [
+        "existing_session",
+        "qr"
+      ],
+      "default": "existing_session"
+    },
+    "platform": {
+      "const": "linux-x86_64"
+    },
+    "startup_timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "shutdown_timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "secret_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": ["runtime_profile"],
+        "properties": {
+          "runtime_profile": {
+            "const": "qqnt-direct"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "host_executable",
+          "data_dir",
+          "required_client_version"
+        ],
+        "not": {
+          "anyOf": [
+            {"required": ["http_base_url"]},
+            {"required": ["websocket_url"]},
+            {"required": ["access_token"]},
+            {"required": ["transport_profile"]},
+            {"required": ["reverse_listen_host"]},
+            {"required": ["reverse_listen_port"]}
+          ]
+        }
+      },
+      "else": {
+        "anyOf": [
+          {"required": ["http_base_url"]},
+          {"required": ["websocket_url"]},
+          {
+            "required": ["transport_profile"],
+            "properties": {
+              "transport_profile": {
+                "const": "reverse_websocket"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": ["transport_profile"],
+        "properties": {
+          "transport_profile": {
+            "const": "http_api"
+          }
+        }
+      },
+      "then": {
+        "required": ["http_base_url"]
+      }
+    },
+    {
+      "if": {
+        "required": ["transport_profile"],
+        "properties": {
+          "transport_profile": {
+            "const": "forward_websocket"
+          }
+        }
+      },
+      "then": {
+        "required": ["websocket_url"]
+      }
+    }
+  ]
 }
