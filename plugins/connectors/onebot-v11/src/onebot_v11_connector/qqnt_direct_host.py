@@ -15,6 +15,7 @@ import os
 import re
 import signal
 import subprocess
+import sys
 import threading
 import time
 from collections.abc import Callable, Mapping
@@ -105,6 +106,8 @@ class QQHostClient:
         self._process: subprocess.Popen[bytes] | None = None
         self._reader_thread: threading.Thread | None = None
         self._stderr_thread: threading.Thread | None = None
+        self._listener_watch_thread: threading.Thread | None = None
+        self._listener_watch_stop = threading.Event()
         self._pending: dict[str, _PendingRequest] = {}
         self._request_counter = 0
         self._generation = 0
@@ -274,8 +277,15 @@ class QQHostClient:
                 name=f"qq-host-stderr-{self.binding_id}-{generation}",
                 daemon=True,
             )
+            self._listener_watch_stop.clear()
+            self._listener_watch_thread = threading.Thread(
+                target=self._listener_watch_loop,
+                name=f"qq-host-portless-{self.binding_id}-{generation}",
+                daemon=True,
+            )
             self._reader_thread.start()
             self._stderr_thread.start()
+            self._listener_watch_thread.start()
 
         try:
             report = self.request(
@@ -290,6 +300,7 @@ class QQHostClient:
                 timeout_seconds=self._config.startup_timeout_seconds,
             )
             self._validate_hello(report, generation)
+            _assert_no_tcp_listener(process)
         except QQHostError:
             self.close()
             raise
@@ -479,11 +490,19 @@ class QQHostClient:
         for thread in (self._reader_thread, self._stderr_thread):
             if thread is not None and thread is not threading.current_thread():
                 thread.join(timeout=self._config.shutdown_timeout_seconds)
+        self._listener_watch_stop.set()
+        listener_watch_thread = self._listener_watch_thread
+        if (
+            listener_watch_thread is not None
+            and listener_watch_thread is not threading.current_thread()
+        ):
+            listener_watch_thread.join(timeout=self._config.shutdown_timeout_seconds)
         self._fail_pending(QQHostError("CAPABILITY_UNAVAILABLE", "QQ Host stopped"))
         with self._state_lock:
             self._process = None
             self._reader_thread = None
             self._stderr_thread = None
+            self._listener_watch_thread = None
             self._state = "STOPPED"
         self._release_binding_lock()
 
@@ -637,6 +656,21 @@ class QQHostClient:
             if line:
                 self._record_diagnostic(line)
 
+    def _listener_watch_loop(self) -> None:
+        """Fail closed if the binding-local Host process tree opens TCP LISTEN."""
+
+        process = self._process
+        if process is None:
+            return
+        while not self._listener_watch_stop.wait(0.25):
+            try:
+                _assert_no_tcp_listener(process)
+            except QQHostError as exc:
+                self._fail_pending(exc)
+                self._mark_failed(exc.code, exc.message, process)
+                _terminate_process_tree(process, force=True)
+                return
+
     def _record_diagnostic(self, value: str) -> None:
         redacted = _REDACTED_DIAGNOSTIC.sub(r"\1\2<redacted>", value)[:512]
         with self._state_lock:
@@ -716,6 +750,91 @@ def _terminate_process_tree(
         (process.kill if force else process.terminate)()
     except ProcessLookupError:
         return
+
+
+def _assert_no_tcp_listener(process: subprocess.Popen[bytes]) -> None:
+    """Reject a Host process tree that owns an IPv4/IPv6 TCP listener.
+
+    The direct profile may use QQ's outbound network connections, but the
+    connector/Host IPC boundary is inherited stdio and must remain portless.
+    This Linux-only probe maps socket inodes held by the child and descendants
+    to the kernel's LISTEN tables.  Missing or already-exited /proc entries are
+    treated as a race with process shutdown, not as a listener.
+    """
+
+    if sys.platform != "linux" or process.poll() is not None:
+        return
+    listening_inodes = _linux_tcp_listening_inodes()
+    if not listening_inodes:
+        return
+    for pid in _linux_process_tree(process.pid):
+        fd_root = Path(f"/proc/{pid}/fd")
+        try:
+            entries = tuple(fd_root.iterdir())
+        except OSError:
+            continue
+        for entry in entries:
+            try:
+                target = os.readlink(entry)
+            except OSError:
+                continue
+            if not target.startswith("socket:[") or not target.endswith("]"):
+                continue
+            inode = target[8:-1]
+            if inode in listening_inodes:
+                raise QQHostError(
+                    "PROTOCOL_MISMATCH",
+                    "QQ Host process tree opened a TCP listener",
+                )
+
+
+def _linux_tcp_listening_inodes() -> set[str]:
+    """Return socket inodes in the Linux IPv4/IPv6 TCP LISTEN state."""
+
+    inodes: set[str] = set()
+    for table in ("/proc/net/tcp", "/proc/net/tcp6"):
+        try:
+            lines = Path(table).read_text(encoding="ascii").splitlines()[1:]
+        except OSError:
+            continue
+        for line in lines:
+            fields = line.split()
+            # /proc/net/tcp: sl local_address rem_address st ... uid timeout inode
+            if len(fields) > 9 and fields[3].upper() == "0A":
+                inodes.add(fields[9])
+    return inodes
+
+
+def _linux_process_tree(root_pid: int) -> tuple[int, ...]:
+    """Return a best-effort snapshot of one process and its descendants."""
+
+    parents: dict[int, int] = {}
+    proc_root = Path("/proc")
+    try:
+        entries = tuple(proc_root.iterdir())
+    except OSError:
+        return (root_pid,)
+    for entry in entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat_line = (entry / "stat").read_text(encoding="ascii")
+            closing = stat_line.rfind(")")
+            fields = stat_line[closing + 2 :].split()
+            # After the comm field: state, ppid, pgrp, ...
+            if len(fields) > 2:
+                parents[int(entry.name)] = int(fields[1])
+        except (OSError, ValueError):
+            continue
+    result = {root_pid}
+    changed = True
+    while changed:
+        changed = False
+        for pid, parent in parents.items():
+            if parent in result and pid not in result:
+                result.add(pid)
+                changed = True
+    return tuple(result)
 
 
 def _claim_binding_data_dir(data_dir: Path, binding_id: str) -> Any:
