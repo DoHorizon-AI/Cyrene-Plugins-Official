@@ -722,11 +722,12 @@ class QQNTDirectConnector:
             filter_value = _decode_filter(filter_payload)
             self._ensure_started()
             self._subscriptions[subscription_id] = _Subscription(emitter, filter_value)
-            self._call_operation(
-                "qq.message.subscribe",
-                {"events": ["message.received", "request.received"]},
-            )
-            self._subscription_generation = self.generation
+            if self._subscription_generation != self.generation:
+                self._call_operation(
+                    "qq.message.subscribe",
+                    {"events": ["message.received", "request.received"]},
+                )
+                self._subscription_generation = self.generation
         except ConnectorError as exc:
             if previous is None:
                 self._subscriptions.pop(subscription_id, None)

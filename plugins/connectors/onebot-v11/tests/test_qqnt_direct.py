@@ -919,6 +919,59 @@ def test_two_bindings_and_restart_keep_generation_and_events_isolated(
         second.close()
 
 
+def test_multiple_subscriptions_share_one_native_listener(tmp_path: Path) -> None:
+    operation_log = tmp_path / "subscription-operations.log"
+    config = _config(tmp_path, "qq-shared-listener")
+    config["host_args"].append(f"--operation-log={operation_log}")
+    connector = QQNTDirectConnector(config)
+    first_emitter = RecordingEmitter()
+    second_emitter = RecordingEmitter()
+    try:
+        assert (
+            connector.on_subscribe(
+                "sub-first", "message.connector.v1", b"{}", first_emitter
+            )
+            is None
+        )
+        assert (
+            connector.on_subscribe(
+                "sub-second", "message.connector.v1", b"{}", second_emitter
+            )
+            is None
+        )
+        assert operation_log.read_text(encoding="utf-8").splitlines().count(
+            "qq.message.subscribe"
+        ) == 1
+
+        first_before = len(first_emitter.events)
+        second_before = len(second_emitter.events)
+        delivered = connector.publish_inbound_event(
+            {
+                "event": "message.received",
+                "event_id": "shared-listener-event",
+                "payload": {
+                    "account_id": "10001",
+                    "message_id": "native-shared-message",
+                    "peer": {
+                        "kind": "group",
+                        "peer_uid": "group-peer-1",
+                        "group_code": "20001",
+                    },
+                    "sender": {"uid": "uid-20002", "uin": "20002"},
+                    "sequence": 3,
+                    "random": 5,
+                    "timestamp": 1700000000,
+                    "elements": [{"type": "text", "text": "shared"}],
+                },
+            }
+        )
+        assert delivered == 2
+        assert len(first_emitter.events) == first_before + 1
+        assert len(second_emitter.events) == second_before + 1
+    finally:
+        connector.close()
+
+
 def test_binding_data_directory_cannot_be_reused_by_another_binding(
     tmp_path: Path,
 ) -> None:
