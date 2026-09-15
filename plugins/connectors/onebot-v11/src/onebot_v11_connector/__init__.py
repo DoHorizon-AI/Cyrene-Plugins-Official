@@ -44,6 +44,15 @@ from .qqnt_direct import (
     QQNTDirectConfig,
     QQNTDirectConnector,
 )
+from .qqnt_direct_discovery import (
+    INSTALLATION_MANIFEST_SCHEMA,
+    SUPPORTED_PLATFORM,
+    QQInstallation,
+    QQInstallationError,
+    discover_explicit,
+    discover_manifest,
+    discover_manifests,
+)
 from .qqnt_direct_host import (
     QQ_HOST_PROTOCOL,
     QQ_HOST_PROTOCOL_VERSION,
@@ -93,6 +102,13 @@ __all__ = [
     "QQNTDirectConnector",
     "QQ_REQUEST_TYPE_URL",
     "QQ_RESPONSE_TYPE_URL",
+    "SUPPORTED_PLATFORM",
+    "INSTALLATION_MANIFEST_SCHEMA",
+    "QQInstallation",
+    "QQInstallationError",
+    "discover_explicit",
+    "discover_manifest",
+    "discover_manifests",
     "QQ_HOST_PROTOCOL",
     "QQ_HOST_PROTOCOL_VERSION",
     "QQHostClient",

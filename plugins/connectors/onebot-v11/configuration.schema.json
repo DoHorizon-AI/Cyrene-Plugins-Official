@@ -82,6 +82,12 @@
       "type": "string",
       "minLength": 1
     },
+    "installation_manifest": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/",
+      "description": "Absolute operator-authored QQ installation manifest."
+    },
     "account_id": {
       "type": [
         "string",
@@ -114,6 +120,41 @@
         "type": "string",
         "minLength": 1
       }
+    },
+    "max_restart_attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 2,
+      "description": "Maximum automatic crash recoveries in the rolling window."
+    },
+    "restart_window_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 3600,
+      "default": 60,
+      "description": "Rolling window used to bound automatic crash recovery."
+    },
+    "restart_backoff_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 60,
+      "default": 0.25,
+      "description": "Initial delay before an automatic crash recovery."
+    },
+    "restart_backoff_max_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 300,
+      "default": 5,
+      "description": "Maximum exponential backoff before an automatic recovery."
+    },
+    "crash_circuit_cooldown_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 3600,
+      "default": 60,
+      "description": "Cooldown after the automatic crash recovery budget is exhausted."
     }
   },
   "allOf": [

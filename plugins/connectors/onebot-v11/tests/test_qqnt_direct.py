@@ -30,7 +30,11 @@ from onebot_v11_connector import (
     ConnectorError,
     ConnectorPlugin,
     QQHostProtocolError,
+    QQInstallationError,
     QQNTDirectConnector,
+    discover_explicit,
+    discover_manifest,
+    discover_manifests,
     encode_frame,
     read_frame,
 )
@@ -96,6 +100,101 @@ def test_stdio_frame_is_big_endian_and_rejects_malformed_payloads() -> None:
         read_frame(BytesIO((1).to_bytes(4, "big") + b"["))
 
 
+def test_explicit_installation_discovery_canonicalizes_operator_paths(
+    tmp_path: Path,
+) -> None:
+    executable_link = tmp_path / "qq-host-link"
+    executable_link.symlink_to(Path(sys.executable))
+    data_dir = tmp_path / "nested" / ".." / "qq-data"
+    installation = discover_explicit(
+        executable_link,
+        data_dir,
+        "qq-test-1",
+    )
+    assert installation.host_executable == Path(sys.executable).resolve()
+    assert installation.data_dir == (tmp_path / "qq-data").resolve()
+    assert installation.platform == "linux-x86_64"
+    assert installation.architecture == "x86_64"
+    assert installation.source == "operator-path"
+
+
+def test_installation_manifest_requires_one_exact_candidate(tmp_path: Path) -> None:
+    manifest = tmp_path / "qq-installation.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "cyrene.qq.installation.v1",
+                "installation_id": "qq-test",
+                "host_executable": sys.executable,
+                "data_dir": str(tmp_path / "qq-data"),
+                "client_version": "qq-test-1",
+                "platform": "linux-x86_64",
+                "architecture": "x86_64",
+            }
+        ),
+        encoding="utf-8",
+    )
+    installation = discover_manifest(
+        manifest,
+        required_client_version="qq-test-1",
+    )
+    assert installation.installation_id == "qq-test"
+    assert installation.source.startswith("manifest:")
+    with pytest.raises(QQInstallationError, match="exactly one"):
+        discover_manifests(
+            [manifest, manifest],
+            required_client_version="qq-test-1",
+        )
+    with pytest.raises(QQInstallationError, match="no QQ installation"):
+        discover_manifests([], required_client_version="qq-test-1")
+
+
+def test_installation_manifest_rejects_build_drift(tmp_path: Path) -> None:
+    manifest = tmp_path / "qq-installation.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "cyrene.qq.installation.v1",
+                "host_executable": sys.executable,
+                "data_dir": str(tmp_path / "qq-data"),
+                "client_version": "qq-other-build",
+                "platform": "linux-x86_64",
+                "architecture": "x86_64",
+            }
+        ),
+        encoding="utf-8",
+    )
+    with pytest.raises(QQInstallationError, match="does not match"):
+        discover_manifest(manifest, required_client_version="qq-test-1")
+
+
+def test_direct_host_requires_manifest_paths_to_match_binding_config(
+    tmp_path: Path,
+) -> None:
+    config = _config(tmp_path, "qq-manifest-binding")
+    manifest = tmp_path / "qq-installation.json"
+    manifest.write_text(
+        json.dumps(
+            {
+                "schema": "cyrene.qq.installation.v1",
+                "host_executable": sys.executable,
+                "data_dir": config["data_dir"],
+                "client_version": "qq-test-1",
+                "platform": "linux-x86_64",
+                "architecture": "x86_64",
+            }
+        ),
+        encoding="utf-8",
+    )
+    config["installation_manifest"] = str(manifest)
+    connector = QQNTDirectConnector(config)
+    try:
+        result = connector.invoke_extension("qq.group.list", {"account_id": "10001"})
+        assert result["status"] == "accepted"
+    finally:
+        connector.close()
+
+
 def test_api_matrix_covers_every_fixed_operation() -> None:
     matrix = (Path(__file__).parents[1] / "QQNT_DIRECT_API_MATRIX.md").read_text(
         encoding="utf-8"
@@ -121,6 +220,24 @@ def test_direct_extension_rejects_undeclared_parameter_names(tmp_path: Path) -> 
         assert connector.generation == 0
     finally:
         connector.close()
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("max_restart_attempts", 6),
+        ("restart_window_seconds", float("nan")),
+        ("restart_backoff_seconds", -1),
+        ("crash_circuit_cooldown_seconds", float("inf")),
+    ],
+)
+def test_restart_supervision_settings_are_bounded(
+    tmp_path: Path, field: str, value: Any
+) -> None:
+    config = _config(tmp_path, "qq-invalid-supervision")
+    config[field] = value
+    with pytest.raises(ConnectorError, match=field):
+        QQNTDirectConnector(config)
 
 
 def test_direct_extension_rejects_cross_family_parameter_names(tmp_path: Path) -> None:
@@ -274,6 +391,53 @@ def test_password_login_updates_session_readiness(tmp_path: Path) -> None:
         )
         assert ok, result
         assert connector.state == "READY"
+    finally:
+        connector.close()
+
+
+def test_crashed_host_recovers_next_operation_without_replaying_the_failure(
+    tmp_path: Path,
+) -> None:
+    config = _config(tmp_path, "qq-crash-once", mode="crash_once")
+    config["restart_backoff_seconds"] = 0
+    connector = QQNTDirectConnector(config)
+    try:
+        with pytest.raises(ConnectorError) as error:
+            connector.invoke_extension("qq.group.list", {"account_id": "10001"})
+        assert error.value.code == "CAPABILITY_UNAVAILABLE"
+        deadline = time.monotonic() + 1.0
+        while connector.state != "FAILED" and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert connector.state == "FAILED"
+
+        result = connector.invoke_extension("qq.group.list", {"account_id": "10001"})
+        assert result["status"] == "accepted"
+        assert connector.generation == 2
+        assert connector._host.supervision["restart_attempts_in_window"] == 1  # noqa: SLF001
+    finally:
+        connector.close()
+
+
+def test_crash_recovery_budget_opens_binding_local_circuit(tmp_path: Path) -> None:
+    config = _config(tmp_path, "qq-crash-circuit", mode="crash_after_hello")
+    config["max_restart_attempts"] = 1
+    config["restart_backoff_seconds"] = 0
+    config["crash_circuit_cooldown_seconds"] = 60
+    connector = QQNTDirectConnector(config)
+    try:
+        for _ in range(2):
+            with pytest.raises(ConnectorError) as error:
+                connector.invoke_extension("qq.group.list", {"account_id": "10001"})
+            assert error.value.code == "CAPABILITY_UNAVAILABLE"
+            deadline = time.monotonic() + 1.0
+            while connector.state != "FAILED" and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert connector.state == "FAILED"
+
+        with pytest.raises(ConnectorError, match="circuit|budget") as error:
+            connector.invoke_extension("qq.group.list", {"account_id": "10001"})
+        assert error.value.code == "CAPABILITY_UNAVAILABLE"
+        assert connector._host.supervision["circuit_open"] is True  # noqa: SLF001
     finally:
         connector.close()
 
@@ -489,9 +653,10 @@ def test_binding_data_directory_cannot_be_reused_by_another_binding(
         assert error is not None
         assert "CAPABILITY_UNAVAILABLE" in error
         assert second.state == "FAILED"
-        assert first.invoke_extension("qq.group.list", {"account_id": "10001"})[
-            "status"
-        ] == "accepted"
+        assert (
+            first.invoke_extension("qq.group.list", {"account_id": "10001"})["status"]
+            == "accepted"
+        )
         marker = tmp_path / "qq-owner-first" / ".cyrene-binding-owner.json"
         metadata = json.loads(marker.read_text(encoding="utf-8"))
         assert metadata == {
@@ -501,6 +666,32 @@ def test_binding_data_directory_cannot_be_reused_by_another_binding(
     finally:
         first.close()
         second.close()
+
+
+def test_one_binding_cannot_start_two_active_host_processes(tmp_path: Path) -> None:
+    first = QQNTDirectConnector(_config(tmp_path, "qq-single-owner"))
+    second_config = _config(tmp_path, "qq-single-owner")
+    second = QQNTDirectConnector(second_config)
+    owner_marker = tmp_path / "qq-single-owner" / ".cyrene-binding-owner.json"
+    lock_path = tmp_path / "qq-single-owner" / ".cyrene-binding.lock"
+    try:
+        assert (
+            first.on_subscribe(
+                "sub-first", "message.connector.v1", b"{}", RecordingEmitter()
+            )
+            is None
+        )
+        error = second.on_subscribe(
+            "sub-second", "message.connector.v1", b"{}", RecordingEmitter()
+        )
+        assert error is not None
+        assert "CAPABILITY_UNAVAILABLE" in error
+        assert owner_marker.is_file()
+        assert not lock_path.exists()
+    finally:
+        first.close()
+        second.close()
+    assert not lock_path.exists()
 
 
 def test_timeout_cancellation_and_late_response_are_generation_safe(
@@ -546,9 +737,7 @@ def test_cancellation_sends_cancel_and_ignores_late_response(tmp_path: Path) -> 
 
 
 def test_out_of_order_and_duplicate_responses_are_correlated(tmp_path: Path) -> None:
-    connector = QQNTDirectConnector(
-        _config(tmp_path, "qq-order", mode="out_of_order")
-    )
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-order", mode="out_of_order"))
     try:
         connector.on_subscribe("sub", "message.connector.v1", b"{}", RecordingEmitter())
         with ThreadPoolExecutor(max_workers=2) as executor:
@@ -599,9 +788,7 @@ def test_duplicate_events_are_emitted_once(tmp_path: Path) -> None:
 
 
 def test_media_and_file_references_remain_bounded_and_typed(tmp_path: Path) -> None:
-    connector = QQNTDirectConnector(
-        _config(tmp_path, "qq-media", mode="media_file")
-    )
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-media", mode="media_file"))
     emitter = RecordingEmitter()
     try:
         assert (
@@ -635,7 +822,9 @@ def test_media_and_file_references_remain_bounded_and_typed(tmp_path: Path) -> N
         payload = message_contract.InboundMessagePayload.FromString(
             emitter.events[-1][1]
         )
-        assert payload.content[0].image.reference.remote_uri == "https://example.invalid/a"
+        assert (
+            payload.content[0].image.reference.remote_uri == "https://example.invalid/a"
+        )
         assert payload.content[1].file.reference.vendor_media.media_id == "file-1"
     finally:
         connector.close()
