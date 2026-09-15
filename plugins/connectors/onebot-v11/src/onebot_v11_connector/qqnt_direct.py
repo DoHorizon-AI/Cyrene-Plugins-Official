@@ -39,6 +39,7 @@ from .qqnt_direct_host import (
     QQHostLaunchConfig,
 )
 from .qqnt_direct_operations import (
+    allowed_qq_parameter_fields,
     get_qq_operation,
 )
 
@@ -234,6 +235,7 @@ class QQNTDirectConfig:
             required_client_version=self.required_client_version,
             platform=self.platform,
             timeout_seconds=self.timeout_seconds,
+            startup_timeout_seconds=self.startup_timeout_seconds,
             shutdown_timeout_seconds=self.shutdown_timeout_seconds,
         )
 
@@ -303,6 +305,8 @@ class QQNTDirectConnector:
     def state(self) -> str:
         """Return the connector lifecycle state."""
 
+        if self._host is not None and self._host.state == "FAILED":
+            return "FAILED"
         return self._state
 
     @property
@@ -466,6 +470,12 @@ class QQNTDirectConnector:
         if {"service", "method", "raw_payload"}.intersection(params):
             raise ConnectorError(
                 "INVALID_REQUEST", "QQ operation params contain reserved fields"
+            )
+        unknown = set(params).difference(allowed_qq_parameter_fields(operation))
+        if unknown:
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                f"QQ operation params contain undeclared fields: {sorted(unknown)}",
             )
         if operation == "qq.login.password" and (
             "password" in params
@@ -703,6 +713,8 @@ class QQNTDirectConnector:
                 cancellation=cancellation,
             )
         except QQHostError as exc:
+            if exc.code in {"LOGIN_FAILED", "ACCOUNT_MISMATCH"}:
+                self._state = "FAILED"
             raise _connector_host_error(exc) from exc
 
     def _update_session_state(self, result: Any) -> None:
@@ -720,7 +732,17 @@ class QQNTDirectConnector:
                 "ACCOUNT_MISMATCH", "QQ Host account does not match binding"
             )
         state = result.get("state")
-        if state in {"ready", "online", "logged_in"} or result.get("ready") is True:
+        ready = state in {"ready", "online", "logged_in"} or result.get("ready") is True
+        if (
+            ready
+            and expected is not None
+            and (account_id is None or str(account_id) != expected)
+        ):
+            self._state = "FAILED"
+            raise ConnectorError(
+                "ACCOUNT_MISMATCH", "QQ Host ready account is missing or mismatched"
+            )
+        if ready:
             self._state = "READY"
         elif state in {"login_required", "qr_required", "offline"}:
             self._state = "LOGIN_REQUIRED"
@@ -810,6 +832,8 @@ def _connector_host_error(error: QQHostError) -> ConnectorError:
         "UNSUPPORTED_VERSION": "UNSUPPORTED_VERSION",
         "ACCOUNT_MISMATCH": "ACCOUNT_MISMATCH",
         "LOGIN_REQUIRED": "LOGIN_REQUIRED",
+        "LOGIN_FAILED": "CAPABILITY_UNAVAILABLE",
+        "UNKNOWN_OPERATION": "UNKNOWN_OPERATION",
     }
     return ConnectorError(
         mapping.get(error.code, "CAPABILITY_UNAVAILABLE"), error.message

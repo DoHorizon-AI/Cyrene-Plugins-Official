@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import os
 import re
+import signal
 import subprocess
 import threading
 import time
@@ -20,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from .qqnt_direct_operations import allowed_qq_parameter_fields, get_qq_operation
 from .qqnt_direct_protocol import QQHostProtocolError, read_frame, write_frame
 
 QQ_HOST_PROTOCOL = "cyrene.qq.host.v1"
@@ -48,6 +50,7 @@ class QQHostLaunchConfig:
     required_client_version: str
     platform: str
     timeout_seconds: float
+    startup_timeout_seconds: float
     shutdown_timeout_seconds: float
 
 
@@ -139,7 +142,19 @@ class QQHostClient:
             self._generation += 1
             generation = self._generation
             self._state = "STARTING"
-            self._config.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+            try:
+                if self._config.data_dir.is_symlink():
+                    raise OSError("binding data directory must not be a symlink")
+                self._config.data_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+                if not self._config.data_dir.is_dir():
+                    raise OSError("binding data path is not a directory")
+                if os.name == "posix":
+                    os.chmod(self._config.data_dir, 0o700)
+            except OSError as exc:
+                self._state = "FAILED"
+                raise QQHostError(
+                    "CAPABILITY_UNAVAILABLE", "QQ Host data directory is unusable"
+                ) from exc
             environment = os.environ.copy()
             environment.update(
                 {
@@ -149,15 +164,19 @@ class QQHostClient:
                 }
             )
             try:
-                process = subprocess.Popen(
-                    list(self._config.command),
-                    cwd=self._config.data_dir,
-                    env=environment,
-                    stdin=subprocess.PIPE,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    close_fds=True,
-                )
+                popen_kwargs: dict[str, Any] = {
+                    "cwd": self._config.data_dir,
+                    "env": environment,
+                    "stdin": subprocess.PIPE,
+                    "stdout": subprocess.PIPE,
+                    "stderr": subprocess.PIPE,
+                    "close_fds": True,
+                }
+                if os.name == "posix":
+                    popen_kwargs["start_new_session"] = True
+                elif hasattr(subprocess, "CREATE_NEW_PROCESS_GROUP"):
+                    popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+                process = subprocess.Popen(list(self._config.command), **popen_kwargs)
             except (OSError, ValueError) as exc:
                 self._state = "FAILED"
                 raise QQHostError(
@@ -187,6 +206,7 @@ class QQHostClient:
                     "platform": self._config.platform,
                     "required_client_version": self._config.required_client_version,
                 },
+                timeout_seconds=self._config.startup_timeout_seconds,
             )
             self._validate_hello(report, generation)
         except QQHostError:
@@ -225,9 +245,23 @@ class QQHostClient:
             raise QQHostError(
                 "INVALID_REQUEST", "Host operation params contain reserved fields"
             )
+        if operation != "hello" and get_qq_operation(operation) is None:
+            raise QQHostError(
+                "UNKNOWN_OPERATION", f"unsupported QQ operation {operation}"
+            )
+        if operation != "hello":
+            unknown = set(params).difference(allowed_qq_parameter_fields(operation))
+            if unknown:
+                raise QQHostError(
+                    "INVALID_REQUEST",
+                    f"QQ operation params contain undeclared fields: {sorted(unknown)}",
+                )
         with self._state_lock:
             process = self._process
             generation = self._generation
+            state = self._state
+        if state in {"FAILED", "DRAINING", "STOPPED"}:
+            raise QQHostError("CAPABILITY_UNAVAILABLE", "QQ Host is unavailable")
         if process is None or process.poll() is not None:
             raise QQHostError("CAPABILITY_UNAVAILABLE", "QQ Host is not running")
         with self._pending_lock:
@@ -293,12 +327,16 @@ class QQHostClient:
             try:
                 process.wait(timeout=self._config.shutdown_timeout_seconds)
             except subprocess.TimeoutExpired:
-                process.terminate()
+                _terminate_process_tree(process, force=False)
                 try:
                     process.wait(timeout=self._config.shutdown_timeout_seconds)
                 except subprocess.TimeoutExpired:
-                    process.kill()
+                    _terminate_process_tree(process, force=True)
                     process.wait(timeout=self._config.shutdown_timeout_seconds)
+        # A well-behaved Host exits on shutdown, but it may have spawned
+        # binding-local helpers.  Reap that process group even after the
+        # leader has already exited.
+        _terminate_process_tree(process, force=True, include_exited=True)
         for stream in (process.stdin, process.stdout, process.stderr):
             if stream is not None:
                 stream.close()
@@ -391,6 +429,12 @@ class QQHostClient:
             self._fail_pending(
                 QQHostError("CAPABILITY_UNAVAILABLE", "QQ Host closed stdio")
             )
+            with self._state_lock:
+                if (
+                    self._process is process
+                    and self._state not in {"DRAINING", "STOPPED"}
+                ):
+                    self._state = "FAILED"
 
     def _handle_response(self, message: Mapping[str, Any]) -> None:
         request_id = message.get("request_id")
@@ -423,6 +467,8 @@ class QQHostClient:
             or message.get("generation") != self.generation
         ):
             raise QQHostProtocolError("QQ Host event crossed binding or generation")
+        if not isinstance(message.get("event_id"), str) or not message["event_id"]:
+            raise QQHostProtocolError("QQ Host event has no event_id")
         event = message.get("event")
         if not isinstance(event, str) or not event:
             raise QQHostProtocolError("QQ Host event has no event name")
@@ -460,3 +506,25 @@ class QQHostClient:
         for item in pending:
             item.error = error
             item.completed.set()
+
+
+def _terminate_process_tree(
+    process: subprocess.Popen[bytes], *, force: bool, include_exited: bool = False
+) -> None:
+    """Terminate the binding-local process group without touching other bindings."""
+
+    if process.poll() is not None and not include_exited:
+        return
+    if os.name == "posix":
+        try:
+            os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+            return
+        except ProcessLookupError:
+            return
+        except OSError:
+            # Fall back to the child handle if the process group disappeared.
+            pass
+    try:
+        (process.kill if force else process.terminate)()
+    except ProcessLookupError:
+        return
