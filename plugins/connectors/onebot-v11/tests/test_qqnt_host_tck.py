@@ -125,6 +125,12 @@ def test_qq_host_tck_rejects_passthrough_and_callback_only_requests(
             ("qq.kernel.raw", {}, "UNKNOWN_OPERATION"),
             ("qq.message.send_completion", {}, "UNSUPPORTED_OPERATION"),
             ("qq.group.list", {"not_declared": True}, "INVALID_REQUEST"),
+            ("qq.group.list", {"account_id": True}, "INVALID_REQUEST"),
+            (
+                "qq.group.list",
+                {"account_id": "10001", "count": -1},
+                "INVALID_REQUEST",
+            ),
         )
         for operation, params, code in invalid_requests:
             with pytest.raises(QQHostError) as error:
