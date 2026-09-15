@@ -22,6 +22,7 @@ class QQOperation:
     method: str
     priority: str
     mapping: str
+    requestable: bool = True
 
 
 def _op(
@@ -30,8 +31,10 @@ def _op(
     method: str,
     priority: str,
     mapping: str,
+    *,
+    requestable: bool = True,
 ) -> QQOperation:
-    return QQOperation(name, service, method, priority, mapping)
+    return QQOperation(name, service, method, priority, mapping, requestable)
 
 
 # This table is the executable counterpart of QQNT_DIRECT_API_MATRIX.md. The
@@ -53,7 +56,7 @@ QQ_OPERATIONS = (
     _op("qq.login.poll", "NodeIKernelLoginService", "startPolling", "P0", "login"),
     _op(
         "qq.login.self_status",
-        "NodeIKernelLoginService",
+        "NodeIKernelProfileService",
         "getSelfStatus",
         "P0",
         "login",
@@ -86,6 +89,7 @@ QQ_OPERATIONS = (
         "onMsgInfoListUpdate",
         "P0",
         "send_message",
+        requestable=False,
     ),
     _op("qq.peer.uid_by_uin", "NodeIKernelProfileService", "getUidByUin", "P0", "peer"),
     _op("qq.peer.uin_by_uid", "NodeIKernelProfileService", "getUinByUid", "P0", "peer"),
@@ -196,6 +200,7 @@ QQ_OPERATIONS = (
         "onRichMediaDownloadComplete",
         "P1",
         "media",
+        requestable=False,
     ),
     _op(
         "qq.file.list", "NodeIKernelRichMediaService", "getGroupFileList", "P1", "file"
@@ -383,6 +388,9 @@ QQ_OPERATIONS = (
 
 QQ_OPERATION_BY_NAME = {operation.name: operation for operation in QQ_OPERATIONS}
 QQ_OPERATION_NAMES = tuple(operation.name for operation in QQ_OPERATIONS)
+CALLBACK_ONLY_OPERATION_NAMES = frozenset(
+    operation.name for operation in QQ_OPERATIONS if not operation.requestable
+)
 
 # These are the only top-level parameter names that may cross the worker/Host
 # boundary.  The native Host still owns exact overload validation for the

@@ -57,17 +57,11 @@ from onebot_v11_connector.qqnt_direct import (
     QQNTDirectConnector,
 )
 from onebot_v11_connector.qqnt_direct_operations import (
+    CALLBACK_ONLY_OPERATION_NAMES,
     QQ_OPERATION_BY_NAME,
     get_qq_operation,
 )
 
-_CALLBACK_ONLY_OPERATIONS = frozenset(
-    {
-        "qq.message.subscribe",
-        "qq.message.send_completion",
-        "qq.media.download_complete",
-    }
-)
 _REQUIRED_REAL_SMOKE_OPERATIONS = frozenset(
     {
         "qq.message.history_include_self",
@@ -187,7 +181,7 @@ def _load_scenario() -> dict[str, Any]:
             raise SmokeConfigurationError(
                 "smoke scenario contains an unknown operation"
             )
-        if operation in _CALLBACK_ONLY_OPERATIONS:
+        if operation in CALLBACK_ONLY_OPERATION_NAMES:
             raise SmokeConfigurationError(
                 "smoke scenario cannot invoke callback-only operations"
             )
@@ -520,6 +514,14 @@ def _run_smoke() -> dict[str, Any]:
         evidence["inbound_events"] = len(
             [event for event in emitter.events if event[0] == "inbound_message"]
         )
+        offline = _operation_result(
+            connector, "qq.login.offline", {"account_id": account_id}
+        )
+        evidence["offline"] = {"status": offline["status"]}
+        if connector.state != "LOGIN_REQUIRED":
+            raise SmokeConfigurationError(
+                "QQ Host offline operation did not enter LOGIN_REQUIRED"
+            )
     finally:
         connector.close()
     if connector.state != "STOPPED":

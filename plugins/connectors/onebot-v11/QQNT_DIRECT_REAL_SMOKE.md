@@ -169,6 +169,7 @@ The scenario must use a dedicated account and reversible P2 values.
 - accepted fixed operation names with priority and registered Service/method;
 - private/group send acceptance and presence of native message IDs;
 - count of canonical inbound events;
+- clean `qq.login.offline` acceptance and transition to `LOGIN_REQUIRED`;
 - clean shutdown and restart binding/account identity checks.
 
 It never writes raw QQ responses, message contents, session files, passwords,

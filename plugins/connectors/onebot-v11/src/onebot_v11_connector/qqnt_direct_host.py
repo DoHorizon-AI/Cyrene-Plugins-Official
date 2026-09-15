@@ -364,9 +364,15 @@ class QQHostClient:
             raise QQHostError(
                 "INVALID_REQUEST", "Host operation params contain reserved fields"
             )
-        if operation != "hello" and get_qq_operation(operation) is None:
+        spec = get_qq_operation(operation) if operation != "hello" else None
+        if operation != "hello" and spec is None:
             raise QQHostError(
                 "UNKNOWN_OPERATION", f"unsupported QQ operation {operation}"
+            )
+        if spec is not None and not spec.requestable:
+            raise QQHostError(
+                "UNSUPPORTED_OPERATION",
+                f"QQ operation {operation} is callback-only",
             )
         if operation != "hello":
             unknown = set(params).difference(allowed_qq_parameter_fields(operation))
