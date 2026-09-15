@@ -157,6 +157,16 @@ generic QQ events. The callback record is published as typed
 不匹配的 request ID 会被丢弃，不会降级成通用 QQ 事件。回调记录通过类型化的
 `type.cyrene.io/qq.client.v1.Callback` 发布，不能作为请求调用。
 
+Completion records are terminal: after the first valid callback consumes the
+originating request identity, later callbacks for the same request are
+dropped even when they use a different event ID. Callback identity fields
+(`peer_uid`, `peer_uin`, `group_code`, `user_uid`, and `user_uin`) remain
+independent values and are never inferred from one another.
+
+完成回调是终态记录：首个合法回调消费原始请求身份后，同一请求的后续回调即使使用不同
+event ID 也会丢弃。回调中的 `peer_uid`、`peer_uin`、`group_code`、`user_uid` 和
+`user_uin` 保持为相互独立的值，不会互相推断。
+
 The three `qq.session.*` operations are explicit lifecycle actions. Calling
 one does not implicitly execute the other two; ordinary message or extension
 operations perform the missing ordered bootstrap stages once per Host
@@ -182,6 +192,14 @@ Its green tests prove framing, lifecycle, and mapping mechanics, not official
 QQ compatibility. Real API rows remain `NOT_RUN` until the exact authorized
 QQ build is exercised.
 
+Only the named `message.received`, `request.received`, and fixed completion
+events cross the application seam. Events from additional QQ services are
+dropped until they receive an explicit contract and matrix entry; they are not
+forwarded as an untyped generic event.
+
 仓库中的 fake Host 只是独立编写的协议测试 fixture。其测试通过只证明分帧、生命周期和
 映射机制，不证明官方 QQ 兼容性。精确授权 QQ build 未实测前，真实 API 行保持
 `NOT_RUN`。
+
+只有命名的 `message.received`、`request.received` 和固定完成回调可以跨越应用边界。其他
+QQ Service 事件在拥有明确契约和矩阵条目之前会被丢弃，不会作为无类型通用事件转发。

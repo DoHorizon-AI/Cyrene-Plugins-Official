@@ -226,9 +226,7 @@ def test_operation_schema_fields_match_the_executable_allow_list() -> None:
     assert set(methods) == set(QQ_OPERATION_NAMES)
     for operation in QQ_OPERATION_NAMES:
         definition_name = operation.replace(".", "_") + "_request"
-        assert methods[operation]["inputSchema"].endswith(
-            f"#/$defs/{definition_name}"
-        )
+        assert methods[operation]["inputSchema"].endswith(f"#/$defs/{definition_name}")
         fields = set(
             schema["$defs"][definition_name]["properties"]["params"]["properties"]
         )
@@ -897,9 +895,7 @@ def test_canonical_send_preserves_qq_peer_and_delivery_facts(
         assert ok
         response = message_contract.DeliveryResult.FromString(result.value)
         assert response.vendor_extension.vendor == "qq"
-        assert {
-            item.name: item.value for item in response.vendor_extension.facts
-        } == {
+        assert {item.name: item.value for item in response.vendor_extension.facts} == {
             "qq_group_code": "30001",
             "qq_peer_uin": "20001",
             "qq_sequence": "7",
@@ -935,6 +931,8 @@ def test_inbound_preserves_all_qq_peer_identity_facts(tmp_path: Path) -> None:
                 {
                     "event": "message.received",
                     "event_id": "private-peer-facts",
+                    "binding_id": "qq-peer-facts",
+                    "generation": 1,
                     "payload": {
                         "account_id": "10001",
                         "message_id": "private-message-1",
@@ -1053,16 +1051,76 @@ def test_send_completion_callback_is_typed_and_request_correlated(
             "sequence": 7,
             "random": 11,
             "peer_uid": "peer-1",
+            "peer_uin": "20001",
+            "group_code": "30001",
+            "user_uid": "user-20001",
+            "user_uin": "20001",
             "status": "completed",
         }
-        assert connector.publish_inbound_event(
-            {
-                "event": "message.send_completion",
-                "event_id": "unrelated",
-                "request_id": "qq-callbacks:1:999",
-                "payload": {"message_id": "wrong"},
-            }
-        ) == 0
+        assert (
+            connector.publish_inbound_event(
+                {
+                    "event": "message.send_completion",
+                    "event_id": "unrelated",
+                    "request_id": "qq-callbacks:1:999",
+                    "binding_id": "qq-callbacks",
+                    "generation": 1,
+                    "payload": {"message_id": "wrong"},
+                }
+            )
+            == 0
+        )
+        assert (
+            connector.publish_inbound_event(
+                {
+                    "event": "message.send_completion",
+                    "event_id": "different-event-id",
+                    "request_id": "qq-callbacks:1:6",
+                    "binding_id": "qq-callbacks",
+                    "generation": 1,
+                    "payload": {"message_id": "duplicate"},
+                }
+            )
+            == 0
+        )
+    finally:
+        connector.close()
+
+
+def test_direct_event_boundary_rejects_unknown_and_cross_generation_events(
+    tmp_path: Path,
+) -> None:
+    """Only named, current-generation events may enter the application seam."""
+
+    connector = QQNTDirectConnector(_config(tmp_path, "qq-event-boundary"))
+    emitter = RecordingEmitter()
+    try:
+        assert (
+            connector.on_subscribe("sub", "message.connector.v1", b"{}", emitter)
+            is None
+        )
+        emitter.events.clear()
+        base_event = {
+            "event": "message.received",
+            "event_id": "boundary-event",
+            "binding_id": "qq-event-boundary",
+            "generation": 1,
+            "payload": {},
+        }
+        assert (
+            connector.publish_inbound_event({**base_event, "event": "qq.unknown"}) == 0
+        )
+        assert (
+            connector.publish_inbound_event({**base_event, "binding_id": "other"}) == 0
+        )
+        assert connector.publish_inbound_event({**base_event, "generation": 2}) == 0
+        assert (
+            connector.publish_inbound_event(
+                {key: value for key, value in base_event.items() if key != "binding_id"}
+            )
+            == 0
+        )
+        assert emitter.events == []
     finally:
         connector.close()
 
@@ -1141,9 +1199,12 @@ def test_multiple_subscriptions_share_one_native_listener(tmp_path: Path) -> Non
             )
             is None
         )
-        assert operation_log.read_text(encoding="utf-8").splitlines().count(
-            "qq.message.subscribe"
-        ) == 1
+        assert (
+            operation_log.read_text(encoding="utf-8")
+            .splitlines()
+            .count("qq.message.subscribe")
+            == 1
+        )
 
         first_before = len(first_emitter.events)
         second_before = len(second_emitter.events)
@@ -1151,6 +1212,8 @@ def test_multiple_subscriptions_share_one_native_listener(tmp_path: Path) -> Non
             {
                 "event": "message.received",
                 "event_id": "shared-listener-event",
+                "binding_id": "qq-shared-listener",
+                "generation": 1,
                 "payload": {
                     "account_id": "10001",
                     "message_id": "native-shared-message",
@@ -1344,6 +1407,8 @@ def test_media_and_file_references_remain_bounded_and_typed(tmp_path: Path) -> N
             {
                 "event": "message.received",
                 "event_id": "manual-media-event",
+                "binding_id": "qq-media",
+                "generation": 1,
                 "payload": {
                     "account_id": "10001",
                     "message_id": "native-media-message",
@@ -1373,6 +1438,8 @@ def test_media_and_file_references_remain_bounded_and_typed(tmp_path: Path) -> N
                 {
                     "event": "message.received",
                     "event_id": "invalid-media-event",
+                    "binding_id": "qq-media",
+                    "generation": 1,
                     "payload": {
                         "account_id": "10001",
                         "message_id": "invalid-media-message",

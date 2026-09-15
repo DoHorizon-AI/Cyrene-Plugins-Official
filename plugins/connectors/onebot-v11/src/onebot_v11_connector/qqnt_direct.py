@@ -14,6 +14,7 @@ from __future__ import annotations
 import json
 import math
 import re
+import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,6 +70,13 @@ _CALLBACK_OPERATION_BY_EVENT = {
         {"qq.media.download", "qq.file.download"},
     ),
 }
+_SUPPORTED_EVENT_NAMES = frozenset(
+    {
+        "message.received",
+        "request.received",
+        *tuple(_CALLBACK_OPERATION_BY_EVENT),
+    }
+)
 _QQ_PEER_FACT_TO_NATIVE_FIELD = {
     "qq_peer_uid": "peer_uid",
     "qq_peer_uin": "peer_uin",
@@ -376,6 +384,7 @@ class QQNTDirectConnector:
         self._subscriptions: dict[str, _Subscription] = {}
         self._subscription_generation: int | None = None
         self._callback_requests: dict[str, str] = {}
+        self._callback_lock = threading.Lock()
         self._seen_events: set[tuple[str, int, str]] = set()
         self._state = "CREATED"
         if config is not None:
@@ -835,7 +844,8 @@ class QQNTDirectConnector:
             self._session_bootstrap_stage = 0
             self._session_generation = self._host.generation
             self._subscription_generation = None
-            self._callback_requests.clear()
+            with self._callback_lock:
+                self._callback_requests.clear()
             self._state = "NATIVE_READY"
 
     def _finish_startup(self) -> None:
@@ -883,6 +893,7 @@ class QQNTDirectConnector:
             "qq.media.download",
             "qq.file.download",
         }:
+
             def remember_request(request_id: str) -> None:
                 self._remember_callback_request(request_id, operation)
 
@@ -905,10 +916,11 @@ class QQNTDirectConnector:
 
         if not isinstance(request_id, str) or not request_id:
             return
-        self._callback_requests[request_id] = operation
-        overflow = len(self._callback_requests) - _MAX_CALLBACK_REQUESTS
-        for old_request_id in tuple(self._callback_requests)[: max(0, overflow)]:
-            del self._callback_requests[old_request_id]
+        with self._callback_lock:
+            self._callback_requests[request_id] = operation
+            overflow = len(self._callback_requests) - _MAX_CALLBACK_REQUESTS
+            for old_request_id in tuple(self._callback_requests)[: max(0, overflow)]:
+                del self._callback_requests[old_request_id]
 
     def _update_session_state(self, result: Any) -> None:
         if not isinstance(result, Mapping):
@@ -949,6 +961,13 @@ class QQNTDirectConnector:
         payload = event.get("payload", event)
         if not isinstance(event_name, str) or not isinstance(payload, Mapping):
             return 0
+        if event_name not in _SUPPORTED_EVENT_NAMES:
+            return 0
+        if (
+            event.get("binding_id") != self.configured_binding_id
+            or event.get("generation") != self.generation
+        ):
+            return 0
         event_id = (
             event.get("event_id")
             or payload.get("message_id")
@@ -987,27 +1006,31 @@ class QQNTDirectConnector:
                 request_id = event.get("request_id")
                 if not isinstance(request_id, str):
                     request_id = payload.get("request_id")
-                if (
-                    not isinstance(request_id, str)
-                    or self._callback_requests.get(request_id)
-                    not in originating_operations
-                ):
+                if not isinstance(request_id, str):
+                    # A callback without a generation-scoped originating
+                    # request is ambiguous; never expose it as a generic event.
+                    return 0
+                with self._callback_lock:
+                    originating_operation = self._callback_requests.get(request_id)
+                if originating_operation not in originating_operations:
                     # A callback without a generation-scoped originating
                     # request is ambiguous; never expose it as a generic event.
                     return 0
                 normalized_callback = _normalize_callback(
                     callback_operation, request_id, event.get("event_id"), payload
                 )
+                with self._callback_lock:
+                    # Completion callbacks are terminal records. Consuming the
+                    # request identity makes a second callback with a different
+                    # event_id harmless as well as making same-id duplicates
+                    # harmless through the event-id deduplication above.
+                    self._callback_requests.pop(request_id, None)
                 return self._emit(
                     "qq_callback", normalized_callback, QQ_CALLBACK_TYPE_URL
                 )
         except ConnectorError:
             return 0
-        return self._emit(
-            "qq_event",
-            {"event": event_name, "payload": _bounded_event_payload(payload)},
-            QQ_RESPONSE_TYPE_URL,
-        )
+        return 0
 
     def _emit(self, event_type: str, value: Any, type_url: str) -> int:
         if event_type in {INBOUND_MESSAGE_EVENT_TYPE, INBOUND_REQUEST_EVENT_TYPE}:
@@ -1305,9 +1328,7 @@ def _native_reference(value: Any, field: str) -> dict[str, str]:
     reference = _mapping(value, field)
     remote = reference.get("remote_uri")
     if remote is not None:
-        return {
-            "remote_uri": _validated_remote_uri(remote, f"{field}.remote_uri")
-        }
+        return {"remote_uri": _validated_remote_uri(remote, f"{field}.remote_uri")}
     vendor_media = _mapping(reference.get("vendor_media"), f"{field}.vendor_media")
     if vendor_media.get("vendor") != QQ_VENDOR:
         raise ConnectorError(
@@ -1646,16 +1667,34 @@ def _normalize_callback(
         "account_id",
         "message_id",
         "peer_uid",
+        "peer_uin",
+        "group_code",
+        "user_uid",
+        "user_uin",
+        "group_id",
+        "user_id",
+        "member_uid",
+        "member_uin",
         "media_id",
         "file_id",
+        "file_uuid",
         "element_id",
     }
     for key in (
         "account_id",
         "message_id",
         "peer_uid",
+        "peer_uin",
+        "group_code",
+        "user_uid",
+        "user_uin",
+        "group_id",
+        "user_id",
+        "member_uid",
+        "member_uin",
         "media_id",
         "file_id",
+        "file_uuid",
         "element_id",
         "sequence",
         "random",
@@ -1691,16 +1730,6 @@ def _normalize_callback(
                 error_map.get("message"), "callback.error.message"
             )[:512],
         }
-    return result
-
-
-def _bounded_event_payload(value: Mapping[str, Any]) -> dict[str, Any]:
-    """Return non-sensitive scalar facts for an unmodeled QQ event."""
-
-    result: dict[str, Any] = {}
-    for key, item in value.items():
-        if isinstance(item, (str, int, float, bool)):
-            result[str(key)[:64]] = str(item)[:2_048]
     return result
 
 
