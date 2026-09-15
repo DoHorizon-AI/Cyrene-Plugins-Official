@@ -113,7 +113,7 @@ Host 提供这些值时，入站消息和发送结果也会以独立 QQ fact 暴
 
 | Area / 领域 | Rule / 规则 | Evidence state / 证据状态 |
 | --- | --- | --- |
-| Correlation | `binding_id + generation + request_id`; UID, UIN, peer UID, group code, message ID, sequence, and random remain separate values. Callback records require a matching originating request and are typed. | Fake Host tested; real `NOT_RUN` |
+| Correlation | `binding_id + generation + request_id`; UID, UIN, peer UID, group code, message ID, sequence, and random remain separate values. Callback records require a matching originating request, preserve peer identity fields independently, and are consumed once. Unknown event names are dropped. | Fake Host tested; real `NOT_RUN` |
 | Timeout/cancel | Bounded deadline; cancellation sends a control frame; removed requests ignore late responses; no implicit side-effect retry. | Fake Host tested; real `NOT_RUN` |
 | Account/session | Exact configured platform/build/ABI and optional expected account; missing or mismatched ready account fails closed. | Fake Host tested; real `NOT_RUN` |
 | Media/files | Only HTTP(S) URI or binding-private QQ media reference crosses the canonical seam; no Product-local path or unbounded content. | Schema and mapper tested; real `NOT_RUN` |

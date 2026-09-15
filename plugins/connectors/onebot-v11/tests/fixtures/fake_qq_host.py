@@ -255,9 +255,7 @@ def _semantic_result(operation: Any, params: Any) -> dict[str, Any]:
     if operation.startswith(("qq.group.", "qq.friend.", "qq.profile.")):
         return {
             "status": "accepted",
-            "target_id": str(
-                values.get("group_id", values.get("uid", "target-1"))
-            ),
+            "target_id": str(values.get("group_id", values.get("uid", "target-1"))),
         }
     if operation.startswith("qq.search."):
         return {
@@ -446,9 +444,7 @@ def main() -> int:
         if request_log:
             with open(request_log, "a", encoding="utf-8") as log:
                 log.write(
-                    json.dumps(
-                        message, ensure_ascii=False, separators=(",", ":")
-                    )
+                    json.dumps(message, ensure_ascii=False, separators=(",", ":"))
                 )
                 log.write("\n")
         if mode in {"timeout", "cancel"} and operation == "qq.group.detail":
@@ -502,6 +498,10 @@ def main() -> int:
                         "sequence": send_result.get("sequence"),
                         "random": send_result.get("random"),
                         "peer_uid": send_result.get("peer_uid"),
+                        "peer_uin": "20001",
+                        "group_code": "30001",
+                        "user_uid": "user-20001",
+                        "user_uin": "20001",
                         "status": "completed",
                     },
                 }
