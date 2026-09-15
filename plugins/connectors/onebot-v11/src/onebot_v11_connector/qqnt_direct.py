@@ -495,11 +495,16 @@ class QQNTDirectConnector:
             operation, dict(params), cancellation=cancellation
         )
         _raise_if_cancelled(cancellation)
-        if operation == "qq.session.start_nt" or operation in {
+        if operation == "qq.login.offline":
+            self._state = "LOGIN_REQUIRED"
+        elif operation in {
+            "qq.session.start_nt",
             "qq.login.connect",
             "qq.login.online",
+            "qq.login.password",
             "qq.login.poll",
             "qq.login.quick",
+            "qq.login.self_status",
         }:
             self._update_session_state(result)
         return {

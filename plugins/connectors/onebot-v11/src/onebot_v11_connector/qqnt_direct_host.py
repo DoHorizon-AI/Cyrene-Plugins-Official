@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import signal
@@ -17,6 +18,7 @@ import subprocess
 import threading
 import time
 from collections.abc import Callable, Mapping
+from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -29,6 +31,7 @@ QQ_HOST_PROTOCOL_VERSION = "1"
 _REDACTED_DIAGNOSTIC = re.compile(
     r"(?i)(password|token|secret|ticket|cookie)(\s*[:=]\s*)\S+"
 )
+_BINDING_OWNER_FILE = ".cyrene-binding-owner.json"
 
 
 class QQHostError(RuntimeError):
@@ -150,6 +153,7 @@ class QQHostClient:
                     raise OSError("binding data path is not a directory")
                 if os.name == "posix":
                     os.chmod(self._config.data_dir, 0o700)
+                _claim_binding_data_dir(self._config.data_dir, self.binding_id)
             except OSError as exc:
                 self._state = "FAILED"
                 raise QQHostError(
@@ -528,3 +532,51 @@ def _terminate_process_tree(
         (process.kill if force else process.terminate)()
     except ProcessLookupError:
         return
+
+
+def _claim_binding_data_dir(data_dir: Path, binding_id: str) -> None:
+    """Claim one data directory for a single binding identity.
+
+    The marker is deliberately small and contains no account secret or QQ
+    session material.  Existing QQ data may remain in the directory, but a
+    second binding cannot silently reuse the same root after the first binding
+    has claimed it.
+    """
+
+    marker = data_dir / _BINDING_OWNER_FILE
+    if marker.is_symlink() or marker.exists() and not marker.is_file():
+        raise OSError("binding owner marker is not a regular file")
+    metadata = {
+        "schema": "cyrene.qq.binding-owner.v1",
+        "binding_id": binding_id,
+    }
+    encoded = (
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    try:
+        descriptor = os.open(
+            marker,
+            os.O_CREAT | os.O_EXCL | os.O_WRONLY,
+            0o600,
+        )
+    except FileExistsError:
+        try:
+            existing = json.loads(marker.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise OSError("binding owner marker is invalid") from exc
+        if not isinstance(existing, dict) or existing.get("binding_id") != binding_id:
+            raise OSError(
+                "binding data directory belongs to another binding"
+            ) from None
+        if os.name == "posix":
+            os.chmod(marker, 0o600)
+        return
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(encoded)
+    except OSError:
+        with suppress(OSError):
+            marker.unlink()
+        raise
+    if os.name == "posix":
+        os.chmod(marker, 0o600)
