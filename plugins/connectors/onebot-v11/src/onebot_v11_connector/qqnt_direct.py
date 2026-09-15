@@ -68,6 +68,7 @@ class QQNTDirectConfig:
     host_args: tuple[str, ...]
     data_dir: Path
     required_client_version: str
+    required_host_abi: str
     account_id: str | None = None
     login_policy: str = "existing_session"
     platform: str = "linux-x86_64"
@@ -97,6 +98,7 @@ class QQNTDirectConfig:
             "host_args",
             "data_dir",
             "required_client_version",
+            "required_host_abi",
             "account_id",
             "self_account_id",
             "login_policy",
@@ -156,6 +158,9 @@ class QQNTDirectConfig:
             raise ConnectorError("INVALID_REQUEST", "data_dir must be an absolute path")
         required_version = _required_text(
             value.get("required_client_version"), "required_client_version"
+        )
+        required_host_abi = _required_text(
+            value.get("required_host_abi"), "required_host_abi"
         )
         platform = _required_text(value.get("platform", "linux-x86_64"), "platform")
         if platform != "linux-x86_64":
@@ -252,6 +257,7 @@ class QQNTDirectConfig:
             host_args=tuple(host_args),
             data_dir=data_dir,
             required_client_version=required_version,
+            required_host_abi=required_host_abi,
             account_id=account_id,
             login_policy=login_policy,
             platform=platform,
@@ -295,6 +301,7 @@ class QQNTDirectConfig:
             command=(self.host_executable, *self.host_args),
             data_dir=self.data_dir,
             required_client_version=self.required_client_version,
+            required_host_abi=self.required_host_abi,
             platform=self.platform,
             timeout_seconds=self.timeout_seconds,
             startup_timeout_seconds=self.startup_timeout_seconds,

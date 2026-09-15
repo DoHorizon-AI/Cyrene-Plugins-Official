@@ -193,6 +193,10 @@ def main() -> int:
     }
     if mode == "wrong_version":
         report["client_version"] = "unexpected-qq-build"
+    elif mode == "wrong_abi":
+        report["abi"] = "unexpected-qq-abi"
+    elif mode == "missing_abi":
+        report.pop("abi")
     elif mode == "wrong_binding":
         report["binding_id"] = f"{binding_id}-other"
     elif mode == "wrong_generation":

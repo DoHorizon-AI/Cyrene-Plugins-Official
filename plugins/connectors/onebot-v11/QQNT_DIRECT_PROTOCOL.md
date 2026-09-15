@@ -85,16 +85,19 @@ Handshake request:
     "protocol": "cyrene.qq.host.v1",
     "protocol_version": "1",
     "platform": "linux-x86_64",
-    "required_client_version": "<exact-approved-build>"
+    "required_client_version": "<exact-approved-build>",
+    "required_host_abi": "<exact-approved-host-abi>"
   }
 }
 ```
 
 The response must return the same protocol, version, binding, generation,
-platform, and exact `client_version`. A mismatch fails closed.
+platform, exact `client_version`, and exact `abi` configured by the operator.
+A mismatch or missing ABI fails closed.
 
 握手响应必须回传相同的协议、版本、binding、generation、平台和准确
-`client_version`；任一不一致都必须 fail closed。
+`client_version`，并回传配置的准确 `abi`；任一不一致或缺失都必须
+fail closed。
 
 Normal request/response uses `type=request|response`, `operation`, `params`,
 `ok`, and either `result` or bounded `{code,message}` error data. Shutdown is a

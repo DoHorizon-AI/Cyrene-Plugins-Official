@@ -56,6 +56,7 @@ class QQHostLaunchConfig:
     command: tuple[str, ...]
     data_dir: Path
     required_client_version: str
+    required_host_abi: str
     platform: str
     timeout_seconds: float
     startup_timeout_seconds: float
@@ -280,6 +281,7 @@ class QQHostClient:
                     "protocol_version": QQ_HOST_PROTOCOL_VERSION,
                     "platform": self._config.platform,
                     "required_client_version": self._config.required_client_version,
+                    "required_host_abi": self._config.required_host_abi,
                 },
                 timeout_seconds=self._config.startup_timeout_seconds,
             )
@@ -496,6 +498,9 @@ class QQHostClient:
             raise QQHostError(
                 "UNSUPPORTED_VERSION", "QQ Host client version is not allow-listed"
             )
+        host_abi = report.get("abi")
+        if host_abi != self._config.required_host_abi:
+            raise QQHostError("UNSUPPORTED_VERSION", "QQ Host ABI is not allow-listed")
         with self._state_lock:
             self._compatibility = {
                 key: report[key]

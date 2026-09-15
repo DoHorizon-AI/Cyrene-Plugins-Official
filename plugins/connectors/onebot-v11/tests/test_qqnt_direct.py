@@ -72,6 +72,7 @@ def _config(
         "host_args": ["-B", str(fake_host), f"--mode={mode}"],
         "data_dir": str(tmp_path / binding_id),
         "required_client_version": "qq-test-1",
+        "required_host_abi": "fake-qqnt-linux-x86_64",
         "account_id": "10001",
         "timeout_seconds": timeout_seconds,
         "secret_refs": ["secret://test/qq-password"],
@@ -210,6 +211,13 @@ def test_direct_config_rejects_onebot_transport_fields(tmp_path: Path) -> None:
         QQNTDirectConnector(config)
 
 
+def test_direct_config_requires_exact_host_abi(tmp_path: Path) -> None:
+    config = _config(tmp_path, "qq-required-abi")
+    del config["required_host_abi"]
+    with pytest.raises(ConnectorError, match="required_host_abi"):
+        QQNTDirectConnector(config)
+
+
 def test_direct_extension_rejects_undeclared_parameter_names(tmp_path: Path) -> None:
     connector = QQNTDirectConnector(_config(tmp_path, "qq-closed-params"))
     try:
@@ -255,7 +263,14 @@ def test_direct_extension_rejects_cross_family_parameter_names(tmp_path: Path) -
 
 @pytest.mark.parametrize(
     "mode",
-    ["wrong_version", "wrong_binding", "wrong_generation", "malformed_hello"],
+    [
+        "wrong_version",
+        "wrong_abi",
+        "missing_abi",
+        "wrong_binding",
+        "wrong_generation",
+        "malformed_hello",
+    ],
 )
 def test_hello_incompatibility_fails_closed(tmp_path: Path, mode: str) -> None:
     connector = QQNTDirectConnector(_config(tmp_path, f"qq-{mode}", mode=mode))
