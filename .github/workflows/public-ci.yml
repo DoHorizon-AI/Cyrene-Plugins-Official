@@ -178,6 +178,28 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
+  qq-host-tck:
+    name: public-ci / qq-host-tck
+    needs: source-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PYTHONPATH: plugins/connectors/onebot-v11/src
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install QQ Host TCK dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check pytest
+          python3 -m pip install --disable-pip-version-check \
+            --requirement plugins/connectors/onebot-v11/requirements.lock
+          python3 -m pip install --disable-pip-version-check \
+            -e sdk/python/cyrene_plugin_runtime
+      - name: Run named QQ Host contract TCK
+        run: python3 -m pytest -q plugins/connectors/onebot-v11/tests/test_qqnt_host_tck.py
+
   buf-contracts:
     name: public-ci / buf-contracts
     runs-on: ubuntu-latest
@@ -355,6 +377,7 @@ jobs:
       - dotnet-native-aot
       - java-spring
       - onebot-v11-package
+      - qq-host-tck
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

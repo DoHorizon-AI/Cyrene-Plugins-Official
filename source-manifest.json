@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "9cff5b3a2c41fa2d73df40ab304b5c20ef6eb0c2ef77c2f2a8e8db5e02c73744",
-      "size_bytes": 20254
+      "sha256": "fccef901698455f3d258933fed8938cd6bfd4ee14f7169dd941527a56e32f92f",
+      "size_bytes": 21107
     },
     {
       "kind": "file",
@@ -896,6 +896,13 @@
       "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
       "sha256": "72268efeb059a0229d65288e6edad8c376ee1aabd7188bbeda73897fffb9a86e",
       "size_bytes": 41018
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_qqnt_host_tck.py",
+      "sha256": "bf2af09dfb7f4fddc791177cceb3eb126afe8dda09f003e91f87c217799328a1",
+      "size_bytes": 8571
     },
     {
       "kind": "file",
