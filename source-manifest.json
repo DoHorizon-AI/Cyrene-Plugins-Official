@@ -3852,7 +3852,7 @@
     }
   ],
   "schema_version": "cyrene.public-source-manifest.v1",
-  "source_commit": "a92dbe8b533db270b3fafa25cb525fd959e51bca",
-  "source_ref": "a92dbe8b533db270b3fafa25cb525fd959e51bca",
+  "source_commit": "91d97f088c5d54f61cc1532e51812729511caa41",
+  "source_ref": "91d97f088c5d54f61cc1532e51812729511caa41",
   "source_repository": "Cyrene-Plugins-Official"
 }
