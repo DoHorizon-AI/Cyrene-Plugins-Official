@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "c5bf74b4f128128f38bb36d7994d8df528a9ae37270824ffd198bb6eb807c18d",
-      "size_bytes": 21449
+      "sha256": "a200408754fcc549898a336eb855d9ef88a1eadd2f2c29b3ae3b21cc5ac03cc6",
+      "size_bytes": 21628
     },
     {
       "kind": "file",
@@ -893,6 +893,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_qqnt_dependency_boundary.py",
+      "sha256": "ea61c6bcd83d31e789d3cceb6a3f4282fde33f33533a9a16b5db27d818696fa2",
+      "size_bytes": 1850
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
       "sha256": "59a5d1ddfde26f40ec84064249196adc893cf636402a05f4e83d0fac78e9717f",
       "size_bytes": 42684
@@ -924,6 +931,13 @@
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
       "sha256": "6cf86ab69237f098d861d6f16582b3af5dd245f69d430a7e3c40ef4a4003ec10",
       "size_bytes": 2194
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tools/verify_direct_dependency_boundary.py",
+      "sha256": "d6cf4f8a7a7385e71dd296718a02d10da05ac2b8047f826076806e49b1481c02",
+      "size_bytes": 7973
     },
     {
       "kind": "file",
