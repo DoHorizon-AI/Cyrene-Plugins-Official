@@ -145,9 +145,10 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install locked OneBot runtime dependencies
-        run: >-
-          python3 -m pip install --disable-pip-version-check
-          --requirement plugins/connectors/onebot-v11/requirements.lock
+        run: |
+          python3 -m pip install --disable-pip-version-check pytest
+          python3 -m pip install --disable-pip-version-check \
+            --requirement plugins/connectors/onebot-v11/requirements.lock
       - name: Assemble deterministic OneBot v11 package candidate
         run: |
           set -euo pipefail
@@ -170,6 +171,13 @@ jobs:
           ! find "$package_root" -type f \( -name '*.pyc' -o -path '*/__pycache__/*' \) -print -quit | grep -q .
           PYTHONPATH="$package_root/src" python3 -c \
             'import cyrene_plugin_runtime.bootstrap; import onebot_v11_connector.plugin'
+      - name: Run installed-artifact direct vertical gate
+        env:
+          PYTHONPATH: sdk/python/cyrene_plugin_runtime/src
+        run: >-
+          python3 -m pytest -q
+          plugins/connectors/onebot-v11/tests/test_package.py
+          -k installed_artifact
       - name: Upload immutable package candidate
         uses: actions/upload-artifact@v4
         with:
