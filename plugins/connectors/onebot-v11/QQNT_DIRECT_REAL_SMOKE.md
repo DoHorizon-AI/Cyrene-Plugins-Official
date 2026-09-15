@@ -1,8 +1,8 @@
 # QQNT Direct Real Smoke / QQNT 直连真实烟测
 
 This document describes the protected-environment smoke gate for the
-`qqnt-direct` profile. The gate is a manual job in the existing `public-ci`
-workflow. It is separate from the fake Host TCK and must never be reported as
+`qqnt-direct` profile. The gate is an operator-dispatched job in the existing
+`public-ci` workflow. It is separate from the fake Host TCK and must never be reported as
 passed from a fake Host or a local simulation.
 
 本文档描述 `qqnt-direct` 的受保护环境真实烟测。它与 fake Host TCK 分离，不能用
@@ -10,8 +10,8 @@ fake Host 或本地模拟结果替代真实通过。
 
 ## Gate shape / 门禁形态
 
-The `public-ci` workflow is manual-capable and the smoke job only runs from
-`main`:
+The `public-ci` workflow exposes a protected `repository_dispatch` event and
+the smoke job only runs from `main`:
 
 - GitHub Environment: `qq-real-smoke`, with required reviewers;
 - runner labels: `self-hosted`, `linux`, `x64`, `qq-real`;
@@ -24,13 +24,14 @@ The `public-ci` workflow is manual-capable and the smoke job only runs from
   the runner script hard-requires both exact values and returns `NOT_RUN` when
   either is absent;
 - the existing workflow already handles push and pull-request events; the smoke
-  job explicitly rejects every non-`workflow_dispatch` event;
+  job explicitly rejects every non-`repository_dispatch` event;
 - the scenario JSON stays on the protected runner and is not committed to this
   public repository.
 
-`public-ci` 已有 push/PR 触发，真实烟测 job 只允许从 `main` 手工触发，并要求受保护
+`public-ci` 已有 push/PR 触发，真实烟测 job 只允许通过受权限控制的
+`repository_dispatch` 从 `main` 触发，并要求受保护
 Environment、专用 Linux x64 runner、精确 QQ build、实现 `cyrene.qq.host.v1` 继承 stdio
-协议的 Host，以及专用测试账号。job 会拒绝非 `workflow_dispatch`，脚本仍强制要求受保护
+协议的 Host，以及专用测试账号。job 会拒绝非 `repository_dispatch`，脚本仍强制要求受保护
 Environment 中的两个精确 build/ABI 值；缺失时脚本返回 `NOT_RUN`。
 场景 JSON 只放在受保护 runner，不提交到公共仓库。
 
@@ -51,6 +52,25 @@ The handshake must return the exact protected `QQNT_REQUIRED_CLIENT_VERSION` and
 `QQNT_REQUIRED_HOST_ABI` values. Passwords are not accepted; a pre-authorized
 session or an operator-run QR login must establish the account before this
 automated gate.
+
+An authorized operator can dispatch the gate from the repository's default
+`main` branch with the GitHub CLI:
+
+```bash
+gh api repos/DoHorizon-AI/Cyrene-Plugins-Official/dispatches \
+  -f event_type=qq-real-smoke
+```
+
+The `qq-real-smoke` Environment reviewers remain the final approval boundary.
+
+授权运维可以使用 GitHub CLI 从仓库默认 `main` 触发：
+
+```bash
+gh api repos/DoHorizon-AI/Cyrene-Plugins-Official/dispatches \
+  -f event_type=qq-real-smoke
+```
+
+最终审批边界仍是 `qq-real-smoke` Environment 的 reviewer。
 
 ## Scenario contract / 场景契约
 

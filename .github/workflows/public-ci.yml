@@ -11,7 +11,9 @@ on:
       - main
       - develop
       - release
-  workflow_dispatch:
+  repository_dispatch:
+    types:
+      - qq-real-smoke
 
 concurrency:
   group: public-ci-${{ github.workflow }}-${{ github.ref }}
@@ -389,7 +391,7 @@ jobs:
 
   qq-real-smoke:
     name: public-ci / qq-real-smoke / linux-x64
-    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'repository_dispatch' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64, qq-real]
     environment:
       name: qq-real-smoke
