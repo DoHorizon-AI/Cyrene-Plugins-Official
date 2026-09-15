@@ -5,11 +5,11 @@ on:
     inputs:
       client_version:
         description: Exact authorized QQ client build installed on the protected runner
-        required: true
+        required: false
         type: string
       host_abi:
         description: Exact authorized QQ Host ABI returned by hello
-        required: true
+        required: false
         type: string
 
 concurrency:
@@ -22,7 +22,7 @@ permissions:
 jobs:
   linux-x64:
     name: qq-real-smoke / linux-x64
-    if: github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
     runs-on: [self-hosted, linux, x64, qq-real]
     environment:
       name: qq-real-smoke
