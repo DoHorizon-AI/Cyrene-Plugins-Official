@@ -10,6 +10,11 @@ This directory contains the source files for the module boundary shown in its pa
 | --- | --- | --- |
 | `__init__.py` | Package initialization and public exports | Package initialization and public exports |
 | `connector.py` | Python implementation module | Python implementation module |
+| `plugin.py` | Profile router for OneBot v11 and QQNT direct | OneBot v11 与 QQNT direct profile 路由 |
+| `qqnt_direct.py` | Direct QQ adapter and canonical message mapping | QQ 直连适配与规范消息映射 |
+| `qqnt_direct_host.py` | One-binding QQ Host subprocess lifecycle | 单 binding QQ Host 子进程生命周期 |
+| `qqnt_direct_operations.py` | Fixed QQ API operation allow-list | 固定 QQ API 操作白名单 |
+| `qqnt_direct_protocol.py` | Length-delimited stdio frame codec | 长度分帧 stdio 编解码 |
 | `transport.py` | Python implementation module | Python implementation module |
 
 ### Child directories / 子目录

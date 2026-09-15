@@ -10,7 +10,7 @@ import queue
 import signal
 import threading
 import uuid
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from concurrent import futures
 from typing import Any
 
@@ -64,27 +64,30 @@ class DirectPluginService(wire_grpc.DirectPluginRuntimeServicer):
     def __init__(
         self,
         plugin: Any,
-        capability: str,
-        interface_versions: str | Sequence[str],
+        capability: str | Sequence[str],
+        interface_versions: str | Sequence[str] | Mapping[str, str | Sequence[str]],
     ) -> None:
         self._plugin = plugin
-        self._capability = _required_text(capability, "capability", _MAX_ID_BYTES)
-        versions = (
-            (interface_versions,)
-            if isinstance(interface_versions, str)
-            else tuple(interface_versions)
+        configured_capabilities = (
+            (capability,) if isinstance(capability, str) else tuple(capability)
         )
-        if not versions:
-            raise ValueError("interface_versions must not be empty")
-        self._interface_versions = frozenset(
-            _required_text(version, "interface_version", _MAX_ID_BYTES)
-            for version in versions
+        if not configured_capabilities:
+            raise ValueError("capability must not be empty")
+        self._capabilities = tuple(
+            _required_text(item, "capability", _MAX_ID_BYTES)
+            for item in configured_capabilities
+        )
+        self._interface_versions = _interface_version_map(
+            self._capabilities, interface_versions
         )
         capabilities = tuple(getattr(plugin, "capabilities", ()))
-        if capabilities and self._capability not in capabilities:
-            raise ValueError(
-                f"plugin does not declare configured capability {self._capability!r}"
-            )
+        if capabilities:
+            missing = set(self._capabilities).difference(capabilities)
+            if missing:
+                raise ValueError(
+                    "plugin does not declare configured capabilities "
+                    + ", ".join(sorted(missing))
+                )
 
     def Invoke(
         self,
@@ -192,7 +195,7 @@ class DirectPluginService(wire_grpc.DirectPluginRuntimeServicer):
             status=wire.HealthResponse.STATUS_SERVING,
             plugin_id=str(getattr(self._plugin, "plugin_id", "unknown")),
             plugin_version=str(getattr(self._plugin, "version", "unknown")),
-            capabilities=[self._capability],
+            capabilities=list(self._capabilities),
         )
 
     def _validate_request(
@@ -210,11 +213,14 @@ class DirectPluginService(wire_grpc.DirectPluginRuntimeServicer):
                 _required_text(value, name, maximum)
         except ValueError as exc:
             return _wire_error(f"INVALID_REQUEST: {exc}")
-        if request.capability != self._capability:
+        if request.capability not in self._capabilities:
             return _wire_error(
-                f"INVALID_REQUEST: endpoint is bound to {self._capability!r}"
+                "INVALID_REQUEST: endpoint is not bound to the requested capability"
             )
-        if request.interface_version not in self._interface_versions:
+        if (
+            request.interface_version
+            not in self._interface_versions[request.capability]
+        ):
             return _wire_error(
                 "INVALID_REQUEST: endpoint interface version does not match"
             )
@@ -272,6 +278,47 @@ def _required_text(value: str, name: str, maximum_bytes: int) -> str:
     return value
 
 
+def _interface_version_map(
+    capabilities: Sequence[str],
+    interface_versions: str | Sequence[str] | Mapping[str, str | Sequence[str]],
+) -> dict[str, frozenset[str]]:
+    """Normalize single- and multi-capability version declarations."""
+
+    if isinstance(interface_versions, Mapping):
+        result: dict[str, frozenset[str]] = {}
+        for capability in capabilities:
+            versions = interface_versions.get(capability)
+            if versions is None:
+                raise ValueError(f"interface_versions has no entry for {capability!r}")
+            raw_versions = (versions,) if isinstance(versions, str) else tuple(versions)
+            if not raw_versions:
+                raise ValueError(f"interface_versions is empty for {capability!r}")
+            result[capability] = frozenset(
+                _required_text(version, "interface_version", _MAX_ID_BYTES)
+                for version in raw_versions
+            )
+        return result
+    versions = (
+        (interface_versions,)
+        if isinstance(interface_versions, str)
+        else tuple(interface_versions)
+    )
+    if not versions:
+        raise ValueError("interface_versions must not be empty")
+    if len(capabilities) > 1 and len(versions) == len(capabilities):
+        return {
+            capability: frozenset(
+                (_required_text(versions[index], "interface_version", _MAX_ID_BYTES),)
+            )
+            for index, capability in enumerate(capabilities)
+        }
+    normalized = frozenset(
+        _required_text(version, "interface_version", _MAX_ID_BYTES)
+        for version in versions
+    )
+    return {capability: normalized for capability in capabilities}
+
+
 def _wire_payload(value: Any) -> wire.DirectPayload:
     payload = getattr(value, "value", None)
     type_url = getattr(value, "type_url", None)
@@ -327,8 +374,8 @@ def load_entrypoint(value: str) -> Any:
 
 def serve(
     plugin: Any,
-    capability: str,
-    interface_versions: str | Sequence[str],
+    capability: str | Sequence[str],
+    interface_versions: str | Sequence[str] | Mapping[str, str | Sequence[str]],
     listen: str,
     *,
     workers: int = 8,
@@ -359,7 +406,7 @@ def serve(
 def main(arguments: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--entrypoint", required=True)
-    parser.add_argument("--capability", required=True)
+    parser.add_argument("--capability", required=True, action="append")
     parser.add_argument("--interface-version", required=True, action="append")
     parser.add_argument("--listen", default="127.0.0.1:0")
     parser.add_argument("--workers", type=int, default=8)
@@ -378,7 +425,11 @@ def main(arguments: list[str] | None = None) -> int:
             {
                 "event": "direct_plugin_ready",
                 "connection_ref": connection,
-                "capability": options.capability,
+                "capability": (
+                    options.capability[0]
+                    if len(options.capability) == 1
+                    else options.capability
+                ),
                 "interface_version": options.interface_version[0],
                 "interface_versions": options.interface_version,
                 "runtime_id": str(uuid.uuid4()),

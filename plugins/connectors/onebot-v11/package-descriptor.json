@@ -4,8 +4,20 @@
   "package": {
     "manifest_ref": "plugins/connectors/onebot-v11/plugin.manifest.json",
     "id": "cyrene.connectors.onebot-v11",
-    "version": "0.1.0"
+    "version": "0.2.0",
+    "lineage": "cyrene.connectors.onebot-v11"
   },
+  "capabilities": [
+    {
+      "id": "message.connector.v1",
+      "interface_version": "1"
+    },
+    {
+      "id": "qq.client.v1",
+      "interface_version": "1",
+      "kind": "owner-scoped"
+    }
+  ],
   "capability": {
     "id": "message.connector.v1",
     "interface_version": "1"
@@ -14,11 +26,52 @@
     "family": "onebot_v11",
     "type": "onebot_v11"
   },
+  "profiles": [
+    {
+      "name": "onebot-v11",
+      "connector": {
+        "family": "onebot_v11",
+        "type": "onebot_v11",
+        "compatibility_profile": null
+      },
+      "runtime": {
+        "external": {
+          "required": true,
+          "kind": "onebot_v11_runtime",
+          "artifact_ref": null,
+          "transport": ["http_api", "forward_websocket", "reverse_websocket"]
+        }
+      }
+    },
+    {
+      "name": "qqnt-direct",
+      "connector": {
+        "family": "qq",
+        "type": "qqnt-direct",
+        "compatibility_profile": "onebot-v11"
+      },
+      "runtime": {
+        "kind": "subprocess-python",
+        "protocol": "cyrene.qq.host.v1",
+        "ipc": "inherited-stdio",
+        "external": {
+          "required": false,
+          "kind": "official_qq_host_child",
+          "artifact_ref": null
+        }
+      },
+      "target": {
+        "os": ["linux"],
+        "architectures": ["x86_64"],
+        "requires_exact_client_version": true
+      }
+    }
+  ],
   "implementation": {
     "artifact": {
       "status": "NOT_PUBLISHED"
     },
-    "entrypoint": "onebot_v11_connector:OneBotV11Connector"
+    "entrypoint": "onebot_v11_connector.plugin:ConnectorPlugin"
   },
   "dependencies": {
     "lock": {
@@ -40,14 +93,12 @@
   },
   "compatibility": {
     "platform_api": ">=0.1.0",
-    "capability_interface": "message.connector.v1@1",
-    "os": [
-      "linux"
+    "capability_interface": [
+      "message.connector.v1@1",
+      "qq.client.v1@1"
     ],
-    "architectures": [
-      "x86_64",
-      "aarch64"
-    ]
+    "os": ["linux"],
+    "architectures": ["x86_64"]
   },
   "integrity": {
     "artifact_digest": null,
@@ -55,12 +106,12 @@
     "signature_ref": null
   },
   "lifecycle": {
-    "rollback_identity": "cyrene.connectors.onebot-v11@0.1.0",
-    "cache_identity": "cyrene.connectors.onebot-v11@0.1.0"
+    "rollback_identity": "cyrene.connectors.onebot-v11@0.2.0",
+    "cache_identity": "cyrene.connectors.onebot-v11@0.2.0"
   },
   "provenance": {
     "source_repository": "Cyrene-Plugins-Official",
-    "source_revision": "22ed62c3d78859a76111a0d06c8b4f07d87c1f20",
+    "source_revision": null,
     "builder": null,
     "sbom_ref": null,
     "attestation_ref": null

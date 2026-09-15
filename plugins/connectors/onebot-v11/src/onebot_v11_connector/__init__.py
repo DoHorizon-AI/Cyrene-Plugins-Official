@@ -36,6 +36,32 @@ from .connector import (
     normalize_inbound_event,
     normalize_request_event,
 )
+from .plugin import ConnectorPlugin
+from .qqnt_direct import (
+    QQ_CAPABILITY_ID,
+    QQ_REQUEST_TYPE_URL,
+    QQ_RESPONSE_TYPE_URL,
+    QQNTDirectConfig,
+    QQNTDirectConnector,
+)
+from .qqnt_direct_host import (
+    QQ_HOST_PROTOCOL,
+    QQ_HOST_PROTOCOL_VERSION,
+    QQHostClient,
+    QQHostError,
+    QQHostLaunchConfig,
+)
+from .qqnt_direct_operations import (
+    QQ_OPERATION_NAMES,
+    QQ_OPERATIONS,
+    QQOperation,
+)
+from .qqnt_direct_protocol import (
+    QQHostProtocolError,
+    encode_frame,
+    read_frame,
+    write_frame,
+)
 from .transport import OneBotReverseWebSocketServer, OneBotWebSocketTransport
 
 __all__ = [
@@ -61,6 +87,24 @@ __all__ = [
     "UrllibOneBotTransport",
     "OneBotWebSocketTransport",
     "OneBotReverseWebSocketServer",
+    "ConnectorPlugin",
+    "QQ_CAPABILITY_ID",
+    "QQNTDirectConfig",
+    "QQNTDirectConnector",
+    "QQ_REQUEST_TYPE_URL",
+    "QQ_RESPONSE_TYPE_URL",
+    "QQ_HOST_PROTOCOL",
+    "QQ_HOST_PROTOCOL_VERSION",
+    "QQHostClient",
+    "QQHostError",
+    "QQHostLaunchConfig",
+    "QQOperation",
+    "QQ_OPERATION_NAMES",
+    "QQ_OPERATIONS",
+    "encode_frame",
+    "read_frame",
+    "write_frame",
+    "QQHostProtocolError",
     "build_onebot_segments",
     "normalize_inbound_event",
     "normalize_request_event",

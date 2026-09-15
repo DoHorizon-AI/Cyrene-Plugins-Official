@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".gitignore",
-      "sha256": "d222a91ddb4162ea1fff41a264bc9ccc7fcf5c220553956c54aad64b9e691e9b",
-      "size_bytes": 597
+      "sha256": "bd0f4e8b860ff0cccbaf78c58eca1719842c8499a08fc6404f8101386bab3052",
+      "size_bytes": 587
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "56cee00f85e1f765711ece44c3111961c687d0441459ea426d45437722d15190",
-      "size_bytes": 11452
+      "sha256": "53a220c61389c41e5fa7d090f79d631c5f0d1f1739235b9652733961a441d8ba",
+      "size_bytes": 16535
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "e76958ffae381763329354888b34983e0fd894d627a76a902bae6d98ad8709c0",
-      "size_bytes": 13691
+      "sha256": "04441c2f0dbc558b705cd04d90dac4c072580c6379ba4baeac79d7274426817f",
+      "size_bytes": 14448
     },
     {
       "kind": "file",
@@ -245,6 +245,34 @@
       "path": "contracts/jvm/build.gradle.kts",
       "sha256": "28fd80e8181b868e09ff5cea1c13deb2009cff3757f245bc632ad644fdccd81e",
       "size_bytes": 741
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/jvm/gradle/wrapper/gradle-wrapper.jar",
+      "sha256": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
+      "size_bytes": 48462
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/jvm/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "e74d4f107d2feab989b9a041a02e2d2b85567ff48415c9c7add5ecc19abd19f9",
+      "size_bytes": 281
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "contracts/jvm/gradlew",
+      "sha256": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+      "size_bytes": 8656
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/jvm/gradlew.bat",
+      "sha256": "d539676c48b596afda64c963ec8f7ee56c7b3fe7e3b81d1dbe2d1a1e3dd9e9f8",
+      "size_bytes": 2848
     },
     {
       "kind": "file",
@@ -564,6 +592,34 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/jvm/gradle/wrapper/gradle-wrapper.jar",
+      "sha256": "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7",
+      "size_bytes": 48462
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/jvm/gradle/wrapper/gradle-wrapper.properties",
+      "sha256": "e74d4f107d2feab989b9a041a02e2d2b85567ff48415c9c7add5ecc19abd19f9",
+      "size_bytes": 281
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "contracts/tck/model-provider-v1/jvm/gradlew",
+      "sha256": "a5a5c199ba02189ae8c46a334223371a20599d9c298ef65e7540ede4a3f72d59",
+      "size_bytes": 8656
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/model-provider-v1/jvm/gradlew.bat",
+      "sha256": "d539676c48b596afda64c963ec8f7ee56c7b3fe7e3b81d1dbe2d1a1e3dd9e9f8",
+      "size_bytes": 2848
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/tck/model-provider-v1/jvm/settings.gradle.kts",
       "sha256": "2c6c0bead9ce8d19cec233abb61dd948599ab3c2bf3f7aca9eb05aab58df60d2",
       "size_bytes": 148
@@ -641,37 +697,58 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_API_MATRIX.md",
+      "sha256": "9ee8b02c8257899dfb5395193396508562046936b28889c21542feca91fa5a63",
+      "size_bytes": 7150
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_PROTOCOL.md",
+      "sha256": "af39ef18a7ba6ab7ff4d6420c05787108f796f72f98ff0c936bf845d98943115",
+      "size_bytes": 4574
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "c0c1691bcd72c1b24ae4e4cd80e70d0c10b87361182eaac49c92a1fb27d390f5",
-      "size_bytes": 4102
+      "sha256": "29f4dde831d049e61bb6bd63b060bff7bbcf868869832d70aa618413c868d21e",
+      "size_bytes": 5776
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/configuration.schema.json",
-      "sha256": "46618ff42ce0595fa687087bc9903938176b724fe514fbe353938ce201154025",
-      "size_bytes": 2235
+      "sha256": "cd743fa72a8cf72719f4cf1a35ced8be5a61fdc73e893227aaf9ffe3bf092c46",
+      "size_bytes": 4134
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/contracts/v1/schema.json",
+      "sha256": "0acc33cd353cc3e316f810561599fe33cb7b330c4075937fda9ef931b546bf4f",
+      "size_bytes": 3981
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/package-descriptor.json",
-      "sha256": "71e9425d1229030bb6664953987d253a0074520551eb08efe2653419236fe08a",
-      "size_bytes": 1662
+      "sha256": "f34a739a2f4d0660938cb6ca75e0c53fab7a8562702201bf0d43b548b6a30dfe",
+      "size_bytes": 2889
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/plugin.manifest.json",
-      "sha256": "827020b482380738abb8fcf53057434d3a40c65beb088171810b6e8af332769d",
-      "size_bytes": 1798
+      "sha256": "8c87aa0424f2248042e5d7b1b45e389e75b32c79dacd73ddd9ef9c047bd4d432",
+      "size_bytes": 24678
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/pyproject.toml",
-      "sha256": "3e1401e576c3e37c537e54cb78003ba9efe2e9b7b4e3d33f956f43fca315ede9",
-      "size_bytes": 787
+      "sha256": "a03f272fb19a545b7adb4795b5132f36af6bc4676ee9103831be56d7306d195f",
+      "size_bytes": 950
     },
     {
       "kind": "file",
@@ -691,15 +768,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/README.md",
-      "sha256": "099cdbecd4107d4a9af889ef3667379f9d70c26e258f31e5726c4ac17362dc33",
-      "size_bytes": 1225
+      "sha256": "f13225ea9684f2f10eabe7630da0ae85ce846db177b029ef1af598160638630c",
+      "size_bytes": 1754
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/__init__.py",
-      "sha256": "2e79ab07f016875a24ce22bebebc62042fdc566e26b1f1e76fb53a831d4f66c2",
-      "size_bytes": 2083
+      "sha256": "9286c878bdc0a4a207f7f2f42de4d5aed269be84fe96f4af30e65419548fda43",
+      "size_bytes": 3051
     },
     {
       "kind": "file",
@@ -732,6 +809,41 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/plugin.py",
+      "sha256": "bc3aa14cc81028ba55d563c77db3bf8450b079c6afbaa92807a97121b03c4a24",
+      "size_bytes": 5762
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct.py",
+      "sha256": "b7850a719117b39c41c604c22684ce924c6377d652b4e9b68bf87e5d07c6c6f9",
+      "size_bytes": 52927
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_host.py",
+      "sha256": "db0c106eed142b58f19fab2068f9ad43a4e3f6d6a1974363d81a96bdf5867366",
+      "size_bytes": 17884
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_operations.py",
+      "sha256": "f56074d757d9afc4b73e8d66c465605d23e224eae68232fb23b9ba8a561db9d5",
+      "size_bytes": 11251
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_protocol.py",
+      "sha256": "14419506a62d6cb85e234750f77f4ca8fe99a7927b5a96b681574c5ce720aabe",
+      "size_bytes": 4082
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/transport.py",
       "sha256": "ee2ed675fc0cf7900ae39da4a8c34c2320601346228aea6869a909d5b1ec4292",
       "size_bytes": 32245
@@ -739,9 +851,23 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py",
+      "sha256": "91deb9e1f876ff33cfef2803a05066f64310f66ca5d7f56d90428dbce2109075",
+      "size_bytes": 4802
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_connector.py",
-      "sha256": "0dfb5e4cc4f52a6de6d311df502fe6cb2737e1c8c917a9c8f7066bfb6ce1230b",
-      "size_bytes": 22249
+      "sha256": "7bdaab79667f34e0d574e82d6e6074a5c1469c4532a267207c00802b71cb7342",
+      "size_bytes": 22431
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
+      "sha256": "042707284e83d7c7f3ab9c1d3512ef93c9d775073801cc533fa68c75bbdd8acb",
+      "size_bytes": 10937
     },
     {
       "kind": "file",
@@ -3596,8 +3722,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/server.py",
-      "sha256": "02c576a5d3de3ebe4180867986f871f4ab275d75c7820de30c8039e8112ca155",
-      "size_bytes": 15513
+      "sha256": "6ed7065b8819366d105448404b071807cd8c7892e39f2af9706990f518a212e8",
+      "size_bytes": 17643
     },
     {
       "kind": "file",
@@ -3617,8 +3743,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_direct_runtime.py",
-      "sha256": "12d4d72dd6d7be6a1a5a5c889f480ee7a92acb9693778c92376bd5620f701c67",
-      "size_bytes": 10835
+      "sha256": "b8629694f4a9af1f5d2a225b3c14de970b8a45ba1aca8c018d053ff71981bae1",
+      "size_bytes": 12356
     },
     {
       "kind": "file",
@@ -3638,8 +3764,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/capability_catalog.py",
-      "sha256": "f4f9de77a2a0aa5a7cd799d2359115a00fed01363197b5011d91d524c76760b1",
-      "size_bytes": 25412
+      "sha256": "6cd5b92ca2cb495344ea8351a496d843f57aca7413c9d18a916da26c933cd018",
+      "size_bytes": 26743
     },
     {
       "kind": "file",
@@ -3701,7 +3827,7 @@
     },
     {
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "c0c1691bcd72c1b24ae4e4cd80e70d0c10b87361182eaac49c92a1fb27d390f5"
+      "sha256": "29f4dde831d049e61bb6bd63b060bff7bbcf868869832d70aa618413c868d21e"
     }
   ],
   "schema_version": "cyrene.public-source-manifest.v1",

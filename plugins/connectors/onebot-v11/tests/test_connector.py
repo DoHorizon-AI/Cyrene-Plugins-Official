@@ -25,6 +25,7 @@ from onebot_v11_connector import (
     INBOUND_REQUEST_EVENT_TYPE,
     INBOUND_REQUEST_TYPE_URL,
     ONEBOT_VENDOR,
+    QQ_CAPABILITY_ID,
     RESPOND_REQUEST_METHOD,
     RESPOND_REQUEST_TYPE_URL,
     RESPOND_RESULT_TYPE_URL,
@@ -214,7 +215,7 @@ def inbound_event(account_id: str, message_id: str) -> dict[str, Any]:
     }
 
 
-def test_manifest_and_package_descriptor_use_generic_onebot_identity() -> None:
+def test_manifest_and_package_descriptor_project_both_connector_profiles() -> None:
     package_root = Path(__file__).parents[1]
     manifest = json.loads(
         (package_root / "plugin.manifest.json").read_text(encoding="utf-8")
@@ -224,11 +225,13 @@ def test_manifest_and_package_descriptor_use_generic_onebot_identity() -> None:
     )
 
     assert manifest["id"] == "cyrene.connectors.onebot-v11"
-    assert manifest["capabilities"] == [CAPABILITY_ID]
+    assert manifest["capabilities"] == [CAPABILITY_ID, QQ_CAPABILITY_ID]
     assert descriptor["capability"]["id"] == CAPABILITY_ID
     assert descriptor["connector"]["type"] == "onebot_v11"
     assert descriptor["publication_status"] == "CANDIDATE"
     assert descriptor["runtime"]["external"]["kind"] == "onebot_v11_runtime"
+    assert descriptor["profiles"][1]["name"] == "qqnt-direct"
+    assert descriptor["profiles"][1]["runtime"]["ipc"] == "inherited-stdio"
 
 
 def test_worker_activation_can_receive_one_binding_from_environment(
