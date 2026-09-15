@@ -41,8 +41,9 @@ from .qqnt_direct_host import (
     QQHostLaunchConfig,
 )
 from .qqnt_direct_operations import (
-    allowed_qq_parameter_fields,
+    QQOperationValidationError,
     get_qq_operation,
+    validate_qq_parameters,
 )
 
 QQ_CAPABILITY_ID = "qq.client.v1"
@@ -566,20 +567,13 @@ class QQNTDirectConnector:
             raise ConnectorError(
                 "INVALID_REQUEST", "QQ operation params must be an object"
             )
-        if {"service", "method", "raw_payload"}.intersection(params):
-            raise ConnectorError(
-                "INVALID_REQUEST", "QQ operation params contain reserved fields"
-            )
-        unknown = set(params).difference(allowed_qq_parameter_fields(operation))
-        if unknown:
-            raise ConnectorError(
-                "INVALID_REQUEST",
-                f"QQ operation params contain undeclared fields: {sorted(unknown)}",
-            )
+        try:
+            checked_params = validate_qq_parameters(operation, params)
+        except QQOperationValidationError as exc:
+            raise ConnectorError("INVALID_REQUEST", str(exc)) from exc
         if operation == "qq.login.password" and (
-            "password" in params
-            or not isinstance(params.get("secret_ref"), str)
-            or params.get("secret_ref") not in config.secret_refs
+            not isinstance(checked_params.get("secret_ref"), str)
+            or checked_params.get("secret_ref") not in config.secret_refs
         ):
             raise ConnectorError(
                 "INVALID_REQUEST",
@@ -597,7 +591,7 @@ class QQNTDirectConnector:
         if spec.priority != "P0" or spec.mapping not in {"session", "login"}:
             self._ensure_ready()
         result = self._call_operation(
-            operation, dict(params), cancellation=cancellation
+            operation, checked_params, cancellation=cancellation
         )
         _raise_if_cancelled(cancellation)
         if spec.mapping == "session":

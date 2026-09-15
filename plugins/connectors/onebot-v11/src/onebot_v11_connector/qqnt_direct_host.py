@@ -28,7 +28,11 @@ from .qqnt_direct_discovery import (
     discover_explicit,
     discover_manifest,
 )
-from .qqnt_direct_operations import allowed_qq_parameter_fields, get_qq_operation
+from .qqnt_direct_operations import (
+    QQOperationValidationError,
+    get_qq_operation,
+    validate_qq_parameters,
+)
 from .qqnt_direct_protocol import QQHostProtocolError, read_frame, write_frame
 
 QQ_HOST_PROTOCOL = "cyrene.qq.host.v1"
@@ -360,11 +364,6 @@ class QQHostClient:
             )
         if cancellation is not None and cancellation.is_cancelled():
             raise QQHostError("CANCELLED", "QQ Host operation was cancelled")
-        forbidden = {"service", "method", "raw_payload", "binding_id", "generation"}
-        if forbidden.intersection(params):
-            raise QQHostError(
-                "INVALID_REQUEST", "Host operation params contain reserved fields"
-            )
         spec = get_qq_operation(operation) if operation != "hello" else None
         if operation != "hello" and spec is None:
             raise QQHostError(
@@ -376,12 +375,15 @@ class QQHostClient:
                 f"QQ operation {operation} is callback-only",
             )
         if operation != "hello":
-            unknown = set(params).difference(allowed_qq_parameter_fields(operation))
-            if unknown:
+            try:
+                checked_params = validate_qq_parameters(operation, params)
+            except QQOperationValidationError as exc:
                 raise QQHostError(
                     "INVALID_REQUEST",
-                    f"QQ operation params contain undeclared fields: {sorted(unknown)}",
-                )
+                    str(exc),
+                ) from exc
+        else:
+            checked_params = dict(params)
         with self._state_lock:
             process = self._process
             generation = self._generation
@@ -404,7 +406,7 @@ class QQHostClient:
             "binding_id": self.binding_id,
             "generation": generation,
             "operation": operation,
-            "params": dict(params),
+            "params": checked_params,
         }
         try:
             self._send(message)

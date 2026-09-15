@@ -118,10 +118,18 @@ are the conservative public envelope from `QQ_API_PLAN.md`; the authorized
 Host remains responsible for exact target-client overload validation and native
 message shapes.
 
+Before IPC, the Python worker also validates primitive types, finite numeric
+values, collection depth/size, and reserved fields. This keeps malformed JSON
+and oversized nested values out of the native Host even when a caller bypasses
+the repository's schema-validation tooling.
+
 `plugin.manifest.json` 中 79 个 operation 都有独立的 request Schema 引用，格式为
 `contracts/v1/schema.json#/$defs/<operation>_request`。可执行 Worker allow-list 与这些
 Schema 字段会做 parity 校验。字段只取 `QQ_API_PLAN.md` 定义的保守公共 envelope；准确的
 目标客户端 overload 校验与原生消息形状仍由授权 Host 负责。
+
+在 IPC 之前，Python Worker 还会校验基础类型、有限数值、集合深度/大小与保留字段；即使调用方
+绕过仓库的 Schema 校验工具，格式错误或过大的嵌套值也不会进入 native Host。
 
 The additional getters in `../im/QQ_SIDE_INTERFACES.md` (collection, album,
 robot, ticket, setting, mini-app, third-party signature, and similar services)
