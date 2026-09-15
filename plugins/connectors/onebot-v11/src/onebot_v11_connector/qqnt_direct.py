@@ -52,6 +52,7 @@ QQ_RESPONSE_TYPE_URL = "type.cyrene.io/qq.client.v1.Response"
 _BINDING_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
 _MAX_EVENT_IDS = 2_048
 _MAX_EXTENSION_RESPONSE_BYTES = 8 * 1024 * 1024
+_MAX_MEDIA_REFERENCE_BYTES = 4 * 1024
 
 
 @dataclass(frozen=True, slots=True)
@@ -539,6 +540,11 @@ class QQNTDirectConnector:
             raise ConnectorError(
                 "UNKNOWN_OPERATION", f"unsupported QQ operation {operation}"
             )
+        if not spec.requestable:
+            raise ConnectorError(
+                "UNSUPPORTED_OPERATION",
+                f"QQ operation {operation} is callback-only",
+            )
         if not isinstance(params, Mapping):
             raise ConnectorError(
                 "INVALID_REQUEST", "QQ operation params must be an object"
@@ -681,6 +687,8 @@ class QQNTDirectConnector:
 
         if capability not in {"message.connector.v1", QQ_CAPABILITY_ID}:
             return f"INVALID_REQUEST: unsupported subscription capability {capability}"
+        previous = self._subscriptions.get(subscription_id)
+        previous_generation = self._subscription_generation
         try:
             filter_value = _decode_filter(filter_payload)
             self._ensure_started()
@@ -691,6 +699,11 @@ class QQNTDirectConnector:
             )
             self._subscription_generation = self.generation
         except ConnectorError as exc:
+            if previous is None:
+                self._subscriptions.pop(subscription_id, None)
+            else:
+                self._subscriptions[subscription_id] = previous
+            self._subscription_generation = previous_generation
             return f"{exc.code}: {exc.message}"
         return None
 
@@ -937,6 +950,7 @@ def _connector_host_error(error: QQHostError) -> ConnectorError:
         "LOGIN_REQUIRED": "LOGIN_REQUIRED",
         "LOGIN_FAILED": "CAPABILITY_UNAVAILABLE",
         "UNKNOWN_OPERATION": "UNKNOWN_OPERATION",
+        "UNSUPPORTED_OPERATION": "UNSUPPORTED_OPERATION",
     }
     return ConnectorError(
         mapping.get(error.code, "CAPABILITY_UNAVAILABLE"), error.message
@@ -1127,13 +1141,9 @@ def _native_reference(value: Any, field: str) -> dict[str, str]:
     reference = _mapping(value, field)
     remote = reference.get("remote_uri")
     if remote is not None:
-        remote = _required_text(remote, f"{field}.remote_uri")
-        parsed = urlparse(remote)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ConnectorError(
-                "INVALID_REQUEST", f"{field}.remote_uri must be http(s)"
-            )
-        return {"remote_uri": remote}
+        return {
+            "remote_uri": _validated_remote_uri(remote, f"{field}.remote_uri")
+        }
     vendor_media = _mapping(reference.get("vendor_media"), f"{field}.vendor_media")
     if vendor_media.get("vendor") != QQ_VENDOR:
         raise ConnectorError(
@@ -1238,7 +1248,10 @@ def _normalize_native_message(
                 )
             }
         else:
-            continue
+            raise ConnectorError(
+                "UNSUPPORTED_OPERATION",
+                f"native message element type is not supported: {element_type}",
+            )
     if not content and reply is None:
         raise ConnectorError(
             "INVALID_REQUEST", "native message has no supported content"
@@ -1281,8 +1294,8 @@ def _native_inbound_reference(
     """Convert a normalized native media object to a canonical attachment reference."""
 
     remote = element.get("remote_uri")
-    if isinstance(remote, str) and remote:
-        return {"remote_uri": remote}
+    if remote is not None:
+        return {"remote_uri": _validated_remote_uri(remote, "remote_uri")}
     media_id = _required_identifier(
         element.get("media_id", element.get("file_id")), "media_id"
     )
@@ -1446,6 +1459,18 @@ def _mapping(value: Any, field: str) -> Mapping[str, Any]:
     if not isinstance(value, Mapping):
         raise ConnectorError("INVALID_REQUEST", f"{field} must be an object")
     return value
+
+
+def _validated_remote_uri(value: Any, field: str) -> str:
+    """Accept only bounded HTTP(S) references across the canonical seam."""
+
+    remote = _required_text(value, field)
+    if len(remote.encode("utf-8")) > _MAX_MEDIA_REFERENCE_BYTES:
+        raise ConnectorError("INVALID_REQUEST", f"{field} is too long")
+    parsed = urlparse(remote)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        raise ConnectorError("INVALID_REQUEST", f"{field} must be http(s)")
+    return remote
 
 
 def _required_text(value: Any, field: str) -> str:

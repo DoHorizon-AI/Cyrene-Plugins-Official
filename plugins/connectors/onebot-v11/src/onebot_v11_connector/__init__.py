@@ -61,6 +61,7 @@ from .qqnt_direct_host import (
     QQHostLaunchConfig,
 )
 from .qqnt_direct_operations import (
+    CALLBACK_ONLY_OPERATION_NAMES,
     QQ_OPERATION_NAMES,
     QQ_OPERATIONS,
     QQOperation,
@@ -115,6 +116,7 @@ __all__ = [
     "QQHostError",
     "QQHostLaunchConfig",
     "QQOperation",
+    "CALLBACK_ONLY_OPERATION_NAMES",
     "QQ_OPERATION_NAMES",
     "QQ_OPERATIONS",
     "encode_frame",
