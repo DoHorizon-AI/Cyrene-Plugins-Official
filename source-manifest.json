@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "373e940e6a7175c98e9ce756b7a1a0743097755a1180cae0c769e16ddaa7c070",
-      "size_bytes": 15745
+      "sha256": "0360b1ebda022f84168912acff14e5b204d5aadaa4a07829dc5aa045329db278",
+      "size_bytes": 17923
     },
     {
       "kind": "file",
@@ -707,6 +707,13 @@
       "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_PROTOCOL.md",
       "sha256": "d09cd65f21561b0c22943b355098762838dcbb612960055f4da6d6a71ee7f735",
       "size_bytes": 6761
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_REAL_SMOKE.md",
+      "sha256": "40071586721e569dd049d61ed31e26153d0bfea6b0b08eeb4e1e3a3b64c213b4",
+      "size_bytes": 8105
     },
     {
       "kind": "file",
@@ -3794,6 +3801,13 @@
       "path": "tools/ci/publish_native_aot.py",
       "sha256": "254db6b612323cd991023e6c2bec05a9636a6f4cf6868514a218553b66045dd6",
       "size_bytes": 10268
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/qqnt_direct_real_smoke.py",
+      "sha256": "84cd28bc40fe45074e73eb46c558b55bd61b11028c503b2557a19cdf658ea7fc",
+      "size_bytes": 22754
     },
     {
       "kind": "file",
