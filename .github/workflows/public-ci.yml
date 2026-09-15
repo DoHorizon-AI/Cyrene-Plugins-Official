@@ -134,6 +134,50 @@ jobs:
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests
 
+  onebot-v11-package:
+    name: public-ci / onebot-v11-package
+    needs: source-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install locked OneBot runtime dependencies
+        run: >-
+          python3 -m pip install --disable-pip-version-check
+          --requirement plugins/connectors/onebot-v11/requirements.lock
+      - name: Assemble deterministic OneBot v11 package candidate
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/cyrene-onebot-v11-package"
+          mkdir -p "$output"
+          python3 plugins/connectors/onebot-v11/tools/assemble_package.py \
+            --repository-root . \
+            --output "$output/cyrene-onebot-v11.zip"
+          unzip -t "$output/cyrene-onebot-v11.zip"
+          sha256sum "$output/cyrene-onebot-v11.zip" > "$output/cyrene-onebot-v11.zip.sha256"
+      - name: Verify candidate outside the source checkout
+        run: |
+          set -euo pipefail
+          package_root="$RUNNER_TEMP/cyrene-onebot-v11-package/unpacked"
+          mkdir -p "$package_root"
+          unzip -q "$RUNNER_TEMP/cyrene-onebot-v11-package/cyrene-onebot-v11.zip" -d "$package_root"
+          test -f "$package_root/plugin.manifest.json"
+          test -f "$package_root/src/cyrene_plugin_runtime/bootstrap.py"
+          test -f "$package_root/src/onebot_v11_connector/plugin.py"
+          ! find "$package_root" -type f \( -name '*.pyc' -o -path '*/__pycache__/*' \) -print -quit | grep -q .
+          PYTHONPATH="$package_root/src" python3 -c \
+            'import cyrene_plugin_runtime.bootstrap; import onebot_v11_connector.plugin'
+      - name: Upload immutable package candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-onebot-v11-package-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-onebot-v11-package
+          if-no-files-found: error
+          compression-level: 0
+
   buf-contracts:
     name: public-ci / buf-contracts
     runs-on: ubuntu-latest
@@ -310,6 +354,7 @@ jobs:
       - rust-native
       - dotnet-native-aot
       - java-spring
+      - onebot-v11-package
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -334,6 +379,10 @@ jobs:
           pattern: cyrene-source-sbom-*
           path: ${{ runner.temp }}/release-input/sbom/source
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-onebot-v11-package-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-input/onebot-v11
       - name: Generate artifact SBOMs
         run: |
           set -euo pipefail
