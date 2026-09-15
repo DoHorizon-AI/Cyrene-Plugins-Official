@@ -101,6 +101,8 @@ def _response(
             if isinstance(peer, dict)
             else "peer-1",
         }
+    elif mode == "semantic_mapping":
+        result = _semantic_result(operation, params)
     elif mode == "media_file" and operation.startswith(("qq.media.", "qq.file.")):
         result = {
             "operation": operation,
@@ -136,6 +138,137 @@ def _response(
     }
 
 
+def _semantic_result(operation: Any, params: Any) -> dict[str, Any]:
+    """Return typed fixture data for the planned mapping families.
+
+    This fixture deliberately models only stable identity and result-shape
+    facts.  It does not claim that these values or native overloads match an
+    official QQ build; that remains the protected real-smoke boundary.
+    """
+
+    values = params if isinstance(params, dict) else {}
+    peer = values.get("peer", {})
+    peer_uid = peer.get("peer_uid", "peer-1") if isinstance(peer, dict) else "peer-1"
+    if operation in {
+        "qq.message.history_include_self",
+        "qq.message.history_by_seq",
+        "qq.message.by_id",
+        "qq.message.single",
+        "qq.message.search",
+    }:
+        return {
+            "messages": [
+                {
+                    "message_id": "history-message-1",
+                    "sequence": 21,
+                    "random": 34,
+                    "timestamp": 1700000001,
+                    "peer_uid": peer_uid,
+                    "elements": [{"type": "text", "text": "history"}],
+                }
+            ],
+            "count": 1,
+        }
+    if operation in {
+        "qq.message.recall",
+        "qq.message.forward",
+        "qq.message.forward_comment",
+        "qq.message.multi_forward",
+    }:
+        return {
+            "status": "accepted",
+            "message_id": "mutated-message-1",
+            "source_peer_uid": peer_uid,
+        }
+    if operation in {
+        "qq.message.read",
+        "qq.message.read_all",
+        "qq.message.emoji_likes",
+        "qq.message.emoji_likes_list",
+    }:
+        return {
+            "status": "accepted",
+            "message_id": str(values.get("message_id", "history-message-1")),
+            "likes": [{"like_id": "like-1", "count": 1}],
+        }
+    if operation in {
+        "qq.group.list",
+        "qq.group.detail",
+        "qq.group.members",
+        "qq.group.member",
+    }:
+        return {
+            "groups": [
+                {
+                    "group_code": "20001",
+                    "group_id": "20001",
+                    "name": "fixture-group",
+                }
+            ],
+            "members": [
+                {
+                    "member_uid": "uid-20002",
+                    "member_uin": "20002",
+                    "display_name": "fixture-member",
+                }
+            ],
+        }
+    if operation in {
+        "qq.friend.list",
+        "qq.friend.cached",
+        "qq.friend.requests",
+        "qq.friend.doubt_requests",
+    }:
+        return {
+            "friends": [
+                {
+                    "uid": "uid-20002",
+                    "uin": "20002",
+                    "display_name": "fixture-friend",
+                }
+            ],
+            "requests": [{"request_id": "friend-request-1", "state": "pending"}],
+        }
+    if operation.startswith(("qq.media.", "qq.file.")):
+        return {
+            "media_id": "media-1",
+            "file_id": "file-1",
+            "element_id": "element-1",
+            "file_name": "fixture.bin",
+            "local_result_reference": "qq://binding-local/media-1",
+            "remote_uri": "https://example.invalid/fixture.bin",
+            "progress": 1.0,
+        }
+    if operation.startswith(("qq.group.", "qq.friend.", "qq.profile.")):
+        return {
+            "status": "accepted",
+            "target_id": str(
+                values.get("group_id", values.get("uid", "target-1"))
+            ),
+        }
+    if operation.startswith("qq.search."):
+        return {
+            "items": [
+                {
+                    "uid": "uid-20002",
+                    "uin": "20002",
+                    "display_name": "fixture-search-result",
+                }
+            ],
+            "count": 1,
+        }
+    if operation.startswith("qq.online."):
+        return {
+            "status": "accepted",
+            "devices": [{"device_id": "device-1", "online": True}],
+        }
+    return {
+        "operation": operation,
+        "state": "ready",
+        "account_id": "10001",
+    }
+
+
 def _message_event(binding_id: str, generation: int, event_id: str) -> dict[str, Any]:
     """Return one message event with distinct QQ identity values."""
 
@@ -164,6 +297,28 @@ def _message_event(binding_id: str, generation: int, event_id: str) -> dict[str,
             "elements": [{"type": "text", "text": "hello from qq"}],
         },
     }
+
+
+def _private_message_event(
+    binding_id: str, generation: int, event_id: str
+) -> dict[str, Any]:
+    """Return a private message event for the semantic mapping fixture."""
+
+    event = _message_event(binding_id, generation, event_id)
+    payload = event["payload"]
+    payload["message_id"] = "native-private-message-1"
+    payload["peer"] = {
+        "kind": "private",
+        "peer_uid": "private-peer-1",
+        "user_uid": "20003",
+    }
+    payload["sender"] = {
+        "uid": "uid-20003",
+        "uin": "20003",
+        "display_name": "private-member",
+    }
+    payload["elements"] = [{"type": "text", "text": "hello from private qq"}]
+    return event
 
 
 def _spawn_child() -> None:
@@ -352,14 +507,25 @@ def main() -> int:
                 }
             )
         if operation == "qq.message.subscribe":
-            event = _message_event(
-                binding_id,
-                generation,
-                f"{binding_id}-{generation}-event-1",
-            )
-            _write_frame(event)
-            if mode == "duplicate_event":
+            events = [
+                _message_event(
+                    binding_id,
+                    generation,
+                    f"{binding_id}-{generation}-event-1",
+                )
+            ]
+            if mode == "semantic_mapping":
+                events.append(
+                    _private_message_event(
+                        binding_id,
+                        generation,
+                        f"{binding_id}-{generation}-private-event-1",
+                    )
+                )
+            for event in events:
                 _write_frame(event)
+                if mode == "duplicate_event":
+                    _write_frame(event)
         if mode == "malformed_event" and operation == "qq.message.subscribe":
             _write_frame(
                 {

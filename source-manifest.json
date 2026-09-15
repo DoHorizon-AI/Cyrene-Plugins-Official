@@ -873,8 +873,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py",
-      "sha256": "4182a805cd14802e5326792f8d03ed537da8a1ee6478b6fd713ae09559035981",
-      "size_bytes": 13862
+      "sha256": "032400df6a28f8d4526b299f97a8f6f7deef707dfc9727586e669a6b56cc00ff",
+      "size_bytes": 19115
     },
     {
       "kind": "file",
@@ -901,8 +901,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
-      "sha256": "d67c5bb6f23e1f9758d74fd161dc1193df9f6022cad54bc28e91d50312db4c86",
-      "size_bytes": 44630
+      "sha256": "32bc21cbdad549005ffc7d587e3699d7097f0167966e19c50c8d8f6576d8fb3e",
+      "size_bytes": 48118
     },
     {
       "kind": "file",
