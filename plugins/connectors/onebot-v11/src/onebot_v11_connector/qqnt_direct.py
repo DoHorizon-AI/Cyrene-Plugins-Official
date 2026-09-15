@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -74,6 +75,12 @@ class QQNTDirectConfig:
     startup_timeout_seconds: float = 30.0
     shutdown_timeout_seconds: float = 2.0
     secret_refs: tuple[str, ...] = ()
+    max_restart_attempts: int = 2
+    restart_window_seconds: float = 60.0
+    restart_backoff_seconds: float = 0.25
+    restart_backoff_max_seconds: float = 5.0
+    crash_circuit_cooldown_seconds: float = 60.0
+    installation_manifest: Path | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> QQNTDirectConfig:
@@ -98,6 +105,12 @@ class QQNTDirectConfig:
             "startup_timeout_seconds",
             "shutdown_timeout_seconds",
             "secret_refs",
+            "max_restart_attempts",
+            "restart_window_seconds",
+            "restart_backoff_seconds",
+            "restart_backoff_max_seconds",
+            "crash_circuit_cooldown_seconds",
+            "installation_manifest",
         }
         unknown = set(value).difference(allowed)
         if unknown:
@@ -160,9 +173,7 @@ class QQNTDirectConfig:
                 "INVALID_REQUEST", "account_id and self_account_id must match"
             )
         account_id = (
-            configured_account
-            if configured_account is not None
-            else legacy_account
+            configured_account if configured_account is not None else legacy_account
         )
         if account_id is not None:
             account_id = _required_identifier(account_id, "account_id")
@@ -190,6 +201,51 @@ class QQNTDirectConfig:
             )
         if any(not isinstance(item, str) or not item.strip() for item in secret_refs):
             raise ConnectorError("INVALID_REQUEST", "secret_refs must contain names")
+        max_restart_attempts = _bounded_integer(
+            value.get("max_restart_attempts", 2),
+            "max_restart_attempts",
+            minimum=0,
+            maximum=5,
+        )
+        restart_window_seconds = _bounded_number(
+            value.get("restart_window_seconds", 60.0),
+            "restart_window_seconds",
+            minimum=0.1,
+            maximum=3_600.0,
+        )
+        restart_backoff_seconds = _bounded_number(
+            value.get("restart_backoff_seconds", 0.25),
+            "restart_backoff_seconds",
+            minimum=0.0,
+            maximum=60.0,
+        )
+        restart_backoff_max_seconds = _bounded_number(
+            value.get("restart_backoff_max_seconds", 5.0),
+            "restart_backoff_max_seconds",
+            minimum=0.0,
+            maximum=300.0,
+        )
+        if restart_backoff_max_seconds < restart_backoff_seconds:
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                "restart_backoff_max_seconds must not be below restart_backoff_seconds",
+            )
+        crash_circuit_cooldown_seconds = _bounded_number(
+            value.get("crash_circuit_cooldown_seconds", 60.0),
+            "crash_circuit_cooldown_seconds",
+            minimum=0.1,
+            maximum=3_600.0,
+        )
+        installation_manifest_value = value.get("installation_manifest")
+        installation_manifest: Path | None = None
+        if installation_manifest_value is not None:
+            installation_manifest = Path(
+                _required_text(installation_manifest_value, "installation_manifest")
+            )
+            if not installation_manifest.is_absolute():
+                raise ConnectorError(
+                    "INVALID_REQUEST", "installation_manifest must be absolute"
+                )
         return cls(
             binding_id=binding_id,
             host_executable=executable,
@@ -203,6 +259,12 @@ class QQNTDirectConfig:
             startup_timeout_seconds=startup_timeout,
             shutdown_timeout_seconds=shutdown_timeout,
             secret_refs=tuple(secret_refs),
+            max_restart_attempts=max_restart_attempts,
+            restart_window_seconds=restart_window_seconds,
+            restart_backoff_seconds=restart_backoff_seconds,
+            restart_backoff_max_seconds=restart_backoff_max_seconds,
+            crash_circuit_cooldown_seconds=crash_circuit_cooldown_seconds,
+            installation_manifest=installation_manifest,
         )
 
     @classmethod
@@ -237,6 +299,12 @@ class QQNTDirectConfig:
             timeout_seconds=self.timeout_seconds,
             startup_timeout_seconds=self.startup_timeout_seconds,
             shutdown_timeout_seconds=self.shutdown_timeout_seconds,
+            max_restart_attempts=self.max_restart_attempts,
+            restart_window_seconds=self.restart_window_seconds,
+            restart_backoff_seconds=self.restart_backoff_seconds,
+            restart_backoff_max_seconds=self.restart_backoff_max_seconds,
+            crash_circuit_cooldown_seconds=self.crash_circuit_cooldown_seconds,
+            installation_manifest=self.installation_manifest,
         )
 
 
@@ -274,6 +342,7 @@ class QQNTDirectConnector:
         self._session_started = False
         self._session_generation: int | None = None
         self._subscriptions: dict[str, _Subscription] = {}
+        self._subscription_generation: int | None = None
         self._seen_events: set[tuple[str, int, str]] = set()
         self._state = "CREATED"
         if config is not None:
@@ -613,6 +682,7 @@ class QQNTDirectConnector:
                 "qq.message.subscribe",
                 {"events": ["message.received", "request.received"]},
             )
+            self._subscription_generation = self.generation
         except ConnectorError as exc:
             return f"{exc.code}: {exc.message}"
         return None
@@ -642,6 +712,7 @@ class QQNTDirectConnector:
         """Drain subscriptions and reap the binding-local QQ Host child."""
 
         self._subscriptions.clear()
+        self._subscription_generation = None
         if self._host is not None:
             self._host.close()
         self._state = "STOPPED"
@@ -655,7 +726,16 @@ class QQNTDirectConnector:
         config = self._require_configured()
         if self._host is None:
             raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is not configured")
-        if self._host.state in {"FAILED", "STOPPED"}:
+        if self._host.state == "FAILED":
+            recover = getattr(self._host, "recover", None)
+            if not callable(recover):
+                raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is unavailable")
+            try:
+                recover()
+            except QQHostError as exc:
+                self._state = "FAILED"
+                raise _connector_host_error(exc) from exc
+        elif self._host.state == "STOPPED":
             raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is unavailable")
         try:
             self._host.start()
@@ -665,6 +745,7 @@ class QQNTDirectConnector:
         if self._session_generation != self._host.generation:
             self._session_started = False
             self._session_generation = self._host.generation
+            self._subscription_generation = None
             self._state = "NATIVE_READY"
         if not self._session_started:
             for operation in (
@@ -684,6 +765,16 @@ class QQNTDirectConnector:
                 if operation == "qq.session.start_nt":
                     self._update_session_state(result)
             self._session_started = True
+        if (
+            self._state == "READY"
+            and self._subscriptions
+            and self._subscription_generation != self._host.generation
+        ):
+            self._call_operation(
+                "qq.message.subscribe",
+                {"events": ["message.received", "request.received"]},
+            )
+            self._subscription_generation = self._host.generation
         if self._state == "CREATED":
             self._state = "NATIVE_READY"
 
@@ -1377,6 +1468,36 @@ def _positive_number(value: Any, field: str) -> float:
             value = float(value)
         except ValueError as exc:
             raise ConnectorError("INVALID_REQUEST", f"{field} must be numeric") from exc
-    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise ConnectorError("INVALID_REQUEST", f"{field} must be positive")
-    return float(value)
+    result = float(value)
+    if not math.isfinite(result) or result <= 0:
+        raise ConnectorError("INVALID_REQUEST", f"{field} must be positive")
+    return result
+
+
+def _bounded_number(value: Any, field: str, *, minimum: float, maximum: float) -> float:
+    """Validate one finite numeric setting against a strict safety range."""
+
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise ConnectorError("INVALID_REQUEST", f"{field} must be numeric")
+    result = float(value)
+    if not math.isfinite(result) or result < minimum or result > maximum:
+        raise ConnectorError(
+            "INVALID_REQUEST",
+            f"{field} must be between {minimum} and {maximum}",
+        )
+    return result
+
+
+def _bounded_integer(value: Any, field: str, *, minimum: int, maximum: int) -> int:
+    """Validate one bounded integer setting without accepting booleans."""
+
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ConnectorError("INVALID_REQUEST", f"{field} must be an integer")
+    if value < minimum or value > maximum:
+        raise ConnectorError(
+            "INVALID_REQUEST",
+            f"{field} must be between {minimum} and {maximum}",
+        )
+    return value

@@ -14,6 +14,7 @@ import json
 import os
 import subprocess
 import sys
+from pathlib import Path
 from typing import Any
 
 MAX_FRAME_BYTES = 8 * 1024 * 1024
@@ -212,6 +213,13 @@ def main() -> int:
     if mode == "stderr_secret":
         sys.stderr.write("password=fixture-password token=fixture-token\n")
         sys.stderr.flush()
+    if mode == "crash_once":
+        marker = Path(os.environ.get("CYRENE_QQ_BINDING_DATA_DIR", ".")) / (
+            "fixture-crash-once.marker"
+        )
+        if not marker.exists():
+            marker.write_text("crashed\n", encoding="ascii")
+            return 7
     if mode in {
         "crash_after_hello",
         "wrong_version",

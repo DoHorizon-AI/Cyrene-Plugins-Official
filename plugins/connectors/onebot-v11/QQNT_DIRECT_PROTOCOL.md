@@ -26,6 +26,39 @@ network activity remains outside this connector IPC boundary.
 WebSocket 或 OneBot endpoint。QQ Host 自身的外联网络行为不属于本 Connector 的
 IPC 边界。
 
+## Installation selection / 安装选择
+
+The first target is Linux x86_64.  The worker accepts an operator-provided
+absolute Host path and binding data path, canonicalizes them before launch, and
+rejects missing, non-regular, non-executable, symlinked-data, or non-Linux
+selections.  An optional `installation_manifest` records one exact
+`cyrene.qq.installation.v1` selection; zero or multiple manifests are rejected,
+and its build, platform, architecture, Host path, and data path must agree with
+the binding configuration.  The Host hello remains the authoritative observed
+QQ build/ABI check.
+
+首个目标固定为 Linux x86_64。Worker 接受操作员提供的绝对 Host 路径和 binding 数据路径，
+启动前完成规范化，并拒绝不存在、非普通文件、不可执行、数据目录为符号链接或非 Linux 的
+选择。可选的 `installation_manifest` 用于记录唯一的
+`cyrene.qq.installation.v1` 安装选择；零个或多个 manifest 都会被拒绝，manifest 中的 build、
+平台、架构、Host 路径和数据路径必须与 binding 配置一致。QQ build/ABI 的最终实测校验仍以
+Host hello 为准。
+
+## Supervision / 进程监督
+
+An unexpected process or stdio exit is recoverable only through a bounded
+binding-local restart budget with exponential backoff and a crash circuit.  A
+recovery starts a new generation and reinitializes the session and subscriptions;
+it never retries the operation that observed the failure.  Protocol, version,
+account, login, and configuration failures remain fail-closed and are not
+automatically retried.  Shutdown drains and reaps the binding-local process
+group.
+
+非预期进程或 stdio 退出只能通过 binding 独立的有界重启预算、指数退避和崩溃熔断恢复。
+恢复会启动新 generation，并重新初始化 session 与订阅；不会重试观察到故障的原操作。
+协议、版本、账号、登录和配置错误保持 fail-closed，不自动重试。关闭流程会排空并回收
+binding 独立的进程组。
+
 ## Correlation / 关联
 
 Every request carries `binding_id`, `generation`, and a request ID in the
