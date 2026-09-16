@@ -1390,9 +1390,23 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectEventSubscriptionRegistry.cs",
+      "sha256": "5f9262bb01daad7e5ed925b5db466ce6973682eb135bd697bb3e6bd04a514188",
+      "size_bytes": 12452
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectInvocationDispatcher.cs",
-      "sha256": "c478e8ebeee86f9014fe32eb15d5cf07dea0482a857593038eb27ddf3ad681bd",
-      "size_bytes": 12357
+      "sha256": "cdda1fcb7dc2306cd6e47fa6e59d27d0f41a2df1995930cbab5c406cb7ab8488",
+      "size_bytes": 26142
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectMessageMapper.cs",
+      "sha256": "942102a2c349ce703ad7ef35ee04dec2a450d325dad043c39807027761986c1b",
+      "size_bytes": 36331
     },
     {
       "kind": "file",
@@ -1405,15 +1419,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostClient.cs",
-      "sha256": "21299eb6784ba735f1768097d2d5d88bd9dc97b29266440b05848960a4e85526",
-      "size_bytes": 28662
+      "sha256": "be03af8a297fd6e7d439c0463cb4f20d1cfbd2308029bf06e49d9606ea710626",
+      "size_bytes": 29230
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostJsonModels.cs",
-      "sha256": "1a63c5a492b295916232861a70d41466c930b73f5e0c74b47f718926508b25e0",
-      "size_bytes": 8166
+      "sha256": "2ef37013239b2f45769538aebbeebe56f8b00d5e70376ee396f61090f0402021",
+      "size_bytes": 15979
     },
     {
       "kind": "file",
@@ -1468,8 +1482,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/DispatcherTests.cs",
-      "sha256": "b7d009b6e899eda0a8c4c76a483875d7ad735f69af503d9f5c90991fc67e4bcb",
-      "size_bytes": 10576
+      "sha256": "2d89d357d887e90aed363214f40303b2dc378e629ccefdf7ad2a9032969b1f4e",
+      "size_bytes": 22039
     },
     {
       "kind": "file",

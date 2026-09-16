@@ -7,7 +7,10 @@
 // └─────────────────────────────────────────────────────────────────────────┘
 
 using System.Text.Json;
+using System.Text;
+using Cyrene.Message.Connector.V1;
 using Cyrene.Plugin.Runtime.V1;
+using Google.Protobuf;
 
 namespace Cyrene.OneBot.V11.Core;
 
@@ -25,14 +28,29 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
     private int _sessionGeneration;
     private int _sessionBootstrapStage;
     private string _sessionState = "CREATED";
+    private int _nativeSubscriptionGeneration;
+    private readonly object _callbackGate = new();
+    private readonly Dictionary<string, string> _callbackRequests = new(StringComparer.Ordinal);
+    private readonly object _eventGate = new();
+    private readonly HashSet<string> _seenEventIds = new(StringComparer.Ordinal);
+    private readonly QqDirectEventSubscriptionRegistry _subscriptions;
 
-    public QqDirectInvocationDispatcher(QqDirectProfile profile, QqHostClient host)
+    public QqDirectInvocationDispatcher(
+        QqDirectProfile profile,
+        QqHostClient host,
+        QqDirectEventSubscriptionRegistry? subscriptions = null)
     {
         _profile = profile;
         _host = host;
+        _subscriptions = subscriptions ?? new QqDirectEventSubscriptionRegistry();
+        _host.EventHandler = HandleHostEvent;
     }
 
-    public void Dispose() => _sessionGate.Dispose();
+    public void Dispose()
+    {
+        _subscriptions.Dispose();
+        _sessionGate.Dispose();
+    }
 
     public async ValueTask<InvocationResult> InvokeAsync(
         DirectInvocationRequest request,
@@ -40,6 +58,11 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
     {
         try
         {
+            if (request.Capability == QqDirectMessageMapper.CapabilityId)
+            {
+                return await InvokeCanonicalMessageAsync(request, cancellationToken);
+            }
+
             ValidateEnvelope(request);
             using JsonDocument document = JsonDocument.Parse(request.Payload.ToByteArray());
             JsonElement root = document.RootElement;
@@ -79,6 +102,10 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
                     response,
                     QqHostJsonContext.Default.QqClientResponse));
         }
+        catch (QqDirectMappingException exception)
+        {
+            return Failure(exception);
+        }
         catch (QqHostException exception)
         {
             return Failure(exception);
@@ -104,6 +131,59 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
         [System.Runtime.CompilerServices.EnumeratorCancellation]
         CancellationToken cancellationToken)
     {
+        if (request.StreamMode == DirectStreamMode.Subscription)
+        {
+            QqDirectEventSubscription? subscription = null;
+            DirectInvocationError? setupError = null;
+            try
+            {
+                subscription = _subscriptions.Subscribe(request);
+                await EnsureHostStartedAsync(cancellationToken);
+                await EnsureSessionStartedAsync(cancellationToken);
+                EnsureSessionReady();
+                await EnsureNativeSubscriptionAsync(cancellationToken);
+            }
+            catch (QqDirectSubscriptionException exception)
+            {
+                setupError = SubscriptionFailure(exception);
+            }
+            catch (QqHostException exception)
+            {
+                setupError = Failure(exception).Error;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                setupError = new DirectInvocationError
+                {
+                    Code = DirectInvocationError.Types.Code.Cancelled,
+                    Message = "Subscription cancelled by caller.",
+                    DomainCode = "CALLER_CANCELLED"
+                };
+            }
+
+            if (setupError is not null)
+            {
+                yield return new DirectStreamItem { Error = setupError };
+                subscription?.Dispose();
+                yield break;
+            }
+
+            try
+            {
+                await foreach (DirectStreamItem item in subscription!.ReadAllAsync(
+                                   cancellationToken))
+                {
+                    yield return item;
+                }
+            }
+            finally
+            {
+                subscription!.Dispose();
+            }
+
+            yield break;
+        }
+
         InvocationResult result = await InvokeAsync(request, cancellationToken);
         if (result.Error is not null)
         {
@@ -116,6 +196,306 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
 
         yield return new DirectStreamItem { End = new DirectStreamEnd() };
     }
+
+    private async Task<InvocationResult> InvokeCanonicalMessageAsync(
+        DirectInvocationRequest request,
+        CancellationToken cancellationToken)
+    {
+        if (request.StreamMode == DirectStreamMode.Subscription)
+        {
+            return InvocationResult.Failure(
+                DirectInvocationError.Types.Code.InvalidRequest,
+                "subscription requires InvokeStream.",
+                domainCode: "SUBSCRIPTION_REQUIRES_STREAM");
+        }
+
+        ValidateCanonicalMessageEnvelope(request);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (request.Method == QqDirectMessageMapper.RespondRequestMethod)
+        {
+            return await InvokeCanonicalRespondAsync(request, cancellationToken);
+        }
+
+        SendMessageRequest message;
+        try
+        {
+            message = SendMessageRequest.Parser.ParseFrom(request.Payload);
+        }
+        catch (InvalidProtocolBufferException)
+        {
+            return InvocationResult.Failure(
+                DirectInvocationError.Types.Code.InvalidRequest,
+                "send_message payload is invalid protobuf.",
+                domainCode: "INVALID_PROTOBUF");
+        }
+
+        JsonElement parameters = QqDirectMessageMapper.BuildSendParameters(message, _profile);
+        await EnsureReadyForOperationAsync(cancellationToken);
+        string? callbackRequestId = null;
+        try
+        {
+            JsonElement result = await _host.RequestAsync(
+                "qq.message.send",
+                parameters,
+                cancellationToken,
+                requestId =>
+                {
+                    callbackRequestId = requestId;
+                    RememberCallbackRequest(requestId, "qq.message.send");
+                });
+            DeliveryResult delivery = QqDirectMessageMapper.BuildDeliveryResult(result);
+            return InvocationResult.Success(
+                QqDirectMessageMapper.DeliveryResultTypeUrl,
+                delivery.ToByteArray());
+        }
+        catch
+        {
+            RemoveCallbackRequest(callbackRequestId);
+            throw;
+        }
+    }
+
+    private async Task<InvocationResult> InvokeCanonicalRespondAsync(
+        DirectInvocationRequest request,
+        CancellationToken cancellationToken)
+    {
+        QqRespondOperation operation = QqDirectMessageMapper.BuildRespondOperation(
+            DecodeUtf8(request.Payload, "respond_request"),
+            _profile);
+        await EnsureReadyForOperationAsync(cancellationToken);
+        JsonElement nativeResult = await _host.RequestAsync(
+            operation.Operation,
+            operation.Parameters,
+            cancellationToken);
+        operation.Result.Result = nativeResult.Clone();
+        return InvocationResult.Success(
+            QqDirectMessageMapper.RespondResultTypeUrl,
+            JsonSerializer.SerializeToUtf8Bytes(
+                operation.Result,
+                QqHostJsonContext.Default.QqRespondResult));
+    }
+
+    private async Task EnsureReadyForOperationAsync(CancellationToken cancellationToken)
+    {
+        await EnsureHostStartedAsync(cancellationToken);
+        await EnsureSessionStartedAsync(cancellationToken);
+        EnsureSessionReady();
+    }
+
+    private async Task EnsureNativeSubscriptionAsync(CancellationToken cancellationToken)
+    {
+        if (_nativeSubscriptionGeneration == _host.Generation)
+        {
+            return;
+        }
+
+        QqSubscribeParameters parameters = new()
+        {
+            Events = new List<string> { "message.received", "request.received" }
+        };
+        JsonElement nativeParameters = JsonSerializer.SerializeToElement(
+            parameters,
+            QqHostJsonContext.Default.QqSubscribeParameters);
+        await _host.RequestAsync(
+            "qq.message.subscribe",
+            nativeParameters,
+            cancellationToken);
+        _nativeSubscriptionGeneration = _host.Generation;
+    }
+
+    private void HandleHostEvent(QqHostEvent @event)
+    {
+        if (!RememberEvent(@event))
+        {
+            return;
+        }
+
+        try
+        {
+            switch (@event.Event)
+            {
+                case "message.received":
+                    _subscriptions.Publish(
+                        QqDirectMessageMapper.NormalizeMessage(
+                            @event.Payload,
+                            _profile,
+                            @event.Generation,
+                            _profile.BindingId));
+                    break;
+                case "request.received":
+                    _subscriptions.Publish(
+                        QqDirectMessageMapper.NormalizeRequest(@event.Payload, _profile));
+                    break;
+                case "message.send_completion":
+                case "qq.message.send_completion":
+                case "media.download_complete":
+                case "qq.media.download_complete":
+                    PublishCallback(@event);
+                    break;
+            }
+        }
+        catch (QqDirectMappingException)
+        {
+            // Malformed native data is dropped at the binding boundary.
+        }
+    }
+
+    private void PublishCallback(QqHostEvent @event)
+    {
+        (string Operation, string[] OriginatingOperations)? callback = @event.Event switch
+        {
+            "message.send_completion" or "qq.message.send_completion" =>
+                ("qq.message.send_completion", new[] { "qq.message.send" }),
+            "media.download_complete" or "qq.media.download_complete" =>
+                ("qq.media.download_complete", new[] { "qq.media.download", "qq.file.download" }),
+            _ => null
+        };
+        if (callback is null)
+        {
+            return;
+        }
+
+        string? requestId = @event.RequestId;
+        if (string.IsNullOrWhiteSpace(requestId)
+            && @event.Payload.ValueKind == JsonValueKind.Object
+            && @event.Payload.TryGetProperty("request_id", out JsonElement payloadRequestId)
+            && payloadRequestId.ValueKind == JsonValueKind.String)
+        {
+            requestId = payloadRequestId.GetString();
+        }
+
+        if (string.IsNullOrWhiteSpace(requestId))
+        {
+            return;
+        }
+
+        lock (_callbackGate)
+        {
+            if (!_callbackRequests.TryGetValue(requestId, out string? originating)
+                || !callback.Value.OriginatingOperations.Contains(originating, StringComparer.Ordinal))
+            {
+                return;
+            }
+        }
+
+        QqDirectNormalizedEvent normalized = QqDirectMessageMapper.NormalizeCallback(
+            callback.Value.Operation,
+            requestId,
+            @event.EventId,
+            @event.Payload);
+        RemoveCallbackRequest(requestId);
+        _subscriptions.Publish(normalized);
+    }
+
+    private bool RememberEvent(QqHostEvent @event)
+    {
+        string key = $"{@event.Generation}:{@event.EventId}";
+        lock (_eventGate)
+        {
+            if (!_seenEventIds.Add(key))
+            {
+                return false;
+            }
+
+            if (_seenEventIds.Count > 2_048)
+            {
+                string? first = _seenEventIds.FirstOrDefault();
+                if (first is not null)
+                {
+                    _seenEventIds.Remove(first);
+                }
+            }
+
+            return true;
+        }
+    }
+
+    private void RememberCallbackRequest(string requestId, string operation)
+    {
+        lock (_callbackGate)
+        {
+            _callbackRequests[requestId] = operation;
+            if (_callbackRequests.Count > 2_048)
+            {
+                string? first = _callbackRequests.Keys.FirstOrDefault();
+                if (first is not null)
+                {
+                    _callbackRequests.Remove(first);
+                }
+            }
+        }
+    }
+
+    private void RemoveCallbackRequest(string? requestId)
+    {
+        if (requestId is null)
+        {
+            return;
+        }
+
+        lock (_callbackGate)
+        {
+            _callbackRequests.Remove(requestId);
+        }
+    }
+
+    private static void ValidateCanonicalMessageEnvelope(DirectInvocationRequest request)
+    {
+        if (request.InterfaceVersion != QqDirectMessageMapper.InterfaceVersion
+            || request.Method is not (
+                QqDirectMessageMapper.SendMessageMethod
+                or QqDirectMessageMapper.RespondRequestMethod))
+        {
+            throw new QqDirectMappingException(
+                "METHOD_NOT_FOUND",
+                "Only message.connector.v1/send_message and respond_request version 1 are registered.");
+        }
+
+        string expectedTypeUrl = request.Method == QqDirectMessageMapper.SendMessageMethod
+            ? QqDirectMessageMapper.SendMessageRequestTypeUrl
+            : QqDirectMessageMapper.RespondRequestTypeUrl;
+        if (request.PayloadTypeUrl != expectedTypeUrl)
+        {
+            throw new QqDirectMappingException(
+                "PAYLOAD_TYPE_MISMATCH",
+                $"{request.Method} payload_type_url is not the canonical request type.");
+        }
+
+        if (request.Payload.Length > QqHostProtocol.MaxFrameBytes)
+        {
+            throw new QqDirectMappingException(
+                "PAYLOAD_TOO_LARGE",
+                "canonical message payload exceeds the 8 MiB limit.");
+        }
+    }
+
+    private static string DecodeUtf8(ByteString payload, string field)
+    {
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(payload.Span);
+        }
+        catch (DecoderFallbackException)
+        {
+            throw new QqDirectMappingException(
+                "INVALID_REQUEST",
+                $"{field} must be valid UTF-8 JSON.");
+        }
+    }
+
+    private static DirectInvocationError SubscriptionFailure(
+        QqDirectSubscriptionException exception) =>
+        new()
+        {
+            Code = exception.DomainCode switch
+            {
+                "METHOD_NOT_FOUND" => DirectInvocationError.Types.Code.MethodNotFound,
+                "CAPABILITY_UNAVAILABLE" => DirectInvocationError.Types.Code.Unavailable,
+                _ => DirectInvocationError.Types.Code.InvalidRequest
+            },
+            Message = exception.Message,
+            DomainCode = exception.DomainCode
+        };
 
     private static void ValidateEnvelope(DirectInvocationRequest request)
     {
@@ -334,5 +714,21 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
             retryable: code is DirectInvocationError.Types.Code.Unavailable
                 or DirectInvocationError.Types.Code.DeadlineExceeded,
             domainCode: exception.Code);
+    }
+
+    private static InvocationResult Failure(QqDirectMappingException exception)
+    {
+        DirectInvocationError.Types.Code code = exception.DomainCode switch
+        {
+            "METHOD_NOT_FOUND" => DirectInvocationError.Types.Code.MethodNotFound,
+            "PAYLOAD_TOO_LARGE" or "PAYLOAD_TYPE_MISMATCH" or "INVALID_REQUEST" =>
+                DirectInvocationError.Types.Code.InvalidRequest,
+            _ => DirectInvocationError.Types.Code.ExecutionFailed
+        };
+        return InvocationResult.Failure(
+            code,
+            exception.Message,
+            retryable: false,
+            domainCode: exception.DomainCode);
     }
 }
