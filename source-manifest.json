@@ -726,8 +726,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "29f4dde831d049e61bb6bd63b060bff7bbcf868869832d70aa618413c868d21e",
-      "size_bytes": 5776
+      "sha256": "b96b06942eb4be8f21da8e48d246239609fd7f6528772a9a0b268b6bef4d160b",
+      "size_bytes": 6084
     },
     {
       "kind": "file",
@@ -817,22 +817,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/connector.py",
-      "sha256": "16abfe78a025696ccb2dbba7890764baa7688440302854e6c17e397b6aee7cbd",
-      "size_bytes": 63428
+      "sha256": "318b608c6c784917bf828d4d38b6e8d98b17e24e26e50c827a0617f0b78f8f06",
+      "size_bytes": 64027
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/plugin.py",
-      "sha256": "5845b6bba8568a384028a65df1a209883b045e62ac3611536b2cf6330e081726",
-      "size_bytes": 5941
+      "sha256": "b5aafbf5fbf5bc9b96ce5375d468012a93b68f833d2da0962404c720a5655858",
+      "size_bytes": 6332
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct.py",
-      "sha256": "91b40520e4de3095ff7e58b82fe2f8ffc87affc916adad5fa27291015f86a989",
-      "size_bytes": 73299
+      "sha256": "0588f4dd2a2bd7b45c9616d5cff348292a4f6d9a3a646158a61e0f4efc9cad17",
+      "size_bytes": 73760
     },
     {
       "kind": "file",
@@ -929,8 +929,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
-      "sha256": "6cf86ab69237f098d861d6f16582b3af5dd245f69d430a7e3c40ef4a4003ec10",
-      "size_bytes": 2194
+      "sha256": "a7ea1c8fa9dbd0b0cc69b8983b9ebf1a0551274334de81defd067150c4b6b279",
+      "size_bytes": 2273
     },
     {
       "kind": "file",
@@ -3890,7 +3890,7 @@
     },
     {
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "29f4dde831d049e61bb6bd63b060bff7bbcf868869832d70aa618413c868d21e"
+      "sha256": "b96b06942eb4be8f21da8e48d246239609fd7f6528772a9a0b268b6bef4d160b"
     }
   ],
   "schema_version": "cyrene.public-source-manifest.v1",

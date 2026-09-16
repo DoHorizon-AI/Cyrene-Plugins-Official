@@ -766,10 +766,15 @@ class QQNTDirectConnector:
         self._subscriptions.pop(subscription_id, None)
 
     def on_cancel(self, request_id: str, reason: str) -> None:
-        """Record cancellation at the worker seam.
+        """Acknowledge the runtime cancellation callback without duplicating it.
 
-        The direct runtime cancellation token is observed by the in-flight Host
-        request and sends the generation-scoped cancel frame.
+        The ``DirectPluginRuntime`` already passes a cancellation token to
+        ``on_invoke``. The in-flight Host request observes that token and sends
+        the generation-scoped cancel frame; this callback remains intentionally
+        side-effect free so it cannot race with the same cancellation path.
+
+        DirectPluginRuntime 已通过 ``on_invoke`` 传入取消信号；这里保持无副作用，避免
+        与同一取消路径竞争或重复发送 cancel frame。
         """
 
         del request_id, reason
@@ -902,6 +907,8 @@ class QQNTDirectConnector:
         }:
 
             def remember_request(request_id: str) -> None:
+                """Bind a callback-capable native call to its originating request."""
+
                 nonlocal callback_request_id
                 callback_request_id = request_id
                 self._remember_callback_request(request_id, operation)
