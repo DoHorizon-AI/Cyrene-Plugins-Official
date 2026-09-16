@@ -1398,8 +1398,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectInvocationDispatcher.cs",
-      "sha256": "cdda1fcb7dc2306cd6e47fa6e59d27d0f41a2df1995930cbab5c406cb7ab8488",
-      "size_bytes": 26142
+      "sha256": "a8d93ca0670c790cddf176bf1d708d7510be55bfc92463e9ccc83ca7fa9e982f",
+      "size_bytes": 26356
     },
     {
       "kind": "file",
@@ -1435,6 +1435,13 @@
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostOperationRegistry.cs",
       "sha256": "4441dc3b07a69d72663818b64b3c2da0565299228314da698c28443c2d600d1b",
       "size_bytes": 11788
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostOperationValidator.cs",
+      "sha256": "e52ad84440ffb144dcab2bea99bdc690a313af66920b68a7f27410672861762d",
+      "size_bytes": 27842
     },
     {
       "kind": "file",
@@ -1482,8 +1489,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/DispatcherTests.cs",
-      "sha256": "2d89d357d887e90aed363214f40303b2dc378e629ccefdf7ad2a9032969b1f4e",
-      "size_bytes": 22039
+      "sha256": "cacb6a8097ff4d08eb6e08da599647cd52098a64e085cfe7e559bccea55e8a39",
+      "size_bytes": 25385
     },
     {
       "kind": "file",

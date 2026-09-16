@@ -66,7 +66,7 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
             ValidateEnvelope(request);
             using JsonDocument document = JsonDocument.Parse(request.Payload.ToByteArray());
             JsonElement root = document.RootElement;
-            JsonElement parameters = ParseParameters(root);
+            JsonElement parameters = ParseParameters(request.Method, root);
             QqHostOperationRegistry.TryGet(request.Method, out QqHostOperation? operation);
             await EnsureHostStartedAsync(cancellationToken);
             if (operation!.Mapping != "session")
@@ -83,6 +83,7 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
                 request.Method,
                 parameters,
                 cancellationToken);
+            QqHostOperationValidator.ValidateResult(request.Method, result);
             UpdateSessionState(request.Method, result);
             QqClientResponse response = new()
             {
@@ -681,7 +682,7 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
 
     }
 
-    private static JsonElement ParseParameters(JsonElement root)
+    private static JsonElement ParseParameters(string operation, JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object
             || root.EnumerateObject().Count() != 1
@@ -693,7 +694,9 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
                 "qq.client.v1 request must contain only an object params field");
         }
 
-        return parameters.Clone();
+        JsonElement copy = parameters.Clone();
+        QqHostOperationValidator.ValidateParameters(operation, copy);
+        return copy;
     }
 
     private static InvocationResult Failure(QqHostException exception)
