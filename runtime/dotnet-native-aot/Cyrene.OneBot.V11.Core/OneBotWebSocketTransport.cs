@@ -26,7 +26,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
     private readonly CancellationTokenSource _shutdown = new();
     private readonly Dictionary<string, TaskCompletionSource<OneBotActionResponse>> _pending = new();
     private TaskCompletionSource<bool> _connected = NewSignal();
-    private ClientWebSocket? _socket;
+    private WebSocket? _socket;
     private Task? _runTask;
     private Action<JsonElement>? _eventHandler;
     private long _nextEcho;
@@ -35,12 +35,20 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
 
     public OneBotWebSocketTransport(OneBotProfile profile)
     {
-        if (profile.TransportProfile != OneBotTransportProfile.ForwardWebSocket
-            || profile.WebSocketUrl is null)
+        if (profile.TransportProfile == OneBotTransportProfile.ForwardWebSocket
+            && profile.WebSocketUrl is null)
         {
             throw new OneBotConfigurationException(
                 "TRANSPORT_PROFILE_MISMATCH",
                 "OneBotWebSocketTransport requires a forward_websocket profile.");
+        }
+
+        if (profile.TransportProfile is not OneBotTransportProfile.ForwardWebSocket
+            and not OneBotTransportProfile.ReverseWebSocket)
+        {
+            throw new OneBotConfigurationException(
+                "TRANSPORT_PROFILE_MISMATCH",
+                "OneBotWebSocketTransport requires a WebSocket profile.");
         }
 
         _profile = profile;
@@ -85,8 +93,33 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
                 return;
             }
 
-            _runTask = RunAsync();
+            if (_profile.TransportProfile == OneBotTransportProfile.ForwardWebSocket)
+            {
+                _runTask = RunAsync();
+            }
         }
+    }
+
+    public void AttachSocket(WebSocket socket)
+    {
+        WebSocket? previous;
+        lock (_stateLock)
+        {
+            if (_closed)
+            {
+                socket.Abort();
+                socket.Dispose();
+                return;
+            }
+
+            previous = _socket;
+            _socket = socket;
+            _connected.TrySetResult(true);
+            _runTask = ReceiveAttachedAsync(socket);
+        }
+
+        previous?.Abort();
+        previous?.Dispose();
     }
 
     public async Task<OneBotActionResponse> CallAsync(
@@ -137,7 +170,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
             await _sendLock.WaitAsync(timeout.Token);
             try
             {
-                ClientWebSocket socket = CurrentSocket();
+                WebSocket socket = CurrentSocket();
                 await socket.SendAsync(
                     new ArraySegment<byte>(encoded),
                     WebSocketMessageType.Text,
@@ -192,7 +225,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
 
             _closed = true;
             _connected.TrySetCanceled();
-            ClientWebSocket? socket = _socket;
+            WebSocket? socket = _socket;
             _socket = null;
             socket?.Abort();
             socket?.Dispose();
@@ -300,7 +333,41 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
         }
     }
 
-    private async Task ReceiveLoopAsync(ClientWebSocket socket)
+    private async Task ReceiveAttachedAsync(WebSocket socket)
+    {
+        try
+        {
+            await ReceiveLoopAsync(socket);
+        }
+        catch (OperationCanceledException) when (_shutdown.IsCancellationRequested)
+        {
+        }
+        catch (WebSocketException)
+        {
+            FailPending(new OneBotTransportException(
+                "CAPABILITY_UNAVAILABLE",
+                "OneBot WebSocket runtime disconnected."));
+        }
+        catch (OneBotTransportException exception)
+        {
+            FailPending(exception);
+        }
+        catch (JsonException)
+        {
+            FailPending(new OneBotTransportException(
+                "PROTOCOL_MISMATCH",
+                "OneBot WebSocket runtime sent malformed JSON."));
+        }
+        finally
+        {
+            FailPending(new OneBotTransportException(
+                "CAPABILITY_UNAVAILABLE",
+                "OneBot WebSocket runtime disconnected."));
+            Disconnect(socket);
+        }
+    }
+
+    private async Task ReceiveLoopAsync(WebSocket socket)
     {
         byte[] buffer = new byte[16 * 1024];
         while (!_shutdown.IsCancellationRequested && socket.State == WebSocketState.Open)
@@ -416,7 +483,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
         }
     }
 
-    private ClientWebSocket CurrentSocket()
+    private WebSocket CurrentSocket()
     {
         lock (_stateLock)
         {
@@ -440,7 +507,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
         }
     }
 
-    private void Disconnect(ClientWebSocket? socket)
+    private void Disconnect(WebSocket? socket)
     {
         lock (_stateLock)
         {
