@@ -32,14 +32,22 @@ public static class Program
         else
         {
             builder.Services.AddSingleton(profile);
+            builder.Services.AddSingleton<OneBotEventSubscriptionRegistry>();
             builder.Services.AddSingleton<HttpClient>(_ => new HttpClient
             {
                 Timeout = Timeout.InfiniteTimeSpan
             });
             builder.Services.AddSingleton<IOneBotActionTransport>(serviceProvider =>
-                OneBotTransportFactory.Create(
+            {
+                IOneBotActionTransport transport = OneBotTransportFactory.Create(
                     profile,
-                    serviceProvider.GetRequiredService<HttpClient>()));
+                    serviceProvider.GetRequiredService<HttpClient>());
+                transport.SetEventHandler(
+                    serviceProvider
+                        .GetRequiredService<OneBotEventSubscriptionRegistry>()
+                        .Publish);
+                return transport;
+            });
             if (profile.TransportProfile == OneBotTransportProfile.ReverseWebSocket)
             {
                 builder.Services.AddSingleton(serviceProvider =>

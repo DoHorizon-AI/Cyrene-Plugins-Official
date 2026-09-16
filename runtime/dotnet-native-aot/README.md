@@ -45,11 +45,16 @@ must provide `Authorization: Bearer <access_token>` when a token is configured.
 The runtime accepts the existing canonical `message.connector.v1/send_message`
 protobuf request and maps private/group conversations plus reply, text,
 mention, image, and file parts to OneBot v11 actions. It never logs or includes
-the access token in protocol errors.
+the access token in protocol errors. `InvokeStream` also accepts the existing
+subscription shape (`method=events`, the canonical `Filter` type URL, and
+`DIRECT_STREAM_MODE_SUBSCRIPTION`) and emits bounded `DirectPayload` items for
+normalized `inbound_message` and `inbound_request` events.
 
 运行时接受现有的 `message.connector.v1/send_message` protobuf 请求，并将私聊/群聊、
 回复、文本、提及、图片和文件片段映射到 OneBot v11 action；协议错误不会记录或包含
-access token。
+access token。`InvokeStream` 也接受现有订阅形态（`method=events`、规范 `Filter`
+type URL 与 `DIRECT_STREAM_MODE_SUBSCRIPTION`），并以有界 `DirectPayload` 流输出规范化的
+`inbound_message` 与 `inbound_request` 事件。
 
 ## 2. Invariants & Implementation Details / 核心不变量与实现细节
 
