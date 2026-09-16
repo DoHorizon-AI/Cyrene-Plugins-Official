@@ -107,6 +107,14 @@ def _response(
             "account_id": "10001",
             "session_token": "fixture-secret",
         }
+    elif mode == "mismatched_result":
+        result = {
+            "operation": (
+                "qq.friend.list" if operation != "qq.friend.list" else "qq.group.list"
+            ),
+            "state": "ready",
+            "account_id": "10001",
+        }
     elif mode == "missing_send_identity" and operation == "qq.message.send":
         result = {
             "sequence": 7,
