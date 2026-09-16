@@ -6,6 +6,8 @@
 // │  模块职责：显式 AOT 分派器调用校验的契约测试                                │
 // └─────────────────────────────────────────────────────────────────────────┘
 
+using System.Diagnostics;
+using System.Globalization;
 using System.Text.Json;
 using Cyrene.Message.Connector.V1;
 using Cyrene.OneBot.V11.Core;
@@ -168,6 +170,239 @@ public sealed class DispatcherTests
         Assert.Equal("ready", result.GetProperty("state").GetString());
         await client.CloseAsync(CancellationToken.None);
         Assert.Equal("STOPPED", client.State);
+    }
+
+    [Fact]
+    public async Task QqHostClientRedactsCredentialLikeStderrDiagnostics()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-diagnostics-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=stderr_secret");
+        await using QqHostClient client = new(profile.HostLaunch);
+
+        await client.StartAsync(CancellationToken.None);
+        await client.RequestAsync(
+            "qq.group.list",
+            JsonSerializer.SerializeToElement(
+                new Dictionary<string, string> { ["account_id"] = "10001" },
+                QqHostJsonContext.Default.DictionaryStringString),
+            CancellationToken.None);
+
+        await WaitUntilAsync(
+            () => client.Diagnostics.Count > 0,
+            TimeSpan.FromSeconds(1));
+        string diagnostics = string.Join('\n', client.Diagnostics);
+        Assert.DoesNotContain("fixture-password", diagnostics, StringComparison.Ordinal);
+        Assert.DoesNotContain("fixture-token", diagnostics, StringComparison.Ordinal);
+        Assert.Contains("<redacted>", diagnostics, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task QqHostClientFailsClosedWhenTheHostOpensATcpListener()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-listener-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=late_tcp_listener");
+        await using QqHostClient client = new(profile.HostLaunch);
+
+        await client.StartAsync(CancellationToken.None);
+        await client.RequestAsync(
+            "qq.group.list",
+            JsonSerializer.SerializeToElement(
+                new Dictionary<string, string> { ["account_id"] = "10001" },
+                QqHostJsonContext.Default.DictionaryStringString),
+            CancellationToken.None);
+
+        await WaitUntilAsync(
+            () => client.State == "FAILED",
+            TimeSpan.FromSeconds(2),
+            () => $"state={client.State}, failure={client.FailureCode}");
+        Assert.Equal("PROTOCOL_MISMATCH", client.FailureCode);
+        Assert.Contains(
+            client.Diagnostics,
+            item => item.Contains("TCP listener", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task QqHostClientReapsBindingLocalProcessTree()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-process-tree-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=spawn_child");
+        await using QqHostClient client = new(profile.HostLaunch);
+
+        await client.StartAsync(CancellationToken.None);
+        string childPidFile = Path.Combine(dataDirectory, "fixture-child.pid");
+        await WaitUntilAsync(
+            () => File.Exists(childPidFile),
+            TimeSpan.FromSeconds(1));
+        int childPid = int.Parse(
+            File.ReadAllText(childPidFile),
+            CultureInfo.InvariantCulture);
+
+        await client.CloseAsync(CancellationToken.None);
+        await WaitUntilAsync(
+            () => !IsLiveProcess(childPid),
+            TimeSpan.FromSeconds(2));
+        Assert.False(IsLiveProcess(childPid));
+    }
+
+    [Fact]
+    public async Task QqHostClientUsesAnExactInstallationManifest()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-manifest-test-{Guid.NewGuid():N}");
+        string manifest = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-manifest-{Guid.NewGuid():N}.json");
+        File.WriteAllText(
+            manifest,
+            "{\"schema\":\"cyrene.qq.installation.v1\","
+            + "\"installation_id\":\"fixture\","
+            + "\"host_executable\":\"/usr/bin/python3\","
+            + $"\"data_dir\":{JsonString(dataDirectory)},"
+            + "\"client_version\":\"fixture-client\","
+            + "\"platform\":\"linux-x86_64\","
+            + "\"architecture\":\"x86_64\"}");
+        QqDirectProfile profile = CreateQqProfile(fixture, dataDirectory) with
+        {
+            InstallationManifest = manifest
+        };
+        await using QqHostClient client = new(profile.HostLaunch);
+
+        await client.StartAsync(CancellationToken.None);
+        Assert.Equal("NATIVE_READY", client.State);
+        Assert.Equal("fixture-client", client.Compatibility?.ClientVersion);
+    }
+
+    [Fact]
+    public async Task QqHostClientRecoversOnceWithoutReplayingTheFailedOperation()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-recovery-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=crash_once") with
+        {
+            RestartBackoffSeconds = 0
+        };
+        await using QqHostClient client = new(profile.HostLaunch);
+
+        await client.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(
+            () => client.State == "FAILED",
+            TimeSpan.FromSeconds(2),
+            () => $"state={client.State}, failure={client.FailureCode}");
+        await Assert.ThrowsAsync<QqHostException>(async () =>
+            await client.RequestAsync(
+                "qq.group.list",
+                JsonSerializer.SerializeToElement(
+                    new Dictionary<string, string> { ["account_id"] = "10001" },
+                    QqHostJsonContext.Default.DictionaryStringString),
+                CancellationToken.None));
+
+        await client.RecoverAsync(CancellationToken.None);
+        JsonElement result = await client.RequestAsync(
+            "qq.group.list",
+            JsonSerializer.SerializeToElement(
+                new Dictionary<string, string> { ["account_id"] = "10001" },
+                QqHostJsonContext.Default.DictionaryStringString),
+            CancellationToken.None);
+        Assert.Equal(2, client.Generation);
+        Assert.Equal(1, client.Supervision.RestartAttemptsInWindow);
+        Assert.Equal("ready", result.GetProperty("state").GetString());
+    }
+
+    [Fact]
+    public async Task QqHostClientOpensTheCrashCircuitAfterTheRestartBudget()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-circuit-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=crash_after_hello") with
+        {
+            MaxRestartAttempts = 1,
+            RestartBackoffSeconds = 0,
+            CrashCircuitCooldownSeconds = 60
+        };
+        await using QqHostClient client = new(profile.HostLaunch);
+
+        await client.StartAsync(CancellationToken.None);
+        await WaitUntilAsync(
+            () => client.State == "FAILED",
+            TimeSpan.FromSeconds(2),
+            () => $"state={client.State}, failure={client.FailureCode}");
+        await client.RecoverAsync(CancellationToken.None);
+        await WaitUntilAsync(
+            () => client.State == "FAILED",
+            TimeSpan.FromSeconds(2),
+            () => $"state={client.State}, failure={client.FailureCode}");
+
+        QqHostException exception = await Assert.ThrowsAsync<QqHostException>(async () =>
+            await client.RecoverAsync(CancellationToken.None));
+        Assert.Equal("CAPABILITY_UNAVAILABLE", exception.Code);
+        Assert.True(client.Supervision.CircuitOpen);
+        Assert.Equal(1, client.Supervision.RestartAttemptsInWindow);
     }
 
     [Fact]
@@ -556,6 +791,35 @@ public sealed class DispatcherTests
 
     private static string JsonString(string value) =>
         $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
+
+    private static async Task WaitUntilAsync(
+        Func<bool> condition,
+        TimeSpan timeout,
+        Func<string>? failureDetails = null)
+    {
+        DateTime deadline = DateTime.UtcNow.Add(timeout);
+        while (!condition() && DateTime.UtcNow < deadline)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(10));
+        }
+
+        Assert.True(
+            condition(),
+            $"condition was not satisfied before the timeout{failureDetails?.Invoke() ?? string.Empty}");
+    }
+
+    private static bool IsLiveProcess(int pid)
+    {
+        try
+        {
+            using Process process = Process.GetProcessById(pid);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            return false;
+        }
+    }
 
     private static string RepositoryPath(params string[] parts)
     {

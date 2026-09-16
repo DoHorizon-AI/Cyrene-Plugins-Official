@@ -47,7 +47,8 @@ public sealed record QqDirectProfile(
         RestartWindowSeconds,
         RestartBackoffSeconds,
         RestartBackoffMaxSeconds,
-        CrashCircuitCooldownSeconds);
+        CrashCircuitCooldownSeconds,
+        InstallationManifest);
 }
 
 /// <summary>Configuration failure safe to expose across the plugin boundary.</summary>

@@ -8,6 +8,7 @@
 
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using System.Text.Json;
 
 namespace Cyrene.OneBot.V11.Core;
@@ -28,7 +29,8 @@ public sealed record QqHostLaunchConfiguration(
     double RestartWindowSeconds = 60,
     double RestartBackoffSeconds = 0.25,
     double RestartBackoffMaxSeconds = 5,
-    double CrashCircuitCooldownSeconds = 60);
+    double CrashCircuitCooldownSeconds = 60,
+    string? InstallationManifest = null);
 
 /// <summary>Negotiated QQ Host compatibility facts safe for diagnostics.</summary>
 public sealed record QqHostCompatibility(
@@ -39,6 +41,14 @@ public sealed record QqHostCompatibility(
     string Platform,
     string ClientVersion,
     string HostAbi);
+
+/// <summary>Bounded restart and crash-circuit state safe for diagnostics.</summary>
+public sealed record QqHostSupervision(
+    string State,
+    string? FailureCode,
+    int RestartAttemptsInWindow,
+    int MaxRestartAttempts,
+    bool CircuitOpen);
 
 /// <summary>Structured error from the QQ Host process boundary.</summary>
 public sealed class QqHostException : Exception
@@ -63,6 +73,7 @@ public sealed class QqHostClient : IAsyncDisposable
 
     private readonly QqHostLaunchConfiguration _configuration;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
+    private readonly SemaphoreSlim _transitionGate = new(1, 1);
     private readonly SemaphoreSlim _writeGate = new(1, 1);
     private readonly object _stateGate = new();
     private readonly Dictionary<string, PendingRequest> _pending = new(StringComparer.Ordinal);
@@ -72,12 +83,14 @@ public sealed class QqHostClient : IAsyncDisposable
     private Stream? _output;
     private Task? _readerTask;
     private Task? _stderrTask;
+    private Task? _listenerTask;
     private long _requestCounter;
     private int _generation;
     private string _state = "CREATED";
     private string? _failureCode;
     private QqHostCompatibility? _compatibility;
     private readonly List<DateTimeOffset> _restartHistory = new();
+    private readonly List<string> _diagnostics = new();
     private DateTimeOffset _circuitOpenUntil;
     private bool _disposed;
 
@@ -149,6 +162,48 @@ public sealed class QqHostClient : IAsyncDisposable
         }
     }
 
+    public int RestartAttemptsInWindow
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                PruneRestartHistory(DateTimeOffset.UtcNow);
+                return _restartHistory.Count;
+            }
+        }
+    }
+
+    /// <summary>Returns bounded restart state without process arguments or secrets.</summary>
+    public QqHostSupervision Supervision
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                PruneRestartHistory(DateTimeOffset.UtcNow);
+                return new QqHostSupervision(
+                    _state,
+                    _failureCode,
+                    _restartHistory.Count,
+                    _configuration.MaxRestartAttempts,
+                    DateTimeOffset.UtcNow < _circuitOpenUntil);
+            }
+        }
+    }
+
+    /// <summary>Returns bounded stderr and supervision diagnostics after redaction.</summary>
+    public IReadOnlyList<string> Diagnostics
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return _diagnostics.ToArray();
+            }
+        }
+    }
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -168,9 +223,10 @@ public sealed class QqHostClient : IAsyncDisposable
                 _compatibility = null;
             }
 
-            Directory.CreateDirectory(_configuration.DataDirectory);
-            ValidateDataDirectory(_configuration.DataDirectory);
-            Process process = StartProcess();
+            QqHostInstallation installation = QqHostInstallationResolver.Resolve(_configuration);
+            Directory.CreateDirectory(installation.DataDirectory);
+            ValidateDataDirectory(installation.DataDirectory);
+            Process process = StartProcess(installation);
             lock (_stateGate)
             {
                 _process = process;
@@ -183,6 +239,9 @@ public sealed class QqHostClient : IAsyncDisposable
                     CancellationToken.None);
                 _stderrTask = Task.Run(
                     () => DrainStderrAsync(process, lifetimeToken),
+                    CancellationToken.None);
+                _listenerTask = Task.Run(
+                    () => WatchForTcpListenersAsync(process, lifetimeToken),
                     CancellationToken.None);
             }
 
@@ -203,10 +262,19 @@ public sealed class QqHostClient : IAsyncDisposable
                 allowHello: true,
                 cancellationToken);
             QqHostCompatibility compatibility = ValidateHello(report);
+            AssertNoTcpListener(process);
             lock (_stateGate)
             {
-                _compatibility = compatibility;
-                _state = "NATIVE_READY";
+                if (_state != "FAILED" && !process.HasExited)
+                {
+                    _compatibility = compatibility;
+                    _state = "NATIVE_READY";
+                }
+                else if (_state != "FAILED")
+                {
+                    _state = "FAILED";
+                    _failureCode = "PROCESS_EXITED";
+                }
             }
         }
         catch
@@ -255,54 +323,69 @@ public sealed class QqHostClient : IAsyncDisposable
 
     public async Task RestartAsync(CancellationToken cancellationToken)
     {
-        await CloseAsync(cancellationToken);
-        await StartAsync(cancellationToken);
+        await _transitionGate.WaitAsync(cancellationToken);
+        try
+        {
+            await CloseAsync(cancellationToken);
+            await StartAsync(cancellationToken);
+        }
+        finally
+        {
+            _transitionGate.Release();
+        }
     }
 
     public async Task RecoverAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
-        DateTimeOffset now = DateTimeOffset.UtcNow;
-        double delay;
-        lock (_stateGate)
+        await _transitionGate.WaitAsync(cancellationToken);
+        try
         {
-            if (_state != "FAILED"
-                || _failureCode is not ("PROCESS_EXITED" or "STDIO_CLOSED"))
+            DateTimeOffset now = DateTimeOffset.UtcNow;
+            double delay;
+            lock (_stateGate)
             {
-                throw new QqHostException(
-                    "CAPABILITY_UNAVAILABLE",
-                    "QQ Host failure is not eligible for automatic recovery");
+                if (_state != "FAILED"
+                    || _failureCode is not ("PROCESS_EXITED" or "STDIO_CLOSED"))
+                {
+                    throw new QqHostException(
+                        "CAPABILITY_UNAVAILABLE",
+                        "QQ Host failure is not eligible for automatic recovery");
+                }
+
+                PruneRestartHistory(now);
+                if (now < _circuitOpenUntil)
+                {
+                    throw new QqHostException("CAPABILITY_UNAVAILABLE", "QQ Host crash circuit is open");
+                }
+
+                if (_restartHistory.Count >= _configuration.MaxRestartAttempts)
+                {
+                    _circuitOpenUntil = now.AddSeconds(_configuration.CrashCircuitCooldownSeconds);
+                    throw new QqHostException(
+                        "CAPABILITY_UNAVAILABLE",
+                        "QQ Host crash restart budget exhausted");
+                }
+
+                int attempt = _restartHistory.Count;
+                _restartHistory.Add(now);
+                delay = Math.Min(
+                    _configuration.RestartBackoffSeconds * Math.Pow(2, attempt),
+                    _configuration.RestartBackoffMaxSeconds);
             }
 
-            _restartHistory.RemoveAll(
-                timestamp => timestamp < now.AddSeconds(-_configuration.RestartWindowSeconds));
-            if (now < _circuitOpenUntil)
+            if (delay > 0)
             {
-                throw new QqHostException("CAPABILITY_UNAVAILABLE", "QQ Host crash circuit is open");
+                await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
             }
 
-            if (_restartHistory.Count >= _configuration.MaxRestartAttempts)
-            {
-                _circuitOpenUntil = now.AddSeconds(_configuration.CrashCircuitCooldownSeconds);
-                throw new QqHostException(
-                    "CAPABILITY_UNAVAILABLE",
-                    "QQ Host crash restart budget exhausted");
-            }
-
-            int attempt = _restartHistory.Count;
-            _restartHistory.Add(now);
-            delay = Math.Min(
-                _configuration.RestartBackoffSeconds * Math.Pow(2, attempt),
-                _configuration.RestartBackoffMaxSeconds);
+            await CloseAsync(cancellationToken);
+            await StartAsync(cancellationToken);
         }
-
-        if (delay > 0)
+        finally
         {
-            await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
+            _transitionGate.Release();
         }
-
-        await CloseAsync(cancellationToken);
-        await StartAsync(cancellationToken);
     }
 
     public async Task CloseAsync(CancellationToken cancellationToken)
@@ -336,6 +419,7 @@ public sealed class QqHostClient : IAsyncDisposable
         {
             _lifecycleGate.Release();
             _lifecycleGate.Dispose();
+            _transitionGate.Dispose();
             _writeGate.Dispose();
         }
     }
@@ -536,19 +620,55 @@ public sealed class QqHostClient : IAsyncDisposable
         }
     }
 
-    private static async Task DrainStderrAsync(Process process, CancellationToken cancellationToken)
+    private async Task DrainStderrAsync(Process process, CancellationToken cancellationToken)
     {
         try
         {
             while (!cancellationToken.IsCancellationRequested
-                && await process.StandardError.ReadLineAsync(cancellationToken) is not null)
+                && await process.StandardError.ReadLineAsync(cancellationToken) is string line)
             {
+                string trimmed = line.Trim();
+                if (trimmed.Length > 0)
+                {
+                    RecordDiagnostic(trimmed);
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
         catch (IOException)
+        {
+        }
+    }
+
+    private async Task WatchForTcpListenersAsync(
+        Process process,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
+                try
+                {
+                    AssertNoTcpListener(process);
+                }
+                catch (QqHostException exception)
+                {
+                    MarkFailed(
+                        exception.Code,
+                        exception.Message,
+                        process,
+                        new QqHostException(exception.Code, exception.Message));
+                    RecordDiagnostic(exception.Message);
+                    TryKill(process);
+                    return;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
     }
@@ -610,6 +730,8 @@ public sealed class QqHostClient : IAsyncDisposable
         Process? process;
         Stream? input;
         int generation;
+        int processId;
+        IReadOnlyList<ProcessIdentity> processTree;
         lock (_stateGate)
         {
             process = _process;
@@ -622,6 +744,8 @@ public sealed class QqHostClient : IAsyncDisposable
             }
 
             _state = "DRAINING";
+            processId = process.Id;
+            processTree = CaptureProcessTree(processId);
         }
 
         if (!process.HasExited && input is not null)
@@ -670,6 +794,10 @@ public sealed class QqHostClient : IAsyncDisposable
         lifetimeCancellation?.Cancel();
         TryKill(process);
         process.Dispose();
+        await WaitForBackgroundTaskAsync(_readerTask);
+        await WaitForBackgroundTaskAsync(_stderrTask);
+        await WaitForBackgroundTaskAsync(_listenerTask);
+        KillCapturedDescendants(processTree, processId);
         lifetimeCancellation?.Dispose();
         lock (_stateGate)
         {
@@ -678,17 +806,18 @@ public sealed class QqHostClient : IAsyncDisposable
             _output = null;
             _readerTask = null;
             _stderrTask = null;
+            _listenerTask = null;
             _state = "STOPPED";
             _failureCode = null;
         }
     }
 
-    private Process StartProcess()
+    private Process StartProcess(QqHostInstallation installation)
     {
         ProcessStartInfo startInfo = new()
         {
-            FileName = _configuration.HostExecutable,
-            WorkingDirectory = _configuration.DataDirectory,
+            FileName = installation.HostExecutable,
+            WorkingDirectory = installation.DataDirectory,
             UseShellExecute = false,
             RedirectStandardInput = true,
             RedirectStandardOutput = true,
@@ -704,7 +833,7 @@ public sealed class QqHostClient : IAsyncDisposable
         startInfo.Environment["CYRENE_QQ_BINDING_ID"] = BindingId;
         startInfo.Environment["CYRENE_QQ_BINDING_GENERATION"] =
             generation.ToString(CultureInfo.InvariantCulture);
-        startInfo.Environment["CYRENE_QQ_BINDING_DATA_DIR"] = _configuration.DataDirectory;
+        startInfo.Environment["CYRENE_QQ_BINDING_DATA_DIR"] = installation.DataDirectory;
         Process process = new() { StartInfo = startInfo, EnableRaisingEvents = true };
         try
         {
@@ -789,7 +918,11 @@ public sealed class QqHostClient : IAsyncDisposable
         }
     }
 
-    private void MarkFailed(string code, string message, Process process)
+    private void MarkFailed(
+        string code,
+        string message,
+        Process process,
+        QqHostException? pendingException = null)
     {
         lock (_stateGate)
         {
@@ -804,7 +937,26 @@ public sealed class QqHostClient : IAsyncDisposable
                 : code;
         }
 
-        FailPending(new QqHostException("CAPABILITY_UNAVAILABLE", message));
+        FailPending(pendingException ?? new QqHostException("CAPABILITY_UNAVAILABLE", message));
+    }
+
+    private void RecordDiagnostic(string value)
+    {
+        string redacted = RedactDiagnostic(value);
+        lock (_stateGate)
+        {
+            _diagnostics.Add(redacted.Length > 512 ? redacted[..512] : redacted);
+            if (_diagnostics.Count > 64)
+            {
+                _diagnostics.RemoveRange(0, _diagnostics.Count - 64);
+            }
+        }
+    }
+
+    private void PruneRestartHistory(DateTimeOffset now)
+    {
+        _restartHistory.RemoveAll(
+            timestamp => timestamp < now.AddSeconds(-_configuration.RestartWindowSeconds));
     }
 
     private static QqHostLaunchConfiguration ValidateConfiguration(
@@ -876,6 +1028,251 @@ public sealed class QqHostClient : IAsyncDisposable
         return result;
     }
 
+    private sealed record ProcessIdentity(int Pid, string StartTime);
+
+    private static void AssertNoTcpListener(Process process)
+    {
+        if (!OperatingSystem.IsLinux() || process.HasExited)
+        {
+            return;
+        }
+
+        HashSet<string> listeningInodes = ReadListeningTcpInodes();
+        if (listeningInodes.Count == 0)
+        {
+            return;
+        }
+
+        foreach (int pid in ReadProcessTree(process.Id))
+        {
+            string fdRoot = $"/proc/{pid}/fd";
+            IEnumerable<string> entries;
+            try
+            {
+                entries = Directory.EnumerateFileSystemEntries(fdRoot);
+            }
+            catch (IOException)
+            {
+                continue;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (string entry in entries)
+            {
+                string? target;
+                try
+                {
+                    target = new FileInfo(entry).LinkTarget;
+                }
+                catch (IOException)
+                {
+                    continue;
+                }
+                catch (UnauthorizedAccessException)
+                {
+                    continue;
+                }
+
+                if (target is null
+                    || !target.StartsWith("socket:[", StringComparison.Ordinal)
+                    || !target.EndsWith(']'))
+                {
+                    continue;
+                }
+
+                string inode = target[8..^1];
+                if (listeningInodes.Contains(inode))
+                {
+                    throw new QqHostException(
+                        "PROTOCOL_MISMATCH",
+                        "QQ Host process tree opened a TCP listener");
+                }
+            }
+        }
+    }
+
+    private static HashSet<string> ReadListeningTcpInodes()
+    {
+        HashSet<string> inodes = new(StringComparer.Ordinal);
+        foreach (string table in new[] { "/proc/net/tcp", "/proc/net/tcp6" })
+        {
+            string[] lines;
+            try
+            {
+                lines = File.ReadAllLines(table);
+            }
+            catch (IOException)
+            {
+                continue;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                continue;
+            }
+
+            foreach (string line in lines.Skip(1))
+            {
+                string[] fields = line.Split(
+                    (char[]?)null,
+                    StringSplitOptions.RemoveEmptyEntries);
+                if (fields.Length > 9 && fields[3].Equals("0A", StringComparison.OrdinalIgnoreCase))
+                {
+                    inodes.Add(fields[9]);
+                }
+            }
+        }
+
+        return inodes;
+    }
+
+    private static int[] ReadProcessTree(int rootPid)
+    {
+        Dictionary<int, int> parents = new();
+        IEnumerable<string> entries;
+        try
+        {
+            entries = Directory.EnumerateDirectories("/proc");
+        }
+        catch (IOException)
+        {
+            return new[] { rootPid };
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return new[] { rootPid };
+        }
+
+        foreach (string entry in entries)
+        {
+            string name = Path.GetFileName(entry);
+            if (!int.TryParse(name, out int pid))
+            {
+                continue;
+            }
+
+            if (!TryReadProcessStat(pid, out int parentPid, out _))
+            {
+                continue;
+            }
+
+            parents[pid] = parentPid;
+        }
+
+        HashSet<int> result = new() { rootPid };
+        bool changed;
+        do
+        {
+            changed = false;
+            foreach ((int pid, int parentPid) in parents)
+            {
+                if (result.Contains(parentPid) && result.Add(pid))
+                {
+                    changed = true;
+                }
+            }
+        }
+        while (changed);
+
+        return result.ToArray();
+    }
+
+    private static IReadOnlyList<ProcessIdentity> CaptureProcessTree(int rootPid)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return Array.Empty<ProcessIdentity>();
+        }
+
+        List<ProcessIdentity> identities = new();
+        foreach (int pid in ReadProcessTree(rootPid))
+        {
+            if (TryReadProcessStat(pid, out _, out string startTime))
+            {
+                identities.Add(new ProcessIdentity(pid, startTime));
+            }
+        }
+
+        return identities;
+    }
+
+    private static bool TryReadProcessStat(
+        int pid,
+        out int parentPid,
+        out string startTime)
+    {
+        parentPid = 0;
+        startTime = string.Empty;
+        try
+        {
+            string stat = File.ReadAllText($"/proc/{pid}/stat");
+            int closingName = stat.LastIndexOf(')');
+            if (closingName < 0)
+            {
+                return false;
+            }
+
+            string[] fields = stat[(closingName + 2)..].Split(
+                (char[]?)null,
+                StringSplitOptions.RemoveEmptyEntries);
+            if (fields.Length <= 19 || !int.TryParse(fields[1], out parentPid))
+            {
+                return false;
+            }
+
+            startTime = fields[19];
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+    }
+
+    private static void KillCapturedDescendants(
+        IReadOnlyList<ProcessIdentity> processTree,
+        int rootPid)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        foreach (ProcessIdentity identity in processTree)
+        {
+            if (identity.Pid == rootPid
+                || !TryReadProcessStat(identity.Pid, out _, out string currentStartTime)
+                || currentStartTime != identity.StartTime)
+            {
+                continue;
+            }
+
+            try
+            {
+                using Process descendant = Process.GetProcessById(identity.Pid);
+                if (!descendant.HasExited)
+                {
+                    descendant.Kill();
+                }
+            }
+            catch (ArgumentException)
+            {
+            }
+            catch (InvalidOperationException)
+            {
+            }
+            catch (System.ComponentModel.Win32Exception)
+            {
+            }
+        }
+    }
+
     private static void TryKill(Process process)
     {
         try
@@ -891,6 +1288,86 @@ public sealed class QqHostClient : IAsyncDisposable
         catch (System.ComponentModel.Win32Exception)
         {
         }
+    }
+
+    private static async Task WaitForBackgroundTaskAsync(Task? task)
+    {
+        if (task is null || task.IsCompleted)
+        {
+            return;
+        }
+
+        try
+        {
+            await task.WaitAsync(TimeSpan.FromSeconds(2));
+        }
+        catch (Exception) when (task.IsCompleted || task.IsCanceled || task.IsFaulted)
+        {
+        }
+        catch (TimeoutException)
+        {
+        }
+    }
+
+    private static string RedactDiagnostic(string value)
+    {
+        const string redacted = "<redacted>";
+        string[] markers = ["password", "token", "secret", "ticket", "cookie"];
+        StringBuilder builder = new(value.Length);
+        int cursor = 0;
+        while (cursor < value.Length)
+        {
+            int markerStart = -1;
+            string? marker = null;
+            foreach (string candidate in markers)
+            {
+                int candidateStart = value.IndexOf(
+                    candidate,
+                    cursor,
+                    StringComparison.OrdinalIgnoreCase);
+                if (candidateStart >= 0 && (markerStart < 0 || candidateStart < markerStart))
+                {
+                    markerStart = candidateStart;
+                    marker = candidate;
+                }
+            }
+
+            if (markerStart < 0 || marker is null)
+            {
+                builder.Append(value, cursor, value.Length - cursor);
+                break;
+            }
+
+            int separator = markerStart + marker.Length;
+            while (separator < value.Length && char.IsWhiteSpace(value[separator]))
+            {
+                separator++;
+            }
+
+            if (separator >= value.Length || (value[separator] != ':' && value[separator] != '='))
+            {
+                builder.Append(value, cursor, markerStart + marker.Length - cursor);
+                cursor = markerStart + marker.Length;
+                continue;
+            }
+
+            int secretStart = separator + 1;
+            while (secretStart < value.Length && char.IsWhiteSpace(value[secretStart]))
+            {
+                secretStart++;
+            }
+            int secretEnd = secretStart;
+            while (secretEnd < value.Length && !char.IsWhiteSpace(value[secretEnd]))
+            {
+                secretEnd++;
+            }
+
+            builder.Append(value, cursor, secretStart - cursor);
+            builder.Append(redacted);
+            cursor = secretEnd;
+        }
+
+        return builder.ToString();
     }
 
     private void ThrowIfDisposed()
