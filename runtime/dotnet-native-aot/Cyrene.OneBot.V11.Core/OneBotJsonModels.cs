@@ -14,6 +14,9 @@ namespace Cyrene.OneBot.V11.Core;
 /// <summary>Bounded parameters for one OneBot v11 action.</summary>
 public sealed record OneBotActionRequest
 {
+    [JsonPropertyName("flag")]
+    public string? Flag { get; init; }
+
     [JsonPropertyName("group_id")]
     public ulong? GroupId { get; init; }
 
@@ -22,6 +25,18 @@ public sealed record OneBotActionRequest
 
     [JsonPropertyName("message")]
     public IReadOnlyList<OneBotMessageSegment>? Message { get; init; }
+
+    [JsonPropertyName("sub_type")]
+    public string? SubType { get; init; }
+
+    [JsonPropertyName("approve")]
+    public bool? Approve { get; init; }
+
+    [JsonPropertyName("remark")]
+    public string? Remark { get; init; }
+
+    [JsonPropertyName("reason")]
+    public string? Reason { get; init; }
 }
 
 /// <summary>One ordered OneBot v11 message segment.</summary>
@@ -120,6 +135,22 @@ public sealed class OneBotInboundRequestPayload
     public Dictionary<string, string> VendorRequest { get; set; } = new();
 }
 
+/// <summary>JSON result returned after a OneBot request decision.</summary>
+public sealed class OneBotRequestResponseResult
+{
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("request_id")]
+    public string RequestId { get; set; } = string.Empty;
+
+    [JsonPropertyName("request_kind")]
+    public string RequestKind { get; set; } = string.Empty;
+
+    [JsonPropertyName("decision")]
+    public string Decision { get; set; } = string.Empty;
+}
+
 [JsonSourceGenerationOptions(
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -132,6 +163,7 @@ public sealed class OneBotInboundRequestPayload
 [JsonSerializable(typeof(OneBotWebSocketActionRequest))]
 [JsonSerializable(typeof(OneBotWebSocketFrame))]
 [JsonSerializable(typeof(OneBotInboundRequestPayload))]
+[JsonSerializable(typeof(OneBotRequestResponseResult))]
 public partial class OneBotJsonContext : JsonSerializerContext
 {
 }

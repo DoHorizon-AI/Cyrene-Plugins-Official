@@ -6,6 +6,7 @@
 // │  模块职责：为通用 OneBot 消息 action 提供 AOT 安全的直接调用分派               │
 // └─────────────────────────────────────────────────────────────────────────┘
 
+using System.Text.Json;
 using Cyrene.Message.Connector.V1;
 using Cyrene.Plugin.Runtime.V1;
 using Google.Protobuf;
@@ -47,6 +48,11 @@ public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
 
             ValidateEnvelope(request);
             cancellationToken.ThrowIfCancellationRequested();
+            if (request.Method == OneBotRequestMapper.RespondRequestMethod)
+            {
+                return await InvokeRespondRequestAsync(request, cancellationToken);
+            }
+
             SendMessageRequest message = SendMessageRequest.Parser.ParseFrom(request.Payload);
             OneBotSendOperation operation = OneBotMessageMapper.MapSendMessage(message, _profile);
             OneBotActionResponse response = await _transport.CallAsync(
@@ -82,6 +88,13 @@ public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
                 DirectInvocationError.Types.Code.InvalidRequest,
                 exception.Message,
                 "INVALID_MESSAGE_MAPPING");
+        }
+        catch (OneBotRequestMappingException exception)
+        {
+            return Failure(
+                DirectInvocationError.Types.Code.InvalidRequest,
+                exception.Message,
+                "INVALID_REQUEST_MAPPING");
         }
         catch (OneBotConfigurationException exception) when (exception.DomainCode == "METHOD_NOT_FOUND")
         {
@@ -201,29 +214,58 @@ public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
     {
         if (!string.Equals(request.Capability, OneBotMessageMapper.CapabilityId, StringComparison.Ordinal)
             || !string.Equals(request.InterfaceVersion, OneBotMessageMapper.InterfaceVersion, StringComparison.Ordinal)
-            || !string.Equals(request.Method, OneBotMessageMapper.SendMessageMethod, StringComparison.Ordinal))
+            || (request.Method != OneBotMessageMapper.SendMessageMethod
+                && request.Method != OneBotRequestMapper.RespondRequestMethod))
         {
             throw new OneBotConfigurationException(
                 "METHOD_NOT_FOUND",
-                "Only message.connector.v1/send_message version 1 is registered.");
+                "Only message.connector.v1/send_message and respond_request version 1 are registered.");
         }
 
-        if (!string.Equals(
-                request.PayloadTypeUrl,
-                OneBotMessageMapper.SendMessageRequestTypeUrl,
-                StringComparison.Ordinal))
+        string expectedTypeUrl = request.Method == OneBotRequestMapper.RespondRequestMethod
+            ? OneBotRequestMapper.RespondRequestTypeUrl
+            : OneBotMessageMapper.SendMessageRequestTypeUrl;
+        if (!string.Equals(request.PayloadTypeUrl, expectedTypeUrl, StringComparison.Ordinal))
         {
             throw new OneBotConfigurationException(
                 "PAYLOAD_TYPE_MISMATCH",
-                "send_message payload_type_url is not the canonical request type.");
+                $"{request.Method} payload_type_url is not the canonical request type.");
         }
 
-        if (request.Payload.Length > MaxPayloadBytes)
+        int maxPayloadBytes = request.Method == OneBotRequestMapper.RespondRequestMethod
+            ? OneBotRequestMapper.MaxPayloadBytes
+            : MaxPayloadBytes;
+        if (request.Payload.Length > maxPayloadBytes)
         {
             throw new OneBotConfigurationException(
                 "PAYLOAD_TOO_LARGE",
-                "send_message payload exceeds the 8 MiB limit.");
+                $"{request.Method} payload exceeds the configured size limit.");
         }
+    }
+
+    private async ValueTask<InvocationResult> InvokeRespondRequestAsync(
+        DirectInvocationRequest request,
+        CancellationToken cancellationToken)
+    {
+        OneBotRequestOperation operation = OneBotRequestMapper.Map(
+            request.Payload.ToByteArray());
+        _ = await _transport.CallAsync(
+            operation.Action,
+            operation.Request,
+            cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        OneBotRequestResponseResult result = new()
+        {
+            Status = "accepted",
+            RequestId = operation.RequestId,
+            RequestKind = operation.RequestKind,
+            Decision = operation.Decision
+        };
+        return InvocationResult.Success(
+            OneBotRequestMapper.RespondResultTypeUrl,
+            JsonSerializer.SerializeToUtf8Bytes(
+                result,
+                OneBotJsonContext.Default.OneBotRequestResponseResult));
     }
 
     private static InvocationResult Failure(

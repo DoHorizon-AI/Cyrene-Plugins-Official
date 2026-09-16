@@ -127,6 +127,52 @@ public sealed class OneBotCoreTests
     }
 
     [Fact]
+    public async Task MapsRequestApprovalToFriendAndGroupActions()
+    {
+        RecordingHandler friendHandler = new(
+            "{\"status\":\"ok\",\"retcode\":0,\"data\":{}}");
+        using HttpClient friendClient = new(friendHandler);
+        OneBotProfile friendProfile = OneBotProfileLoader.FromJson(
+            "{\"binding_id\":\"qq-main\",\"http_base_url\":\"http://127.0.0.1:18080\"}");
+        OneBotInvocationDispatcher friendDispatcher = new(
+            friendProfile,
+            new OneBotHttpTransport(friendProfile, friendClient));
+
+        InvocationResult friendResult = await friendDispatcher.InvokeAsync(
+            CreateRequestApproval("friend", "approve", "flag-friend", "hello"),
+            CancellationToken.None);
+
+        Assert.Null(friendResult.Error);
+        Assert.Equal(
+            OneBotRequestMapper.RespondResultTypeUrl,
+            friendResult.Payload?.TypeUrl);
+        Assert.Equal("http://127.0.0.1:18080/set_friend_add_request", friendHandler.RequestUri!.ToString());
+        Assert.Contains("\"flag\":\"flag-friend\"", friendHandler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"approve\":true", friendHandler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"remark\":\"hello\"", friendHandler.Body, StringComparison.Ordinal);
+
+        RecordingHandler groupHandler = new(
+            "{\"status\":\"ok\",\"retcode\":0,\"data\":{}}");
+        using HttpClient groupClient = new(groupHandler);
+        OneBotProfile groupProfile = OneBotProfileLoader.FromJson(
+            "{\"binding_id\":\"qq-main\",\"http_base_url\":\"http://127.0.0.1:18080\"}");
+        OneBotInvocationDispatcher groupDispatcher = new(
+            groupProfile,
+            new OneBotHttpTransport(groupProfile, groupClient));
+
+        InvocationResult groupResult = await groupDispatcher.InvokeAsync(
+            CreateRequestApproval("group_invite", "reject", "flag-group", "nope"),
+            CancellationToken.None);
+
+        Assert.Null(groupResult.Error);
+        Assert.Equal("http://127.0.0.1:18080/set_group_add_request", groupHandler.RequestUri!.ToString());
+        Assert.Contains("\"flag\":\"flag-group\"", groupHandler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"sub_type\":\"invite\"", groupHandler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"approve\":false", groupHandler.Body, StringComparison.Ordinal);
+        Assert.Contains("\"reason\":\"nope\"", groupHandler.Body, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ForwardWebSocketCorrelatesActionAndDeliversEvent()
     {
         using WebSocketPeer peer = new();
@@ -386,6 +432,21 @@ public sealed class OneBotCoreTests
             Payload = Google.Protobuf.ByteString.CopyFrom(message.ToByteArray())
         };
     }
+
+    private static DirectInvocationRequest CreateRequestApproval(
+        string requestKind,
+        string decision,
+        string requestId,
+        string comment) => new()
+        {
+            Capability = OneBotMessageMapper.CapabilityId,
+            InterfaceVersion = OneBotMessageMapper.InterfaceVersion,
+            Method = OneBotRequestMapper.RespondRequestMethod,
+            PayloadTypeUrl = OneBotRequestMapper.RespondRequestTypeUrl,
+            Payload = Google.Protobuf.ByteString.CopyFromUtf8(
+                $"{{\"request_id\":\"{requestId}\",\"request_kind\":\"{requestKind}\","
+                + $"\"decision\":\"{decision}\",\"comment\":\"{comment}\"}}")
+        };
 
     private sealed class RecordingHandler : HttpMessageHandler
     {

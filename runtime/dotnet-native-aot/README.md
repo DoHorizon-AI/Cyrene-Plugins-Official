@@ -50,11 +50,23 @@ subscription shape (`method=events`, the canonical `Filter` type URL, and
 `DIRECT_STREAM_MODE_SUBSCRIPTION`) and emits bounded `DirectPayload` items for
 normalized `inbound_message` and `inbound_request` events.
 
+The unary `message.connector.v1/respond_request` operation is also mapped to
+OneBot v11 `set_friend_add_request` and `set_group_add_request` actions. The
+mapping preserves opaque request flags, normalized friend/group-invite kinds,
+approve/reject decisions, bounded comments, and optional canonical vendor
+request facts. The formal Python manifest remains unchanged until the remaining
+QQNT direct bridge and native package assembly are verified.
+
 运行时接受现有的 `message.connector.v1/send_message` protobuf 请求，并将私聊/群聊、
 回复、文本、提及、图片和文件片段映射到 OneBot v11 action；协议错误不会记录或包含
 access token。`InvokeStream` 也接受现有订阅形态（`method=events`、规范 `Filter`
 type URL 与 `DIRECT_STREAM_MODE_SUBSCRIPTION`），并以有界 `DirectPayload` 流输出规范化的
 `inbound_message` 与 `inbound_request` 事件。
+
+一元 `message.connector.v1/respond_request` 操作也已映射到 OneBot v11 的
+`set_friend_add_request` 与 `set_group_add_request` action。该映射保留不透明请求 flag、
+规范化的好友/群邀请类型、同意/拒绝决策、有界评论以及可选的规范 vendor 请求事实。
+在 QQNT direct 桥接和原生包组装完成验证前，正式 Python 清单保持不变。
 
 ## 2. Invariants & Implementation Details / 核心不变量与实现细节
 
