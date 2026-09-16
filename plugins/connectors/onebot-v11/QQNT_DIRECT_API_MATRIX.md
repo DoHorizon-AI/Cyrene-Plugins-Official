@@ -40,6 +40,16 @@ tickets, session files, or private message bodies.
 超时/取消结果和实际错误后才能从 `NOT_RUN` 变为 `PASS`；验收记录不得写入凭据、票据、会话
 文件或私聊正文。
 
+The canonical `message.connector.v1` mapper currently has four content kinds:
+text, mention, image, and file; replies use a separate reply reference. Native
+audio/video elements are not coerced into another kind. They remain available
+only through the fixed QQ media/file operation boundary until the canonical
+connector contract defines a corresponding content type.
+
+canonical `message.connector.v1` mapper 当前只有四种内容：text、mention、image、file；reply
+使用独立的 reply reference。原生 audio/video 不会被强行转换成其他类型；在 canonical connector
+契约定义对应内容类型前，它们只保留在固定 QQ media/file 操作边界内。
+
 ## Coverage matrix / 覆盖矩阵
 
 | Priority | QQ API row / QQ API 行 | Direct operation(s) / 直连操作 | Native service and method / 原生 Service 与方法 | Request fields / 请求字段 | Result or callback / 结果或回调 | Target / evidence |
@@ -141,6 +151,19 @@ the repository's schema-validation tooling.
 `contracts/v1/schema.json#/$defs/<operation>_request`。可执行 Worker allow-list 与这些
 Schema 字段会做 parity 校验。字段只取 `QQ_API_PLAN.md` 定义的保守公共 envelope；准确的
 目标客户端 overload 校验与原生消息形状仍由授权 Host 负责。
+
+Each operation also has an independent output schema reference in the manifest:
+`contracts/v1/schema.json#/$defs/<operation>_response`. The response envelope fixes
+the operation name, priority, and exact service/method mapping; its result selects
+the operation's mapping profile. Profile result objects remain extensible because
+the authorized Host owns exact overload-specific fields, while the Python worker
+still rejects malformed, oversized, or credential-bearing values before IPC.
+
+`plugin.manifest.json` 中每个 operation 也有独立的 output Schema 引用：
+`contracts/v1/schema.json#/$defs/<operation>_response`。响应 envelope 固定 operation 名称、
+优先级与精确 service/method 映射，result 再选择该 operation 的 mapping profile。由于准确的
+overload 字段由授权 Host 负责，profile result 对象保留扩展性；Python Worker 仍会在 IPC 前
+拒绝格式错误、超限或含凭据的数据。
 
 在 IPC 之前，Python Worker 还会校验基础类型、有限数值、集合深度/大小与保留字段；即使调用方
 绕过仓库的 Schema 校验工具，格式错误或过大的嵌套值也不会进入 native Host。

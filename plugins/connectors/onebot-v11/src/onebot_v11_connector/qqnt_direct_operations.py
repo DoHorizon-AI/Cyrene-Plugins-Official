@@ -1087,6 +1087,11 @@ def _validate_operation_result_shape(
 ) -> None:
     """Require identity that the direct send contract cannot safely invent."""
 
+    reported_operation = result.get("operation")
+    if reported_operation is not None and reported_operation != operation:
+        raise QQOperationValidationError(
+            f"QQ operation result operation does not match {operation}"
+        )
     if operation == "qq.message.send" and _missing_identifier(result.get("message_id")):
         raise QQOperationValidationError(
             "QQ operation result for qq.message.send must contain message_id"

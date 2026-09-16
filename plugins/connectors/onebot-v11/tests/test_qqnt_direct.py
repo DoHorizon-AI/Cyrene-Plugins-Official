@@ -42,6 +42,7 @@ from onebot_v11_connector import (
 )
 from onebot_v11_connector._generated import message_connector_pb2 as message_contract
 from onebot_v11_connector.qqnt_direct_operations import (
+    QQ_OPERATIONS,
     allowed_qq_parameter_fields,
     get_qq_operation,
     validate_qq_result,
@@ -62,6 +63,39 @@ class RecordingEmitter:
 class CancelledToken:
     def is_cancelled(self) -> bool:
         return True
+
+
+def test_manifest_exposes_operation_specific_output_contracts() -> None:
+    """Keep executable QQ mappings and public response references in lockstep."""
+
+    package_root = Path(__file__).parents[1]
+    manifest = json.loads(
+        (package_root / "plugin.manifest.json").read_text(encoding="utf-8")
+    )
+    schema = json.loads(
+        (package_root / "contracts/v1/schema.json").read_text(encoding="utf-8")
+    )
+    methods = {
+        method["name"]: method
+        for method in manifest["methods"]
+        if method["name"].startswith("qq.")
+    }
+    definitions = schema["$defs"]
+
+    assert set(methods) == {spec.name for spec in QQ_OPERATIONS}
+    for spec in QQ_OPERATIONS:
+        definition_name = spec.name.replace(".", "_") + "_response"
+        method = methods[spec.name]
+        assert method["outputSchema"] == (
+            f"contracts/v1/schema.json#/$defs/{definition_name}"
+        )
+        contract = definitions[definition_name]
+        properties = contract["properties"]
+        assert properties["operation"] == {"const": spec.name}
+        assert properties["priority"] == {"const": spec.priority}
+        mapping = properties["mapping"]["properties"]
+        assert mapping["service"] == {"const": spec.service}
+        assert mapping["method"] == {"const": spec.method}
 
 
 def _config(
@@ -690,6 +724,12 @@ def test_extension_is_fixed_and_uses_explicit_qq_client_contract(
             "qq.media.download",
             {"account_id": "10001", "media_id": "media-1"},
             "must be http(s)",
+        ),
+        (
+            "mismatched_result",
+            "qq.group.list",
+            {"account_id": "10001"},
+            "does not match qq.group.list",
         ),
     ],
 )
