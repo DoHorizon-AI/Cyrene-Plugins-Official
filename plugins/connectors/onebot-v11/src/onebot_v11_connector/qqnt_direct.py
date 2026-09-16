@@ -45,6 +45,7 @@ from .qqnt_direct_operations import (
     QQOperationValidationError,
     get_qq_operation,
     validate_qq_parameters,
+    validate_qq_result,
 )
 
 QQ_CAPABILITY_ID = "qq.client.v1"
@@ -496,9 +497,14 @@ class QQNTDirectConnector:
             raise ConnectorError(
                 "PROTOCOL_MISMATCH", "QQ send result must be an object"
             )
+        vendor_message_id = _optional_identifier(result.get("message_id"))
+        if vendor_message_id is None:
+            raise ConnectorError(
+                "PROTOCOL_MISMATCH", "QQ send result omitted message_id"
+            )
         return {
             "status": "accepted",
-            "vendor_message_id": _optional_identifier(result.get("message_id")) or "",
+            "vendor_message_id": vendor_message_id,
             "vendor_extension": {
                 "vendor": QQ_VENDOR,
                 "facts": _facts_from_result(result),
@@ -888,6 +894,7 @@ class QQNTDirectConnector:
         if self._host is None:
             raise ConnectorError("CAPABILITY_UNAVAILABLE", "QQ Host is not configured")
         request_id_sink: Callable[[str], None] | None = None
+        callback_request_id: str | None = None
         if operation in {
             "qq.message.send",
             "qq.media.download",
@@ -895,18 +902,25 @@ class QQNTDirectConnector:
         }:
 
             def remember_request(request_id: str) -> None:
+                nonlocal callback_request_id
+                callback_request_id = request_id
                 self._remember_callback_request(request_id, operation)
 
             request_id_sink = remember_request
         try:
-            return self._host.request(
+            result = self._host.request(
                 operation,
                 params,
                 timeout_seconds=self._config.timeout_seconds if self._config else None,
                 cancellation=cancellation,
                 request_id_sink=request_id_sink,
             )
+            return validate_qq_result(operation, result)
+        except QQOperationValidationError as exc:
+            self._forget_callback_request(callback_request_id)
+            raise ConnectorError("PROTOCOL_MISMATCH", str(exc)) from exc
         except QQHostError as exc:
+            self._forget_callback_request(callback_request_id)
             if exc.code in {"LOGIN_FAILED", "ACCOUNT_MISMATCH"}:
                 self._state = "FAILED"
             raise _connector_host_error(exc) from exc
@@ -921,6 +935,14 @@ class QQNTDirectConnector:
             overflow = len(self._callback_requests) - _MAX_CALLBACK_REQUESTS
             for old_request_id in tuple(self._callback_requests)[: max(0, overflow)]:
                 del self._callback_requests[old_request_id]
+
+    def _forget_callback_request(self, request_id: str | None) -> None:
+        """Discard a callback identity when its originating request failed."""
+
+        if not request_id:
+            return
+        with self._callback_lock:
+            self._callback_requests.pop(request_id, None)
 
     def _update_session_state(self, result: Any) -> None:
         if not isinstance(result, Mapping):
@@ -1707,6 +1729,10 @@ def _normalize_callback(
             continue
         if key in identifier_fields:
             result[key] = _required_identifier(value, f"callback.{key}")
+        elif key == "local_result_reference":
+            result[key] = _validated_local_result_reference(
+                value, "callback.local_result_reference"
+            )
         elif isinstance(value, bool):
             result[key] = value
         elif isinstance(value, (int, float)):
@@ -1749,6 +1775,17 @@ def _validated_remote_uri(value: Any, field: str) -> str:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ConnectorError("INVALID_REQUEST", f"{field} must be http(s)")
     return remote
+
+
+def _validated_local_result_reference(value: Any, field: str) -> str:
+    """Accept only bounded binding-private references for local media results."""
+
+    reference = _required_text(value, field)
+    if len(reference.encode("utf-8")) > _MAX_MEDIA_REFERENCE_BYTES:
+        raise ConnectorError("INVALID_REQUEST", f"{field} is too long")
+    if not reference.startswith(("qq://", "staging://")):
+        raise ConnectorError("INVALID_REQUEST", f"{field} must be binding-private")
+    return reference
 
 
 def _required_text(value: Any, field: str) -> str:

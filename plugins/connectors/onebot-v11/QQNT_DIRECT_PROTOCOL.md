@@ -111,6 +111,21 @@ the original request identity.
 或有界的 `{code,message}` 错误数据。关闭使用 `type=shutdown`，取消使用带原始请求
 身份的 `type=cancel`。
 
+The worker validates every successful Host result before exposing it to the
+connector or extension caller. Results must be bounded JSON objects, may not
+contain credential-like fields such as tokens, secrets, tickets, or cookies,
+and `qq.message.send` must return a native `message_id`. Media and file
+results may expose only bounded HTTP(S) `remote_uri` values or binding-private
+`qq://`/`staging://` local references. Any violation is returned as
+`PROTOCOL_MISMATCH`; callback registration created for that request is removed
+before the failure is surfaced.
+
+Worker 会在成功结果进入 Connector 或扩展调用方之前校验每一个 Host result。结果必须是
+有界 JSON 对象，不能包含 token、secret、ticket、cookie 等凭据类字段；
+`qq.message.send` 必须返回 native `message_id`。媒体和文件结果只能暴露有界的 HTTP(S)
+`remote_uri` 或 binding 私有的 `qq://`/`staging://` 本地引用。违反任一约束都会返回
+`PROTOCOL_MISMATCH`；该请求若已登记回调，也会在向上报告失败前清理登记。
+
 Events use `type=event`, a stable `event_id`, the binding and generation, an
 event name, and a typed `payload`. `message.received` is normalized directly
 to `message.connector.v1`; it is never serialized to an intermediate OneBot

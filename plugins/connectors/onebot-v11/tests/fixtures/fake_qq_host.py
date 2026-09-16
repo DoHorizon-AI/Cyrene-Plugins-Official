@@ -100,6 +100,26 @@ def _response(
         result = {"operation": operation, "state": "login_required"}
     elif mode == "account_mismatch" and operation == "qq.session.start_nt":
         result = {"operation": operation, "state": "ready", "account_id": "10002"}
+    elif mode == "sensitive_result":
+        result = {
+            "operation": operation,
+            "state": "ready",
+            "account_id": "10001",
+            "session_token": "fixture-secret",
+        }
+    elif mode == "missing_send_identity" and operation == "qq.message.send":
+        result = {
+            "sequence": 7,
+            "random": 11,
+            "peer_uid": "peer-1",
+        }
+    elif mode == "invalid_media_reference" and operation.startswith(
+        ("qq.media.", "qq.file.")
+    ):
+        result = {
+            "media_id": "media-1",
+            "remote_uri": "file:///tmp/secret",
+        }
     elif operation == "qq.message.send":
         peer = params.get("peer", {}) if isinstance(params, dict) else {}
         result = {

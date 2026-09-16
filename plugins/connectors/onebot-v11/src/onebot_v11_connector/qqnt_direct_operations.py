@@ -14,6 +14,7 @@ import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 
 class QQOperationValidationError(ValueError):
@@ -995,6 +996,15 @@ _RESERVED_PARAMETER_FIELDS = frozenset(
 _MAX_PARAMETER_DEPTH = 8
 _MAX_PARAMETER_ITEMS = 4_096
 _MAX_PARAMETER_STRING_BYTES = 64 * 1024
+_MAX_RESULT_REFERENCE_BYTES = 4 * 1024
+_RESULT_SENSITIVE_KEY_MARKERS = (
+    "password",
+    "token",
+    "secret",
+    "ticket",
+    "cookie",
+)
+_RESULT_REFERENCE_SCHEMES = ("qq://", "staging://")
 
 
 def validate_qq_parameters(
@@ -1033,6 +1043,115 @@ def validate_qq_parameters(
     for field, value in params.items():
         _validate_parameter_value(field, value)
     return dict(params)
+
+
+def validate_qq_result(operation: str, result: Any) -> dict[str, Any]:
+    """Validate one bounded, normalized result returned by the QQ Host.
+
+    The native Host is version-specific and therefore owns overload handling,
+    but its result still crosses a public worker boundary.  This validator
+    keeps that boundary typed enough to reject malformed or credential-bearing
+    data without guessing every field exposed by a future QQ build.
+
+    Args:
+        operation: Fixed QQ operation that produced the result.
+        result: JSON-compatible Host result object.
+    Returns:
+        A shallow copy of the validated result object.
+    Raises:
+        QQOperationValidationError: If the result is not a safe normalized
+            object for the fixed operation.
+    """
+
+    spec = get_qq_operation(operation)
+    if spec is None:
+        raise QQOperationValidationError(f"unsupported QQ operation {operation}")
+    if not spec.requestable:
+        raise QQOperationValidationError(f"QQ operation {operation} is callback-only")
+    if not isinstance(result, Mapping):
+        raise QQOperationValidationError(
+            f"QQ operation result for {operation} must be an object"
+        )
+    _validate_json_value(
+        result, "result", depth=0, label="result", allow_null=True
+    )
+    _reject_sensitive_result_fields(result, "result")
+    _validate_operation_result_shape(operation, result)
+    if spec.mapping in {"media", "file"}:
+        _validate_result_references(result)
+    return dict(result)
+
+
+def _validate_operation_result_shape(
+    operation: str, result: Mapping[str, Any]
+) -> None:
+    """Require identity that the direct send contract cannot safely invent."""
+
+    if operation == "qq.message.send" and _missing_identifier(result.get("message_id")):
+        raise QQOperationValidationError(
+            "QQ operation result for qq.message.send must contain message_id"
+        )
+
+
+def _missing_identifier(value: Any) -> bool:
+    """Return whether a result identifier is absent or invalid."""
+
+    return (
+        isinstance(value, bool)
+        or not isinstance(value, (str, int))
+        or not str(value).strip()
+    )
+
+
+def _reject_sensitive_result_fields(value: Any, path: str) -> None:
+    """Reject credential-like keys anywhere in a Host result tree."""
+
+    if isinstance(value, Mapping):
+        for key, item in value.items():
+            normalized = key.casefold().replace("_", "").replace("-", "")
+            if any(marker in normalized for marker in _RESULT_SENSITIVE_KEY_MARKERS):
+                raise QQOperationValidationError(
+                    f"QQ operation result contains a sensitive field: {path}.{key}"
+                )
+            _reject_sensitive_result_fields(item, f"{path}.{key}")
+    elif isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            _reject_sensitive_result_fields(item, f"{path}[{index}]")
+
+
+def _validate_result_references(result: Mapping[str, Any]) -> None:
+    """Keep media/file references remote-or-binding-private at the seam."""
+
+    remote_uri = result.get("remote_uri")
+    if remote_uri is not None:
+        if not isinstance(remote_uri, str) or not remote_uri.strip():
+            raise QQOperationValidationError(
+                "QQ operation result remote_uri must be text"
+            )
+        if len(remote_uri.encode("utf-8")) > _MAX_RESULT_REFERENCE_BYTES:
+            raise QQOperationValidationError(
+                "QQ operation result remote_uri is too long"
+            )
+        parsed = urlparse(remote_uri)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise QQOperationValidationError(
+                "QQ operation result remote_uri must be http(s)"
+            )
+
+    local_reference = result.get("local_result_reference")
+    if local_reference is not None:
+        if not isinstance(local_reference, str) or not local_reference.strip():
+            raise QQOperationValidationError(
+                "QQ operation result local_result_reference must be text"
+            )
+        if len(local_reference.encode("utf-8")) > _MAX_RESULT_REFERENCE_BYTES:
+            raise QQOperationValidationError(
+                "QQ operation result local_result_reference is too long"
+            )
+        if not local_reference.startswith(_RESULT_REFERENCE_SCHEMES):
+            raise QQOperationValidationError(
+                "QQ operation result local_result_reference must be binding-private"
+            )
 
 
 def _validate_parameter_value(field: str, value: Any) -> None:
@@ -1117,16 +1236,25 @@ def _validate_parameter_value(field: str, value: Any) -> None:
             )
 
 
-def _validate_json_value(value: Any, field: str, *, depth: int) -> None:
+def _validate_json_value(
+    value: Any,
+    field: str,
+    *,
+    depth: int,
+    label: str = "parameter",
+    allow_null: bool = False,
+) -> None:
     """Reject non-JSON values and unbounded nested structures."""
 
     if depth > _MAX_PARAMETER_DEPTH:
         raise QQOperationValidationError(
-            f"QQ operation parameter {field} is nested too deeply"
+            f"QQ operation {label} {field} is nested too deeply"
         )
     if value is None:
+        if allow_null:
+            return
         raise QQOperationValidationError(
-            f"QQ operation parameter {field} must not be null"
+            f"QQ operation {label} {field} must not be null"
         )
     if isinstance(value, bool):
         return
@@ -1135,35 +1263,47 @@ def _validate_json_value(value: Any, field: str, *, depth: int) -> None:
     if isinstance(value, float):
         if not math.isfinite(value):
             raise QQOperationValidationError(
-                f"QQ operation parameter {field} must be finite"
+                f"QQ operation {label} {field} must be finite"
             )
         return
     if isinstance(value, str):
         if len(value.encode("utf-8")) > _MAX_PARAMETER_STRING_BYTES:
             raise QQOperationValidationError(
-                f"QQ operation parameter {field} is too large"
+                f"QQ operation {label} {field} is too large"
             )
         return
     if isinstance(value, Mapping):
         if len(value) > _MAX_PARAMETER_ITEMS:
             raise QQOperationValidationError(
-                f"QQ operation parameter {field} has too many object fields"
+                f"QQ operation {label} {field} has too many object fields"
             )
         for key, item in value.items():
             if not isinstance(key, str) or not key:
                 raise QQOperationValidationError(
-                    f"QQ operation parameter {field} has an invalid object key"
+                    f"QQ operation {label} {field} has an invalid object key"
                 )
-            _validate_json_value(item, f"{field}.{key}", depth=depth + 1)
+            _validate_json_value(
+                item,
+                f"{field}.{key}",
+                depth=depth + 1,
+                label=label,
+                allow_null=allow_null,
+            )
         return
     if isinstance(value, (list, tuple)):
         if len(value) > _MAX_PARAMETER_ITEMS:
             raise QQOperationValidationError(
-                f"QQ operation parameter {field} has too many list items"
+                f"QQ operation {label} {field} has too many list items"
             )
         for index, item in enumerate(value):
-            _validate_json_value(item, f"{field}[{index}]", depth=depth + 1)
+            _validate_json_value(
+                item,
+                f"{field}[{index}]",
+                depth=depth + 1,
+                label=label,
+                allow_null=allow_null,
+            )
         return
     raise QQOperationValidationError(
-        f"QQ operation parameter {field} contains a non-JSON value"
+        f"QQ operation {label} {field} contains a non-JSON value"
     )

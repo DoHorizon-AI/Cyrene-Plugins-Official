@@ -712,8 +712,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_PROTOCOL.md",
-      "sha256": "3b77d84d45279669cc02f92fa5ab7e6a7bcb62dc68e07b46bcdcb9f11c0ca883",
-      "size_bytes": 10194
+      "sha256": "c4df2ba3d5fcbf6b8c120ae49fe6f494fd24edb77e68b23d0b0b73546d33bf30",
+      "size_bytes": 11261
     },
     {
       "kind": "file",
@@ -831,8 +831,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct.py",
-      "sha256": "f66444e5d5f001e411a96c24d7f225b43386b716607cc5a8585e6fde646b36b9",
-      "size_bytes": 71655
+      "sha256": "91b40520e4de3095ff7e58b82fe2f8ffc87affc916adad5fa27291015f86a989",
+      "size_bytes": 73299
     },
     {
       "kind": "file",
@@ -852,8 +852,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_operations.py",
-      "sha256": "f6fdf827892985294545e4e8434e99edef51aa95bf44a9710baf8ddefa5845b0",
-      "size_bytes": 35888
+      "sha256": "90326075d03ddeb6ec89ef3ece820211c930b4e233f75b53ce5ae0d963240a37",
+      "size_bytes": 40979
     },
     {
       "kind": "file",
@@ -873,8 +873,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py",
-      "sha256": "b3c4bb9ebdd649f5473f4e12143a46fac124670d5fd470c15a8c262290c41111",
-      "size_bytes": 20026
+      "sha256": "4a154eee74a7a2165fffe1030eec8b1c01265d616569774e26b1de68f91384e2",
+      "size_bytes": 20655
     },
     {
       "kind": "file",
@@ -901,8 +901,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
-      "sha256": "b83cd7dcd07ab2518c0f299a9cd3fb0b4f439ad30caf2a0219f38f1b4679937a",
-      "size_bytes": 53987
+      "sha256": "c507848dc7a377c2653c84692b72c211b9ca653bb7fae820bae439287375440c",
+      "size_bytes": 55749
     },
     {
       "kind": "file",
