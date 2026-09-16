@@ -23,7 +23,12 @@ public sealed record QqHostLaunchConfiguration(
     string Platform = "linux-x86_64",
     double TimeoutSeconds = 10,
     double StartupTimeoutSeconds = 30,
-    double ShutdownTimeoutSeconds = 2);
+    double ShutdownTimeoutSeconds = 2,
+    int MaxRestartAttempts = 2,
+    double RestartWindowSeconds = 60,
+    double RestartBackoffSeconds = 0.25,
+    double RestartBackoffMaxSeconds = 5,
+    double CrashCircuitCooldownSeconds = 60);
 
 /// <summary>Negotiated QQ Host compatibility facts safe for diagnostics.</summary>
 public sealed record QqHostCompatibility(
@@ -70,7 +75,10 @@ public sealed class QqHostClient : IAsyncDisposable
     private long _requestCounter;
     private int _generation;
     private string _state = "CREATED";
+    private string? _failureCode;
     private QqHostCompatibility? _compatibility;
+    private readonly List<DateTimeOffset> _restartHistory = new();
+    private DateTimeOffset _circuitOpenUntil;
     private bool _disposed;
 
     public QqHostClient(
@@ -119,6 +127,28 @@ public sealed class QqHostClient : IAsyncDisposable
         }
     }
 
+    public string? FailureCode
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return _failureCode;
+            }
+        }
+    }
+
+    public bool CrashCircuitOpen
+    {
+        get
+        {
+            lock (_stateGate)
+            {
+                return DateTimeOffset.UtcNow < _circuitOpenUntil;
+            }
+        }
+    }
+
     public async Task StartAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -134,6 +164,7 @@ public sealed class QqHostClient : IAsyncDisposable
 
                 _generation++;
                 _state = "STARTING";
+                _failureCode = null;
                 _compatibility = null;
             }
 
@@ -222,6 +253,52 @@ public sealed class QqHostClient : IAsyncDisposable
 
     public async Task RestartAsync(CancellationToken cancellationToken)
     {
+        await CloseAsync(cancellationToken);
+        await StartAsync(cancellationToken);
+    }
+
+    public async Task RecoverAsync(CancellationToken cancellationToken)
+    {
+        ThrowIfDisposed();
+        DateTimeOffset now = DateTimeOffset.UtcNow;
+        double delay;
+        lock (_stateGate)
+        {
+            if (_state != "FAILED"
+                || _failureCode is not ("PROCESS_EXITED" or "STDIO_CLOSED"))
+            {
+                throw new QqHostException(
+                    "CAPABILITY_UNAVAILABLE",
+                    "QQ Host failure is not eligible for automatic recovery");
+            }
+
+            _restartHistory.RemoveAll(
+                timestamp => timestamp < now.AddSeconds(-_configuration.RestartWindowSeconds));
+            if (now < _circuitOpenUntil)
+            {
+                throw new QqHostException("CAPABILITY_UNAVAILABLE", "QQ Host crash circuit is open");
+            }
+
+            if (_restartHistory.Count >= _configuration.MaxRestartAttempts)
+            {
+                _circuitOpenUntil = now.AddSeconds(_configuration.CrashCircuitCooldownSeconds);
+                throw new QqHostException(
+                    "CAPABILITY_UNAVAILABLE",
+                    "QQ Host crash restart budget exhausted");
+            }
+
+            int attempt = _restartHistory.Count;
+            _restartHistory.Add(now);
+            delay = Math.Min(
+                _configuration.RestartBackoffSeconds * Math.Pow(2, attempt),
+                _configuration.RestartBackoffMaxSeconds);
+        }
+
+        if (delay > 0)
+        {
+            await Task.Delay(TimeSpan.FromSeconds(delay), cancellationToken);
+        }
+
         await CloseAsync(cancellationToken);
         await StartAsync(cancellationToken);
     }
@@ -588,6 +665,7 @@ public sealed class QqHostClient : IAsyncDisposable
             _readerTask = null;
             _stderrTask = null;
             _state = "STOPPED";
+            _failureCode = null;
         }
     }
 
@@ -707,6 +785,9 @@ public sealed class QqHostClient : IAsyncDisposable
             }
 
             _state = "FAILED";
+            _failureCode = code == "STDIO_CLOSED" && process.HasExited
+                ? "PROCESS_EXITED"
+                : code;
         }
 
         FailPending(new QqHostException("CAPABILITY_UNAVAILABLE", message));
