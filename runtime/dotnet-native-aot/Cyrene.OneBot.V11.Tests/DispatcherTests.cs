@@ -286,6 +286,73 @@ public sealed class DispatcherTests
         await host.CloseAsync(CancellationToken.None);
     }
 
+    [Theory]
+    [InlineData("{\"account_id\":true}")]
+    [InlineData("{\"account_id\":[]}")]
+    [InlineData("{\"account_id\":\"10001\",\"count\":-1}")]
+    [InlineData("{\"account_id\":\"10001\",\"binding_id\":\"other\"}")]
+    public async Task QqDispatcherRejectsInvalidParametersBeforeHostStart(string parameters)
+    {
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-invalid-params-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(fixture, dataDirectory);
+        await using QqHostClient host = new(profile.HostLaunch);
+        QqDirectInvocationDispatcher dispatcher = new(profile, host);
+
+        InvocationResult result = await dispatcher.InvokeAsync(
+            new DirectInvocationRequest
+            {
+                Capability = QqDirectInvocationDispatcher.CapabilityId,
+                InterfaceVersion = QqDirectInvocationDispatcher.InterfaceVersion,
+                Method = "qq.group.list",
+                PayloadTypeUrl = QqDirectInvocationDispatcher.RequestTypeUrl,
+                Payload = ByteString.CopyFromUtf8($"{{\"params\":{parameters}}}")
+            },
+            CancellationToken.None);
+
+        Assert.Equal(DirectInvocationError.Types.Code.InvalidRequest, result.Error?.Code);
+        Assert.Equal("INVALID_REQUEST", result.Error?.DomainCode);
+        Assert.Equal(0, host.Generation);
+    }
+
+    [Theory]
+    [InlineData("sensitive_result", "qq.group.list", "{\"account_id\":\"10001\"}", "sensitive field")]
+    [InlineData("invalid_media_reference", "qq.media.download", "{\"account_id\":\"10001\",\"media_id\":\"media-1\"}", "must be http(s)")]
+    [InlineData("mismatched_result", "qq.group.list", "{\"account_id\":\"10001\"}", "does not match qq.group.list")]
+    public async Task QqDispatcherRejectsUnsafeHostResults(
+        string mode,
+        string operation,
+        string parameters,
+        string expectedMessage)
+    {
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-invalid-result-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(fixture, dataDirectory, $"--mode={mode}");
+        await using QqHostClient host = new(profile.HostLaunch);
+        QqDirectInvocationDispatcher dispatcher = new(profile, host);
+
+        InvocationResult result = await dispatcher.InvokeAsync(
+            new DirectInvocationRequest
+            {
+                Capability = QqDirectInvocationDispatcher.CapabilityId,
+                InterfaceVersion = QqDirectInvocationDispatcher.InterfaceVersion,
+                Method = operation,
+                PayloadTypeUrl = QqDirectInvocationDispatcher.RequestTypeUrl,
+                Payload = ByteString.CopyFromUtf8($"{{\"params\":{parameters}}}")
+            },
+            CancellationToken.None);
+
+        Assert.Equal(DirectInvocationError.Types.Code.ExecutionFailed, result.Error?.Code);
+        Assert.Equal("PROTOCOL_MISMATCH", result.Error?.DomainCode);
+        Assert.Contains(expectedMessage, result.Error?.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task QqDispatcherMapsCanonicalSendMessageAndDelivery()
     {
