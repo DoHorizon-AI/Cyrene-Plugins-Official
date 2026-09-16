@@ -60,8 +60,13 @@ The package exposes direct host APIs:
 - `on_subscribe(..., emitter)` binds an inbound event stream;
 - `publish_inbound_event(event)` emits one binding-local inbound event;
 - `on_configure(settings)` applies one host-provided binding;
-- `on_invoke(...)` is a temporary generic-worker compatibility adapter and is
-  not the target Product data path.
+- `on_invoke(...)` is the formal `DirectPluginRuntime.Invoke` data-plane entry
+  for `message.connector.v1` and `qq.client.v1`; it routes to the selected
+  profile without adding a OneBot JSON or transport hop.
+
+`on_invoke(...)` 是 `DirectPluginRuntime.Invoke` 的正式数据平面入口，负责
+`message.connector.v1` 和 `qq.client.v1`；它只路由到选定 profile，不增加
+OneBot JSON 或额外传输中转。
 
 ## Contract authority / 契约权威
 
