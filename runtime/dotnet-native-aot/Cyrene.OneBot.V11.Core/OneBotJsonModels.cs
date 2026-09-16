@@ -72,6 +72,35 @@ public sealed class OneBotActionResponse
     public string? Echo { get; set; }
 }
 
+/// <summary>One forward-WebSocket action envelope.</summary>
+public sealed class OneBotWebSocketActionRequest
+{
+    [JsonPropertyName("action")]
+    public string Action { get; set; } = string.Empty;
+
+    [JsonPropertyName("params")]
+    public OneBotActionRequest Params { get; set; } = new();
+
+    [JsonPropertyName("echo")]
+    public string Echo { get; set; } = string.Empty;
+}
+
+/// <summary>Decoded response/event projection for a OneBot WebSocket frame.</summary>
+public sealed class OneBotWebSocketFrame
+{
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("retcode")]
+    public int Retcode { get; set; }
+
+    [JsonPropertyName("data")]
+    public JsonElement Data { get; set; }
+
+    [JsonPropertyName("echo")]
+    public string? Echo { get; set; }
+}
+
 [JsonSourceGenerationOptions(
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -81,6 +110,8 @@ public sealed class OneBotActionResponse
 [JsonSerializable(typeof(OneBotMessageSegment))]
 [JsonSerializable(typeof(OneBotSegmentData))]
 [JsonSerializable(typeof(OneBotActionResponse))]
+[JsonSerializable(typeof(OneBotWebSocketActionRequest))]
+[JsonSerializable(typeof(OneBotWebSocketFrame))]
 public partial class OneBotJsonContext : JsonSerializerContext
 {
 }
