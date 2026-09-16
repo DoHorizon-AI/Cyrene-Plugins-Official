@@ -44,6 +44,7 @@ from onebot_v11_connector._generated import message_connector_pb2 as message_con
 from onebot_v11_connector.qqnt_direct_operations import (
     allowed_qq_parameter_fields,
     get_qq_operation,
+    validate_qq_result,
 )
 
 
@@ -671,6 +672,62 @@ def test_extension_is_fixed_and_uses_explicit_qq_client_contract(
         )
         assert not bad
         assert "reserved fields" in error
+    finally:
+        connector.close()
+
+
+@pytest.mark.parametrize(
+    ("mode", "operation", "params", "message"),
+    [
+        (
+            "sensitive_result",
+            "qq.group.list",
+            {"account_id": "10001"},
+            "sensitive field",
+        ),
+        (
+            "invalid_media_reference",
+            "qq.media.download",
+            {"account_id": "10001", "media_id": "media-1"},
+            "must be http(s)",
+        ),
+    ],
+)
+def test_host_result_boundary_rejects_unsafe_results(
+    tmp_path: Path,
+    mode: str,
+    operation: str,
+    params: dict[str, Any],
+    message: str,
+) -> None:
+    connector = QQNTDirectConnector(_config(tmp_path, f"qq-result-{mode}", mode=mode))
+    try:
+        with pytest.raises(ConnectorError) as error:
+            connector.invoke_extension(operation, params)
+        assert error.value.code == "PROTOCOL_MISMATCH"
+        assert message in error.value.message
+    finally:
+        connector.close()
+
+
+def test_host_result_boundary_preserves_optional_null_fields() -> None:
+    result = validate_qq_result(
+        "qq.group.list",
+        {"groups": [{"group_id": "20001", "remark": None}]},
+    )
+    assert result["groups"][0]["remark"] is None
+
+
+def test_send_result_requires_native_message_identity(tmp_path: Path) -> None:
+    connector = QQNTDirectConnector(
+        _config(tmp_path, "qq-missing-send-identity", mode="missing_send_identity")
+    )
+    try:
+        with pytest.raises(ConnectorError) as error:
+            connector.send_message(_send_request())
+        assert error.value.code == "PROTOCOL_MISMATCH"
+        assert "message_id" in error.value.message
+        assert connector._callback_requests == {}  # noqa: SLF001 - protocol cleanup
     finally:
         connector.close()
 
