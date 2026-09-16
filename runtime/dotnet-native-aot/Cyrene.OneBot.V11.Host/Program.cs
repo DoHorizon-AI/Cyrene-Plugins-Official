@@ -40,6 +40,18 @@ public static class Program
                 OneBotTransportFactory.Create(
                     profile,
                     serviceProvider.GetRequiredService<HttpClient>()));
+            if (profile.TransportProfile == OneBotTransportProfile.ReverseWebSocket)
+            {
+                builder.Services.AddSingleton(serviceProvider =>
+                {
+                    OneBotWebSocketTransport transport =
+                        (OneBotWebSocketTransport)serviceProvider
+                            .GetRequiredService<IOneBotActionTransport>();
+                    OneBotReverseWebSocketServer server = new(profile, transport);
+                    server.Start();
+                    return server;
+                });
+            }
             builder.Services.AddSingleton<IDirectInvocationDispatcher,
                 OneBotInvocationDispatcher>();
             builder.Services.AddSingleton(RuntimeReadiness.Serving());
@@ -47,6 +59,11 @@ public static class Program
 
         WebApplication app = builder.Build();
         app.MapGrpcService<DirectPluginRuntimeService>();
+        if (profile?.TransportProfile == OneBotTransportProfile.ReverseWebSocket)
+        {
+            app.Services.GetRequiredService<OneBotReverseWebSocketServer>();
+        }
+
         return app.RunAsync();
     }
 

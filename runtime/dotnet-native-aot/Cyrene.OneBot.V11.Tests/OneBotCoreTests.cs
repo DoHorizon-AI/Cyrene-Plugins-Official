@@ -9,6 +9,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -161,6 +162,69 @@ public sealed class OneBotCoreTests
         await peer.Completed.WaitAsync(TimeSpan.FromSeconds(2));
         Assert.Equal("send_private_msg", peer.Action);
         Assert.Contains("\"user_id\":10001", peer.ActionBody, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReverseWebSocketAcceptsAuthorizedPeerAndCorrelatesAction()
+    {
+        int port = GetFreePort();
+        OneBotProfile profile = OneBotProfileLoader.FromJson(
+            $"{{\"binding_id\":\"qq-main\",\"transport_profile\":\"reverse_websocket\",\"reverse_listen_host\":\"127.0.0.1\",\"reverse_listen_port\":{port},\"access_token\":\"reverse-token\",\"timeout_seconds\":2}}",
+            "qq-main");
+        using OneBotWebSocketTransport transport = new(profile);
+        using OneBotReverseWebSocketServer server = new(profile, transport);
+        server.Start();
+        using ClientWebSocket client = new();
+        client.Options.SetRequestHeader("Authorization", "Bearer reverse-token");
+        await client.ConnectAsync(
+            new Uri($"ws://127.0.0.1:{server.ListenPort}/onebot"),
+            CancellationToken.None);
+
+        Task<OneBotActionResponse> call = transport.CallAsync(
+            "send_private_msg",
+            new OneBotActionRequest { UserId = 10001 },
+            CancellationToken.None);
+        string actionBody = await ReceiveWebSocketTextAsync(client);
+        using JsonDocument action = JsonDocument.Parse(actionBody);
+        string echo = action.RootElement.GetProperty("echo").GetString()!;
+        await client.SendAsync(
+            Encoding.UTF8.GetBytes(
+                $"{{\"status\":\"ok\",\"retcode\":0,\"data\":{{\"message_id\":\"reverse-1\"}},\"echo\":\"{echo}\"}}"),
+            WebSocketMessageType.Text,
+            true,
+            CancellationToken.None);
+
+        OneBotActionResponse response = await call;
+        Assert.Equal("ok", response.Status);
+        Assert.Equal("reverse-1", response.Data.GetProperty("message_id").GetString());
+        Assert.Equal("send_private_msg", action.RootElement.GetProperty("action").GetString());
+    }
+
+    private static int GetFreePort()
+    {
+        TcpListener probe = new(IPAddress.Loopback, 0);
+        probe.Start();
+        int port = ((IPEndPoint)probe.LocalEndpoint).Port;
+        probe.Stop();
+        return port;
+    }
+
+    private static async Task<string> ReceiveWebSocketTextAsync(ClientWebSocket client)
+    {
+        byte[] buffer = new byte[16 * 1024];
+        using MemoryStream output = new();
+        WebSocketReceiveResult result;
+        do
+        {
+            result = await client.ReceiveAsync(
+                new ArraySegment<byte>(buffer),
+                CancellationToken.None);
+            Assert.Equal(WebSocketMessageType.Text, result.MessageType);
+            output.Write(buffer, 0, result.Count);
+        }
+        while (!result.EndOfMessage);
+
+        return Encoding.UTF8.GetString(output.ToArray());
     }
 
     private static DirectInvocationRequest CreateMessageRequest(

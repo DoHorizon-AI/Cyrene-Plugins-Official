@@ -255,10 +255,7 @@ public static class OneBotTransportFactory
         {
             OneBotTransportProfile.HttpApi => new OneBotHttpTransport(profile, httpClient),
             OneBotTransportProfile.ForwardWebSocket => new OneBotWebSocketTransport(profile),
-            OneBotTransportProfile.ReverseWebSocket =>
-                throw new OneBotConfigurationException(
-                    "TRANSPORT_NOT_IMPLEMENTED",
-                    "Reverse WebSocket listener is reserved for the next transport slice."),
+            OneBotTransportProfile.ReverseWebSocket => new OneBotWebSocketTransport(profile),
             _ => throw new OneBotConfigurationException(
                 "INVALID_TRANSPORT_PROFILE",
                 "OneBot transport profile is not registered.")
