@@ -170,6 +170,70 @@ public sealed class DispatcherTests
     }
 
     [Fact]
+    public async Task QqDispatcherBootstrapsTheSessionBeforeAReadyOperation()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = Path.GetFullPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        if (!File.Exists(fixture))
+        {
+            return;
+        }
+
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-dispatch-test-{Guid.NewGuid():N}");
+        string operationLog = Path.Combine(dataDirectory, "operations.log");
+        QqDirectProfile profile = QqDirectProfileLoader.FromJson(
+            $$"""
+            {
+                "runtime_profile":"qqnt-direct",
+                "binding_id":"qq-dispatch",
+                "host_executable":"/usr/bin/python3",
+                "host_args":["{{fixture}}","--operation-log={{operationLog}}"],
+                "data_dir":"{{dataDirectory}}",
+                "required_client_version":"fixture-client",
+                "required_host_abi":"fake-qqnt-linux-x86_64",
+                "account_id":"10001"
+            }
+            """
+        );
+        await using QqHostClient host = new(profile.HostLaunch);
+        QqDirectInvocationDispatcher dispatcher = new(profile, host);
+
+        InvocationResult result = await dispatcher.InvokeAsync(
+            new DirectInvocationRequest
+            {
+                Capability = QqDirectInvocationDispatcher.CapabilityId,
+                InterfaceVersion = QqDirectInvocationDispatcher.InterfaceVersion,
+                Method = "qq.group.list",
+                PayloadTypeUrl = QqDirectInvocationDispatcher.RequestTypeUrl,
+                Payload = ByteString.CopyFromUtf8("{\"params\":{\"account_id\":\"10001\"}}")
+            },
+            CancellationToken.None);
+
+        Assert.Null(result.Error);
+        using JsonDocument response = JsonDocument.Parse(result.Payload!.ToByteArray());
+        Assert.Equal("qq.group.list", response.RootElement.GetProperty("operation").GetString());
+        Assert.Equal("NodeIKernelGroupService", response.RootElement.GetProperty("mapping").GetProperty("service").GetString());
+        string[] operations = File.ReadAllLines(operationLog);
+        Assert.Equal(
+            new List<string>
+            {
+                "qq.session.create",
+                "qq.session.init",
+                "qq.session.start_nt",
+                "qq.group.list"
+            },
+            operations);
+        await host.CloseAsync(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task StreamReturnsErrorAndTerminalEnd()
     {
         var items = new List<DirectStreamItem>();

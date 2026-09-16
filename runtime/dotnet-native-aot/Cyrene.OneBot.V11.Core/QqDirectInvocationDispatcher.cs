@@ -12,7 +12,7 @@ using Cyrene.Plugin.Runtime.V1;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>Dispatches fixed QQ extension operations through one Host client.</summary>
-public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher
+public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, IDisposable
 {
     public const string CapabilityId = "qq.client.v1";
     public const string InterfaceVersion = "1";
@@ -21,12 +21,18 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher
 
     private readonly QqDirectProfile _profile;
     private readonly QqHostClient _host;
+    private readonly SemaphoreSlim _sessionGate = new(1, 1);
+    private int _sessionGeneration;
+    private int _sessionBootstrapStage;
+    private string _sessionState = "CREATED";
 
     public QqDirectInvocationDispatcher(QqDirectProfile profile, QqHostClient host)
     {
         _profile = profile;
         _host = host;
     }
+
+    public void Dispose() => _sessionGate.Dispose();
 
     public async ValueTask<InvocationResult> InvokeAsync(
         DirectInvocationRequest request,
@@ -38,12 +44,23 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher
             using JsonDocument document = JsonDocument.Parse(request.Payload.ToByteArray());
             JsonElement root = document.RootElement;
             JsonElement parameters = ParseParameters(root);
-            await _host.StartAsync(cancellationToken);
+            QqHostOperationRegistry.TryGet(request.Method, out QqHostOperation? operation);
+            await EnsureHostStartedAsync(cancellationToken);
+            if (operation!.Mapping != "session")
+            {
+                await EnsureSessionStartedAsync(cancellationToken);
+            }
+
+            if (operation.Priority != "P0" || operation.Mapping is not ("session" or "login"))
+            {
+                EnsureSessionReady();
+            }
+
             JsonElement result = await _host.RequestAsync(
                 request.Method,
                 parameters,
                 cancellationToken);
-            QqHostOperationRegistry.TryGet(request.Method, out QqHostOperation? operation);
+            UpdateSessionState(request.Method, result);
             QqClientResponse response = new()
             {
                 Operation = request.Method,
@@ -137,6 +154,151 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher
                 "INVALID_REQUEST",
                 "qq.client.v1 request payload exceeds the 8 MiB limit");
         }
+    }
+
+    private async Task EnsureHostStartedAsync(CancellationToken cancellationToken)
+    {
+        if (_host.State == "STOPPED" && _host.Generation > 0)
+        {
+            throw new QqHostException("CAPABILITY_UNAVAILABLE", "QQ Host is stopped");
+        }
+
+        if (_host.State == "FAILED")
+        {
+            await _host.RecoverAsync(cancellationToken);
+        }
+        else
+        {
+            await _host.StartAsync(cancellationToken);
+        }
+
+        if (_sessionGeneration != _host.Generation)
+        {
+            _sessionGeneration = _host.Generation;
+            _sessionBootstrapStage = 0;
+            _sessionState = "NATIVE_READY";
+        }
+    }
+
+    private async Task EnsureSessionStartedAsync(CancellationToken cancellationToken)
+    {
+        await _sessionGate.WaitAsync(cancellationToken);
+        try
+        {
+            string[] stages =
+            {
+                "qq.session.create",
+                "qq.session.init",
+                "qq.session.start_nt"
+            };
+            for (int index = 0; index < stages.Length; index++)
+            {
+                if (_sessionBootstrapStage > index)
+                {
+                    continue;
+                }
+
+                JsonElement result = await _host.RequestAsync(
+                    stages[index],
+                    CreateBootstrapParameters(),
+                    cancellationToken);
+                _sessionBootstrapStage = index + 1;
+                UpdateSessionState(stages[index], result);
+            }
+        }
+        finally
+        {
+            _sessionGate.Release();
+        }
+    }
+
+    private JsonElement CreateBootstrapParameters()
+    {
+        return JsonSerializer.SerializeToElement(
+            new Dictionary<string, string> { ["login_policy"] = _profile.LoginPolicy },
+            QqHostJsonContext.Default.DictionaryStringString);
+    }
+
+    private void EnsureSessionReady()
+    {
+        if (_sessionState == "READY")
+        {
+            return;
+        }
+
+        string code = _sessionState == "LOGIN_REQUIRED"
+            ? "LOGIN_REQUIRED"
+            : "CAPABILITY_UNAVAILABLE";
+        throw new QqHostException(code, $"QQ direct session is {_sessionState.ToLowerInvariant()}");
+    }
+
+    private void UpdateSessionState(
+        string operation,
+        JsonElement result)
+    {
+        _sessionBootstrapStage = operation switch
+        {
+            "qq.session.create" => Math.Max(_sessionBootstrapStage, 1),
+            "qq.session.init" => Math.Max(_sessionBootstrapStage, 2),
+            "qq.session.start_nt" => Math.Max(_sessionBootstrapStage, 3),
+            _ => _sessionBootstrapStage
+        };
+        if (operation is "qq.session.create" or "qq.session.init")
+        {
+            _sessionState = "NATIVE_READY";
+        }
+
+        if (result.ValueKind != JsonValueKind.Object)
+        {
+            return;
+        }
+
+        string? accountId = null;
+        if (result.TryGetProperty("account_id", out JsonElement account))
+        {
+            accountId = account.ValueKind == JsonValueKind.String
+                ? account.GetString()
+                : account.ValueKind == JsonValueKind.Number
+                    ? account.GetRawText()
+                    : null;
+        }
+
+        if (_profile.AccountId is not null
+            && accountId is not null
+            && accountId != _profile.AccountId)
+        {
+            _sessionState = "FAILED";
+            throw new QqHostException("ACCOUNT_MISMATCH", "QQ Host account does not match binding");
+        }
+
+        string? state = result.TryGetProperty("state", out JsonElement stateElement)
+            && stateElement.ValueKind == JsonValueKind.String
+            ? stateElement.GetString()
+            : null;
+        bool ready = state is "ready" or "online" or "logged_in"
+            || result.TryGetProperty("ready", out JsonElement readyElement)
+                && readyElement.ValueKind == JsonValueKind.True;
+        if (ready)
+        {
+            if (_profile.AccountId is not null && accountId is null)
+            {
+                _sessionState = "FAILED";
+                throw new QqHostException(
+                    "ACCOUNT_MISMATCH",
+                    "QQ Host ready account is missing or mismatched");
+            }
+
+            _sessionState = "READY";
+        }
+        else if (state is "login_required" or "qr_required" or "offline")
+        {
+            _sessionState = "LOGIN_REQUIRED";
+        }
+        else if (state == "failed")
+        {
+            _sessionState = "FAILED";
+        }
+
     }
 
     private static JsonElement ParseParameters(JsonElement root)
