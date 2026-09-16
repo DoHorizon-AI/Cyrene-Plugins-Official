@@ -1342,15 +1342,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotInvocationDispatcher.cs",
-      "sha256": "2d07b14fbf2b6ece17c807c5dc22eab0a64c62f7e35e9e2ba9707dd015a4dd21",
-      "size_bytes": 9673
+      "sha256": "ffba5cbafda322e685c87eaa44441253e80723ebcf2b4e9a46b7bb5e47ecd719",
+      "size_bytes": 11472
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotJsonModels.cs",
-      "sha256": "e85f9ba34bd4a8453c2b3d9bbb985dc62f4babfaf70507f17d3d180bb1a13de3",
-      "size_bytes": 4721
+      "sha256": "8092725fb8a797d5fd1f2d533362c3561d2829d5e0552e9eb0d8ac39abd9c27f",
+      "size_bytes": 5658
     },
     {
       "kind": "file",
@@ -1365,6 +1365,13 @@
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotProfile.cs",
       "sha256": "9e6b3cb5bdd75bf0ef6af10f99c3ef493e45b9d4a2a4420b3eb0d6b2bab1b430",
       "size_bytes": 11669
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotRequestMapper.cs",
+      "sha256": "9844c8ef3d47e753ea9508146077f8f34feceac440072e526ea8b840c3ff80ff",
+      "size_bytes": 7988
     },
     {
       "kind": "file",
@@ -1426,8 +1433,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/OneBotCoreTests.cs",
-      "sha256": "a9550b33800b819981835e572875d5bca4c97ceb1fa58359bab12c07ee45e39f",
-      "size_bytes": 28688
+      "sha256": "871d46d8c032349f3934dc37b32940378ab2710f3404bd363498a754b3e9153f",
+      "size_bytes": 31893
     },
     {
       "kind": "file",
@@ -1622,8 +1629,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/README.md",
-      "sha256": "5ac8ed7431a09499946190cb4a7ebe27f768fe878f1affe4bd5d4a19eb60bfb7",
-      "size_bytes": 4288
+      "sha256": "8a752025163022018e06e288bbc7df113a452df7c3bc5b55dd861fcfc41fa904",
+      "size_bytes": 5131
     },
     {
       "kind": "file",
