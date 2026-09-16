@@ -223,7 +223,8 @@ public sealed class QqHostClient : IAsyncDisposable
     public async Task<JsonElement> RequestAsync(
         string operation,
         JsonElement parameters,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<string>? requestIdHandler = null)
     {
         ThrowIfDisposed();
         if (!QqHostOperationRegistry.TryGet(operation, out QqHostOperation? spec))
@@ -248,7 +249,8 @@ public sealed class QqHostClient : IAsyncDisposable
             parameters,
             _configuration.TimeoutSeconds,
             allowHello: false,
-            cancellationToken);
+            cancellationToken,
+            requestIdHandler);
     }
 
     public async Task RestartAsync(CancellationToken cancellationToken)
@@ -343,7 +345,8 @@ public sealed class QqHostClient : IAsyncDisposable
         JsonElement parameters,
         double timeoutSeconds,
         bool allowHello,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<string>? requestIdHandler = null)
     {
         Process process;
         int generation;
@@ -373,6 +376,7 @@ public sealed class QqHostClient : IAsyncDisposable
             requestId = $"{BindingId}:{generation}:{Interlocked.Increment(ref _requestCounter)}";
             _pending.Add(requestId, pending);
         }
+        requestIdHandler?.Invoke(requestId);
 
         QqHostRequest message = new()
         {
@@ -583,7 +587,17 @@ public sealed class QqHostClient : IAsyncDisposable
 
         try
         {
-            EventHandler?.Invoke(@event);
+            EventHandler?.Invoke(
+                new QqHostEvent
+                {
+                    Type = @event.Type,
+                    Event = @event.Event,
+                    EventId = @event.EventId,
+                    RequestId = @event.RequestId,
+                    BindingId = @event.BindingId,
+                    Generation = @event.Generation,
+                    Payload = @event.Payload.Clone()
+                });
         }
         catch (Exception)
         {

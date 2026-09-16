@@ -7,6 +7,7 @@
 // └─────────────────────────────────────────────────────────────────────────┘
 
 using System.Text.Json;
+using Cyrene.Message.Connector.V1;
 using Cyrene.OneBot.V11.Core;
 using Cyrene.Plugin.Runtime.V1;
 using Google.Protobuf;
@@ -133,7 +134,7 @@ public sealed class DispatcherTests
             return;
         }
 
-        string fixture = Path.GetFullPath(
+        string fixture = RepositoryPath(
             "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
         if (!File.Exists(fixture))
         {
@@ -170,6 +171,66 @@ public sealed class DispatcherTests
     }
 
     [Fact]
+    public async Task QqHostClientDeliversCurrentGenerationEvents()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        if (!File.Exists(fixture))
+        {
+            return;
+        }
+
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-host-event-test-{Guid.NewGuid():N}");
+        TaskCompletionSource<QqHostEvent> received = new(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=semantic_mapping");
+        await using QqHostClient client = new(
+            profile.HostLaunch,
+            @event =>
+            {
+                if (@event.Payload.TryGetProperty("message_id", out JsonElement messageId)
+                    && messageId.GetString() == "native-private-message-1")
+                {
+                    received.TrySetResult(@event);
+                }
+            });
+
+        await client.StartAsync(CancellationToken.None);
+        JsonElement parameters = JsonSerializer.SerializeToElement(
+            new QqSubscribeParameters
+            {
+                Events = new List<string> { "message.received" }
+            },
+            QqHostJsonContext.Default.QqSubscribeParameters);
+        await client.RequestAsync("qq.message.subscribe", parameters, CancellationToken.None);
+
+        QqHostEvent @event = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Assert.Equal("message.received", @event.Event);
+        Assert.Equal(client.Generation, @event.Generation);
+        Assert.Equal("native-private-message-1", @event.Payload.GetProperty("message_id").GetString());
+        Assert.Equal(
+            "20003",
+            @event.Payload.GetProperty("peer").GetProperty("user_uid").GetString());
+        Assert.Equal("private", @event.Payload.GetProperty("peer").GetProperty("kind").GetString());
+        QqDirectNormalizedEvent normalized = QqDirectMessageMapper.NormalizeMessage(
+            @event.Payload,
+            profile,
+            @event.Generation,
+            profile.BindingId);
+        Assert.Equal(QqDirectMessageMapper.InboundMessageEventType, normalized.EventType);
+    }
+
+    [Fact]
     public async Task QqDispatcherBootstrapsTheSessionBeforeAReadyOperation()
     {
         if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
@@ -177,7 +238,7 @@ public sealed class DispatcherTests
             return;
         }
 
-        string fixture = Path.GetFullPath(
+        string fixture = RepositoryPath(
             "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
         if (!File.Exists(fixture))
         {
@@ -188,20 +249,10 @@ public sealed class DispatcherTests
             Path.GetTempPath(),
             $"cyrene-qq-dispatch-test-{Guid.NewGuid():N}");
         string operationLog = Path.Combine(dataDirectory, "operations.log");
-        QqDirectProfile profile = QqDirectProfileLoader.FromJson(
-            $$"""
-            {
-                "runtime_profile":"qqnt-direct",
-                "binding_id":"qq-dispatch",
-                "host_executable":"/usr/bin/python3",
-                "host_args":["{{fixture}}","--operation-log={{operationLog}}"],
-                "data_dir":"{{dataDirectory}}",
-                "required_client_version":"fixture-client",
-                "required_host_abi":"fake-qqnt-linux-x86_64",
-                "account_id":"10001"
-            }
-            """
-        );
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            $"--operation-log={operationLog}");
         await using QqHostClient host = new(profile.HostLaunch);
         QqDirectInvocationDispatcher dispatcher = new(profile, host);
 
@@ -217,7 +268,9 @@ public sealed class DispatcherTests
             CancellationToken.None);
 
         Assert.Null(result.Error);
-        using JsonDocument response = JsonDocument.Parse(result.Payload!.ToByteArray());
+        string payloadText = result.Payload!.Value.ToStringUtf8();
+        Assert.True(payloadText.StartsWith('{'), payloadText);
+        using JsonDocument response = JsonDocument.Parse(payloadText);
         Assert.Equal("qq.group.list", response.RootElement.GetProperty("operation").GetString());
         Assert.Equal("NodeIKernelGroupService", response.RootElement.GetProperty("mapping").GetProperty("service").GetString());
         string[] operations = File.ReadAllLines(operationLog);
@@ -232,6 +285,239 @@ public sealed class DispatcherTests
             operations);
         await host.CloseAsync(CancellationToken.None);
     }
+
+    [Fact]
+    public async Task QqDispatcherMapsCanonicalSendMessageAndDelivery()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        if (!File.Exists(fixture))
+        {
+            return;
+        }
+
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-send-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(fixture, dataDirectory);
+        await using QqHostClient host = new(profile.HostLaunch);
+        QqDirectInvocationDispatcher dispatcher = new(profile, host);
+        SendMessageRequest message = new()
+        {
+            Conversation = new ConversationScope
+            {
+                Vendor = QqDirectMessageMapper.Vendor,
+                AccountId = "10001",
+                ConversationId = "20001",
+                Kind = ConversationKind.Group
+            },
+            Reply = new ReplyReference { MessageId = "reply-1" },
+            VendorExtension = new VendorExtension { Vendor = QqDirectMessageMapper.Vendor }
+        };
+        message.VendorExtension.Facts.Add(new VendorFact
+        {
+            Name = "qq_peer_uid",
+            Value = "group-peer-1"
+        });
+        message.Content.Add(new MessageContentPart
+        {
+            Text = new TextContent { Text = "hello" }
+        });
+        message.Content.Add(new MessageContentPart
+        {
+            Mention = new MentionContent { Target = MentionTarget.Everyone }
+        });
+        message.Content.Add(new MessageContentPart
+        {
+            Image = new ImageContent
+            {
+                Reference = new AttachmentReference
+                {
+                    RemoteUri = "https://cdn.example/image.png"
+                }
+            }
+        });
+
+        InvocationResult result = await dispatcher.InvokeAsync(
+            new DirectInvocationRequest
+            {
+                Capability = QqDirectMessageMapper.CapabilityId,
+                InterfaceVersion = QqDirectMessageMapper.InterfaceVersion,
+                Method = QqDirectMessageMapper.SendMessageMethod,
+                PayloadTypeUrl = QqDirectMessageMapper.SendMessageRequestTypeUrl,
+                Payload = ByteString.CopyFrom(message.ToByteArray())
+            },
+            CancellationToken.None);
+
+        Assert.Null(result.Error);
+        DeliveryResult delivery = DeliveryResult.Parser.ParseFrom(result.Payload!.Value);
+        Assert.Equal(DeliveryStatus.Accepted, delivery.Status);
+        Assert.Equal("qq-test-1-message-1", delivery.VendorMessageId);
+        Assert.Equal(QqDirectMessageMapper.Vendor, delivery.VendorExtension.Vendor);
+    }
+
+    [Fact]
+    public async Task QqDispatcherFiltersNativeInboundMessageEvents()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        if (!File.Exists(fixture))
+        {
+            return;
+        }
+
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-event-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=semantic_mapping");
+        await using QqHostClient host = new(profile.HostLaunch);
+        QqDirectInvocationDispatcher dispatcher = new(profile, host);
+        DirectInvocationRequest request = CreateSubscriptionRequest(
+            "qq-events",
+            "{\"event_type\":\"inbound_message\",\"kind\":\"private\"}");
+
+        await using IAsyncEnumerator<DirectStreamItem> events = dispatcher
+            .InvokeStreamAsync(request, CancellationToken.None)
+            .GetAsyncEnumerator();
+        Assert.True(
+            await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        DirectStreamItem item = events.Current;
+        Assert.NotNull(item.Payload);
+        Assert.Equal(QqDirectMessageMapper.InboundMessageEventType, item.Payload.EventType);
+        InboundMessagePayload message = InboundMessagePayload.Parser.ParseFrom(item.Payload.Value);
+        Assert.Equal(ConversationKind.Private, message.Conversation.Kind);
+        Assert.Equal("native-private-message-1", message.MessageId);
+        Assert.Equal("20003", message.Conversation.ConversationId);
+    }
+
+    [Fact]
+    public async Task QqDispatcherCorrelatesSendCompletionCallbackToTheOriginatingSend()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py");
+        if (!File.Exists(fixture))
+        {
+            return;
+        }
+
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-callback-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(fixture, dataDirectory, "--mode=callbacks");
+        await using QqHostClient host = new(profile.HostLaunch);
+        QqDirectInvocationDispatcher dispatcher = new(profile, host);
+        await using IAsyncEnumerator<DirectStreamItem> events = dispatcher
+            .InvokeStreamAsync(
+                CreateSubscriptionRequest("qq-callbacks", "{}"),
+                CancellationToken.None)
+            .GetAsyncEnumerator();
+
+        Assert.True(
+            await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(5)));
+        Assert.Equal(QqDirectMessageMapper.InboundMessageEventType, events.Current.Payload.EventType);
+
+        SendMessageRequest message = new()
+        {
+            Conversation = new ConversationScope
+            {
+                Vendor = QqDirectMessageMapper.Vendor,
+                AccountId = "10001",
+                ConversationId = "20001",
+                Kind = ConversationKind.Group
+            }
+        };
+        message.Content.Add(new MessageContentPart
+        {
+            Text = new TextContent { Text = "callback" }
+        });
+        InvocationResult send = await dispatcher.InvokeAsync(
+            new DirectInvocationRequest
+            {
+                Capability = QqDirectMessageMapper.CapabilityId,
+                InterfaceVersion = QqDirectMessageMapper.InterfaceVersion,
+                Method = QqDirectMessageMapper.SendMessageMethod,
+                PayloadTypeUrl = QqDirectMessageMapper.SendMessageRequestTypeUrl,
+                Payload = ByteString.CopyFrom(message.ToByteArray())
+            },
+            CancellationToken.None);
+        Assert.Null(send.Error);
+
+        Assert.True(await events.MoveNextAsync());
+        DirectStreamItem callback = events.Current;
+        Assert.Equal(QqDirectMessageMapper.CallbackEventType, callback.Payload.EventType);
+        QqCallbackPayload payload = JsonSerializer.Deserialize(
+            callback.Payload.Value.ToByteArray(),
+            QqHostJsonContext.Default.QqCallbackPayload)!;
+        Assert.Equal("qq.message.send_completion", payload.Operation);
+        Assert.Equal("completed", payload.Status?.GetString());
+    }
+
+    private static QqDirectProfile CreateQqProfile(
+        string fixture,
+        string dataDirectory,
+        params string[] extraArguments)
+    {
+        string[] hostArguments = new[] { fixture }.Concat(extraArguments).ToArray();
+        string json = "{\"runtime_profile\":\"qqnt-direct\","
+            + "\"binding_id\":\"qq-test\","
+            + "\"host_executable\":\"/usr/bin/python3\","
+            + $"\"host_args\":[{string.Join(',', hostArguments.Select(JsonString))}],"
+            + $"\"data_dir\":{JsonString(dataDirectory)},"
+            + "\"required_client_version\":\"fixture-client\","
+            + "\"required_host_abi\":\"fake-qqnt-linux-x86_64\","
+            + "\"account_id\":\"10001\"}";
+        return QqDirectProfileLoader.FromJson(json);
+    }
+
+    private static string JsonString(string value) =>
+        $"\"{value.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
+
+    private static string RepositoryPath(params string[] parts)
+    {
+        DirectoryInfo? directory = new(AppContext.BaseDirectory);
+        while (directory is not null)
+        {
+            if (File.Exists(Path.Combine(directory.FullName, "source-manifest.json")))
+            {
+                return Path.Combine(new[] { directory.FullName }.Concat(parts).ToArray());
+            }
+
+            directory = directory.Parent;
+        }
+
+        throw new InvalidOperationException("repository root was not found");
+    }
+
+    private static DirectInvocationRequest CreateSubscriptionRequest(
+        string requestId,
+        string filter) => new()
+        {
+            Capability = QqDirectMessageMapper.CapabilityId,
+            InterfaceVersion = QqDirectMessageMapper.InterfaceVersion,
+            Method = QqDirectMessageMapper.EventsMethod,
+            PayloadTypeUrl = QqDirectMessageMapper.FilterTypeUrl,
+            RequestId = requestId,
+            StreamMode = DirectStreamMode.Subscription,
+            Payload = ByteString.CopyFromUtf8(filter)
+        };
 
     [Fact]
     public async Task StreamReturnsErrorAndTerminalEnd()
