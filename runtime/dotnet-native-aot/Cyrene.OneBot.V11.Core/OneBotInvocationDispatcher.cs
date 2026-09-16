@@ -19,13 +19,16 @@ public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
 
     private readonly OneBotProfile _profile;
     private readonly IOneBotActionTransport _transport;
+    private readonly OneBotEventSubscriptionRegistry _subscriptions;
 
     public OneBotInvocationDispatcher(
         OneBotProfile profile,
-        IOneBotActionTransport transport)
+        IOneBotActionTransport transport,
+        OneBotEventSubscriptionRegistry? subscriptions = null)
     {
         _profile = profile;
         _transport = transport;
+        _subscriptions = subscriptions ?? new OneBotEventSubscriptionRegistry(profile);
     }
 
     public async ValueTask<InvocationResult> InvokeAsync(
@@ -34,6 +37,14 @@ public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
     {
         try
         {
+            if (request.StreamMode == DirectStreamMode.Subscription)
+            {
+                return Failure(
+                    DirectInvocationError.Types.Code.InvalidRequest,
+                    "subscription requires InvokeStream.",
+                    "SUBSCRIPTION_REQUIRES_STREAM");
+            }
+
             ValidateEnvelope(request);
             cancellationToken.ThrowIfCancellationRequested();
             SendMessageRequest message = SendMessageRequest.Parser.ParseFrom(request.Payload);
@@ -131,6 +142,50 @@ public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
         [System.Runtime.CompilerServices.EnumeratorCancellation]
         CancellationToken cancellationToken)
     {
+        if (request.StreamMode == DirectStreamMode.Subscription)
+        {
+            OneBotEventSubscription? subscription = null;
+            OneBotSubscriptionException? subscriptionFailure = null;
+            try
+            {
+                subscription = _subscriptions.Subscribe(request);
+                _transport.Start();
+            }
+            catch (OneBotSubscriptionException exception)
+            {
+                subscriptionFailure = exception;
+            }
+
+            if (subscriptionFailure is not null)
+            {
+                yield return new DirectStreamItem
+                {
+                    Error = new DirectInvocationError
+                    {
+                        Code = SubscriptionErrorCode(subscriptionFailure.DomainCode),
+                        Message = subscriptionFailure.Message,
+                        DomainCode = subscriptionFailure.DomainCode
+                    }
+                };
+                yield break;
+            }
+
+            try
+            {
+                await foreach (DirectStreamItem item in subscription!.ReadAllAsync(
+                                   cancellationToken))
+                {
+                    yield return item;
+                }
+            }
+            finally
+            {
+                subscription!.Dispose();
+            }
+
+            yield break;
+        }
+
         InvocationResult result = await InvokeAsync(request, cancellationToken);
         if (result.Payload is not null)
         {
@@ -181,4 +236,12 @@ public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
         _ = detail;
         return InvocationResult.Failure(code, message, retryable, domainCode);
     }
+
+    private static DirectInvocationError.Types.Code SubscriptionErrorCode(string domainCode) =>
+        domainCode switch
+        {
+            "METHOD_NOT_FOUND" => DirectInvocationError.Types.Code.MethodNotFound,
+            "CAPABILITY_UNAVAILABLE" => DirectInvocationError.Types.Code.Unavailable,
+            _ => DirectInvocationError.Types.Code.InvalidRequest
+        };
 }

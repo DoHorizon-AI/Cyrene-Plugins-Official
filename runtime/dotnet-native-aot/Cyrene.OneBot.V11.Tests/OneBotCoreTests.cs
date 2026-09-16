@@ -173,12 +173,43 @@ public sealed class OneBotCoreTests
             "qq-main");
         using OneBotWebSocketTransport transport = new(profile);
         using OneBotReverseWebSocketServer server = new(profile, transport);
+        using OneBotEventSubscriptionRegistry registry = new(profile);
+        transport.SetEventHandler(registry.Publish);
+        using OneBotEventSubscription subscription = registry.Subscribe(
+            new DirectInvocationRequest
+            {
+                Capability = OneBotMessageMapper.CapabilityId,
+                InterfaceVersion = OneBotMessageMapper.InterfaceVersion,
+                Method = OneBotEventSubscriptionRegistry.SubscriptionMethod,
+                PayloadTypeUrl = OneBotEventSubscriptionRegistry.FilterTypeUrl,
+                Payload = Google.Protobuf.ByteString.CopyFromUtf8(
+                    "{\"event_type\":\"inbound_message\"}"),
+                RequestId = "reverse-subscription",
+                StreamMode = DirectStreamMode.Subscription
+            });
         server.Start();
         using ClientWebSocket client = new();
         client.Options.SetRequestHeader("Authorization", "Bearer reverse-token");
         await client.ConnectAsync(
             new Uri($"ws://127.0.0.1:{server.ListenPort}/onebot"),
             CancellationToken.None);
+
+        await client.SendAsync(
+            Encoding.UTF8.GetBytes(
+                "{\"post_type\":\"message\",\"message_type\":\"private\","
+                + "\"self_id\":10001,\"user_id\":10002,\"message_id\":\"reverse-event-1\","
+                + "\"sender\":{\"user_id\":10002,\"nickname\":\"Alice\"},"
+                + "\"message\":[{\"type\":\"text\",\"data\":{\"text\":\"from reverse\"}}]}"),
+            WebSocketMessageType.Text,
+            true,
+            CancellationToken.None);
+        await using IAsyncEnumerator<DirectStreamItem> events =
+            subscription.ReadAllAsync(CancellationToken.None).GetAsyncEnumerator();
+        Assert.True(await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2)));
+        InboundMessagePayload inbound = InboundMessagePayload.Parser.ParseFrom(
+            events.Current.Payload.Value);
+        Assert.Equal("reverse-event-1", inbound.MessageId);
+        Assert.Equal("from reverse", inbound.Content[0].Text.Text);
 
         Task<OneBotActionResponse> call = transport.CallAsync(
             "send_private_msg",
@@ -198,6 +229,111 @@ public sealed class OneBotCoreTests
         Assert.Equal("ok", response.Status);
         Assert.Equal("reverse-1", response.Data.GetProperty("message_id").GetString());
         Assert.Equal("send_private_msg", action.RootElement.GetProperty("action").GetString());
+    }
+
+    [Fact]
+    public void NormalizesInboundMessageToCanonicalPayload()
+    {
+        OneBotProfile profile = OneBotProfileLoader.FromJson(
+            "{\"binding_id\":\"qq-main\",\"http_base_url\":\"http://127.0.0.1:18080\",\"self_account_id\":\"10001\"}");
+        using JsonDocument document = JsonDocument.Parse(
+            "{\"post_type\":\"message\",\"message_type\":\"group\","
+            + "\"self_id\":10001,\"group_id\":20001,\"message_id\":30001,"
+            + "\"sender\":{\"user_id\":10002,\"card\":\"Card\",\"nickname\":\"Nick\"},"
+            + "\"message\":["
+            + "{\"type\":\"text\",\"data\":{\"text\":\"hello\"}},"
+            + "{\"type\":\"at\",\"data\":{\"qq\":\"10003\",\"name\":\"Bob\"}},"
+            + "{\"type\":\"image\",\"data\":{\"url\":\"https://cdn.example/a.png\"}},"
+            + "{\"type\":\"file\",\"data\":{\"file\":\"media-1\",\"name\":\"a.txt\"}},"
+            + "{\"type\":\"reply\",\"data\":{\"id\":\"29999\"}},"
+            + "{\"type\":\"json\",\"data\":{\"foo\":\"bar\"}}]}");
+
+        OneBotNormalizedEvent normalized = OneBotEventNormalizer.Normalize(
+            document.RootElement,
+            profile)!;
+        InboundMessagePayload payload = InboundMessagePayload.Parser.ParseFrom(
+            normalized.Payload);
+
+        Assert.Equal(OneBotEventNormalizer.InboundMessageEventType, normalized.EventType);
+        Assert.Equal(OneBotEventNormalizer.InboundMessageTypeUrl, normalized.TypeUrl);
+        Assert.Equal("30001", payload.MessageId);
+        Assert.Equal("20001", payload.Conversation.ConversationId);
+        Assert.Equal(ConversationKind.Group, payload.Conversation.Kind);
+        Assert.Equal("10002", payload.SenderId);
+        Assert.Equal("Card", payload.SenderDisplayName);
+        Assert.Equal(4, payload.Content.Count);
+        Assert.Equal("hello", payload.Content[0].Text.Text);
+        Assert.Equal(MentionTarget.User, payload.Content[1].Mention.Target);
+        Assert.Equal("10003", payload.Content[1].Mention.TargetId);
+        Assert.Equal("https://cdn.example/a.png", payload.Content[2].Image.Reference.RemoteUri);
+        Assert.Equal("media-1", payload.Content[3].File.Reference.VendorMedia.MediaId);
+        Assert.Equal("29999", payload.Reply.MessageId);
+        Assert.Equal("onebot.v11", payload.VendorExtension.Vendor);
+        Assert.Contains(payload.VendorExtension.Facts, fact =>
+            fact.Name == "segment_5_type" && fact.Value == "json");
+        Assert.Contains(payload.VendorExtension.Facts, fact =>
+            fact.Name == "segment_5_foo" && fact.Value == "bar");
+    }
+
+    [Fact]
+    public void NormalizesInboundRequestToExistingJsonContract()
+    {
+        OneBotProfile profile = OneBotProfileLoader.FromJson(
+            "{\"binding_id\":\"qq-main\",\"http_base_url\":\"http://127.0.0.1:18080\",\"self_account_id\":\"10001\"}");
+        using JsonDocument document = JsonDocument.Parse(
+            "{\"post_type\":\"request\",\"request_type\":\"group\","
+            + "\"sub_type\":\"invite\",\"self_id\":\"10001\",\"flag\":\"flag-1\","
+            + "\"group_id\":20001,\"user_id\":10002}");
+
+        OneBotNormalizedEvent normalized = OneBotEventNormalizer.Normalize(
+            document.RootElement,
+            profile)!;
+        using JsonDocument payload = JsonDocument.Parse(normalized.Payload);
+        JsonElement root = payload.RootElement;
+
+        Assert.Equal(OneBotEventNormalizer.InboundRequestEventType, normalized.EventType);
+        Assert.Equal("group_invite", normalized.RequestKind);
+        Assert.Equal("flag-1", root.GetProperty("request_id").GetString());
+        Assert.Equal("group_invite", root.GetProperty("request_kind").GetString());
+        Assert.Equal("invite", root.GetProperty("vendor_request").GetProperty("sub_type").GetString());
+        Assert.Equal("20001", root.GetProperty("vendor_request").GetProperty("group_id").GetString());
+        Assert.Equal("10002", root.GetProperty("vendor_request").GetProperty("user_id").GetString());
+    }
+
+    [Fact]
+    public async Task SubscriptionFiltersAndPublishesCanonicalInboundEvents()
+    {
+        OneBotProfile profile = OneBotProfileLoader.FromJson(
+            "{\"binding_id\":\"qq-main\",\"http_base_url\":\"http://127.0.0.1:18080\",\"self_account_id\":\"10001\"}");
+        using OneBotEventSubscriptionRegistry registry = new(profile);
+        using OneBotEventSubscription subscription = registry.Subscribe(
+            new DirectInvocationRequest
+            {
+                Capability = OneBotMessageMapper.CapabilityId,
+                InterfaceVersion = OneBotMessageMapper.InterfaceVersion,
+                Method = OneBotEventSubscriptionRegistry.SubscriptionMethod,
+                PayloadTypeUrl = OneBotEventSubscriptionRegistry.FilterTypeUrl,
+                Payload = Google.Protobuf.ByteString.CopyFromUtf8(
+                    "{\"event_type\":\"inbound_message\",\"conversation_id\":\"20001\",\"kind\":\"group\"}"),
+                RequestId = "subscription-1",
+                StreamMode = DirectStreamMode.Subscription
+            });
+        using JsonDocument document = JsonDocument.Parse(
+            "{\"post_type\":\"message\",\"message_type\":\"group\","
+            + "\"self_id\":10001,\"group_id\":20001,\"message_id\":30001,"
+            + "\"sender\":{\"user_id\":10002},"
+            + "\"message\":[{\"type\":\"text\",\"data\":{\"text\":\"hello\"}}]}");
+        registry.Publish(document.RootElement);
+
+        await using IAsyncEnumerator<DirectStreamItem> events =
+            subscription.ReadAllAsync(CancellationToken.None).GetAsyncEnumerator();
+        Assert.True(await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(2)));
+        DirectStreamItem item = events.Current;
+        Assert.Equal(OneBotEventNormalizer.InboundMessageEventType, item.Payload.EventType);
+        InboundMessagePayload payload = InboundMessagePayload.Parser.ParseFrom(
+            item.Payload.Value);
+        Assert.Equal("20001", payload.Conversation.ConversationId);
+        Assert.Equal("hello", payload.Content[0].Text.Text);
     }
 
     private static int GetFreePort()

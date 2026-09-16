@@ -101,6 +101,25 @@ public sealed class OneBotWebSocketFrame
     public string? Echo { get; set; }
 }
 
+/// <summary>Canonical JSON payload for one normalized OneBot request event.</summary>
+public sealed class OneBotInboundRequestPayload
+{
+    [JsonPropertyName("account_id")]
+    public string AccountId { get; set; } = string.Empty;
+
+    [JsonPropertyName("vendor")]
+    public string Vendor { get; set; } = string.Empty;
+
+    [JsonPropertyName("request_id")]
+    public string RequestId { get; set; } = string.Empty;
+
+    [JsonPropertyName("request_kind")]
+    public string RequestKind { get; set; } = string.Empty;
+
+    [JsonPropertyName("vendor_request")]
+    public Dictionary<string, string> VendorRequest { get; set; } = new();
+}
+
 [JsonSourceGenerationOptions(
     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
     PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
@@ -112,6 +131,7 @@ public sealed class OneBotWebSocketFrame
 [JsonSerializable(typeof(OneBotActionResponse))]
 [JsonSerializable(typeof(OneBotWebSocketActionRequest))]
 [JsonSerializable(typeof(OneBotWebSocketFrame))]
+[JsonSerializable(typeof(OneBotInboundRequestPayload))]
 public partial class OneBotJsonContext : JsonSerializerContext
 {
 }
