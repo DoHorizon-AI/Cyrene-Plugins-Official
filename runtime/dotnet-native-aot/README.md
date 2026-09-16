@@ -17,11 +17,23 @@ functional profiles are `http_api`, `forward_websocket`, and
 `reverse_websocket`. The production Python manifest is intentionally unchanged
 until cross-transport behavior and package assembly reach parity.
 
+The current C# slice also contains a binding-scoped `qqnt-direct` bridge for
+the fixed `qq.client.v1` operation registry. It starts the explicitly selected
+Linux x86_64 QQ Host over inherited stdio, negotiates protocol/version/ABI,
+correlates requests by binding and generation, bounds frames, and performs
+bounded shutdown. Session bootstrap, QQ canonical message/event projections,
+crash recovery parity, and native package cutover remain later migration gates.
+
 `Cyrene.OneBot.V11.Host` 现在暴露规范的 `DirectPluginRuntime` gRPC 服务，并从
 插件激活环境选择一个 binding。当前第一个可运行 profile 是 `http_api`；
 `forward_websocket` 与 `reverse_websocket` 也已实现。reverse profile 在 binding
 本地监听器上完成受控 RFC 6455 握手，并将单个当前对端交给同一套 action/echo
 关联循环。在跨传输行为和包组装达到等价前，正式 Python 清单保持不变。
+
+当前 C# 阶段也包含限定在 binding 内的 `qqnt-direct` 桥接和固定
+`qq.client.v1` operation 注册表：通过继承 stdio 启动明确选择的 Linux x86_64 QQ Host，
+协商 protocol/version/ABI，按 binding 与 generation 关联请求，有界分帧并执行有界关闭。
+session bootstrap、QQ canonical message/event 投影、崩溃恢复等价性和原生包切换仍是后续门禁。
 
 For a local configured-host smoke test, provide:
 
