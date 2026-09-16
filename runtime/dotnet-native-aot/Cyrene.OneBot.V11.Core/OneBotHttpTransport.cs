@@ -19,6 +19,12 @@ public interface IOneBotActionTransport
         string action,
         OneBotActionRequest request,
         CancellationToken cancellationToken);
+
+    void SetEventHandler(Action<JsonElement>? eventHandler);
+
+    void Start();
+
+    void Close();
 }
 
 /// <summary>Safe transport failure classification for the direct runtime.</summary>
@@ -180,6 +186,17 @@ public sealed class OneBotHttpTransport : IOneBotActionTransport, IDisposable
         }
     }
 
+    public void SetEventHandler(Action<JsonElement>? eventHandler)
+    {
+        _ = eventHandler;
+    }
+
+    public void Start()
+    {
+    }
+
+    public void Close() => Dispose();
+
     private static async Task<byte[]> ReadBoundedAsync(
         HttpResponseMessage response,
         CancellationToken cancellationToken,
@@ -237,10 +254,11 @@ public static class OneBotTransportFactory
         HttpClient? httpClient = null) => profile.TransportProfile switch
         {
             OneBotTransportProfile.HttpApi => new OneBotHttpTransport(profile, httpClient),
-            OneBotTransportProfile.ForwardWebSocket or OneBotTransportProfile.ReverseWebSocket =>
+            OneBotTransportProfile.ForwardWebSocket => new OneBotWebSocketTransport(profile),
+            OneBotTransportProfile.ReverseWebSocket =>
                 throw new OneBotConfigurationException(
                     "TRANSPORT_NOT_IMPLEMENTED",
-                    "WebSocket transport is reserved for the next OneBot runtime slice."),
+                    "Reverse WebSocket listener is reserved for the next transport slice."),
             _ => throw new OneBotConfigurationException(
                 "INVALID_TRANSPORT_PROFILE",
                 "OneBot transport profile is not registered.")
