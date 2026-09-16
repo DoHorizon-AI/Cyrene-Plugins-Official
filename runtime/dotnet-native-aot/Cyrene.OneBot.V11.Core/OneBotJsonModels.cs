@@ -1,0 +1,86 @@
+// ┌─────────────────────────────────────────────────────────────────────────┐
+// │  📄 OneBotJsonModels.cs                                                   │
+// │  Namespace: Cyrene.OneBot.V11.Core                                        │
+// │  Role: Bounded OneBot v11 JSON wire models and source-generated metadata. │
+// │                                                                         │
+// │  模块职责：有界 OneBot v11 JSON 线协议模型与源码生成元数据                    │
+// └─────────────────────────────────────────────────────────────────────────┘
+
+using System.Text.Json;
+using System.Text.Json.Serialization;
+
+namespace Cyrene.OneBot.V11.Core;
+
+/// <summary>Bounded parameters for one OneBot v11 action.</summary>
+public sealed record OneBotActionRequest
+{
+    [JsonPropertyName("group_id")]
+    public ulong? GroupId { get; init; }
+
+    [JsonPropertyName("user_id")]
+    public ulong? UserId { get; init; }
+
+    [JsonPropertyName("message")]
+    public IReadOnlyList<OneBotMessageSegment>? Message { get; init; }
+}
+
+/// <summary>One ordered OneBot v11 message segment.</summary>
+public sealed class OneBotMessageSegment
+{
+    [JsonPropertyName("type")]
+    public string Type { get; set; } = string.Empty;
+
+    [JsonPropertyName("data")]
+    public OneBotSegmentData Data { get; set; } = new();
+}
+
+/// <summary>Known scalar data fields for the supported OneBot segments.</summary>
+public sealed class OneBotSegmentData
+{
+    [JsonPropertyName("id")]
+    public string? Id { get; set; }
+
+    [JsonPropertyName("text")]
+    public string? Text { get; set; }
+
+    [JsonPropertyName("qq")]
+    public string? Qq { get; set; }
+
+    [JsonPropertyName("url")]
+    public string? Url { get; set; }
+
+    [JsonPropertyName("file")]
+    public string? File { get; set; }
+
+    [JsonPropertyName("name")]
+    public string? Name { get; set; }
+}
+
+/// <summary>One OneBot v11 action response envelope.</summary>
+public sealed class OneBotActionResponse
+{
+    [JsonPropertyName("status")]
+    public string? Status { get; set; }
+
+    [JsonPropertyName("retcode")]
+    public int Retcode { get; set; }
+
+    [JsonPropertyName("data")]
+    public JsonElement Data { get; set; }
+
+    [JsonPropertyName("echo")]
+    public string? Echo { get; set; }
+}
+
+[JsonSourceGenerationOptions(
+    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase,
+    GenerationMode = JsonSourceGenerationMode.Metadata)]
+[JsonSerializable(typeof(OneBotProfileDocument))]
+[JsonSerializable(typeof(OneBotActionRequest))]
+[JsonSerializable(typeof(OneBotMessageSegment))]
+[JsonSerializable(typeof(OneBotSegmentData))]
+[JsonSerializable(typeof(OneBotActionResponse))]
+public partial class OneBotJsonContext : JsonSerializerContext
+{
+}

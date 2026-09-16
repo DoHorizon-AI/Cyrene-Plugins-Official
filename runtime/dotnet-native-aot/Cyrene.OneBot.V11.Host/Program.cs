@@ -19,9 +19,31 @@ public static class Program
     {
         WebApplicationBuilder builder = WebApplication.CreateSlimBuilder(args);
         builder.Services.AddGrpc();
-        builder.Services.AddSingleton<IDirectInvocationDispatcher, NotConfiguredInvocationDispatcher>();
         builder.Services.AddSingleton(CreateMetadata());
-        builder.Services.AddSingleton(CreateReadiness());
+
+        OneBotProfile? profile = OneBotProfileLoader.FromEnvironment();
+        if (profile is null)
+        {
+            builder.Services.AddSingleton<IDirectInvocationDispatcher,
+                NotConfiguredInvocationDispatcher>();
+            builder.Services.AddSingleton(RuntimeReadiness.NotServing(
+                "CONNECTOR_PROFILE_NOT_CONFIGURED"));
+        }
+        else
+        {
+            builder.Services.AddSingleton(profile);
+            builder.Services.AddSingleton<HttpClient>(_ => new HttpClient
+            {
+                Timeout = Timeout.InfiniteTimeSpan
+            });
+            builder.Services.AddSingleton<IOneBotActionTransport>(serviceProvider =>
+                OneBotTransportFactory.Create(
+                    profile,
+                    serviceProvider.GetRequiredService<HttpClient>()));
+            builder.Services.AddSingleton<IDirectInvocationDispatcher,
+                OneBotInvocationDispatcher>();
+            builder.Services.AddSingleton(RuntimeReadiness.Serving());
+        }
 
         WebApplication app = builder.Build();
         app.MapGrpcService<DirectPluginRuntimeService>();
@@ -35,6 +57,4 @@ public static class Program
             ?? "0.3.0",
         Capabilities);
 
-    private static RuntimeReadiness CreateReadiness() =>
-        RuntimeReadiness.NotServing("CONNECTOR_PROFILE_NOT_CONFIGURED");
 }
