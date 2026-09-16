@@ -1321,8 +1321,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotHttpTransport.cs",
-      "sha256": "dd1bc6b624ed404c93dae9bfca6bbb881dfa5894f95c948c43579c5df60deba5",
-      "size_bytes": 9606
+      "sha256": "108f37304d2ad6f086fab3331ffcb731bb7b202772c28b045273c872e8ed65d0",
+      "size_bytes": 9447
     },
     {
       "kind": "file",
@@ -1355,9 +1355,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotReverseWebSocketServer.cs",
+      "sha256": "ff1de087391e9b7f035859fb6ef67dc38b4669792196d7d3ecf19e7870af4cd2",
+      "size_bytes": 9858
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotWebSocketTransport.cs",
-      "sha256": "2ab8ab6d114dae1a3295fd19aacc35ea76a88f571595e1bdf2baad8567c99dd5",
-      "size_bytes": 15039
+      "sha256": "9b7bfe04bc3b1a13b258ba3d038257043bfa47fedf2676e198a51f92f3e09f80",
+      "size_bytes": 16959
     },
     {
       "kind": "file",
@@ -1384,8 +1391,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Program.cs",
-      "sha256": "c3b5ce28ba904ac50304154fd9256ad8c8f4ddd600f89985b9a4800e0d6141b1",
-      "size_bytes": 2801
+      "sha256": "ecec5cdcdcc4b1decb5d44ae5f44f7d02c1d981e0aeb68838d6c81c474669b80",
+      "size_bytes": 3549
     },
     {
       "kind": "file",
@@ -1405,8 +1412,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/OneBotCoreTests.cs",
-      "sha256": "f8e1db31849ccc9a48f3cd15d371af7eecd4a66aed95f24bc2d4aa837f1821f0",
-      "size_bytes": 18092
+      "sha256": "1daf40d0745a8ca0e1ce130dbedc7b8999faf59808dc34bf96e47b681b1ea00e",
+      "size_bytes": 20808
     },
     {
       "kind": "file",
@@ -1601,8 +1608,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/README.md",
-      "sha256": "cbf75cd3ef1479e4238ca3b6a6ddc0d5d7ba598e067a91d8339c3c289a3313bd",
-      "size_bytes": 3061
+      "sha256": "a4c437e8cce6805b017325a84b86002afdb787aefeff60eb09112c73e663ecee",
+      "size_bytes": 3804
     },
     {
       "kind": "file",
