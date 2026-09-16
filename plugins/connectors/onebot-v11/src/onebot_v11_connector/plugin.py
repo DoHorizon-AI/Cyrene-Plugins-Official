@@ -84,7 +84,15 @@ class ConnectorPlugin:
         request_id: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, Any]:
-        """Forward a direct invocation without translating payload semantics."""
+        """Route the formal DirectPluginRuntime invocation to the selected profile.
+
+        The runtime invokes this method for the package data plane. Payload
+        semantics stay in the selected profile, so this router adds no OneBot
+        JSON hop or alternate transport.
+
+        DirectPluginRuntime 的 Invoke 是当前插件的正式调用入口；路由层只选择
+        profile，不改变 payload 语义，也不新增另一条传输路径。
+        """
 
         return self._delegate.on_invoke(
             capability,

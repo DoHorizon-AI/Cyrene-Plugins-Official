@@ -73,13 +73,19 @@ class ConnectorError(RuntimeError):
 class CancellationToken(Protocol):
     """Minimal cancellation seam provided by the generic worker."""
 
-    def is_cancelled(self) -> bool: ...
+    def is_cancelled(self) -> bool:
+        """Return whether the current direct invocation has been cancelled."""
+
+        ...
 
 
 class ApplicationEventEmitter(Protocol):
     """Worker-owned bounded emitter for one application-event subscription."""
 
-    def emit(self, event_type: str, payload: bytes, type_url: str = "") -> bool: ...
+    def emit(self, event_type: str, payload: bytes, type_url: str = "") -> bool:
+        """Deliver one typed event and report whether the subscriber accepted it."""
+
+        ...
 
 
 class OneBotTransport(Protocol):
@@ -98,9 +104,15 @@ class OneBotTransport(Protocol):
         *,
         timeout_seconds: float,
         cancellation: CancellationToken | None,
-    ) -> Mapping[str, Any]: ...
+    ) -> Mapping[str, Any]:
+        """Execute one binding-scoped OneBot action and return its result object."""
 
-    def close(self) -> None: ...
+        ...
+
+    def close(self) -> None:
+        """Close the transport and release all binding-local resources."""
+
+        ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -342,6 +354,8 @@ class UrllibOneBotTransport:
         timeout_seconds: float,
         cancellation: CancellationToken | None,
     ) -> Mapping[str, Any]:
+        """POST one action to the configured OneBot HTTP endpoint."""
+
         _raise_if_cancelled(cancellation)
         request = urllib.request.Request(
             f"{self._base_url}/{action}",
@@ -779,6 +793,8 @@ class OneBotV11Connector:
         return None
 
     def on_unsubscribe(self, subscription_id: str, reason: str) -> None:
+        """Detach one binding-local subscription without affecting the transport."""
+
         del reason
         self._subscriptions.pop(subscription_id, None)
 
@@ -849,6 +865,8 @@ class OneBotV11Connector:
             self._transport.close()
 
     def on_shutdown(self, grace_period_ms: int) -> None:
+        """Stop the configured transport within the worker shutdown callback."""
+
         del grace_period_ms
         self.close()
 

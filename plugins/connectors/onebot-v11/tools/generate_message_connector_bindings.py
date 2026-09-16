@@ -32,6 +32,8 @@ OUTPUT_PATH = (
 
 
 def main() -> int:
+    """Generate the checked-in Python projection from the canonical proto."""
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--contract-root",
