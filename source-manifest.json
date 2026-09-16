@@ -1306,6 +1306,62 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/Cyrene.OneBot.V11.Core.csproj",
+      "sha256": "64c91ce601404d321dfabe8a40d10622b1cd5fc5f253f516849d0cb3b71ee080",
+      "size_bytes": 446
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/DirectInvocationDispatcher.cs",
+      "sha256": "19c0a00cf6b9f78011bf2d697d05520338b298bacd65e44c946c053bdfc7c14f",
+      "size_bytes": 5841
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/RuntimeMetadata.cs",
+      "sha256": "4069a7a1afaf3a34aa2f82fc086c4a3df9ca5c09a2c6753cbd342eeeea12e280",
+      "size_bytes": 1662
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Cyrene.OneBot.V11.Host.csproj",
+      "sha256": "27995e89441dd84282953e03b3c16334a940df024514dd6b7f915d6ad31f5478",
+      "size_bytes": 613
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/DirectPluginRuntimeService.cs",
+      "sha256": "21f7da8c081701fb354e34a22a0062f572e990f392ce123e1582db5fca3bce5a",
+      "size_bytes": 4595
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Program.cs",
+      "sha256": "c4429d2134a1fbc14da4c23505e20ce42099b7ee68dbaa2211a594b0c5dbeafa",
+      "size_bytes": 2060
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj",
+      "sha256": "2889e4718d250bd82767b915acc3cf7da21c830a16a7562a332dfe4ffe69dfca",
+      "size_bytes": 712
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/DispatcherTests.cs",
+      "sha256": "95b0ab55932606b091a616ec8a6042806ac63d65ea9c29e01fb9b6166eee4c42",
+      "size_bytes": 3699
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/Cyrene.Plugin.Core.csproj",
       "sha256": "a1626e369c7a2fa36827e680f949ef3bee065ccd3d8e8218d8d97bc76fae5157",
       "size_bytes": 455
