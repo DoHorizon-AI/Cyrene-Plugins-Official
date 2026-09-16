@@ -21,8 +21,22 @@ public static class Program
         builder.Services.AddGrpc();
         builder.Services.AddSingleton(CreateMetadata());
 
-        OneBotProfile? profile = OneBotProfileLoader.FromEnvironment();
-        if (profile is null)
+        QqDirectProfile? qqProfile = QqDirectProfileLoader.FromEnvironment();
+        OneBotProfile? profile = qqProfile is null
+            ? OneBotProfileLoader.FromEnvironment()
+            : null;
+        if (qqProfile is not null)
+        {
+            builder.Services.AddSingleton(qqProfile);
+            builder.Services.AddSingleton<QqHostClient>(serviceProvider =>
+                new QqHostClient(qqProfile.HostLaunch));
+            builder.Services.AddSingleton<IDirectInvocationDispatcher>(serviceProvider =>
+                new QqDirectInvocationDispatcher(
+                    qqProfile,
+                    serviceProvider.GetRequiredService<QqHostClient>()));
+            builder.Services.AddSingleton(RuntimeReadiness.Serving());
+        }
+        else if (profile is null)
         {
             builder.Services.AddSingleton<IDirectInvocationDispatcher,
                 NotConfiguredInvocationDispatcher>();
