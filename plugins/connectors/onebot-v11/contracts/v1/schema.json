@@ -2833,6 +2833,3222 @@
           }
         }
       }
+    },
+    "qq_result_object": {
+      "$comment": "Normalized Host result envelope. Exact native overloads remain owned by the authorized Host; the worker rejects unsafe values before this seam.",
+      "type": "object",
+      "additionalProperties": true,
+      "maxProperties": 128,
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "account_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "uin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "user_uid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "user_uin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "peer_uid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "peer_uin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "member_uid": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "member_uin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "message_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sequence": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "random": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "timestamp": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "session_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "login_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/identifier"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "display_name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "client_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "host_abi": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "qr_code": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "progress": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "remote_uri": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^https?://"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "local_result_reference": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^(qq|staging)://"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "groups": {
+          "type": "array"
+        },
+        "members": {
+          "type": "array"
+        },
+        "friends": {
+          "type": "array"
+        },
+        "requests": {
+          "type": "array"
+        },
+        "messages": {
+          "type": "array"
+        },
+        "items": {
+          "type": "array"
+        },
+        "devices": {
+          "type": "array"
+        },
+        "likes": {
+          "type": "array"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "qq_result_session": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "state": {
+              "type": "string"
+            },
+            "session_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "account_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "client_version": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "host_abi": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_login": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "state": {
+              "type": "string"
+            },
+            "login_state": {
+              "type": "string"
+            },
+            "account_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "qr_code": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "progress": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_account": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "account_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "display_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "profile": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_message": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "message_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "sequence": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "random": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "peer_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "peer_uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "group_code": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_send_message": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "required": [
+            "message_id"
+          ],
+          "properties": {
+            "message_id": {
+              "$ref": "#/$defs/identifier"
+            },
+            "sequence": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "random": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "peer_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "peer_uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "group_code": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "user_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "user_uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_peer": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "peer_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "peer_uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_lookup": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "messages": {
+              "type": "array"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_read": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "message_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_emoji": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "message_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "likes": {
+              "type": "array"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_group": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "groups": {
+              "type": "array"
+            },
+            "members": {
+              "type": "array"
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_friend": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "friends": {
+              "type": "array"
+            },
+            "requests": {
+              "type": "array"
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_media": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "media_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "element_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "remote_uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "local_result_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(qq|staging)://"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "progress": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_file": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "file_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "file_uuid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "file_name": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "remote_uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "local_result_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(qq|staging)://"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "progress": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_group_mutation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "group_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "member_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_friend_mutation": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "reason": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "target_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "user_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "user_uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_profile": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "account_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_search": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "items": {
+              "type": "array"
+            },
+            "count": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_online": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "properties": {
+            "status": {
+              "type": "string"
+            },
+            "devices": {
+              "type": "array"
+            },
+            "likes": {
+              "type": "array"
+            }
+          }
+        }
+      ]
+    },
+    "qq_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "service",
+        "method"
+      ],
+      "properties": {
+        "service": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        }
+      }
+    },
+    "qq_response_envelope": {
+      "$comment": "Successful direct operation response after worker normalization.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "status",
+        "priority",
+        "result",
+        "mapping"
+      ],
+      "properties": {
+        "operation": {
+          "type": "string"
+        },
+        "status": {
+          "const": "accepted"
+        },
+        "priority": {
+          "enum": [
+            "P0",
+            "P1",
+            "P2"
+          ]
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        "mapping": {
+          "$ref": "#/$defs/qq_mapping"
+        }
+      }
+    },
+    "qq_session_create_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.session.create"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_session"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIQQNTWrapperSession"
+            },
+            "method": {
+              "const": "create"
+            }
+          }
+        }
+      }
+    },
+    "qq_session_init_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.session.init"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_session"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIQQNTWrapperSession"
+            },
+            "method": {
+              "const": "init"
+            }
+          }
+        }
+      }
+    },
+    "qq_session_start_nt_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.session.start_nt"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_session"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIQQNTWrapperSession"
+            },
+            "method": {
+              "const": "startNT"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_connect_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.connect"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "connect"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_online_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.online"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "online"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_offline_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.offline"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "offline"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_list_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.list"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "getLoginList"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_quick_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.quick"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "quickLoginWithUin"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_password_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.password"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "passwordLogin"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_qr_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.qr"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "getQRCodePicture"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_poll_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.poll"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelLoginService"
+            },
+            "method": {
+              "const": "startPolling"
+            }
+          }
+        }
+      }
+    },
+    "qq_login_self_status_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.login.self_status"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_login"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "getSelfStatus"
+            }
+          }
+        }
+      }
+    },
+    "qq_account_core_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.account.core"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_account"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "getCoreAndBaseInfo"
+            }
+          }
+        }
+      }
+    },
+    "qq_account_simple_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.account.simple"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_account"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "getUserSimpleInfo"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_subscribe_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.subscribe"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_message"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "addKernelMsgListener"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_send_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.send"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_send_message"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "sendMsg"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_send_completion_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.send_completion"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_send_completion"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgListener"
+            },
+            "method": {
+              "const": "onMsgInfoListUpdate"
+            }
+          }
+        }
+      }
+    },
+    "qq_peer_uid_by_uin_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.peer.uid_by_uin"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_peer"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "getUidByUin"
+            }
+          }
+        }
+      }
+    },
+    "qq_peer_uin_by_uid_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.peer.uin_by_uid"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_peer"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "getUinByUid"
+            }
+          }
+        }
+      }
+    },
+    "qq_peer_uid_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.peer.uid"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_peer"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelUixConvertService"
+            },
+            "method": {
+              "const": "getUid"
+            }
+          }
+        }
+      }
+    },
+    "qq_peer_uin_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.peer.uin"
+        },
+        "priority": {
+          "const": "P0"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_peer"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelUixConvertService"
+            },
+            "method": {
+              "const": "getUin"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_history_include_self_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.history_include_self"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_lookup"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "getMsgsIncludeSelf"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_history_by_seq_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.history_by_seq"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_lookup"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "getMsgsBySeqAndCount"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_by_id_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.by_id"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_lookup"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "getMsgsByMsgId"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_single_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.single"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_lookup"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "getSingleMsg"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_search_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.search"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_lookup"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "queryMsgsWithFilterEx"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_recall_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.recall"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_message"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "recallMsg"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_forward_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.forward"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_message"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "forwardMsg"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_forward_comment_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.forward_comment"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_message"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "forwardMsgWithComment"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_multi_forward_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.multi_forward"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_message"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "multiForwardMsg"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_read_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.read"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_read"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "setMsgRead"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_read_all_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.read_all"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_read"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "setAllC2CAndGroupMsgRead"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_emoji_likes_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.emoji_likes"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_emoji"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "setMsgEmojiLikes"
+            }
+          }
+        }
+      }
+    },
+    "qq_message_emoji_likes_list_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.message.emoji_likes_list"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_emoji"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "getMsgEmojiLikesList"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_list_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.list"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "getGroupList"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_detail_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.detail"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "getGroupDetailInfo"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_members_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.members"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "getAllMemberList"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_member_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.member"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "getMemberInfo"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_list_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.list"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "getBuddyListV2"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_cached_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.cached"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "getBuddyListFromCache"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_requests_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.requests"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "getBuddyReq"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_element_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.media.element"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_media"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "getRichMediaElement"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_download_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.media.download"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_media"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "downloadRichMedia"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_video_url_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.media.video_url"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_media"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelRichMediaService"
+            },
+            "method": {
+              "const": "getVideoPlayUrlV2"
+            }
+          }
+        }
+      }
+    },
+    "qq_media_download_complete_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.media.download_complete"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_media_download_complete"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelRichMediaListener"
+            },
+            "method": {
+              "const": "onRichMediaDownloadComplete"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_list_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.file.list"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_file"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelRichMediaService"
+            },
+            "method": {
+              "const": "getGroupFileList"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_search_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.file.search"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_file"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelFileAssistantService"
+            },
+            "method": {
+              "const": "searchFile"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_download_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.file.download"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_file"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelFileAssistantService"
+            },
+            "method": {
+              "const": "downloadFile"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_forward_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.file.forward"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_file"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelFileAssistantService"
+            },
+            "method": {
+              "const": "forwardFile"
+            }
+          }
+        }
+      }
+    },
+    "qq_file_save_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.file.save"
+        },
+        "priority": {
+          "const": "P1"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_file"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelFileAssistantService"
+            },
+            "method": {
+              "const": "saveAs"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_modify_name_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.modify_name"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "modifyGroupName"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_modify_remark_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.modify_remark"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "modifyGroupRemark"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_mute_member_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.mute_member"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "setMemberShutUp"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_mute_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.mute"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "setGroupShutUp"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_kick_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.kick"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "kickMember"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_quit_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.quit"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "quitGroup"
+            }
+          }
+        }
+      }
+    },
+    "qq_group_approve_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.group.approve"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_group_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelGroupService"
+            },
+            "method": {
+              "const": "operateSysNotify"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_approve_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.approve"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "approvalFriendRequest"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_approve_doubt_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.approve_doubt"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "approvalDoubtBuddyReq"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_doubt_requests_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.doubt_requests"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "getDoubtBuddyReq"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_add_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.add"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "reqToAddFriends"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_delete_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.delete"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "delBuddy"
+            }
+          }
+        }
+      }
+    },
+    "qq_friend_set_remark_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.friend.set_remark"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_friend_mutation"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelBuddyService"
+            },
+            "method": {
+              "const": "setBuddyRemark"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_modify_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.profile.modify"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_profile"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "modifySelfProfile"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_nickname_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.profile.nickname"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_profile"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "setNickName"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_long_nick_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.profile.long_nick"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_profile"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "setLongNick"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_birthday_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.profile.birthday"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_profile"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "setBirthday"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_gender_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.profile.gender"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_profile"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "setGander"
+            }
+          }
+        }
+      }
+    },
+    "qq_profile_header_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.profile.header"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_profile"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelProfileService"
+            },
+            "method": {
+              "const": "setHeader"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_stranger_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.search.stranger"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_search"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelSearchService"
+            },
+            "method": {
+              "const": "searchStranger"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_group_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.search.group"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_search"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelSearchService"
+            },
+            "method": {
+              "const": "searchGroup"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_contact_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.search.contact"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_search"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelSearchService"
+            },
+            "method": {
+              "const": "searchContact"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_message_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.search.message"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_search"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelSearchService"
+            },
+            "method": {
+              "const": "searchMsgWithKeywords"
+            }
+          }
+        }
+      }
+    },
+    "qq_search_file_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.search.file"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_search"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelSearchService"
+            },
+            "method": {
+              "const": "searchFileWithKeywords"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_status_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.online.status"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_online"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelOnlineStatusService"
+            },
+            "method": {
+              "const": "setStatus"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_devices_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.online.devices"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_online"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelOnlineStatusService"
+            },
+            "method": {
+              "const": "getOnLineDev"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_likes_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.online.likes"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_online"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "getLikeList"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_set_like_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.online.set_like"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_online"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "setLikeStatus"
+            }
+          }
+        }
+      }
+    },
+    "qq_online_check_like_response": {
+      "$ref": "#/$defs/qq_response_envelope",
+      "properties": {
+        "operation": {
+          "const": "qq.online.check_like"
+        },
+        "priority": {
+          "const": "P2"
+        },
+        "result": {
+          "$ref": "#/$defs/qq_result_online"
+        },
+        "mapping": {
+          "properties": {
+            "service": {
+              "const": "NodeIKernelMsgService"
+            },
+            "method": {
+              "const": "checkLikeStatus"
+            }
+          }
+        }
+      }
+    },
+    "qq_result_callback": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/qq_result_object"
+        },
+        {
+          "required": [
+            "request_id"
+          ],
+          "properties": {
+            "request_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "event_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "account_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "message_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "peer_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "peer_uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "group_code": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "user_uid": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "user_uin": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "media_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "file_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "element_id": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/identifier"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "progress": {
+              "anyOf": [
+                {
+                  "type": "number",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "local_result_reference": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^(qq|staging)://"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "remote_uri": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "pattern": "^https?://"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "error": {
+              "type": "object"
+            }
+          }
+        }
+      ]
+    },
+    "qq_result_send_completion": {
+      "$ref": "#/$defs/qq_result_callback"
+    },
+    "qq_result_media_download_complete": {
+      "$ref": "#/$defs/qq_result_callback"
     }
   }
 }
