@@ -140,6 +140,8 @@ jobs:
             plugins/evaluation/llm-judge/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests
+      - name: Verify Python/native behavior matrix
+        run: python3 plugins/connectors/onebot-v11/tools/verify_behavior_matrix.py
 
   onebot-v11-package:
     name: public-ci / onebot-v11-package

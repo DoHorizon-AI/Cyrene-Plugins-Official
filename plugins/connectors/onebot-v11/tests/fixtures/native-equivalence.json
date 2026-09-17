@@ -146,6 +146,114 @@
       }
     },
     {
+      "id": "send-group-text-only",
+      "kind": "send_message",
+      "input": {
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "20001",
+          "kind": "group"
+        },
+        "content": [
+          {
+            "text": {
+              "text": "plain group message"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "action": "send_group_msg",
+        "params": {
+          "group_id": 20001,
+          "message": [
+            {
+              "type": "text",
+              "data": {
+                "text": "plain group message"
+              }
+            }
+          ]
+        },
+        "result": {
+          "status": "accepted",
+          "vendor_message_id": "fixture-message-1"
+        }
+      }
+    },
+    {
+      "id": "send-private-rich",
+      "kind": "send_message",
+      "input": {
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "10002",
+          "kind": "private"
+        },
+        "content": [
+          {
+            "text": {
+              "text": "private"
+            }
+          },
+          {
+            "image": {
+              "reference": {
+                "remote_uri": "https://cdn.example/private.png"
+              },
+              "mime_type": "image/png"
+            }
+          },
+          {
+            "file": {
+              "reference": {
+                "vendor_media": {
+                  "vendor": "onebot.v11",
+                  "account_id": "10001",
+                  "media_id": "private-file-id"
+                }
+              },
+              "file_name": "private.txt",
+              "mime_type": "text/plain"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "action": "send_private_msg",
+        "params": {
+          "user_id": 10002,
+          "message": [
+            {
+              "type": "text",
+              "data": {
+                "text": "private"
+              }
+            },
+            {
+              "type": "image",
+              "data": {
+                "url": "https://cdn.example/private.png"
+              }
+            },
+            {
+              "type": "file",
+              "data": {
+                "file": "private-file-id",
+                "name": "private.txt"
+              }
+            }
+          ]
+        },
+        "result": {
+          "status": "accepted",
+          "vendor_message_id": "fixture-message-1"
+        }
+      }
+    },
+    {
       "id": "respond-friend-approve",
       "kind": "respond_request",
       "input": {
@@ -361,6 +469,110 @@
           {
             "text": {
               "text": "notice"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "inbound-group-minimal",
+      "kind": "inbound_message",
+      "input": {
+        "post_type": "message",
+        "message_type": "group",
+        "self_id": "10001",
+        "group_id": "20001",
+        "message_id": "group-minimal-1",
+        "sender": {
+          "user_id": "10002"
+        },
+        "message": [
+          {
+            "type": "text",
+            "data": {
+              "text": "minimal"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "message_id": "group-minimal-1",
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "20001",
+          "kind": "group"
+        },
+        "sender_id": "10002",
+        "sender_display_name": "10002",
+        "content": [
+          {
+            "text": {
+              "text": "minimal"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "inbound-private-rich",
+      "kind": "inbound_message",
+      "input": {
+        "post_type": "message",
+        "message_type": "private",
+        "self_id": "10001",
+        "user_id": "10002",
+        "message_id": "private-rich-1",
+        "sender": {
+          "user_id": "10002",
+          "nickname": "Alice"
+        },
+        "message": [
+          {
+            "type": "image",
+            "data": {
+              "url": "https://cdn.example/private.png"
+            }
+          },
+          {
+            "type": "file",
+            "data": {
+              "file": "private-file-id",
+              "name": "private.txt"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "message_id": "private-rich-1",
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "10002",
+          "kind": "private"
+        },
+        "sender_id": "10002",
+        "sender_display_name": "Alice",
+        "content": [
+          {
+            "image": {
+              "reference": {
+                "remote_uri": "https://cdn.example/private.png"
+              },
+              "mime_type": ""
+            }
+          },
+          {
+            "file": {
+              "reference": {
+                "vendor_media": {
+                  "vendor": "onebot.v11",
+                  "account_id": "10001",
+                  "media_id": "private-file-id"
+                }
+              },
+              "file_name": "private.txt",
+              "mime_type": ""
             }
           }
         ]
