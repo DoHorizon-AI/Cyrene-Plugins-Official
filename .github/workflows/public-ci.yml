@@ -117,6 +117,7 @@ jobs:
             plugins/connectors/onebot-v11/tools \
             tools/ci/publish_onebot_native_aot.py \
             tools/ci/exercise_onebot_native_transports.py \
+            tools/ci/exercise_onebot_native_qqnt.py \
             plugins/connectors/wecom \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \
@@ -408,6 +409,15 @@ jobs:
           --rid "${{ matrix.rid }}"
           --evidence
           "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/transport-evidence.json"
+      - name: Exercise packaged qqnt-direct profile and QQ Host boundary
+        if: matrix.rid == 'linux-x64'
+        run: >-
+          python tools/ci/exercise_onebot_native_qqnt.py
+          --binary
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/unpacked/bin/cyrene-onebot-v11"
+          --rid "${{ matrix.rid }}"
+          --evidence
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/qqnt-evidence.json"
       - name: Upload OneBot Native AOT package evidence
         if: startsWith(matrix.rid, 'linux-')
         uses: actions/upload-artifact@v4
