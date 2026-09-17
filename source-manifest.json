@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "929843e11496f2c36beb6be5f12fb9dba4d459ed5d8c56fea658a99a919f9773",
-      "size_bytes": 22837
+      "sha256": "2be10929cfb580450c19d90103f85244163097c18f3fd1d86df629de80f168c3",
+      "size_bytes": 25889
     },
     {
       "kind": "file",
@@ -698,8 +698,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
-      "sha256": "3f323bfcf750459d5ee916fef0f942dcc4f234ebfa890ea5fd5a67fcfbbfad56",
-      "size_bytes": 2844
+      "sha256": "8ca31bbb548e718929b7b74a1989b42fa5dd38ce7fa7cb727ada5364667de78e",
+      "size_bytes": 3151
     },
     {
       "kind": "file",
@@ -747,15 +747,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/package-descriptor.json",
-      "sha256": "97a75d9c55a01543d6b6aedeb6a462639f69d7067594d063e91a6abb2324ba1f",
-      "size_bytes": 2888
+      "sha256": "620cf2cfd5dd03a19efef114a92ac8da955a176663cdf2d829d49c006c657f9b",
+      "size_bytes": 2884
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/plugin.manifest.json",
-      "sha256": "edbdc518f36c63f88311387060986c2423bd008c12bbbf1e6ea1fe0bcd24804f",
-      "size_bytes": 27575
+      "sha256": "4d18c10b2248d540cc95a8b8852770b66d42d5b23233ac93aa5e7d0cd544db0a",
+      "size_bytes": 27332
     },
     {
       "kind": "file",
@@ -770,6 +770,27 @@
       "path": "plugins/connectors/onebot-v11/requirements.lock",
       "sha256": "01a18ad7ddf3cd1f7042b7be2fe1b0618ed5a2deef903a1f967ed5050973e5ca",
       "size_bytes": 207
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/rollback/python-0.2.0/README.md",
+      "sha256": "ae7706089c3dfecb409021b4a58b3efe9338c9dc1942b6e6050449aa349b9456",
+      "size_bytes": 440
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/rollback/python-0.2.0/package-descriptor.json",
+      "sha256": "97a75d9c55a01543d6b6aedeb6a462639f69d7067594d063e91a6abb2324ba1f",
+      "size_bytes": 2888
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/rollback/python-0.2.0/plugin.manifest.json",
+      "sha256": "edbdc518f36c63f88311387060986c2423bd008c12bbbf1e6ea1fe0bcd24804f",
+      "size_bytes": 27575
     },
     {
       "kind": "file",
@@ -887,8 +908,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_connector.py",
-      "sha256": "76f935178e1e3b25fe8b13edcf2d62f61122b6bf47632a5d3a1561bbf53e6297",
-      "size_bytes": 22531
+      "sha256": "ac8c21d268001ca202a4920074dc40d8c1c512f2d5b04d9d75e40c5f4825722f",
+      "size_bytes": 23214
     },
     {
       "kind": "file",
@@ -901,15 +922,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_native_package.py",
-      "sha256": "d6040bd100c49c8b6f91c2042f49440a73f1090dc409b23f8a1e8a8d37854d75",
-      "size_bytes": 5233
+      "sha256": "e3560640514106bf20da9b7492b491d75c9dc42b66efda1c7cb42dd18bff5093",
+      "size_bytes": 6534
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_package.py",
-      "sha256": "e9e7166dc8fe1209771f31810c624efaad193872621bdf60e0dc2a1327a8bd85",
-      "size_bytes": 12764
+      "sha256": "60ea530bb7c7731593901517eba81dc8c667b8d1368788c00b63d92ceafede39",
+      "size_bytes": 12941
     },
     {
       "kind": "file",
@@ -950,8 +971,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/assemble_package.py",
-      "sha256": "e7b581e9f371c24501bfa12839456feb72805a66533867f48ee0413baf52f95e",
-      "size_bytes": 7554
+      "sha256": "e6a313f6ddd4694425720c8dea5cb8f76868feda848eff066ea42d10b8742ba5",
+      "size_bytes": 7937
     },
     {
       "kind": "file",

@@ -1,11 +1,12 @@
-"""Assemble an installable OneBot/QQNT direct package candidate.
+"""Assemble the isolated Python 0.2.0 rollback package.
 
-The Platform package runtime launches ``src/cyrene_plugin_runtime/bootstrap.py``
-from an unpacked package. The SDK runtime is owned by this repository but is
-not duplicated in the connector source tree, so this builder copies it into a
-temporary package staging directory and rewrites only repository-relative
-schema references. It never copies a QQ installation, native Host, account
-data, or credentials.
+The formal package is now the C# Native AOT artifact assembled by
+``assemble_native_package.py``. This builder deliberately retains the last
+Python package as an independently assembled rollback artifact. The SDK
+runtime is owned by this repository but is not duplicated in the connector
+source tree, so this builder copies it into temporary staging and rewrites
+only repository-relative schema references. It never copies a QQ installation,
+native Host, account data, or credentials.
 """
 
 from __future__ import annotations
@@ -19,13 +20,11 @@ from pathlib import Path
 from typing import Any
 
 PACKAGE_RELATIVE_FILES = (
-    "README.md",
     "configuration.schema.json",
-    "package-descriptor.json",
-    "plugin.manifest.json",
     "pyproject.toml",
     "requirements.lock",
 )
+ROLLBACK_METADATA_ROOT = "rollback/python-0.2.0"
 SHARED_SCHEMA_FILES = (
     "contracts/json/message-connector-v1-inbound-request.schema.json",
     "contracts/json/message-connector-v1-request-response.schema.json",
@@ -121,6 +120,15 @@ def assemble_package(repository_root: Path, output_root: Path) -> Path:
 
     for relative in PACKAGE_RELATIVE_FILES:
         _copy_required_file(connector_root / relative, output_root / relative)
+    _copy_required_file(
+        connector_root / ROLLBACK_METADATA_ROOT / "README.md",
+        output_root / "README.md",
+    )
+    for relative in ("plugin.manifest.json", "package-descriptor.json"):
+        _copy_required_file(
+            connector_root / ROLLBACK_METADATA_ROOT / relative,
+            output_root / relative,
+        )
     for relative in LOCAL_SCHEMA_FILES:
         _copy_required_file(connector_root / relative, output_root / relative)
     for relative in SHARED_SCHEMA_FILES:

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.connectors.onebot-v11",
   "name": "Official OneBot v11 and QQNT Direct Connector",
-  "version": "0.3.0",
+  "version": "0.2.0",
   "description": "OneBot v11 compatibility transport and direct QQNT adapter for message.connector.v1.",
   "kind": "capability-plugin",
   "capabilities": [
@@ -670,7 +670,8 @@
     }
   ],
   "runtime": {
-    "language": "csharp",
+    "language": "python",
+    "entrypoint": "onebot_v11_connector.plugin:ConnectorPlugin",
     "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
     "runtimeProfile": "onebot-v11",
     "profiles": [
@@ -689,7 +690,13 @@
       }
     ],
     "launch": {
-      "executable": "bin/cyrene-onebot-v11"
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "onebot_v11_connector.plugin:ConnectorPlugin"
+      ]
     }
   },
   "distribution": {
@@ -699,12 +706,12 @@
   },
   "compatibility": {
     "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
     "os": [
       "linux"
     ],
     "architectures": [
-      "x86_64",
-      "aarch64"
+      "x86_64"
     ]
   },
   "configuration": {
@@ -721,7 +728,7 @@
     "isStateful": true,
     "storageCategory": "cache",
     "migrationSupported": false,
-    "downgradeSupported": true,
+    "downgradeSupported": false,
     "retentionPolicyOnUninstall": "retain"
   }
 }
