@@ -1,4 +1,4 @@
-"""Tests for the installable OneBot/QQNT direct package candidate."""
+"""Tests for the isolated Python rollback package."""
 
 from __future__ import annotations
 
@@ -163,17 +163,22 @@ def _message_subscription_request(
 def test_assembled_package_contains_runtime_and_resolvable_schema_refs(
     tmp_path: Path,
 ) -> None:
-    """The unpacked Platform payload must run without a source checkout."""
+    """The rollback payload must run without a source checkout."""
 
     package_root = assemble_package(REPOSITORY_ROOT, tmp_path / "package")
     assert (package_root / "src/cyrene_plugin_runtime/bootstrap.py").is_file()
     assert (package_root / "src/onebot_v11_connector/plugin.py").is_file()
-    assert not list(package_root.rglob("__pycache__"))
-    assert not list(package_root.rglob("*.pyc"))
-
     manifest = json.loads(
         (package_root / "plugin.manifest.json").read_text(encoding="utf-8")
     )
+    assert manifest["version"] == "0.2.0"
+    assert manifest["runtime"]["language"] == "python"
+    assert manifest["runtime"]["entrypoint"] == (
+        "onebot_v11_connector.plugin:ConnectorPlugin"
+    )
+    assert not list(package_root.rglob("__pycache__"))
+    assert not list(package_root.rglob("*.pyc"))
+
     for method in manifest["methods"]:
         for key in ("inputSchema", "outputSchema"):
             reference = method.get(key)
@@ -212,7 +217,7 @@ def test_assembled_package_contains_runtime_and_resolvable_schema_refs(
 
 
 def test_package_archive_is_self_contained(tmp_path: Path) -> None:
-    """The candidate ZIP must contain the root manifest and both runtimes."""
+    """The rollback ZIP must contain the Python runtime and metadata."""
 
     archive_path = build_package_archive(REPOSITORY_ROOT, tmp_path / "onebot.zip")
     with zipfile.ZipFile(archive_path) as archive:

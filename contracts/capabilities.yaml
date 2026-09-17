@@ -208,7 +208,7 @@ capabilities:
       - ref: cyrene.connectors.onebot-v11
         source: plugins/connectors/onebot-v11/plugin.manifest.json
         kind: capability-plugin
-        language: python
+        language: csharp
         publication: published
         methods:
           - inbound_message
@@ -400,7 +400,7 @@ capabilities:
       - ref: cyrene.connectors.onebot-v11
         source: plugins/connectors/onebot-v11/plugin.manifest.json
         kind: capability-plugin
-        language: python
+        language: csharp
         publication: published
         methods:
           - qq.account.core

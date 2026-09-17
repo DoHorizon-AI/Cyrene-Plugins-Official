@@ -2,9 +2,9 @@
   "record_type": "package_descriptor",
   "spec_version": "0.1",
   "package": {
-    "manifest_ref": "plugin.manifest.json",
+    "manifest_ref": "plugins/connectors/onebot-v11/plugin.manifest.json",
     "id": "cyrene.connectors.onebot-v11",
-    "version": "0.3.0",
+    "version": "0.2.0",
     "lineage": "cyrene.connectors.onebot-v11"
   },
   "capabilities": [
@@ -51,7 +51,7 @@
         "compatibility_profile": "onebot-v11"
       },
       "runtime": {
-        "kind": "configured-native-child",
+        "kind": "subprocess-python",
         "protocol": "cyrene.qq.host.v1",
         "ipc": "inherited-stdio",
         "external": {
@@ -71,25 +71,24 @@
     "artifact": {
       "status": "NOT_PUBLISHED"
     },
-    "entrypoint": "bin/cyrene-onebot-v11"
+    "entrypoint": "onebot_v11_connector.plugin:ConnectorPlugin"
   },
   "dependencies": {
     "lock": {
-      "status": "NOT_REQUIRED"
+      "status": "NOT_PUBLISHED"
     }
   },
   "configuration": {
-    "schema_ref": "configuration.schema.json",
+    "schema_ref": "plugins/connectors/onebot-v11/configuration.schema.json",
     "digest": null
   },
   "runtime": {
-    "kind": "native-executable",
+    "kind": "subprocess-python",
     "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
-    "entrypoint": "bin/cyrene-onebot-v11",
     "external": {
       "required": true,
       "kind": "onebot_v11_runtime",
-      "artifact_ref": "bin/cyrene-onebot-v11"
+      "artifact_ref": null
     }
   },
   "compatibility": {
@@ -99,7 +98,7 @@
       "qq.client.v1@1"
     ],
     "os": ["linux"],
-    "architectures": ["x86_64", "aarch64"]
+    "architectures": ["x86_64"]
   },
   "integrity": {
     "artifact_digest": null,
@@ -108,7 +107,7 @@
   },
   "lifecycle": {
     "rollback_identity": "cyrene.connectors.onebot-v11@0.2.0",
-    "cache_identity": "cyrene.connectors.onebot-v11@0.3.0"
+    "cache_identity": "cyrene.connectors.onebot-v11@0.2.0"
   },
   "provenance": {
     "source_repository": "Cyrene-Plugins-Official",
