@@ -94,12 +94,16 @@ public static class Program
 
             WebApplication app = builder.Build();
             app.MapGrpcService<DirectPluginRuntimeService>();
-            if (profile?.TransportProfile == OneBotTransportProfile.ReverseWebSocket)
-            {
-                app.Services.GetRequiredService<OneBotReverseWebSocketServer>();
-            }
 
             await app.StartAsync();
+            if (profile?.TransportProfile == OneBotTransportProfile.ReverseWebSocket)
+            {
+                // Start the reverse listener only after Kestrel has completed
+                // application startup.  This keeps the readiness announcement
+                // deterministic on all Native AOT architectures and prevents
+                // the listener's accept loop from running during host startup.
+                app.Services.GetRequiredService<OneBotReverseWebSocketServer>();
+            }
             WriteReadyAnnouncement(app);
             await app.WaitForShutdownAsync();
             await app.StopAsync();

@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "2be10929cfb580450c19d90103f85244163097c18f3fd1d86df629de80f168c3",
-      "size_bytes": 25889
+      "sha256": "2a3a716231c12dc4a057df8a4f4e9b4befeead3fc8a10bf4cf3ed0591855afc0",
+      "size_bytes": 26940
     },
     {
       "kind": "file",
@@ -1538,8 +1538,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Program.cs",
-      "sha256": "f857de5aa7f7737be0bc910dd62dbbb9d7392a02243675376a5371a596630145",
-      "size_bytes": 8070
+      "sha256": "59b2ead36111bd42ac37042cb870a8a1987184d40478dcd454bd6a8d1f304626",
+      "size_bytes": 8386
     },
     {
       "kind": "file",
@@ -4105,6 +4105,20 @@
     },
     {
       "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/exercise_onebot_native_qqnt.py",
+      "sha256": "a255cc85f6da255d384b5ab4dc1fe01314ad47d905271275b247b6a949f5780c",
+      "size_bytes": 16094
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/exercise_onebot_native_transports.py",
+      "sha256": "4f984065166c94f5fb86d201c37662d3c4e13670a750c2210adb39b8e421b4b4",
+      "size_bytes": 22416
+    },
+    {
+      "kind": "file",
       "mode": "100644",
       "path": "tools/ci/package_release_artifact.py",
       "sha256": "1d248a506588bfae386613c32415f73c1deb8393e3fdcef4eb7838d328afd40d",
@@ -4121,8 +4135,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/publish_onebot_native_aot.py",
-      "sha256": "09af272bc98c27c17fd84578dc18c82d5a2304c0184c830df62c971011deab90",
-      "size_bytes": 13800
+      "sha256": "ee437681756554782af90a7884ed87c84252b87b6b539bde715bea653669f524",
+      "size_bytes": 14017
     },
     {
       "kind": "file",
