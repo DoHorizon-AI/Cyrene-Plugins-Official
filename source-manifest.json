@@ -4098,7 +4098,7 @@
     },
     {
       "kind": "file",
-      "mode": "100644",
+      "mode": "100755",
       "path": "tools/ci/publish_onebot_native_aot.py",
       "sha256": "09af272bc98c27c17fd84578dc18c82d5a2304c0184c830df62c971011deab90",
       "size_bytes": 13800
