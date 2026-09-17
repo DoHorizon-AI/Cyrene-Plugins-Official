@@ -85,6 +85,7 @@ def test_native_candidate_contains_only_native_runtime_and_resolvable_refs(
     )
 
     assert (package_root / "bin/cyrene-onebot-v11").is_file()
+    assert (package_root / "NATIVE_AOT_OPERATIONS.md").is_file()
     assert not list(package_root.rglob("*.py"))
     assert not list(package_root.rglob("*.pyc"))
     assert not (package_root / "src").exists()

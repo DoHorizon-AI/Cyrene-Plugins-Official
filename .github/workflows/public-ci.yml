@@ -116,6 +116,7 @@ jobs:
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
             tools/ci/publish_onebot_native_aot.py \
+            tools/ci/benchmark_onebot_native_aot.py \
             tools/ci/exercise_onebot_native_transports.py \
             tools/ci/exercise_onebot_native_qqnt.py \
             plugins/connectors/wecom \
@@ -179,6 +180,7 @@ jobs:
             mkdir -p "$package_root"
             unzip -q "$archive" -d "$package_root"
             test -f "$package_root/plugin.manifest.json"
+            test -f "$package_root/NATIVE_AOT_OPERATIONS.md"
             test -x "$package_root/bin/cyrene-onebot-v11"
             ! find "$package_root" -type f \( -name '*.py' -o -name '*.pyc' \) -print -quit | grep -q .
             python3 - "$package_root" <<'PY'
@@ -435,6 +437,17 @@ jobs:
           --rid "${{ matrix.rid }}"
           --evidence
           "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/qqnt-evidence.json"
+      - name: Record descriptive Native AOT performance sample
+        if: matrix.rid == 'linux-x64'
+        run: >-
+          python tools/ci/benchmark_onebot_native_aot.py
+          --binary
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/unpacked/bin/cyrene-onebot-v11"
+          --package
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/cyrene-onebot-v11-native-${{ matrix.rid }}.zip"
+          --rid "${{ matrix.rid }}"
+          --evidence
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/performance-evidence.json"
       - name: Upload OneBot Native AOT package evidence
         if: startsWith(matrix.rid, 'linux-')
         uses: actions/upload-artifact@v4

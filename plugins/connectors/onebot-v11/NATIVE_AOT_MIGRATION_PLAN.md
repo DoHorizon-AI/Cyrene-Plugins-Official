@@ -154,6 +154,12 @@ checkout 或 SDK 本地路径；安装目录可独立启动并执行 Health/Invo
 在相同硬件和配置记录 Python reference 与 C# candidate 的冷启动、Health、action/event
 latency、RSS、吞吐、包体积、重连恢复时间；性能数据只用于收益判断，不降低功能/安全门禁。
 
+Native 包随附 [`NATIVE_AOT_OPERATIONS.md`](NATIVE_AOT_OPERATIONS.md)，规定 clean install、
+启动/Health、生命周期、安全边界、回滚身份和真实 QQ 证据的记录格式。Linux x64 的
+`tools/ci/benchmark_onebot_native_aot.py` 从解包后的正式候选包启动进程，写出 exact source
+revision、RID、包/二进制 SHA-256、平台、冷启动、Health、Invoke 延迟、采样 RSS 和脱敏状态；
+该采样是描述性证据，不设置性能阈值，也不能替代功能、契约、安全或真实 QQ 门禁。
+
 真实 QQ smoke 使用授权 exact build，单独记录 build、Host ABI、platform、账号环境、
 操作范围、时间、日志脱敏结果和 `PASS`/`NOT_RUN`；凭据缺失时保持 `NOT_RUN`。
 
