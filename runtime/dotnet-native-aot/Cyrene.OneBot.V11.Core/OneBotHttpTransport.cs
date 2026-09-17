@@ -174,6 +174,13 @@ public sealed class OneBotHttpTransport : IOneBotActionTransport, IDisposable
                     $"OneBot action '{action}' was rejected by the runtime.");
             }
 
+            if (decoded.Data.ValueKind != JsonValueKind.Object)
+            {
+                throw new OneBotTransportException(
+                    "PROTOCOL_MISMATCH",
+                    $"OneBot action '{action}' returned non-object data.");
+            }
+
             return decoded;
         }
     }

@@ -106,3 +106,15 @@ Side-effecting sends are never retried implicitly after disconnect.
 Compatible OneBot v11 runtimes use the same connector identity. Offline
 protocol tests do not claim a live endpoint; runtime E2E remains
 deployment-owner evidence.
+
+## Migration evidence / 迁移证据
+
+The Python-to-C# coverage inventory is kept in
+[`behavior_matrix.json`](behavior_matrix.json). It records all current Python
+test functions, the current collected-case baseline, and concrete C# test,
+package, QQ Host TCK, or source-hygiene evidence. The matrix gate rejects a
+new Python behavior test until its native or external evidence is declared.
+
+Python 到 C# 的覆盖清单见 [`behavior_matrix.json`](behavior_matrix.json)。该文件记录当前
+所有 Python 测试函数、当前收集用例基线，以及具体的 C# 测试、包 smoke、QQ Host TCK 或源码
+卫生证据。新增 Python 行为测试如果没有声明对应的 Native 或外部证据，矩阵门禁会失败。

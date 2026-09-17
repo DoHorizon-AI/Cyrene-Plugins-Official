@@ -6,6 +6,7 @@
 // │  模块职责：Forward WebSocket action 关联与重连生命周期                       │
 // └─────────────────────────────────────────────────────────────────────────┘
 
+using System.Net;
 using System.Net.WebSockets;
 using System.Text.Json;
 
@@ -32,6 +33,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
     private long _nextEcho;
     private int _reconnectCount;
     private bool _closed;
+    private OneBotTransportException? _lastError;
 
     public OneBotWebSocketTransport(OneBotProfile profile)
     {
@@ -72,6 +74,18 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
             lock (_stateLock)
             {
                 return _reconnectCount;
+            }
+        }
+    }
+
+    /// <summary>Returns the latest binding-local connection failure category.</summary>
+    public string? LastErrorDomainCode
+    {
+        get
+        {
+            lock (_stateLock)
+            {
+                return _lastError?.DomainCode;
             }
         }
     }
@@ -250,9 +264,11 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
         while (!_shutdown.IsCancellationRequested)
         {
             ClientWebSocket? socket = null;
+            bool terminalFailure = false;
             try
             {
                 socket = new ClientWebSocket();
+                socket.Options.CollectHttpResponseDetails = true;
                 if (_profile.AccessToken.Length > 0)
                 {
                     socket.Options.SetRequestHeader(
@@ -276,25 +292,44 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
             }
             catch (OperationCanceledException)
             {
-                FailPending(new OneBotTransportException(
+                OneBotTransportException failure = new(
                     "TIMEOUT",
-                    "OneBot WebSocket connection attempt timed out."));
+                    "OneBot WebSocket connection attempt timed out.");
+                SetLastError(failure);
+                FailPending(failure);
             }
-            catch (WebSocketException)
+            catch (WebSocketException exception)
             {
-                FailPending(new OneBotTransportException(
-                    "CAPABILITY_UNAVAILABLE",
-                    "OneBot WebSocket runtime disconnected."));
+                OneBotTransportException failure = ClassifyConnectionFailure(socket, exception);
+                SetLastError(failure);
+                FailPending(failure);
+                if (failure.DomainCode == "AUTHENTICATION_FAILED")
+                {
+                    terminalFailure = true;
+                }
+            }
+            catch (HttpRequestException exception)
+            {
+                OneBotTransportException failure = ClassifyConnectionFailure(socket, exception);
+                SetLastError(failure);
+                FailPending(failure);
+                if (failure.DomainCode == "AUTHENTICATION_FAILED")
+                {
+                    terminalFailure = true;
+                }
             }
             catch (OneBotTransportException exception)
             {
+                SetLastError(exception);
                 FailPending(exception);
             }
             catch (JsonException)
             {
-                FailPending(new OneBotTransportException(
+                OneBotTransportException failure = new(
                     "PROTOCOL_MISMATCH",
-                    "OneBot WebSocket runtime sent malformed JSON."));
+                    "OneBot WebSocket runtime sent malformed JSON.");
+                SetLastError(failure);
+                FailPending(failure);
             }
             finally
             {
@@ -308,7 +343,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
                 Disconnect(socket);
             }
 
-            if (_shutdown.IsCancellationRequested)
+            if (_shutdown.IsCancellationRequested || terminalFailure)
             {
                 break;
             }
@@ -468,6 +503,11 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
             Task signal;
             lock (_stateLock)
             {
+                if (_lastError?.DomainCode == "AUTHENTICATION_FAILED")
+                {
+                    throw _lastError;
+                }
+
                 signal = _connected.Task;
             }
 
@@ -478,7 +518,27 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
             }
             catch (OneBotTransportException)
             {
+                lock (_stateLock)
+                {
+                    if (_lastError?.DomainCode == "AUTHENTICATION_FAILED")
+                    {
+                        throw _lastError;
+                    }
+                }
+
                 cancellationToken.ThrowIfCancellationRequested();
+            }
+            catch (OperationCanceledException)
+            {
+                lock (_stateLock)
+                {
+                    if (_lastError?.DomainCode == "AUTHENTICATION_FAILED")
+                    {
+                        throw _lastError;
+                    }
+                }
+
+                throw;
             }
         }
     }
@@ -503,8 +563,44 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
         lock (_stateLock)
         {
             _socket = socket;
+            _lastError = null;
             _connected.TrySetResult(true);
         }
+    }
+
+    private void SetLastError(OneBotTransportException exception)
+    {
+        lock (_stateLock)
+        {
+            _lastError = exception;
+        }
+    }
+
+    private static OneBotTransportException ClassifyConnectionFailure(
+        ClientWebSocket? socket,
+        Exception exception)
+    {
+        if (socket?.HttpStatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            return new OneBotTransportException(
+                "AUTHENTICATION_FAILED",
+                "OneBot WebSocket authentication failed.");
+        }
+
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current.Message.Contains("401", StringComparison.Ordinal)
+                || current.Message.Contains("403", StringComparison.Ordinal))
+            {
+                return new OneBotTransportException(
+                    "AUTHENTICATION_FAILED",
+                    "OneBot WebSocket authentication failed.");
+            }
+        }
+
+        return new OneBotTransportException(
+            "CAPABILITY_UNAVAILABLE",
+            "OneBot WebSocket runtime disconnected.");
     }
 
     private void Disconnect(WebSocket? socket)

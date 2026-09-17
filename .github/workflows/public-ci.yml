@@ -116,6 +116,7 @@ jobs:
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
             tools/ci/publish_onebot_native_aot.py \
+            tools/ci/benchmark_onebot_native_aot.py \
             tools/ci/exercise_onebot_native_transports.py \
             tools/ci/exercise_onebot_native_qqnt.py \
             plugins/connectors/wecom \
@@ -140,6 +141,8 @@ jobs:
             plugins/evaluation/llm-judge/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests
+      - name: Verify Python/native behavior matrix
+        run: python3 plugins/connectors/onebot-v11/tools/verify_behavior_matrix.py
 
   onebot-v11-package:
     name: public-ci / onebot-v11-package
@@ -177,6 +180,7 @@ jobs:
             mkdir -p "$package_root"
             unzip -q "$archive" -d "$package_root"
             test -f "$package_root/plugin.manifest.json"
+            test -f "$package_root/NATIVE_AOT_OPERATIONS.md"
             test -x "$package_root/bin/cyrene-onebot-v11"
             ! find "$package_root" -type f \( -name '*.py' -o -name '*.pyc' \) -print -quit | grep -q .
             python3 - "$package_root" <<'PY'
@@ -378,6 +382,21 @@ jobs:
           Split-Path -Parent $dumpbin | Out-File -FilePath $env:GITHUB_PATH -Append
       - name: Run provider tests
         run: dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release
+      - name: Run OneBot Native AOT contract and parity tests
+        if: runner.os != 'Windows'
+        run: >-
+          dotnet test
+          runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj
+          --configuration Release
+          /p:TreatWarningsAsErrors=true
+      - name: Run generic OneBot Native AOT tests on Windows
+        if: runner.os == 'Windows'
+        run: >-
+          dotnet test
+          runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj
+          --configuration Release
+          /p:TreatWarningsAsErrors=true
+          --filter "FullyQualifiedName!~DispatcherTests&FullyQualifiedName!~QqHostParityTests"
       - name: Verify Native AOT source rules
         run: python tools/check_dotnet_aot_rules.py
       - name: Publish and smoke-test all Native AOT components
@@ -418,6 +437,17 @@ jobs:
           --rid "${{ matrix.rid }}"
           --evidence
           "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/qqnt-evidence.json"
+      - name: Record descriptive Native AOT performance sample
+        if: matrix.rid == 'linux-x64'
+        run: >-
+          python tools/ci/benchmark_onebot_native_aot.py
+          --binary
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/unpacked/bin/cyrene-onebot-v11"
+          --package
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/cyrene-onebot-v11-native-${{ matrix.rid }}.zip"
+          --rid "${{ matrix.rid }}"
+          --evidence
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/performance-evidence.json"
       - name: Upload OneBot Native AOT package evidence
         if: startsWith(matrix.rid, 'linux-')
         uses: actions/upload-artifact@v4

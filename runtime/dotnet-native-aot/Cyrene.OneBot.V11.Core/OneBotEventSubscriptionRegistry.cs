@@ -258,7 +258,10 @@ public sealed class OneBotEventSubscriptionRegistry : IDisposable
             });
             if (!accepted)
             {
-                Remove(subscription);
+                // A full bounded queue is terminal for this subscription.
+                // 有界队列满表示该订阅终止；若只移除而不完成 channel，
+                // DirectPluginRuntime stream 会永久等待。
+                subscription.Dispose();
             }
         }
     }
