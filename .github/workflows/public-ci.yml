@@ -116,6 +116,7 @@ jobs:
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
             tools/ci/publish_onebot_native_aot.py \
+            tools/ci/exercise_onebot_native_transports.py \
             plugins/connectors/wecom \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \
@@ -398,6 +399,15 @@ jobs:
           python tools/ci/publish_onebot_native_aot.py
           --rid "${{ matrix.rid }}"
           --output-dir "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}"
+      - name: Exercise packaged OneBot WebSocket profiles and subscriptions
+        if: startsWith(matrix.rid, 'linux-')
+        run: >-
+          python tools/ci/exercise_onebot_native_transports.py
+          --binary
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/unpacked/bin/cyrene-onebot-v11"
+          --rid "${{ matrix.rid }}"
+          --evidence
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/transport-evidence.json"
       - name: Upload OneBot Native AOT package evidence
         if: startsWith(matrix.rid, 'linux-')
         uses: actions/upload-artifact@v4
