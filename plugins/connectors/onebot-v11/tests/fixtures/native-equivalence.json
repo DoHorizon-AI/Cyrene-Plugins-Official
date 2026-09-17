@@ -1,0 +1,416 @@
+{
+  "schema_version": 1,
+  "baseline": "python-onebot-v11",
+  "cases": [
+    {
+      "id": "send-group-rich",
+      "kind": "send_message",
+      "input": {
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "20001",
+          "kind": "group"
+        },
+        "reply": {
+          "message_id": "30001"
+        },
+        "content": [
+          {
+            "text": {
+              "text": "hello"
+            }
+          },
+          {
+            "mention": {
+              "target": "user",
+              "target_id": "10002",
+              "display_name": "member"
+            }
+          },
+          {
+            "image": {
+              "reference": {
+                "remote_uri": "https://cdn.example/image.png"
+              },
+              "mime_type": "image/png"
+            }
+          },
+          {
+            "file": {
+              "reference": {
+                "vendor_media": {
+                  "vendor": "onebot.v11",
+                  "account_id": "10001",
+                  "media_id": "opaque-file-id"
+                }
+              },
+              "file_name": "notes.txt",
+              "mime_type": "text/plain"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "action": "send_group_msg",
+        "params": {
+          "group_id": 20001,
+          "message": [
+            {
+              "type": "reply",
+              "data": {
+                "id": 30001
+              }
+            },
+            {
+              "type": "text",
+              "data": {
+                "text": "hello"
+              }
+            },
+            {
+              "type": "at",
+              "data": {
+                "qq": "10002"
+              }
+            },
+            {
+              "type": "image",
+              "data": {
+                "url": "https://cdn.example/image.png"
+              }
+            },
+            {
+              "type": "file",
+              "data": {
+                "file": "opaque-file-id",
+                "name": "notes.txt"
+              }
+            }
+          ]
+        },
+        "result": {
+          "status": "accepted",
+          "vendor_message_id": "fixture-message-1"
+        }
+      }
+    },
+    {
+      "id": "send-private-everyone",
+      "kind": "send_message",
+      "input": {
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "10002",
+          "kind": "private"
+        },
+        "content": [
+          {
+            "mention": {
+              "target": "everyone"
+            }
+          },
+          {
+            "file": {
+              "reference": {
+                "remote_uri": "https://cdn.example/manual.pdf"
+              }
+            }
+          }
+        ]
+      },
+      "expected": {
+        "action": "send_private_msg",
+        "params": {
+          "user_id": 10002,
+          "message": [
+            {
+              "type": "at",
+              "data": {
+                "qq": "all"
+              }
+            },
+            {
+              "type": "file",
+              "data": {
+                "url": "https://cdn.example/manual.pdf"
+              }
+            }
+          ]
+        },
+        "result": {
+          "status": "accepted",
+          "vendor_message_id": "fixture-message-1"
+        }
+      }
+    },
+    {
+      "id": "respond-friend-approve",
+      "kind": "respond_request",
+      "input": {
+        "request_id": "friend-1",
+        "request_kind": "friend",
+        "decision": "approve",
+        "comment": "welcome"
+      },
+      "expected": {
+        "action": "set_friend_add_request",
+        "params": {
+          "flag": "friend-1",
+          "approve": true,
+          "remark": "welcome"
+        },
+        "result": {
+          "status": "accepted",
+          "request_id": "friend-1",
+          "request_kind": "friend",
+          "decision": "approve"
+        }
+      }
+    },
+    {
+      "id": "respond-group-invite-reject",
+      "kind": "respond_request",
+      "input": {
+        "request_id": "group-1",
+        "request_kind": "group_invite",
+        "decision": "reject",
+        "vendor_request": {
+          "sub_type": "invite"
+        }
+      },
+      "expected": {
+        "action": "set_group_add_request",
+        "params": {
+          "flag": "group-1",
+          "sub_type": "invite",
+          "approve": false
+        },
+        "result": {
+          "status": "accepted",
+          "request_id": "group-1",
+          "request_kind": "group_invite",
+          "decision": "reject"
+        }
+      }
+    },
+    {
+      "id": "inbound-group-rich",
+      "kind": "inbound_message",
+      "input": {
+        "post_type": "message",
+        "message_type": "group",
+        "self_id": 10001,
+        "group_id": 20001,
+        "message_id": 30001,
+        "sender": {
+          "user_id": 10002,
+          "card": "Card",
+          "nickname": "Nick"
+        },
+        "message": [
+          {
+            "type": "text",
+            "data": {
+              "text": "hello"
+            }
+          },
+          {
+            "type": "at",
+            "data": {
+              "qq": "10003",
+              "name": "Bob"
+            }
+          },
+          {
+            "type": "image",
+            "data": {
+              "url": "https://cdn.example/a.png"
+            }
+          },
+          {
+            "type": "file",
+            "data": {
+              "file": "media-1",
+              "name": "a.txt"
+            }
+          },
+          {
+            "type": "reply",
+            "data": {
+              "id": "29999"
+            }
+          },
+          {
+            "type": "json",
+            "data": {
+              "foo": "bar"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "message_id": "30001",
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "20001",
+          "kind": "group"
+        },
+        "sender_id": "10002",
+        "sender_display_name": "Card",
+        "content": [
+          {
+            "text": {
+              "text": "hello"
+            }
+          },
+          {
+            "mention": {
+              "target": "user",
+              "target_id": "10003",
+              "display_name": "Bob"
+            }
+          },
+          {
+            "image": {
+              "reference": {
+                "remote_uri": "https://cdn.example/a.png"
+              },
+              "mime_type": ""
+            }
+          },
+          {
+            "file": {
+              "reference": {
+                "vendor_media": {
+                  "vendor": "onebot.v11",
+                  "account_id": "10001",
+                  "media_id": "media-1"
+                }
+              },
+              "file_name": "a.txt",
+              "mime_type": ""
+            }
+          }
+        ],
+        "reply": {
+          "message_id": "29999"
+        },
+        "vendor_extension": {
+          "vendor": "onebot.v11",
+          "facts": [
+            {
+              "name": "segment_5_type",
+              "value": "json"
+            },
+            {
+              "name": "segment_5_foo",
+              "value": "bar"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "inbound-private-everyone",
+      "kind": "inbound_message",
+      "input": {
+        "post_type": "message",
+        "message_type": "private",
+        "self_id": "10001",
+        "user_id": "10002",
+        "message_id": "private-1",
+        "sender": {
+          "user_id": "10002",
+          "nickname": "Alice"
+        },
+        "message": [
+          {
+            "type": "at",
+            "data": {
+              "qq": "all"
+            }
+          },
+          {
+            "type": "text",
+            "data": {
+              "text": "notice"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "message_id": "private-1",
+        "conversation": {
+          "vendor": "onebot.v11",
+          "account_id": "10001",
+          "conversation_id": "10002",
+          "kind": "private"
+        },
+        "sender_id": "10002",
+        "sender_display_name": "Alice",
+        "content": [
+          {
+            "mention": {
+              "target": "everyone",
+              "target_id": ""
+            }
+          },
+          {
+            "text": {
+              "text": "notice"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "inbound-request-friend",
+      "kind": "inbound_request",
+      "input": {
+        "post_type": "request",
+        "request_type": "friend",
+        "sub_type": "add",
+        "self_id": "10001",
+        "flag": "friend-1",
+        "user_id": 10002
+      },
+      "expected": {
+        "account_id": "10001",
+        "vendor": "onebot.v11",
+        "request_id": "friend-1",
+        "request_kind": "friend",
+        "vendor_request": {
+          "sub_type": "add",
+          "user_id": "10002"
+        }
+      }
+    },
+    {
+      "id": "inbound-request-group-invite",
+      "kind": "inbound_request",
+      "input": {
+        "post_type": "request",
+        "request_type": "group",
+        "sub_type": "invite",
+        "self_id": "10001",
+        "flag": "group-1",
+        "group_id": 20001,
+        "user_id": 10002
+      },
+      "expected": {
+        "account_id": "10001",
+        "vendor": "onebot.v11",
+        "request_id": "group-1",
+        "request_kind": "group_invite",
+        "vendor_request": {
+          "sub_type": "invite",
+          "group_id": "20001",
+          "user_id": "10002"
+        }
+      }
+    }
+  ]
+}

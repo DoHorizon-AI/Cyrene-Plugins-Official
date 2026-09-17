@@ -115,6 +115,9 @@ jobs:
             sdk/python/cyrene_plugin_runtime/src \
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
+            tools/ci/publish_onebot_native_aot.py \
+            tools/ci/exercise_onebot_native_transports.py \
+            tools/ci/exercise_onebot_native_qqnt.py \
             plugins/connectors/wecom \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \
@@ -140,6 +143,68 @@ jobs:
 
   onebot-v11-package:
     name: public-ci / onebot-v11-package
+    needs:
+      - source-hygiene
+      - dotnet-native-aot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cyrene-onebot-v11-native-*
+          path: ${{ runner.temp }}/cyrene-onebot-v11-native
+          merge-multiple: false
+      - name: Promote the tested Native AOT package as the formal package
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/cyrene-onebot-v11-package"
+          mkdir -p "$output"
+          count=0
+          while IFS= read -r archive; do
+            cp "$archive" "$output/$(basename "$archive")"
+            unzip -t "$archive"
+            count=$((count + 1))
+          done < <(find "$RUNNER_TEMP/cyrene-onebot-v11-native" -type f \
+            -name 'cyrene-onebot-v11-native-*.zip' -print | sort)
+          test "$count" -eq 2
+          sha256sum "$output"/*.zip > "$output/cyrene-onebot-v11-native.zip.sha256"
+      - name: Verify candidate outside the source checkout
+        run: |
+          set -euo pipefail
+          for archive in "$RUNNER_TEMP"/cyrene-onebot-v11-package/*.zip; do
+            package_root="$RUNNER_TEMP/cyrene-onebot-v11-package/unpacked/$(basename "$archive" .zip)"
+            mkdir -p "$package_root"
+            unzip -q "$archive" -d "$package_root"
+            test -f "$package_root/plugin.manifest.json"
+            test -x "$package_root/bin/cyrene-onebot-v11"
+            ! find "$package_root" -type f \( -name '*.py' -o -name '*.pyc' \) -print -quit | grep -q .
+            python3 - "$package_root" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          root = pathlib.Path(sys.argv[1])
+          manifest = json.loads((root / "plugin.manifest.json").read_text())
+          assert manifest["version"] == "0.3.0"
+          assert manifest["runtime"]["language"] == "csharp"
+          assert manifest["runtime"]["launch"] == {"executable": "bin/cyrene-onebot-v11"}
+          assert "requiresPython" not in manifest["compatibility"]
+          descriptor = json.loads((root / "package-descriptor.json").read_text())
+          assert descriptor["runtime"]["kind"] == "native-executable"
+          assert descriptor["dependencies"]["lock"]["status"] == "NOT_REQUIRED"
+          PY
+          done
+      - name: Upload immutable package candidate
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-onebot-v11-package-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-onebot-v11-package
+          if-no-files-found: error
+          compression-level: 0
+
+  onebot-v11-python-rollback:
+    name: public-ci / onebot-v11-python-rollback
     needs: source-hygiene
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -148,45 +213,44 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Install locked OneBot runtime dependencies
+      - name: Install locked OneBot rollback dependencies
         run: |
           python3 -m pip install --disable-pip-version-check pytest
           python3 -m pip install --disable-pip-version-check \
             --requirement plugins/connectors/onebot-v11/requirements.lock
-      - name: Assemble deterministic OneBot v11 package candidate
+      - name: Assemble deterministic Python rollback package
         run: |
           set -euo pipefail
-          output="$RUNNER_TEMP/cyrene-onebot-v11-package"
+          output="$RUNNER_TEMP/cyrene-onebot-v11-python-rollback"
           mkdir -p "$output"
           python3 plugins/connectors/onebot-v11/tools/assemble_package.py \
             --repository-root . \
-            --output "$output/cyrene-onebot-v11.zip"
-          unzip -t "$output/cyrene-onebot-v11.zip"
-          sha256sum "$output/cyrene-onebot-v11.zip" > "$output/cyrene-onebot-v11.zip.sha256"
-      - name: Verify candidate outside the source checkout
+            --output "$output/cyrene-onebot-v11-python-0.2.0.zip"
+          unzip -t "$output/cyrene-onebot-v11-python-0.2.0.zip"
+          sha256sum "$output/cyrene-onebot-v11-python-0.2.0.zip" > "$output/cyrene-onebot-v11-python-0.2.0.zip.sha256"
+      - name: Verify rollback artifact outside the source checkout
         run: |
           set -euo pipefail
-          package_root="$RUNNER_TEMP/cyrene-onebot-v11-package/unpacked"
+          package_root="$RUNNER_TEMP/cyrene-onebot-v11-python-rollback/unpacked"
           mkdir -p "$package_root"
-          unzip -q "$RUNNER_TEMP/cyrene-onebot-v11-package/cyrene-onebot-v11.zip" -d "$package_root"
-          test -f "$package_root/plugin.manifest.json"
+          unzip -q "$RUNNER_TEMP/cyrene-onebot-v11-python-rollback/cyrene-onebot-v11-python-0.2.0.zip" -d "$package_root"
           test -f "$package_root/src/cyrene_plugin_runtime/bootstrap.py"
           test -f "$package_root/src/onebot_v11_connector/plugin.py"
           ! find "$package_root" -type f \( -name '*.pyc' -o -path '*/__pycache__/*' \) -print -quit | grep -q .
           PYTHONPATH="$package_root/src" python3 -c \
             'import cyrene_plugin_runtime.bootstrap; import onebot_v11_connector.plugin'
-      - name: Run installed-artifact direct vertical gate
+      - name: Run installed rollback artifact vertical gate
         env:
           PYTHONPATH: sdk/python/cyrene_plugin_runtime/src
         run: >-
           python3 -m pytest -q
           plugins/connectors/onebot-v11/tests/test_package.py
           -k installed_artifact
-      - name: Upload immutable package candidate
+      - name: Upload immutable Python rollback artifact
         uses: actions/upload-artifact@v4
         with:
-          name: cyrene-onebot-v11-package-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ runner.temp }}/cyrene-onebot-v11-package
+          name: cyrene-onebot-v11-python-rollback-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-onebot-v11-python-rollback
           if-no-files-found: error
           compression-level: 0
 
@@ -325,6 +389,43 @@ jobs:
           path: ${{ runner.temp }}/cyrene-dotnet-native/${{ matrix.rid }}
           if-no-files-found: error
           compression-level: 0
+      - name: Install OneBot Native AOT smoke-test dependencies
+        if: startsWith(matrix.rid, 'linux-')
+        run: >-
+          python -m pip install --disable-pip-version-check
+          --requirement plugins/connectors/onebot-v11/requirements.lock
+      - name: Publish and exercise OneBot Native AOT package
+        if: startsWith(matrix.rid, 'linux-')
+        run: >-
+          python tools/ci/publish_onebot_native_aot.py
+          --rid "${{ matrix.rid }}"
+          --output-dir "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}"
+      - name: Exercise packaged OneBot WebSocket profiles and subscriptions
+        if: startsWith(matrix.rid, 'linux-')
+        run: >-
+          python tools/ci/exercise_onebot_native_transports.py
+          --binary
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/unpacked/bin/cyrene-onebot-v11"
+          --rid "${{ matrix.rid }}"
+          --evidence
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/transport-evidence.json"
+      - name: Exercise packaged qqnt-direct profile and QQ Host boundary
+        if: matrix.rid == 'linux-x64'
+        run: >-
+          python tools/ci/exercise_onebot_native_qqnt.py
+          --binary
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/unpacked/bin/cyrene-onebot-v11"
+          --rid "${{ matrix.rid }}"
+          --evidence
+          "${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}/qqnt-evidence.json"
+      - name: Upload OneBot Native AOT package evidence
+        if: startsWith(matrix.rid, 'linux-')
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-onebot-v11-native-${{ matrix.rid }}-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-onebot-v11-native/${{ matrix.rid }}
+          if-no-files-found: error
+          compression-level: 0
 
   java-spring:
     name: public-ci / java-spring
@@ -389,6 +490,7 @@ jobs:
       - dotnet-native-aot
       - java-spring
       - onebot-v11-package
+      - onebot-v11-python-rollback
       - qq-host-tck
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -418,6 +520,15 @@ jobs:
         with:
           name: cyrene-onebot-v11-package-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/release-input/onebot-v11
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-onebot-v11-python-rollback-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-input/onebot-v11-python-rollback
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: cyrene-onebot-v11-native-*
+          path: ${{ runner.temp }}/release-input/onebot-v11-native
+          merge-multiple: false
       - name: Generate artifact SBOMs
         run: |
           set -euo pipefail
