@@ -886,6 +886,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_native_package.py",
+      "sha256": "d6040bd100c49c8b6f91c2042f49440a73f1090dc409b23f8a1e8a8d37854d75",
+      "size_bytes": 5233
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_package.py",
       "sha256": "e9e7166dc8fe1209771f31810c624efaad193872621bdf60e0dc2a1327a8bd85",
       "size_bytes": 12764
@@ -917,6 +924,13 @@
       "path": "plugins/connectors/onebot-v11/tests/test_transport.py",
       "sha256": "9f24b1cfe550469019ef6d82f042ed3ae896a55445eec66504b20dafa7ae882d",
       "size_bytes": 21805
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tools/assemble_native_package.py",
+      "sha256": "16a850f55d897b82c09d4f77b49750cdf6a8427a73db3b4f52985b6bef399b46",
+      "size_bytes": 10424
     },
     {
       "kind": "file",
