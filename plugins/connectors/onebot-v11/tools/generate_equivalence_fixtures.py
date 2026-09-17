@@ -125,6 +125,51 @@ def _send_private_everyone() -> dict[str, Any]:
     }
 
 
+def _send_group_text_only() -> dict[str, Any]:
+    return {
+        "conversation": {
+            "vendor": "onebot.v11",
+            "account_id": "10001",
+            "conversation_id": "20001",
+            "kind": "group",
+        },
+        "content": [{"text": {"text": "plain group message"}}],
+    }
+
+
+def _send_private_rich() -> dict[str, Any]:
+    return {
+        "conversation": {
+            "vendor": "onebot.v11",
+            "account_id": "10001",
+            "conversation_id": "10002",
+            "kind": "private",
+        },
+        "content": [
+            {"text": {"text": "private"}},
+            {
+                "image": {
+                    "reference": {"remote_uri": "https://cdn.example/private.png"},
+                    "mime_type": "image/png",
+                }
+            },
+            {
+                "file": {
+                    "reference": {
+                        "vendor_media": {
+                            "vendor": "onebot.v11",
+                            "account_id": "10001",
+                            "media_id": "private-file-id",
+                        }
+                    },
+                    "file_name": "private.txt",
+                    "mime_type": "text/plain",
+                }
+            },
+        ],
+    }
+
+
 def _inbound_group_rich() -> dict[str, Any]:
     return {
         "post_type": "message",
@@ -147,6 +192,18 @@ def _inbound_group_rich() -> dict[str, Any]:
     }
 
 
+def _inbound_group_minimal() -> dict[str, Any]:
+    return {
+        "post_type": "message",
+        "message_type": "group",
+        "self_id": "10001",
+        "group_id": "20001",
+        "message_id": "group-minimal-1",
+        "sender": {"user_id": "10002"},
+        "message": [{"type": "text", "data": {"text": "minimal"}}],
+    }
+
+
 def _inbound_private_everyone() -> dict[str, Any]:
     return {
         "post_type": "message",
@@ -158,6 +215,24 @@ def _inbound_private_everyone() -> dict[str, Any]:
         "message": [
             {"type": "at", "data": {"qq": "all"}},
             {"type": "text", "data": {"text": "notice"}},
+        ],
+    }
+
+
+def _inbound_private_rich() -> dict[str, Any]:
+    return {
+        "post_type": "message",
+        "message_type": "private",
+        "self_id": "10001",
+        "user_id": "10002",
+        "message_id": "private-rich-1",
+        "sender": {"user_id": "10002", "nickname": "Alice"},
+        "message": [
+            {"type": "image", "data": {"url": "https://cdn.example/private.png"}},
+            {
+                "type": "file",
+                "data": {"file": "private-file-id", "name": "private.txt"},
+            },
         ],
     }
 
@@ -253,6 +328,8 @@ def build_fixture() -> dict[str, Any]:
         "cases": [
             _send_case("send-group-rich", _send_group_rich()),
             _send_case("send-private-everyone", _send_private_everyone()),
+            _send_case("send-group-text-only", _send_group_text_only()),
+            _send_case("send-private-rich", _send_private_rich()),
             _respond_case(
                 "respond-friend-approve",
                 {
@@ -282,6 +359,18 @@ def build_fixture() -> dict[str, Any]:
                 "kind": "inbound_message",
                 "input": inbound_private,
                 "expected": normalize_inbound_event(inbound_private),
+            },
+            {
+                "id": "inbound-group-minimal",
+                "kind": "inbound_message",
+                "input": _inbound_group_minimal(),
+                "expected": normalize_inbound_event(_inbound_group_minimal()),
+            },
+            {
+                "id": "inbound-private-rich",
+                "kind": "inbound_message",
+                "input": _inbound_private_rich(),
+                "expected": normalize_inbound_event(_inbound_private_rich()),
             },
             {
                 "id": "inbound-request-friend",

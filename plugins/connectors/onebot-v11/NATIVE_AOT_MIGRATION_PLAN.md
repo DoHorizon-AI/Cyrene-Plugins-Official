@@ -131,6 +131,12 @@ listener、raw payload 或任意 service/method；真实 QQ 行另行记录。
 Python 只做 reference：同一输入 fixture 比较 OneBot action、参数、DeliveryResult、
 protobuf payload、事件顺序、错误 domain code 和 cancellation/deadline 结果。
 
+当前逐项清单固定在
+`plugins/connectors/onebot-v11/behavior_matrix.json`，由
+`tools/verify_behavior_matrix.py` 校验 Python 测试集合、C# 方法引用和 CI 证据引用；golden
+fixture 由 `tools/generate_equivalence_fixtures.py` 从 Python reference 重新生成，C#
+`NativeEquivalenceTests` 在不加载 Python 的情况下消费同一份 JSON。
+
 差异处理顺序：先确认 fixture/contract → 修 C# → 若 Python 确实错误才更新基线，并在
 变更记录写明原因。等价测试不能仅通过文件 hash 或同名测试证明。
 

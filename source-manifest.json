@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "f627d929a31e18dfb04be0611050460d684f35c529da8581616c739683e8a2c4",
-      "size_bytes": 27634
+      "sha256": "7cbc83c6b264b60ad185773e7a5913015bae4068e1961c782f5cd70b549299d5",
+      "size_bytes": 27768
     },
     {
       "kind": "file",
@@ -698,8 +698,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/NATIVE_AOT_MIGRATION_PLAN.md",
-      "sha256": "98ec37f474e43482510d4744063c7e546aae526e8b80f8f643f20cdd61182d30",
-      "size_bytes": 11025
+      "sha256": "4b64ca792d8974a56ecac0f10decdb20d4e3e2d77845c163345a6ff0a1c879b7",
+      "size_bytes": 11393
     },
     {
       "kind": "file",
@@ -733,8 +733,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "b96b06942eb4be8f21da8e48d246239609fd7f6528772a9a0b268b6bef4d160b",
-      "size_bytes": 6084
+      "sha256": "e66fd1785d3c8890c215d2db159c147469c56c3c23f0118aca3a13eae3e8f43f",
+      "size_bytes": 6817
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/behavior_matrix.json",
+      "sha256": "648d6b01dd0d9abd765cb5d5684bfcf7aa1327cabd045f4cf132b5945d888129",
+      "size_bytes": 40829
     },
     {
       "kind": "file",
@@ -908,8 +915,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/fixtures/native-equivalence.json",
-      "sha256": "24ab6875e6cb01bd662dc80423d2f0347746efc15c394efa40174ccace8ddc36",
-      "size_bytes": 9643
+      "sha256": "961108936a61bdb82a179f88fbefce8b1f1d7b6411da62b0332e5a96a07995a8",
+      "size_bytes": 14705
     },
     {
       "kind": "file",
@@ -985,8 +992,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/generate_equivalence_fixtures.py",
-      "sha256": "e877424ca398ccf984df21d08ccd5e21f17c0f72869c1f6c1ac3db0ddccabc46",
-      "size_bytes": 9777
+      "sha256": "420593a0cd88711e36de100ccc96e245cadd8ab5d816f146e895e04444f3d9f0",
+      "size_bytes": 12584
     },
     {
       "kind": "file",
@@ -994,6 +1001,13 @@
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
       "sha256": "a7ea1c8fa9dbd0b0cc69b8983b9ebf1a0551274334de81defd067150c4b6b279",
       "size_bytes": 2273
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tools/verify_behavior_matrix.py",
+      "sha256": "1d5820ee07f9faa2f5530c3455046c36b52dd61bd1c1364ec433128c079486dc",
+      "size_bytes": 16477
     },
     {
       "kind": "file",
@@ -4205,7 +4219,7 @@
     },
     {
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "b96b06942eb4be8f21da8e48d246239609fd7f6528772a9a0b268b6bef4d160b"
+      "sha256": "e66fd1785d3c8890c215d2db159c147469c56c3c23f0118aca3a13eae3e8f43f"
     }
   ],
   "schema_version": "cyrene.public-source-manifest.v1",
