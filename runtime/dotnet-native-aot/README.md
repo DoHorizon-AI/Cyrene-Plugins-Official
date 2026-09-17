@@ -11,29 +11,32 @@ This directory contains the C# implementation of Milestone M2 tasks (T26 & T27).
 
 ## 3. OneBot v11 Native AOT slice / OneBot v11 Native AOT 阶段实现
 
-`Cyrene.OneBot.V11.Host` now exposes the canonical `DirectPluginRuntime` gRPC
-service and selects one binding from the activation environment. The first
-functional profiles are `http_api`, `forward_websocket`, and
-`reverse_websocket`. The production Python manifest is intentionally unchanged
-until cross-transport behavior and package assembly reach parity.
+`Cyrene.OneBot.V11.Host` exposes the canonical `DirectPluginRuntime` gRPC
+service and selects one binding from the activation environment. The formal
+candidate package is now the C# Native AOT runtime (`0.3.0`); the Python
+`0.2.0` implementation is retained only as a separately assembled rollback
+artifact and behavior reference. The supported generic profiles are
+`http_api`, `forward_websocket`, and `reverse_websocket`.
 
 The current C# slice also contains a binding-scoped `qqnt-direct` bridge for
 the fixed `qq.client.v1` operation registry. It starts the explicitly selected
 Linux x86_64 QQ Host over inherited stdio, negotiates protocol/version/ABI,
 correlates requests by binding and generation, bounds frames, and performs
 bounded shutdown. Session bootstrap, QQ canonical message/event projections,
-crash recovery parity, and native package cutover remain later migration gates.
+and crash recovery gates are exercised by the Native AOT candidate package;
+authorized real-QQ smoke remains a separate acceptance record.
 
 `Cyrene.OneBot.V11.Host` 现在暴露规范的 `DirectPluginRuntime` gRPC 服务，并从
 插件激活环境选择一个 binding。当前第一个可运行 profile 是 `http_api`；
 `forward_websocket` 与 `reverse_websocket` 也已实现。reverse profile 在 binding
 本地监听器上完成受控 RFC 6455 握手，并将单个当前对端交给同一套 action/echo
-关联循环。在跨传输行为和包组装达到等价前，正式 Python 清单保持不变。
+关联循环。正式候选包已切换到 C# Native AOT；Python 0.2.0 仅作为独立回滚制品保留。
 
-当前 C# 阶段也包含限定在 binding 内的 `qqnt-direct` 桥接和固定
+当前正式候选也包含限定在 binding 内的 `qqnt-direct` 桥接和固定
 `qq.client.v1` operation 注册表：通过继承 stdio 启动明确选择的 Linux x86_64 QQ Host，
 协商 protocol/version/ABI，按 binding 与 generation 关联请求，有界分帧并执行有界关闭。
-session bootstrap、QQ canonical message/event 投影、崩溃恢复等价性和原生包切换仍是后续门禁。
+session bootstrap、QQ canonical message/event 投影和崩溃恢复门禁已纳入 Native AOT
+候选包；真实授权 QQ smoke 仍单独记录，不由 fake Host 代替。
 
 For a local configured-host smoke test, provide:
 
@@ -66,8 +69,9 @@ The unary `message.connector.v1/respond_request` operation is also mapped to
 OneBot v11 `set_friend_add_request` and `set_group_add_request` actions. The
 mapping preserves opaque request flags, normalized friend/group-invite kinds,
 approve/reject decisions, bounded comments, and optional canonical vendor
-request facts. The formal Python manifest remains unchanged until the remaining
-QQNT direct bridge and native package assembly are verified.
+request facts. The formal plugin manifest points to the Native AOT executable;
+the Python manifest snapshot is kept under the rollback artifact directory and
+is not a dual-runtime fallback.
 
 运行时接受现有的 `message.connector.v1/send_message` protobuf 请求，并将私聊/群聊、
 回复、文本、提及、图片和文件片段映射到 OneBot v11 action；协议错误不会记录或包含
@@ -78,7 +82,8 @@ type URL 与 `DIRECT_STREAM_MODE_SUBSCRIPTION`），并以有界 `DirectPayload`
 一元 `message.connector.v1/respond_request` 操作也已映射到 OneBot v11 的
 `set_friend_add_request` 与 `set_group_add_request` action。该映射保留不透明请求 flag、
 规范化的好友/群邀请类型、同意/拒绝决策、有界评论以及可选的规范 vendor 请求事实。
-在 QQNT direct 桥接和原生包组装完成验证前，正式 Python 清单保持不变。
+正式插件清单已指向 Native AOT 可执行文件；Python 清单快照仅保留在回滚制品目录中，
+不构成双运行时 fallback。
 
 ## 2. Invariants & Implementation Details / 核心不变量与实现细节
 
