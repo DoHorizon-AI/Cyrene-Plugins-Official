@@ -1538,8 +1538,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Program.cs",
-      "sha256": "f857de5aa7f7737be0bc910dd62dbbb9d7392a02243675376a5371a596630145",
-      "size_bytes": 8070
+      "sha256": "59b2ead36111bd42ac37042cb870a8a1987184d40478dcd454bd6a8d1f304626",
+      "size_bytes": 8386
     },
     {
       "kind": "file",
