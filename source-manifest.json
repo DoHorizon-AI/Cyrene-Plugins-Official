@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "7cbc83c6b264b60ad185773e7a5913015bae4068e1961c782f5cd70b549299d5",
-      "size_bytes": 27768
+      "sha256": "b6e964dff3ebd5c8e85dde5e2f5c573d17f97a1084042f9320b4fbb1be036c92",
+      "size_bytes": 28479
     },
     {
       "kind": "file",
@@ -698,8 +698,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/NATIVE_AOT_MIGRATION_PLAN.md",
-      "sha256": "4b64ca792d8974a56ecac0f10decdb20d4e3e2d77845c163345a6ff0a1c879b7",
-      "size_bytes": 11393
+      "sha256": "7c3f125bc05bf5fbb97b8a9e3b7bbbd69320268d6d79e54da25f897773326c6d",
+      "size_bytes": 11941
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/NATIVE_AOT_OPERATIONS.md",
+      "sha256": "35843f323e9a40185e21cf4393c46701d1aca2b3e3bc5b3afdce7b0f63162e08",
+      "size_bytes": 7656
     },
     {
       "kind": "file",
@@ -936,8 +943,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_native_package.py",
-      "sha256": "e3560640514106bf20da9b7492b491d75c9dc42b66efda1c7cb42dd18bff5093",
-      "size_bytes": 6534
+      "sha256": "56917ccb9da03b431cf73afb759009808bb21cd4995e36a1d793260de9bf6fce",
+      "size_bytes": 6599
     },
     {
       "kind": "file",
@@ -978,8 +985,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/assemble_native_package.py",
-      "sha256": "16a850f55d897b82c09d4f77b49750cdf6a8427a73db3b4f52985b6bef399b46",
-      "size_bytes": 10424
+      "sha256": "8eadc468c4969b6f898a02d4d12127e7c293eb2408b25978f6fca9dc26c6288c",
+      "size_bytes": 10456
     },
     {
       "kind": "file",
@@ -4123,6 +4130,13 @@
       "path": "tools/ci/assert_no_test_skips.py",
       "sha256": "2b7b25772e76bf48a68936b198ed8efc4268d1bfc60a2013c09c0e6fc7a34e3a",
       "size_bytes": 2847
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/benchmark_onebot_native_aot.py",
+      "sha256": "1fb4cf1cbcaaff9670202971108e874fba4dc326e80a39be6e6d14840d568076",
+      "size_bytes": 13995
     },
     {
       "kind": "file",

@@ -31,6 +31,7 @@ EXECUTABLE = "bin/cyrene-onebot-v11"
 PROTOCOL = "cyrene.plugin.runtime.v1.DirectPluginRuntime"
 PACKAGE_FILES = (
     "README.md",
+    "NATIVE_AOT_OPERATIONS.md",
     "configuration.schema.json",
     "contracts/v1/schema.json",
     "contracts/json/message-connector-v1-inbound-request.schema.json",
