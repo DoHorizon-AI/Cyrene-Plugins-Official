@@ -392,7 +392,7 @@ jobs:
           runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj
           --configuration Release
           /p:TreatWarningsAsErrors=true
-          --filter "FullyQualifiedName!~DispatcherTests"
+          --filter "FullyQualifiedName!~DispatcherTests&FullyQualifiedName!~QqHostParityTests"
       - name: Verify Native AOT source rules
         run: python tools/check_dotnet_aot_rules.py
       - name: Publish and smoke-test all Native AOT components

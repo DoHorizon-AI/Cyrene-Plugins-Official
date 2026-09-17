@@ -48,6 +48,15 @@ def _request_log() -> str | None:
     return os.environ.get("CYRENE_QQ_REQUEST_LOG")
 
 
+def _control_log() -> str | None:
+    """Read an optional fixture-only control-frame log path."""
+
+    for argument in sys.argv[1:]:
+        if argument.startswith("--control-log="):
+            return argument.partition("=")[2]
+    return os.environ.get("CYRENE_QQ_CONTROL_LOG")
+
+
 def _read_frame() -> dict[str, Any] | None:
     """Read one bounded frame using only inherited stdin."""
 
@@ -451,6 +460,13 @@ def main() -> int:
         if message is None:
             return 0
         message_type = message.get("type")
+        control_log = _control_log()
+        if control_log and message_type in {"cancel", "shutdown"}:
+            with open(control_log, "a", encoding="utf-8") as log:
+                log.write(
+                    json.dumps(message, ensure_ascii=False, separators=(",", ":"))
+                )
+                log.write("\n")
         if message_type == "shutdown":
             if listener is not None:
                 listener.close()
