@@ -29,7 +29,6 @@ public sealed record OneBotSendOperation(
 /// Maps only the canonical V1 message kinds supported by the Python baseline.
 /// <para>仅映射 Python 基线已支持的 V1 规范消息类型。</para>
 /// </summary>
-/// <summary>Explicit canonical V1 to OneBot v11 message mapper.</summary>
 public static class OneBotMessageMapper
 {
     public const string CapabilityId = "message.connector.v1";
