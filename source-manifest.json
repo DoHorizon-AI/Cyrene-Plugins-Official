@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "1acd39846f98d9844cb1e97e7ef2e1a9f716e5f2401035d17b94c10bfee3653a",
-      "size_bytes": 27596
+      "sha256": "f627d929a31e18dfb04be0611050460d684f35c529da8581616c739683e8a2c4",
+      "size_bytes": 27634
     },
     {
       "kind": "file",
@@ -901,8 +901,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py",
-      "sha256": "5fdffee79409b092e1e3ae9488139011e18d62cf34e3660813cdbee4f276f908",
-      "size_bytes": 20916
+      "sha256": "0d08304dd9a4587bbfdab2b7e6c8d8a46461b61a9eb225749864b968ba331346",
+      "size_bytes": 21528
     },
     {
       "kind": "file",
@@ -1589,6 +1589,13 @@
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/OneBotParityTests.cs",
       "sha256": "3ab6bb94968de2afacd1bca99d46f322be64d247e2d813e045df12b82889d65f",
       "size_bytes": 22462
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/QqHostParityTests.cs",
+      "sha256": "2ff5749606196f1e620fb5239c60254ef7a431ad0832d75b73eec3ae834874bd",
+      "size_bytes": 17352
     },
     {
       "kind": "file",
