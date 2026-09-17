@@ -125,17 +125,25 @@ def _read_ready_announcement(process: subprocess.Popen[str]) -> dict[str, Any]:
 
     if process.stdout is None:
         raise RuntimeError("OneBot Native AOT host stdout is not captured")
+    stdout_fd = process.stdout.fileno()
     deadline = time.monotonic() + 15
     diagnostics: list[str] = []
+    pending = b""
     while time.monotonic() < deadline:
-        ready, _, _ = select.select([process.stdout], [], [], 0.1)
+        ready, _, _ = select.select([stdout_fd], [], [], 0.1)
         if not ready:
             if process.poll() is not None:
                 break
             continue
-        line = process.stdout.readline()
-        if line:
-            text = line.strip()
+        chunk = os.read(stdout_fd, 4096)
+        if not chunk:
+            if process.poll() is not None:
+                break
+            continue
+        pending += chunk
+        while b"\n" in pending:
+            raw_line, pending = pending.split(b"\n", 1)
+            text = raw_line.decode("utf-8", errors="replace").strip()
             try:
                 value = json.loads(text)
             except json.JSONDecodeError:
@@ -144,9 +152,6 @@ def _read_ready_announcement(process: subprocess.Popen[str]) -> dict[str, Any]:
             if isinstance(value, dict) and value.get("event") == "direct_plugin_ready":
                 return value
             diagnostics.append(text)
-            continue
-        if process.poll() is not None:
-            break
     stderr = ""
     if process.poll() is None:
         process.terminate()

@@ -4107,15 +4107,15 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/exercise_onebot_native_qqnt.py",
-      "sha256": "23e0084947bfb2706d0e66defb493a8c5f3fdc6a88a4404b279244944e83d385",
-      "size_bytes": 15788
+      "sha256": "a255cc85f6da255d384b5ab4dc1fe01314ad47d905271275b247b6a949f5780c",
+      "size_bytes": 16094
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/exercise_onebot_native_transports.py",
-      "sha256": "78f022c9e76fa164a400691580813fc0f902c4327620cc13d167b0e380d11baf",
-      "size_bytes": 22110
+      "sha256": "4f984065166c94f5fb86d201c37662d3c4e13670a750c2210adb39b8e421b4b4",
+      "size_bytes": 22416
     },
     {
       "kind": "file",
@@ -4135,8 +4135,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/publish_onebot_native_aot.py",
-      "sha256": "09af272bc98c27c17fd84578dc18c82d5a2304c0184c830df62c971011deab90",
-      "size_bytes": 13800
+      "sha256": "ee437681756554782af90a7884ed87c84252b87b6b539bde715bea653669f524",
+      "size_bytes": 14017
     },
     {
       "kind": "file",
