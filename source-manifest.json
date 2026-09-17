@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "a200408754fcc549898a336eb855d9ef88a1eadd2f2c29b3ae3b21cc5ac03cc6",
-      "size_bytes": 21628
+      "sha256": "929843e11496f2c36beb6be5f12fb9dba4d459ed5d8c56fea658a99a919f9773",
+      "size_bytes": 22837
     },
     {
       "kind": "file",
@@ -4095,6 +4095,13 @@
       "path": "tools/ci/publish_native_aot.py",
       "sha256": "254db6b612323cd991023e6c2bec05a9636a6f4cf6868514a218553b66045dd6",
       "size_bytes": 10268
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/publish_onebot_native_aot.py",
+      "sha256": "09af272bc98c27c17fd84578dc18c82d5a2304c0184c830df62c971011deab90",
+      "size_bytes": 13800
     },
     {
       "kind": "file",
