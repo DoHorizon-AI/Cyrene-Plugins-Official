@@ -879,9 +879,23 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/fixtures/native-equivalence.json",
+      "sha256": "24ab6875e6cb01bd662dc80423d2f0347746efc15c394efa40174ccace8ddc36",
+      "size_bytes": 9643
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_connector.py",
       "sha256": "76f935178e1e3b25fe8b13edcf2d62f61122b6bf47632a5d3a1561bbf53e6297",
       "size_bytes": 22531
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_equivalence_fixtures.py",
+      "sha256": "366a10c66028faddac2125f2b86be72a97149455d2f65d9a4be17e8238c32fe3",
+      "size_bytes": 1412
     },
     {
       "kind": "file",
@@ -938,6 +952,13 @@
       "path": "plugins/connectors/onebot-v11/tools/assemble_package.py",
       "sha256": "e7b581e9f371c24501bfa12839456feb72805a66533867f48ee0413baf52f95e",
       "size_bytes": 7554
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tools/generate_equivalence_fixtures.py",
+      "sha256": "e877424ca398ccf984df21d08ccd5e21f17c0f72869c1f6c1ac3db0ddccabc46",
+      "size_bytes": 9777
     },
     {
       "kind": "file",
@@ -1363,15 +1384,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotJsonModels.cs",
-      "sha256": "8092725fb8a797d5fd1f2d533362c3561d2829d5e0552e9eb0d8ac39abd9c27f",
-      "size_bytes": 5658
+      "sha256": "965e5b0d83894390d0dcad1e4d86d86d4dae636baf3232760df52d5f3dd7241a",
+      "size_bytes": 5657
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotMessageMapper.cs",
-      "sha256": "8dc3ba9c59480770347ac7f755a8ee1f287fa977f92b4c859f5771995f4c99b7",
-      "size_bytes": 9558
+      "sha256": "28f8639ae70562c238c1094ec70cab8fa0772e859a0433009f345cafda1e894f",
+      "size_bytes": 9557
     },
     {
       "kind": "file",
@@ -1519,6 +1540,13 @@
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/DispatcherTests.cs",
       "sha256": "684b47ca92e2d8c0cc9d85c5d6e7d561330264e41f00fa6800162822ff79c450",
       "size_bytes": 35351
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/NativeEquivalenceTests.cs",
+      "sha256": "745e2d97e473189306c650475984ac0f8442beb02f33d56588321e5cf82b6420",
+      "size_bytes": 13776
     },
     {
       "kind": "file",
