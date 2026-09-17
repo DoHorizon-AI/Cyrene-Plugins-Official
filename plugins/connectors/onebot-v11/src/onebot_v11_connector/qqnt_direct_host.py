@@ -486,7 +486,12 @@ class QQHostClient:
         _terminate_process_tree(process, force=True, include_exited=True)
         for stream in (process.stdin, process.stdout, process.stderr):
             if stream is not None:
-                stream.close()
+                try:
+                    stream.close()
+                except (BrokenPipeError, OSError):
+                    self._record_diagnostic(
+                        "QQ Host process stream was already closed"
+                    )
         for thread in (self._reader_thread, self._stderr_thread):
             if thread is not None and thread is not threading.current_thread():
                 thread.join(timeout=self._config.shutdown_timeout_seconds)
