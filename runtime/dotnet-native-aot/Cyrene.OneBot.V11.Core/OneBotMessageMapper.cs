@@ -115,7 +115,7 @@ public static class OneBotMessageMapper
                 Type = "reply",
                 Data = new OneBotSegmentData
                 {
-                    Id = RequiredIdentifier(request.Reply.MessageId, "reply.message_id")
+                    Id = NumericIdentifier(request.Reply.MessageId, "reply.message_id")
                 }
             });
         }

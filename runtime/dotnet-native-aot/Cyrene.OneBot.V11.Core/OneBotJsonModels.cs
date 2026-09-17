@@ -53,7 +53,7 @@ public sealed class OneBotMessageSegment
 public sealed class OneBotSegmentData
 {
     [JsonPropertyName("id")]
-    public string? Id { get; set; }
+    public ulong? Id { get; set; }
 
     [JsonPropertyName("text")]
     public string? Text { get; set; }
