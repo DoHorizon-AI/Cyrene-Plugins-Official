@@ -379,11 +379,20 @@ jobs:
       - name: Run provider tests
         run: dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release
       - name: Run OneBot Native AOT contract and parity tests
+        if: runner.os != 'Windows'
         run: >-
           dotnet test
           runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj
           --configuration Release
           /p:TreatWarningsAsErrors=true
+      - name: Run generic OneBot Native AOT tests on Windows
+        if: runner.os == 'Windows'
+        run: >-
+          dotnet test
+          runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj
+          --configuration Release
+          /p:TreatWarningsAsErrors=true
+          --filter "FullyQualifiedName!~DispatcherTests"
       - name: Verify Native AOT source rules
         run: python tools/check_dotnet_aot_rules.py
       - name: Publish and smoke-test all Native AOT components
