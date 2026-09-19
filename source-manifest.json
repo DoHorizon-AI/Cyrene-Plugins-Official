@@ -676,6 +676,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "docs/plans/python-plugin-inventory-2026-09-18.md",
+      "sha256": "53521951e0fe025cba7c2daa3e90314c4f0b191f758b14abc1638bc4ee0e017c",
+      "size_bytes": 8612
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "manifests/plugin.manifest.schema.json",
       "sha256": "46c50d12e8a6524eb59999c98d227e748273804971a97b992828fd7125516d5b",
       "size_bytes": 6442
