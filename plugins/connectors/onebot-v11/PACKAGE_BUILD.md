@@ -92,3 +92,37 @@ repository.
 
 正式 Python runtime 从仓库移除前，必须先把 reference archive 及其 SHA-256 sidecar
 保存在不可变 release handoff 中。
+
+## Protected real OneBot smoke / 受保护真实 OneBot 烟测
+
+The `onebot-real-smoke` repository-dispatch job runs only on `main`, with the
+protected `onebot-real-smoke` environment and runner labels
+`self-hosted, linux, x64, onebot-real`. It downloads the tested `linux-x64`
+Native AOT package and covers `http_api`, `forward_websocket`, and
+`reverse_websocket`. HTTP requires a successful real `send_message`; both
+WebSocket profiles additionally require a matching inbound marker event.
+
+`ONEBOT_REAL_SMOKE_APPROVED=YES`, the three endpoint variables, the dedicated
+account and conversation IDs, and the fixed reverse-listener port must be
+configured in the protected environment. `ONEBOT_REAL_ACCESS_TOKEN` is an
+environment secret. The external reverse-WebSocket OneBot runtime must be
+preconfigured to connect to that fixed listener. The script writes only
+redacted health, delivery, event, and binary-digest evidence.
+
+`onebot-real-smoke` passing is necessary for generic OneBot Python cleanup, but
+does not authorize removal of the `qqnt-direct` Python reference. That profile
+still requires the separate protected real QQNT smoke to pass.
+
+`onebot-real-smoke` 只在 `main`、受保护的 `onebot-real-smoke` environment 以及
+`self-hosted, linux, x64, onebot-real` runner 上执行。它下载已经通过 Native AOT
+门禁的 `linux-x64` 正式包，并覆盖 `http_api`、`forward_websocket`、
+`reverse_websocket` 三种 profile。HTTP 必须完成真实 `send_message`；两个 WebSocket
+profile 还必须收到同一标记对应的入站事件。
+
+受保护环境必须配置 `ONEBOT_REAL_SMOKE_APPROVED=YES`、三个 endpoint 变量、专用账号与
+会话 ID、固定反向监听端口；`ONEBOT_REAL_ACCESS_TOKEN` 使用 environment secret。外部
+反向 WebSocket OneBot runtime 必须预先连接该固定监听器。脚本只写入脱敏的 health、投递、
+事件和二进制摘要证据。
+
+`onebot-real-smoke` 通过只是清理通用 OneBot Python 的必要条件，不能授权删除
+`qqnt-direct` Python reference；该 profile 仍需单独的真实 QQNT smoke 通过。
