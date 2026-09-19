@@ -4140,7 +4140,7 @@
     },
     {
       "kind": "file",
-      "mode": "100644",
+      "mode": "100755",
       "path": "tools/ci/assemble_onebot_reference.py",
       "sha256": "46893c4210242782386fb4f75a9a51eb892e957f3376289a93cc8e2871d9b958",
       "size_bytes": 7901
