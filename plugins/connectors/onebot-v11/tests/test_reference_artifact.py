@@ -32,6 +32,9 @@ def test_reference_archive_contains_provenance_and_python_payload(
     with zipfile.ZipFile(output) as archive:
         names = set(archive.namelist())
         assert "reference-manifest.json" in names
+        assert "reference-sbom.json" in names
+        assert "reference-build-proof.json" in names
+        assert "reference-runner/onebot_reference_parity.py" in names
         assert "src/onebot_v11_connector/plugin.py" in names
         assert "src/cyrene_plugin_runtime/bootstrap.py" in names
         assert not any(name.endswith(".pyc") for name in names)
@@ -44,6 +47,13 @@ def test_reference_archive_contains_provenance_and_python_payload(
     assert manifest["qqnt_real_smoke"] == "NOT_RUN"
     assert len(manifest["source_revision"]) == 40
     assert all(entry["path"] for entry in manifest["entries"])
+
+    with zipfile.ZipFile(output) as archive:
+        sbom = json.loads(archive.read("reference-sbom.json"))
+        proof = json.loads(archive.read("reference-build-proof.json"))
+    assert sbom["schema"] == "cyrene.onebot.python-reference-sbom.v1"
+    assert proof["schema"] == "cyrene.onebot.python-reference-build-proof.v1"
+    assert proof["source_revision"] == manifest["source_revision"]
 
 
 def test_reference_archive_is_deterministic(tmp_path: Path, monkeypatch) -> None:

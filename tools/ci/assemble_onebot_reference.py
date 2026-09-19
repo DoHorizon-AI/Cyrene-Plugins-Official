@@ -28,6 +28,7 @@ REFERENCE_SCHEMA = "cyrene.onebot.python-reference.v1"
 PACKAGE_BUILDER = (
     "plugins/connectors/onebot-v11/tools/assemble_package.py"
 )
+REFERENCE_RUNNER = "tools/ci/onebot_reference_parity.py"
 
 
 class ReferenceAssemblyError(ValueError):
@@ -134,6 +135,55 @@ def _write_manifest(root: Path, repository_root: Path) -> None:
     )
 
 
+def _write_build_metadata(root: Path, repository_root: Path) -> None:
+    """Write deterministic SBOM and build-proof records into the artifact."""
+
+    source_revision = _source_revision(repository_root)
+    builder_path = repository_root / PACKAGE_BUILDER
+    runner_path = repository_root / REFERENCE_RUNNER
+    if not builder_path.is_file() or not runner_path.is_file():
+        raise ReferenceAssemblyError("reference builder or runner is missing")
+    sbom = {
+        "schema": "cyrene.onebot.python-reference-sbom.v1",
+        "source_revision": source_revision,
+        "components": [
+            {"name": "python", "version": "3.12", "scope": "runtime"},
+            {"name": "grpcio", "version": ">=1.62,<1.63", "scope": "runtime"},
+            {"name": "protobuf", "version": ">=4.21,<5", "scope": "runtime"},
+        ],
+        "payload_files": _entries(root),
+    }
+    (root / "reference-sbom.json").write_text(
+        json.dumps(sbom, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    proof = {
+        "schema": "cyrene.onebot.python-reference-build-proof.v1",
+        "source_revision": source_revision,
+        "source_date_epoch": _source_date_epoch(),
+        "builder": {
+            "path": PACKAGE_BUILDER,
+            "sha256": _sha256(builder_path),
+        },
+        "runner": {
+            "path": REFERENCE_RUNNER,
+            "sha256": _sha256(runner_path),
+        },
+        "command": [
+            "python3",
+            "tools/ci/assemble_onebot_reference.py",
+            "--repository-root",
+            ".",
+            "--output",
+            "<immutable-output>.zip",
+        ],
+    }
+    (root / "reference-build-proof.json").write_text(
+        json.dumps(proof, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+
+
 def _zip_timestamp(epoch: int) -> tuple[int, int, int, int, int, int]:
     """Convert one epoch to ZIP's minimum-safe timestamp representation."""
 
@@ -189,6 +239,10 @@ def build_reference_archive(repository_root: Path, output: Path) -> Path:
     with tempfile.TemporaryDirectory(prefix="cyrene-onebot-reference-") as temporary:
         staged = Path(temporary) / "reference"
         builder.assemble_package(repository_root, staged)
+        runner_destination = staged / "reference-runner/onebot_reference_parity.py"
+        runner_destination.parent.mkdir(parents=True, exist_ok=True)
+        runner_destination.write_bytes((repository_root / REFERENCE_RUNNER).read_bytes())
+        _write_build_metadata(staged, repository_root)
         _write_manifest(staged, repository_root)
         _write_archive(staged, output, epoch)
     return output

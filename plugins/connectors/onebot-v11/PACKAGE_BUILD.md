@@ -109,6 +109,16 @@ environment secret. The external reverse-WebSocket OneBot runtime must be
 preconfigured to connect to that fixed listener. The script writes only
 redacted health, delivery, event, and binary-digest evidence.
 
+This smoke is deliberately not the migration approval gate by itself: the
+current job exercises only the C# package. The external reference archive now
+also contains `reference-runner/onebot_reference_parity.py`, which requires a
+Python-reference trace and a C# trace with the same scenario version. It
+rejects missing `http_api`, `forward_websocket`, or `reverse_websocket`
+profiles, any `NOT_RUN` check, and differences in canonical actions, type URLs,
+delivery/error semantics, event order, or binding isolation. The complete
+matrix includes private/group sends, inbound/request events, timeout,
+cancellation, disconnect/reconnect, close, and parallel binding isolation.
+
 `onebot-real-smoke` passing is necessary for generic OneBot Python cleanup, but
 does not authorize removal of the `qqnt-direct` Python reference. That profile
 still requires the separate protected real QQNT smoke to pass.
@@ -123,6 +133,12 @@ profile 还必须收到同一标记对应的入站事件。
 会话 ID、固定反向监听端口；`ONEBOT_REAL_ACCESS_TOKEN` 使用 environment secret。外部
 反向 WebSocket OneBot runtime 必须预先连接该固定监听器。脚本只写入脱敏的 health、投递、
 事件和二进制摘要证据。
+
+因此，当前 smoke 只验证 C# 正式包，不能证明 Python/C# 等价。外部参考制品中的
+`reference-runner/onebot_reference_parity.py` 要求同一场景版本的 Python reference trace
+和 C# trace，缺 profile、`NOT_RUN`、canonical action/type URL、投递/错误语义、事件顺序或
+binding 隔离差异都会失败；完整矩阵还必须覆盖私聊/群聊发送、入站/请求事件、超时、取消、
+断线/重连、关闭以及并行 binding 隔离。
 
 `onebot-real-smoke` 通过只是清理通用 OneBot Python 的必要条件，不能授权删除
 `qqnt-direct` Python reference；该 profile 仍需单独的真实 QQNT smoke 通过。

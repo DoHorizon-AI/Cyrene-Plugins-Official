@@ -36,6 +36,7 @@ PYTHON_MODULE_COUNTS = {
     "test_qqnt_direct.py": 71,
     "test_qqnt_host_tck.py": 12,
     "test_reference_artifact.py": 2,
+    "test_real_parity.py": 3,
     "test_transport.py": 5,
 }
 
@@ -54,6 +55,10 @@ EVIDENCE_CATALOG = {
     },
     "ci:public-ci / onebot-v11-python-reference": {
         "kind": "immutable-python-reference",
+        "path": ".github/workflows/public-ci.yml",
+    },
+    "ci:public-ci / onebot-real-smoke": {
+        "kind": "protected-real-onebot-smoke",
         "path": ".github/workflows/public-ci.yml",
     },
     "ci:public-ci / qq-host-tck": {
@@ -154,6 +159,18 @@ EXACT_EVIDENCE: dict[str, list[str]] = {
     "test_reference_artifact.py::test_reference_archive_is_deterministic": [
         "ci:public-ci / onebot-v11-python-reference",
     ],
+    "test_real_parity.py::test_real_trace_comparison_normalizes_deployment_ids": [
+        "ci:public-ci / onebot-v11-python-reference",
+        "ci:public-ci / onebot-real-smoke",
+    ],
+    "test_real_parity.py::test_real_trace_comparison_rejects_incomplete_profile": [
+        "ci:public-ci / onebot-v11-python-reference",
+        "ci:public-ci / onebot-real-smoke",
+    ],
+    "test_real_parity.py::test_real_trace_comparison_rejects_semantic_difference": [
+        "ci:public-ci / onebot-v11-python-reference",
+        "ci:public-ci / onebot-real-smoke",
+    ],
     (
         "test_transport.py::test_forward_websocket_connects_parses_events_and_correlates_actions"
     ): [
@@ -195,6 +212,10 @@ FILE_DEFAULT_EVIDENCE: dict[str, list[str]] = {
     ],
     "test_reference_artifact.py": [
         "ci:public-ci / onebot-v11-python-reference",
+    ],
+    "test_real_parity.py": [
+        "ci:public-ci / onebot-v11-python-reference",
+        "ci:public-ci / onebot-real-smoke",
     ],
     "test_transport.py": [
         "csharp:OneBotCoreTests.ForwardWebSocketCorrelatesActionAndDeliversEvent",
@@ -346,7 +367,7 @@ def build_matrix() -> dict[str, Any]:
                 "--collect-only -q plugins/connectors/onebot-v11/tests"
             ),
             "function_count": len(tests),
-            "collected_case_count": 123,
+            "collected_case_count": 126,
             "module_case_counts": PYTHON_MODULE_COUNTS,
         },
         "evidence_catalog": EVIDENCE_CATALOG,

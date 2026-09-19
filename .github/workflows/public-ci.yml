@@ -118,6 +118,7 @@ jobs:
             plugins/connectors/onebot-v11/tools \
             tools/ci/publish_onebot_native_aot.py \
             tools/ci/assemble_onebot_reference.py \
+            tools/ci/onebot_reference_parity.py \
             tools/ci/onebot_real_smoke.py \
             tools/ci/benchmark_onebot_native_aot.py \
             tools/ci/exercise_onebot_native_transports.py \
@@ -304,6 +305,9 @@ jobs:
           assert manifest["reference_runtime"] == "python"
           assert manifest["qqnt_real_smoke"] == "NOT_RUN"
           assert "src/onebot_v11_connector/plugin.py" in names
+          assert "reference-runner/onebot_reference_parity.py" in names
+          assert "reference-sbom.json" in names
+          assert "reference-build-proof.json" in names
           assert not any(name.endswith(".pyc") for name in names)
           PY
       - name: Upload immutable Python reference artifact

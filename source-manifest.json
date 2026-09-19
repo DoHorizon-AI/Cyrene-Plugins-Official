@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "056a7f75dbe3001dc2ec7795caf8f452ca20132fb49185a14b5a57b397a1e8d0",
-      "size_bytes": 34397
+      "sha256": "e1cf43149ba47910844ef27939e71861bf347e5e903fc73c838aab8e1a88659c",
+      "size_bytes": 34622
     },
     {
       "kind": "file",
@@ -712,8 +712,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
-      "sha256": "a3e5a322e3d7d349ac9734545a1a0336a6f79007bdaec89321e7d390323f2e8f",
-      "size_bytes": 6601
+      "sha256": "e3cd78831955b70fa682ea448c905462044b731ec8fb07e3e346ee3db508efea",
+      "size_bytes": 7763
     },
     {
       "kind": "file",
@@ -747,8 +747,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/behavior_matrix.json",
-      "sha256": "e26825474679c5a8b2ab5a2fe4378dc52f88a9f8b84e9b36565367a4cc38f84f",
-      "size_bytes": 41449
+      "sha256": "876306d6ba6ed3bd7704e853cc969ca6020739ab865f2da8064391d80deea6f8",
+      "size_bytes": 42388
     },
     {
       "kind": "file",
@@ -957,8 +957,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_reference_artifact.py",
-      "sha256": "ca49745e386bd1a4afd1378799f4679cb57510d84a2c9ee99f6c4b87e95e85cf",
-      "size_bytes": 2349
+      "sha256": "42ed14577b25e23947f2863cee3c49e6420ae54a1d50217b42d13b5acc909583",
+      "size_bytes": 2913
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_real_parity.py",
+      "sha256": "7a85378a14c6c229eb9d10aa73722b86c17a9a3896ec1615db121b10c044411e",
+      "size_bytes": 2803
     },
     {
       "kind": "file",
@@ -1020,8 +1027,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/verify_behavior_matrix.py",
-      "sha256": "031fa652c4b10ec8e54af4cdcdc3bcd5656be2dab1105b26dba9cd9fde7b9aeb",
-      "size_bytes": 17092
+      "sha256": "b41ef42ee5fed10f6060615196dc42202761f9989ad1a2f5236d3f5b1c65f1f9",
+      "size_bytes": 17970
     },
     {
       "kind": "file",
@@ -4142,8 +4149,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/assemble_onebot_reference.py",
-      "sha256": "46893c4210242782386fb4f75a9a51eb892e957f3376289a93cc8e2871d9b958",
-      "size_bytes": 7901
+      "sha256": "b2f5b0ebbc8008253c42bfc8afdd9097656cc6bf75c6440a8e4e8b1d3e2e70bf",
+      "size_bytes": 10092
     },
     {
       "kind": "file",
@@ -4186,6 +4193,13 @@
       "path": "tools/ci/onebot_real_smoke.py",
       "sha256": "22af8bc0ec27b550049a9ca2276eedd7a331c8a0a9b1e7fb91d507d6b2b4d1c5",
       "size_bytes": 14536
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/onebot_reference_parity.py",
+      "sha256": "56455f5150465c2210696901e77ce04e687d1e549cfd005be875766e2156f17a",
+      "size_bytes": 7687
     },
     {
       "kind": "file",
