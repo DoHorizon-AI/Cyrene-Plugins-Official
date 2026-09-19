@@ -14,6 +14,7 @@ on:
   repository_dispatch:
     types:
       - qq-real-smoke
+      - onebot-real-smoke
 
 concurrency:
   group: public-ci-${{ github.workflow }}-${{ github.ref }}
@@ -116,6 +117,9 @@ jobs:
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
             tools/ci/publish_onebot_native_aot.py \
+            tools/ci/assemble_onebot_reference.py \
+            tools/ci/onebot_reference_parity.py \
+            tools/ci/onebot_real_smoke.py \
             tools/ci/benchmark_onebot_native_aot.py \
             tools/ci/exercise_onebot_native_transports.py \
             tools/ci/exercise_onebot_native_qqnt.py \
@@ -258,6 +262,62 @@ jobs:
           if-no-files-found: error
           compression-level: 0
 
+  onebot-v11-python-reference:
+    name: public-ci / onebot-v11-python-reference
+    needs: source-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Assemble immutable Python reference artifact
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/cyrene-onebot-v11-python-reference"
+          mkdir -p "$output"
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct "$GITHUB_SHA")"
+          python3 tools/ci/assemble_onebot_reference.py \
+            --repository-root . \
+            --output "$output/cyrene-onebot-v11-python-reference-0.2.0.zip"
+          unzip -t "$output/cyrene-onebot-v11-python-reference-0.2.0.zip"
+          sha256sum "$output/cyrene-onebot-v11-python-reference-0.2.0.zip" \
+            > "$output/cyrene-onebot-v11-python-reference-0.2.0.zip.sha256"
+      - name: Verify immutable reference metadata
+        env:
+          EXPECTED_SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/cyrene-onebot-v11-python-reference/cyrene-onebot-v11-python-reference-0.2.0.zip"
+          python3 - "$archive" "$EXPECTED_SOURCE_REVISION" <<'PY'
+          import json
+          import sys
+          import zipfile
+
+          archive_path, expected_revision = sys.argv[1:]
+          with zipfile.ZipFile(archive_path) as archive:
+              manifest = json.loads(archive.read("reference-manifest.json"))
+              names = set(archive.namelist())
+          assert manifest["schema"] == "cyrene.onebot.python-reference.v1"
+          assert manifest["source_revision"] == expected_revision
+          assert manifest["formal_runtime"] == "csharp-native-aot"
+          assert manifest["reference_runtime"] == "python"
+          assert manifest["qqnt_real_smoke"] == "NOT_RUN"
+          assert "src/onebot_v11_connector/plugin.py" in names
+          assert "reference-runner/onebot_reference_parity.py" in names
+          assert "reference-sbom.json" in names
+          assert "reference-build-proof.json" in names
+          assert not any(name.endswith(".pyc") for name in names)
+          PY
+      - name: Upload immutable Python reference artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-onebot-v11-python-reference-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-onebot-v11-python-reference
+          if-no-files-found: error
+          compression-level: 0
+
   qq-host-tck:
     name: public-ci / qq-host-tck
     needs: source-hygiene
@@ -279,6 +339,97 @@ jobs:
             -e sdk/python/cyrene_plugin_runtime
       - name: Run named QQ Host contract TCK
         run: python3 -m pytest -q plugins/connectors/onebot-v11/tests/test_qqnt_host_tck.py
+
+  onebot-real-smoke:
+    name: public-ci / onebot-real-smoke / linux-x64
+    if: >-
+      github.event_name == 'repository_dispatch' &&
+      github.event.action == 'onebot-real-smoke' &&
+      github.ref == 'refs/heads/main'
+    needs:
+      - onebot-v11-package
+      - onebot-v11-python-reference
+    runs-on: [self-hosted, linux, x64, onebot-real]
+    environment:
+      name: onebot-real-smoke
+    timeout-minutes: 45
+    env:
+      ONEBOT_REAL_SMOKE_APPROVED: ${{ vars.ONEBOT_REAL_SMOKE_APPROVED }}
+      ONEBOT_REAL_HTTP_BASE_URL: ${{ vars.ONEBOT_REAL_HTTP_BASE_URL }}
+      ONEBOT_REAL_FORWARD_WEBSOCKET_URL: ${{ vars.ONEBOT_REAL_FORWARD_WEBSOCKET_URL }}
+      ONEBOT_REAL_REVERSE_LISTEN_HOST: ${{ vars.ONEBOT_REAL_REVERSE_LISTEN_HOST }}
+      ONEBOT_REAL_REVERSE_LISTEN_PORT: ${{ vars.ONEBOT_REAL_REVERSE_LISTEN_PORT }}
+      ONEBOT_REAL_ACCOUNT_ID: ${{ vars.ONEBOT_REAL_ACCOUNT_ID }}
+      ONEBOT_REAL_CONVERSATION_ID: ${{ vars.ONEBOT_REAL_CONVERSATION_ID }}
+      ONEBOT_REAL_CONVERSATION_KIND: ${{ vars.ONEBOT_REAL_CONVERSATION_KIND }}
+      ONEBOT_REAL_MARKER_PREFIX: ${{ vars.ONEBOT_REAL_MARKER_PREFIX }}
+      ONEBOT_REAL_EVENT_TIMEOUT_SECONDS: ${{ vars.ONEBOT_REAL_EVENT_TIMEOUT_SECONDS }}
+      ONEBOT_REAL_ACCESS_TOKEN: ${{ secrets.ONEBOT_REAL_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Verify protected Linux x64 runner
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = "Linux"
+          test "$(uname -m)" = "x86_64"
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-onebot-v11-package-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/onebot-real-input
+      - name: Extract the tested Linux x64 package
+        id: package
+        run: |
+          set -euo pipefail
+          archive="$(find "$RUNNER_TEMP/onebot-real-input" -type f \
+            -name '*linux-x64*.zip' -print -quit)"
+          test -n "$archive"
+          package_root="$RUNNER_TEMP/onebot-real-package"
+          mkdir -p "$package_root"
+          unzip -q "$archive" -d "$package_root"
+          binary="$package_root/bin/cyrene-onebot-v11"
+          test -x "$binary"
+          printf 'binary=%s\n' "$binary" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-onebot-v11-python-reference-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/onebot-python-reference-input
+      - name: Extract the immutable Python reference package
+        id: python-reference
+        run: |
+          set -euo pipefail
+          archive="$(find "$RUNNER_TEMP/onebot-python-reference-input" -type f \
+            -name '*python-reference-0.2.0.zip' -print -quit)"
+          test -n "$archive"
+          package_root="$RUNNER_TEMP/onebot-python-reference"
+          mkdir -p "$package_root"
+          unzip -q "$archive" -d "$package_root"
+          test -f "$package_root/reference-manifest.json"
+          test -d "$package_root/src/onebot_v11_connector"
+          printf 'package_root=%s\n' "$package_root" >> "$GITHUB_OUTPUT"
+      - name: Install protected smoke dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check \
+            'grpcio>=1.62,<1.63' \
+            'protobuf>=4.21,<5'
+      - name: Run authorized real OneBot smoke
+        env:
+          ONEBOT_REAL_SMOKE_EVIDENCE: ${{ runner.temp }}/onebot-real-smoke/evidence.json
+        run: >-
+          python3 tools/ci/onebot_real_smoke.py
+          --binary "${{ steps.package.outputs.binary }}"
+          --python-package "${{ steps.python-reference.outputs.package_root }}"
+          --evidence "$ONEBOT_REAL_SMOKE_EVIDENCE"
+      - name: Upload redacted OneBot evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-onebot-real-smoke-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/onebot-real-smoke/evidence.json
+          if-no-files-found: warn
+          compression-level: 0
 
   buf-contracts:
     name: public-ci / buf-contracts
@@ -521,6 +672,7 @@ jobs:
       - java-spring
       - onebot-v11-package
       - onebot-v11-python-rollback
+      - onebot-v11-python-reference
       - qq-host-tck
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -554,6 +706,10 @@ jobs:
         with:
           name: cyrene-onebot-v11-python-rollback-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/release-input/onebot-v11-python-rollback
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-onebot-v11-python-reference-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-input/onebot-v11-python-reference
       - uses: actions/download-artifact@v4
         with:
           pattern: cyrene-onebot-v11-native-*
