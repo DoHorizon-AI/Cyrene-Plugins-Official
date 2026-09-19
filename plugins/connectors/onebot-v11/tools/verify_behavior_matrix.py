@@ -145,7 +145,10 @@ EXACT_EVIDENCE: dict[str, list[str]] = {
         "csharp:NativeEquivalenceTests.OutboundAndRequestMappingsMatchThePythonGoldenFixture",
         "csharp:NativeEquivalenceTests.InboundMappingsMatchThePythonGoldenFixture",
     ],
-    "test_reference_artifact.py::test_reference_archive_contains_provenance_and_python_payload": [
+    (
+        "test_reference_artifact.py::"
+        "test_reference_archive_contains_provenance_and_python_payload"
+    ): [
         "ci:public-ci / onebot-v11-python-reference",
     ],
     "test_reference_artifact.py::test_reference_archive_is_deterministic": [

@@ -1020,8 +1020,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/verify_behavior_matrix.py",
-      "sha256": "47086f8d434eb992ef5d7ad12d9ec5d846e845ad0eca4d510d89205213ad8169",
-      "size_bytes": 17065
+      "sha256": "031fa652c4b10ec8e54af4cdcdc3bcd5656be2dab1105b26dba9cd9fde7b9aeb",
+      "size_bytes": 17092
     },
     {
       "kind": "file",
