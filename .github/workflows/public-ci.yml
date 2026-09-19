@@ -346,7 +346,9 @@ jobs:
       github.event_name == 'repository_dispatch' &&
       github.event.action == 'onebot-real-smoke' &&
       github.ref == 'refs/heads/main'
-    needs: onebot-v11-package
+    needs:
+      - onebot-v11-package
+      - onebot-v11-python-reference
     runs-on: [self-hosted, linux, x64, onebot-real]
     environment:
       name: onebot-real-smoke
@@ -390,6 +392,23 @@ jobs:
           binary="$package_root/bin/cyrene-onebot-v11"
           test -x "$binary"
           printf 'binary=%s\n' "$binary" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-onebot-v11-python-reference-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/onebot-python-reference-input
+      - name: Extract the immutable Python reference package
+        id: python-reference
+        run: |
+          set -euo pipefail
+          archive="$(find "$RUNNER_TEMP/onebot-python-reference-input" -type f \
+            -name '*python-reference-0.2.0.zip' -print -quit)"
+          test -n "$archive"
+          package_root="$RUNNER_TEMP/onebot-python-reference"
+          mkdir -p "$package_root"
+          unzip -q "$archive" -d "$package_root"
+          test -f "$package_root/reference-manifest.json"
+          test -d "$package_root/src/onebot_v11_connector"
+          printf 'package_root=%s\n' "$package_root" >> "$GITHUB_OUTPUT"
       - name: Install protected smoke dependencies
         run: |
           python3 -m pip install --disable-pip-version-check \
@@ -401,6 +420,7 @@ jobs:
         run: >-
           python3 tools/ci/onebot_real_smoke.py
           --binary "${{ steps.package.outputs.binary }}"
+          --python-package "${{ steps.python-reference.outputs.package_root }}"
           --evidence "$ONEBOT_REAL_SMOKE_EVIDENCE"
       - name: Upload redacted OneBot evidence
         if: always()

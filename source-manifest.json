@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "e1cf43149ba47910844ef27939e71861bf347e5e903fc73c838aab8e1a88659c",
-      "size_bytes": 34622
+      "sha256": "1bb9818500712ee8ce222c8510974f0e8761ee064897e85642e9e4c9f91eb862",
+      "size_bytes": 35600
     },
     {
       "kind": "file",
@@ -712,8 +712,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
-      "sha256": "8527457cfc1179772140388cb6f43be652f9904b29c15eab2f5ede8c226cb995",
-      "size_bytes": 8811
+      "sha256": "93a4ade04f82552e77dbc1fd06f8bdeb01884ff89ab1c9fcc7e39611f67b6a2e",
+      "size_bytes": 9129
     },
     {
       "kind": "file",
@@ -4191,8 +4191,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/onebot_real_smoke.py",
-      "sha256": "22af8bc0ec27b550049a9ca2276eedd7a331c8a0a9b1e7fb91d507d6b2b4d1c5",
-      "size_bytes": 14536
+      "sha256": "ba09df86d5e51234d7d85add00b26558cbffe13498fd22df7d3f04a36ac2f8c1",
+      "size_bytes": 17119
     },
     {
       "kind": "file",

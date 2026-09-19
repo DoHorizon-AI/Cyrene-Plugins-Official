@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """
-Run the protected real OneBot v11 smoke against the packaged Native AOT host.
+Run the protected real OneBot v11 smoke against both packaged runtimes.
 
 The runner supplies three operator-owned OneBot endpoints.  This script sends
-one bounded marker through each profile and requires a matching inbound event
-for both WebSocket profiles.  It never prints endpoint URLs, access tokens,
-message contents, or process diagnostics.
+one bounded marker through each profile for the immutable Python reference and
+the Native AOT host, requiring a matching inbound event for both WebSocket
+profiles.  It never prints endpoint URLs, access tokens, message contents, or
+process diagnostics.  This is a real-runtime smoke, not the full migration
+approval gate; the independent parity verifier owns that decision.
 """
 
 from __future__ import annotations
@@ -59,10 +61,11 @@ def _bounded_env(name: str, default: str, maximum: int = 512) -> str:
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse the packaged binary and redacted evidence destination."""
+    """Parse packaged runtimes and the redacted evidence destination."""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
+    parser.add_argument("--python-package", type=Path, required=True)
     parser.add_argument("--evidence", type=Path, required=True)
     return parser.parse_args()
 
@@ -71,7 +74,7 @@ def _read_ready_announcement(process: subprocess.Popen[bytes]) -> dict[str, Any]
     """Read the bounded JSON readiness announcement from the child process."""
 
     if process.stdout is None:
-        raise RuntimeError("Native AOT host stdout is not captured")
+        raise RuntimeError("direct runtime stdout is not captured")
     descriptor = process.stdout.fileno()
     deadline = time.monotonic() + 20
     pending = b""
@@ -191,7 +194,9 @@ def _stop(process: subprocess.Popen[bytes]) -> None:
 
 
 def _invoke_profile(
-    binary: Path,
+    binary: Path | None,
+    python_package: Path | None,
+    runtime: str,
     profile: str,
     configuration: dict[str, Any],
     run_id: str,
@@ -200,7 +205,14 @@ def _invoke_profile(
     message_wire: Any,
     grpc_module: Any,
 ) -> dict[str, Any]:
-    """Start one binding, verify Health, send a marker, and observe WebSocket events."""
+    """Start one runtime binding, verify Health, and send a marker."""
+
+    if runtime not in {"python-reference", "csharp-native-aot"}:
+        raise ValueError(f"unsupported smoke runtime: {runtime}")
+    if runtime == "csharp-native-aot" and binary is None:
+        raise ValueError("C# smoke requires a Native AOT binary")
+    if runtime == "python-reference" and python_package is None:
+        raise ValueError("Python smoke requires an extracted reference package")
 
     binding_id = f"onebot-real-{run_id}-{profile}"
     profile_config = {
@@ -227,9 +239,36 @@ def _invoke_profile(
     environment = os.environ.copy()
     environment["CYRENE_CAPABILITY_CONFIGURATION_JSON"] = json.dumps(profile_config)
     environment["CYRENE_CAPABILITY_BINDING_ID"] = binding_id
+    if runtime == "csharp-native-aot":
+        assert binary is not None
+        command = [str(binary), "--listen", "127.0.0.1:0"]
+        working_directory = binary.parent.parent
+    else:
+        assert python_package is not None
+        command = [
+            sys.executable,
+            "-m",
+            "cyrene_plugin_runtime.server",
+            "--entrypoint",
+            "onebot_v11_connector.plugin:ConnectorPlugin",
+            "--capability",
+            CAPABILITY,
+            "--interface-version",
+            "1",
+            "--listen",
+            "127.0.0.1:0",
+        ]
+        working_directory = python_package
+        existing_pythonpath = environment.get("PYTHONPATH", "")
+        package_pythonpath = str(python_package / "src")
+        environment["PYTHONPATH"] = (
+            package_pythonpath
+            if not existing_pythonpath
+            else f"{package_pythonpath}{os.pathsep}{existing_pythonpath}"
+        )
     process = subprocess.Popen(
-        [str(binary), "--listen", "127.0.0.1:0"],
-        cwd=binary.parent.parent,
+        command,
+        cwd=working_directory,
         env=environment,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -242,13 +281,13 @@ def _invoke_profile(
         announcement = _read_ready_announcement(process)
         connection_ref = announcement.get("connection_ref")
         if not isinstance(connection_ref, str) or not connection_ref.startswith("grpc://"):
-            raise RuntimeError("invalid Native AOT readiness announcement")
+            raise RuntimeError("invalid direct runtime readiness announcement")
         channel = grpc_module.insecure_channel(connection_ref.removeprefix("grpc://"))
         grpc_module.channel_ready_future(channel).result(timeout=10)
         client = runtime_wire_grpc.DirectPluginRuntimeStub(channel)
         health = client.Health(runtime_wire.HealthRequest(), timeout=5)
         if health.status != runtime_wire.HealthResponse.STATUS_SERVING:
-            raise RuntimeError("Native AOT Host did not report SERVING")
+            raise RuntimeError(f"{runtime} did not report SERVING")
 
         if profile != "http_api":
             stream = client.InvokeStream(
@@ -314,6 +353,7 @@ def _invoke_profile(
                 raise RuntimeError("real OneBot WebSocket marker event was not observed")
 
         return {
+            "runtime": runtime,
             "profile": profile,
             "health": runtime_wire.HealthResponse.Status.Name(health.status),
             "send_message": {
@@ -334,10 +374,15 @@ def _invoke_profile(
 
 
 def main() -> int:
-    """Run all three real profiles and write only redacted evidence."""
+    """Run all three real profiles for both runtimes and write redacted evidence."""
 
     args = _parse_args()
     binary = args.binary.resolve(strict=True)
+    python_package = args.python_package.resolve(strict=True)
+    if not (python_package / "src/onebot_v11_connector").is_dir():
+        raise SmokeConfigurationError(
+            "extracted Python reference package has no OneBot source package"
+        )
     configuration = _load_configuration()
     sys.path.insert(0, str(REPOSITORY_ROOT / "sdk/python/cyrene_plugin_runtime/src"))
     sys.path.insert(0, str(REPOSITORY_ROOT / "plugins/connectors/onebot-v11/src"))
@@ -352,23 +397,40 @@ def main() -> int:
 
     run_id = _bounded_env("GITHUB_RUN_ID", "local", maximum=64)
     evidence = {
-        "schema": "cyrene.onebot.real-smoke.v1",
-        "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
-        "profiles": [],
+        "schema": "cyrene.onebot.real-smoke.v2",
+        "runtimes": [],
     }
-    for profile in PROFILE_NAMES:
-        evidence["profiles"].append(
-            _invoke_profile(
-                binary,
-                profile,
-                configuration,
-                run_id,
-                runtime_wire,
-                runtime_wire_grpc,
-                message_wire,
-                grpc,
+    for runtime, runtime_binary, runtime_package in (
+        ("python-reference", None, python_package),
+        ("csharp-native-aot", binary, None),
+    ):
+        runtime_evidence = {
+            "runtime": runtime,
+            "artifact_sha256": (
+                hashlib.sha256(runtime_binary.read_bytes()).hexdigest()
+                if runtime_binary is not None
+                else hashlib.sha256(
+                    (runtime_package / "reference-manifest.json").read_bytes()
+                ).hexdigest()
+            ),
+            "profiles": [],
+        }
+        for profile in PROFILE_NAMES:
+            runtime_evidence["profiles"].append(
+                _invoke_profile(
+                    runtime_binary,
+                    runtime_package,
+                    runtime,
+                    profile,
+                    configuration,
+                    run_id,
+                    runtime_wire,
+                    runtime_wire_grpc,
+                    message_wire,
+                    grpc,
+                )
             )
-        )
+        evidence["runtimes"].append(runtime_evidence)
     args.evidence.parent.mkdir(parents=True, exist_ok=True)
     args.evidence.write_text(
         json.dumps(evidence, ensure_ascii=False, indent=2, sort_keys=True) + "\n",

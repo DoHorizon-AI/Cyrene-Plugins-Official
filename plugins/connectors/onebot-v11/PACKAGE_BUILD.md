@@ -98,9 +98,11 @@ repository.
 The `onebot-real-smoke` repository-dispatch job runs only on `main`, with the
 protected `onebot-real-smoke` environment and runner labels
 `self-hosted, linux, x64, onebot-real`. It downloads the tested `linux-x64`
-Native AOT package and covers `http_api`, `forward_websocket`, and
-`reverse_websocket`. HTTP requires a successful real `send_message`; both
-WebSocket profiles additionally require a matching inbound marker event.
+Native AOT package and the immutable Python reference package, then runs both
+runtimes sequentially against the same operator-owned `http_api`,
+`forward_websocket`, and `reverse_websocket` endpoints. HTTP requires a
+successful real `send_message`; both WebSocket profiles additionally require
+a matching inbound marker event.
 
 `ONEBOT_REAL_SMOKE_APPROVED=YES`, the three endpoint variables, the dedicated
 account and conversation IDs, and the fixed reverse-listener port must be
@@ -109,9 +111,10 @@ environment secret. The external reverse-WebSocket OneBot runtime must be
 preconfigured to connect to that fixed listener. The script writes only
 redacted health, delivery, event, and binary-digest evidence.
 
-This smoke is deliberately not the migration approval gate by itself: the
-current job exercises only the C# package. The external reference archive now
-also contains `reference-runner/onebot_reference_parity.py`, which requires a
+This smoke is deliberately not the migration approval gate by itself: it only
+proves that both installed runtimes can complete the bounded real
+send/event smoke. The external reference archive also contains
+`reference-runner/onebot_reference_parity.py`, which requires a
 Python-reference trace and a C# trace with the same scenario version. It
 rejects missing `http_api`, `forward_websocket`, or `reverse_websocket`
 profiles, any `NOT_RUN` check, and differences in canonical actions, type URLs,
@@ -134,7 +137,8 @@ still requires the separate protected real QQNT smoke to pass.
 
 `onebot-real-smoke` 只在 `main`、受保护的 `onebot-real-smoke` environment 以及
 `self-hosted, linux, x64, onebot-real` runner 上执行。它下载已经通过 Native AOT
-门禁的 `linux-x64` 正式包，并覆盖 `http_api`、`forward_websocket`、
+门禁的 `linux-x64` 正式包和不可变 Python reference package，然后在同一外部
+OneBot 目标上依次运行两个 runtime，覆盖 `http_api`、`forward_websocket`、
 `reverse_websocket` 三种 profile。HTTP 必须完成真实 `send_message`；两个 WebSocket
 profile 还必须收到同一标记对应的入站事件。
 
@@ -143,7 +147,8 @@ profile 还必须收到同一标记对应的入站事件。
 反向 WebSocket OneBot runtime 必须预先连接该固定监听器。脚本只写入脱敏的 health、投递、
 事件和二进制摘要证据。
 
-因此，当前 smoke 只验证 C# 正式包，不能证明 Python/C# 等价。外部参考制品中的
+因此，当前 smoke 会验证 Python reference 和 C# 正式包的有限真实发送/事件路径，但不能单独证明
+Python/C# 等价。外部参考制品中的
 `reference-runner/onebot_reference_parity.py` 要求同一场景版本的 Python reference trace
 和 C# trace，缺 profile、`NOT_RUN`、canonical action/type URL、投递/错误语义、事件顺序或
 binding 隔离差异都会失败；完整矩阵还必须覆盖私聊/群聊发送、入站/请求事件、超时、取消、
