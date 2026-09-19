@@ -4196,7 +4196,7 @@
     },
     {
       "kind": "file",
-      "mode": "100644",
+      "mode": "100755",
       "path": "tools/ci/onebot_reference_parity.py",
       "sha256": "56455f5150465c2210696901e77ce04e687d1e549cfd005be875766e2156f17a",
       "size_bytes": 7687
