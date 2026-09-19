@@ -119,6 +119,15 @@ delivery/error semantics, event order, or binding isolation. The complete
 matrix includes private/group sends, inbound/request events, timeout,
 cancellation, disconnect/reconnect, close, and parallel binding isolation.
 
+There is also a current transport-scope blocker: both implementations expose
+`http_api` as an action-only client. The Python HTTP transport has no event
+listener, and the C# HTTP transport's event handler and `Start` hooks are
+no-ops. Consequently, a real HTTP send pass cannot be promoted to full
+equivalence until the protected scenario supplies a supported event ingress or
+both implementations add the same event ingress contract. The parity gate
+must keep this case incomplete rather than silently treating WebSocket-only
+events as HTTP coverage.
+
 `onebot-real-smoke` passing is necessary for generic OneBot Python cleanup, but
 does not authorize removal of the `qqnt-direct` Python reference. That profile
 still requires the separate protected real QQNT smoke to pass.
@@ -139,6 +148,12 @@ profile 还必须收到同一标记对应的入站事件。
 和 C# trace，缺 profile、`NOT_RUN`、canonical action/type URL、投递/错误语义、事件顺序或
 binding 隔离差异都会失败；完整矩阵还必须覆盖私聊/群聊发送、入站/请求事件、超时、取消、
 断线/重连、关闭以及并行 binding 隔离。
+
+当前还有一个 transport 范围阻断：两种实现的 `http_api` 都只是 action client。Python HTTP
+transport 没有事件监听器，C# HTTP transport 的 event handler 与 `Start` hook 也是空实现。
+所以真实 HTTP 发送通过不能升级为完整等价；除非受保护场景提供受支持的事件入口，或两种实现
+共同增加同一事件入口契约。parity 门禁必须将此情况保留为未完成，不能把 WebSocket 的事件
+结果冒充 HTTP 覆盖。
 
 `onebot-real-smoke` 通过只是清理通用 OneBot Python 的必要条件，不能授权删除
 `qqnt-direct` Python reference；该 profile 仍需单独的真实 QQNT smoke 通过。
