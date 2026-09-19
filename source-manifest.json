@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "b6e964dff3ebd5c8e85dde5e2f5c573d17f97a1084042f9320b4fbb1be036c92",
-      "size_bytes": 28479
+      "sha256": "24082058c4cc4995cf5557c86292622b4f346acdd227e49fe76078e5bcfb4150",
+      "size_bytes": 31201
     },
     {
       "kind": "file",
@@ -712,8 +712,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
-      "sha256": "8ca31bbb548e718929b7b74a1989b42fa5dd38ce7fa7cb727ada5364667de78e",
-      "size_bytes": 3151
+      "sha256": "15835918ca29628ec5bba20a5eed7391ac1ac06f6340b2cecede0b04ccc783c6",
+      "size_bytes": 4495
     },
     {
       "kind": "file",
@@ -952,6 +952,13 @@
       "path": "plugins/connectors/onebot-v11/tests/test_package.py",
       "sha256": "60ea530bb7c7731593901517eba81dc8c667b8d1368788c00b63d92ceafede39",
       "size_bytes": 12941
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/tests/test_reference_artifact.py",
+      "sha256": "ca49745e386bd1a4afd1378799f4679cb57510d84a2c9ee99f6c4b87e95e85cf",
+      "size_bytes": 2349
     },
     {
       "kind": "file",
@@ -4130,6 +4137,13 @@
       "path": "tools/ci/assert_no_test_skips.py",
       "sha256": "2b7b25772e76bf48a68936b198ed8efc4268d1bfc60a2013c09c0e6fc7a34e3a",
       "size_bytes": 2847
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/assemble_onebot_reference.py",
+      "sha256": "46893c4210242782386fb4f75a9a51eb892e957f3376289a93cc8e2871d9b958",
+      "size_bytes": 7901
     },
     {
       "kind": "file",

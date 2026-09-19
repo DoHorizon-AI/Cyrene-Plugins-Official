@@ -65,3 +65,30 @@ gates.
 
 这是 Plugins 内的 artifact-level 门禁，不是 Workspace P2.5 Product/AstrBot/pgvector 三仓
 harness，也不能把任何能力行提升为官方 QQ runtime 的 `IMPLEMENTED`；两者仍是独立验收门禁。
+
+## Python reference artifact / Python 参考制品
+
+The migration also assembles one immutable Python reference archive so a
+future cleanup can remove Python from the formal plugin without losing a
+reproducible cross-language comparison target. The archive records the exact
+Git revision, content digests, formal runtime identity, and the current
+`qqnt_real_smoke` state. It is a reference input for protected validation, not
+a second formal runtime and not a release downgrade target.
+
+迁移期间还会额外生成一个不可变的 Python reference archive，使正式插件清理 Python 后仍能
+进行可复现的跨语言对照。制品记录精确 Git revision、内容摘要、正式运行时身份以及当前
+`qqnt_real_smoke` 状态。它只用于受保护验证，不是第二运行时，也不是正式回滚目标：
+
+```bash
+SOURCE_DATE_EPOCH="$(git log -1 --format=%ct HEAD)" \
+  python3 tools/ci/assemble_onebot_reference.py \
+  --repository-root . \
+  --output /tmp/cyrene-onebot-v11-python-reference-0.2.0.zip
+```
+
+The reference archive must be retained in the immutable release handoff with
+its sidecar SHA-256 file before the formal Python runtime is removed from the
+repository.
+
+正式 Python runtime 从仓库移除前，必须先把 reference archive 及其 SHA-256 sidecar
+保存在不可变 release handoff 中。

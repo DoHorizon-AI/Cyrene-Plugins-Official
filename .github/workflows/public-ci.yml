@@ -116,6 +116,7 @@ jobs:
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
             tools/ci/publish_onebot_native_aot.py \
+            tools/ci/assemble_onebot_reference.py \
             tools/ci/benchmark_onebot_native_aot.py \
             tools/ci/exercise_onebot_native_transports.py \
             tools/ci/exercise_onebot_native_qqnt.py \
@@ -255,6 +256,59 @@ jobs:
         with:
           name: cyrene-onebot-v11-python-rollback-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/cyrene-onebot-v11-python-rollback
+          if-no-files-found: error
+          compression-level: 0
+
+  onebot-v11-python-reference:
+    name: public-ci / onebot-v11-python-reference
+    needs: source-hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Assemble immutable Python reference artifact
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/cyrene-onebot-v11-python-reference"
+          mkdir -p "$output"
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct "$GITHUB_SHA")"
+          python3 tools/ci/assemble_onebot_reference.py \
+            --repository-root . \
+            --output "$output/cyrene-onebot-v11-python-reference-0.2.0.zip"
+          unzip -t "$output/cyrene-onebot-v11-python-reference-0.2.0.zip"
+          sha256sum "$output/cyrene-onebot-v11-python-reference-0.2.0.zip" \
+            > "$output/cyrene-onebot-v11-python-reference-0.2.0.zip.sha256"
+      - name: Verify immutable reference metadata
+        env:
+          EXPECTED_SOURCE_REVISION: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          archive="$RUNNER_TEMP/cyrene-onebot-v11-python-reference/cyrene-onebot-v11-python-reference-0.2.0.zip"
+          python3 - "$archive" "$EXPECTED_SOURCE_REVISION" <<'PY'
+          import json
+          import sys
+          import zipfile
+
+          archive_path, expected_revision = sys.argv[1:]
+          with zipfile.ZipFile(archive_path) as archive:
+              manifest = json.loads(archive.read("reference-manifest.json"))
+              names = set(archive.namelist())
+          assert manifest["schema"] == "cyrene.onebot.python-reference.v1"
+          assert manifest["source_revision"] == expected_revision
+          assert manifest["formal_runtime"] == "csharp-native-aot"
+          assert manifest["reference_runtime"] == "python"
+          assert manifest["qqnt_real_smoke"] == "NOT_RUN"
+          assert "src/onebot_v11_connector/plugin.py" in names
+          assert not any(name.endswith(".pyc") for name in names)
+          PY
+      - name: Upload immutable Python reference artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-onebot-v11-python-reference-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/cyrene-onebot-v11-python-reference
           if-no-files-found: error
           compression-level: 0
 
@@ -521,6 +575,7 @@ jobs:
       - java-spring
       - onebot-v11-package
       - onebot-v11-python-rollback
+      - onebot-v11-python-reference
       - qq-host-tck
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -554,6 +609,10 @@ jobs:
         with:
           name: cyrene-onebot-v11-python-rollback-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/release-input/onebot-v11-python-rollback
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyrene-onebot-v11-python-reference-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/release-input/onebot-v11-python-reference
       - uses: actions/download-artifact@v4
         with:
           pattern: cyrene-onebot-v11-native-*
