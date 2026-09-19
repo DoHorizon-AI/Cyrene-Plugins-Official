@@ -3,8 +3,8 @@
   "baseline": {
     "suite": "plugins/connectors/onebot-v11/tests",
     "collection_command": "PYTHONPATH=plugins/connectors/onebot-v11/src:sdk/python/cyrene_plugin_runtime/src python3 -m pytest --collect-only -q plugins/connectors/onebot-v11/tests",
-    "function_count": 101,
-    "collected_case_count": 121,
+    "function_count": 103,
+    "collected_case_count": 123,
     "module_case_counts": {
       "test_connector.py": 18,
       "test_equivalence_fixtures.py": 1,
@@ -13,6 +13,7 @@
       "test_qqnt_dependency_boundary.py": 2,
       "test_qqnt_direct.py": 71,
       "test_qqnt_host_tck.py": 12,
+      "test_reference_artifact.py": 2,
       "test_transport.py": 5
     }
   },
@@ -27,6 +28,10 @@
     },
     "ci:public-ci / onebot-v11-python-rollback": {
       "kind": "rollback-package",
+      "path": ".github/workflows/public-ci.yml"
+    },
+    "ci:public-ci / onebot-v11-python-reference": {
+      "kind": "immutable-python-reference",
       "path": ".github/workflows/public-ci.yml"
     },
     "ci:public-ci / qq-host-tck": {
@@ -932,6 +937,20 @@
       "evidence": [
         "ci:public-ci / qq-host-tck",
         "csharp:QqHostParityTests.FakeHostDispatchesEveryRequestableOperationAndShutsDownCleanly"
+      ]
+    },
+    {
+      "id": "test_reference_artifact.py::test_reference_archive_contains_provenance_and_python_payload",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / onebot-v11-python-reference"
+      ]
+    },
+    {
+      "id": "test_reference_artifact.py::test_reference_archive_is_deterministic",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / onebot-v11-python-reference"
       ]
     },
     {
