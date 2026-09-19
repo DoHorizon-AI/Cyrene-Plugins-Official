@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "24082058c4cc4995cf5557c86292622b4f346acdd227e49fe76078e5bcfb4150",
-      "size_bytes": 31201
+      "sha256": "056a7f75dbe3001dc2ec7795caf8f452ca20132fb49185a14b5a57b397a1e8d0",
+      "size_bytes": 34397
     },
     {
       "kind": "file",
@@ -4179,6 +4179,13 @@
       "path": "tools/ci/exercise_onebot_native_transports.py",
       "sha256": "4f984065166c94f5fb86d201c37662d3c4e13670a750c2210adb39b8e421b4b4",
       "size_bytes": 22416
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/onebot_real_smoke.py",
+      "sha256": "22af8bc0ec27b550049a9ca2276eedd7a331c8a0a9b1e7fb91d507d6b2b4d1c5",
+      "size_bytes": 14536
     },
     {
       "kind": "file",
