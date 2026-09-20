@@ -17,6 +17,7 @@ import hashlib
 import json
 import os
 import stat
+import subprocess
 import sys
 from pathlib import Path
 
@@ -49,12 +50,55 @@ def _load(manifest_path: Path) -> dict:
     return manifest
 
 
+def _ignored_untracked(root: Path) -> set[str]:
+    """Return untracked paths excluded by the repository's ignore rules."""
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "ls-files",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "-z",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ManifestUpdateError(
+            "cannot resolve ignored untracked paths from Git"
+        ) from error
+    return {
+        item.decode("utf-8")
+        for item in result.stdout.split(b"\0")
+        if item
+    }
+
+
+def _is_ignored(relative: str, ignored: set[str]) -> bool:
+    """Return whether a path is inside an ignored untracked subtree."""
+
+    return any(relative == item or relative.startswith(item + "/") for item in ignored)
+
+
 def _collect(root: Path) -> dict[str, dict]:
     """Return manifest records for every payload file and symlink under root."""
 
     entries: dict[str, dict] = {}
+    ignored = _ignored_untracked(root)
     for current, directories, filenames in os.walk(root, followlinks=False):
         current_path = Path(current)
+        directories[:] = [
+            name
+            for name in directories
+            if not _is_ignored(
+                (current_path / name).relative_to(root).as_posix(), ignored
+            )
+        ]
         for directory in directories:
             candidate = current_path / directory
             if directory == ".git":
@@ -66,6 +110,8 @@ def _collect(root: Path) -> dict[str, dict]:
         for filename in filenames:
             candidate = current_path / filename
             relative = candidate.relative_to(root).as_posix()
+            if _is_ignored(relative, ignored):
+                continue
             if relative == MANIFEST_NAME:
                 continue
             if candidate.is_symlink():

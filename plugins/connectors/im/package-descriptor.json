@@ -1,0 +1,113 @@
+{
+  "record_type": "package_descriptor",
+  "spec_version": "0.1",
+  "package": {
+    "manifest_ref": "plugin.manifest.json",
+    "id": "cyrene.connectors.im",
+    "version": "0.1.0",
+    "lineage": "cyrene.connectors.im"
+  },
+  "capabilities": [
+    {
+      "id": "message.connector.v1",
+      "interface_version": "1"
+    },
+    {
+      "id": "qq.client.v1",
+      "interface_version": "1",
+      "kind": "owner-scoped"
+    }
+  ],
+  "capability": {
+    "id": "message.connector.v1",
+    "interface_version": "1"
+  },
+  "connector": {
+    "family": "im",
+    "type": "qqnt-direct"
+  },
+  "profiles": [
+    {
+      "name": "qqnt-direct",
+      "connector": {
+        "family": "im",
+        "type": "qqnt-direct",
+        "compatibility_profile": null
+      },
+      "runtime": {
+        "kind": "configured-native-child",
+        "protocol": "cyrene.qq.host.v1",
+        "ipc": "inherited-stdio",
+        "external": {
+          "required": true,
+          "kind": "official_qq_host_child",
+          "artifact_ref": null
+        }
+      },
+      "target": {
+        "os": [
+          "linux"
+        ],
+        "architectures": [
+          "x86_64"
+        ],
+        "requires_exact_client_version": true
+      }
+    }
+  ],
+  "implementation": {
+    "artifact": {
+      "status": "NOT_PUBLISHED"
+    },
+    "entrypoint": "bin/cyrene-im"
+  },
+  "dependencies": {
+    "lock": {
+      "status": "NOT_REQUIRED"
+    }
+  },
+  "configuration": {
+    "schema_ref": "configuration.schema.json",
+    "digest": null
+  },
+  "runtime": {
+    "kind": "native-executable",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "entrypoint": "bin/cyrene-im",
+    "external": {
+      "required": true,
+      "kind": "official_qq_host_child",
+      "artifact_ref": "bin/cyrene-im"
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "capability_interface": [
+      "message.connector.v1@1",
+      "qq.client.v1@1"
+    ],
+    "os": [
+      "linux"
+    ],
+    "architectures": [
+      "x86_64"
+    ]
+  },
+  "integrity": {
+    "artifact_digest": null,
+    "archive_digest": null,
+    "signature_ref": null
+  },
+  "lifecycle": {
+    "rollback_identity": "cyrene.connectors.im@0.1.0-python-reference",
+    "cache_identity": "cyrene.connectors.im@0.1.0"
+  },
+  "provenance": {
+    "source_repository": "Cyrene-Plugins-Official",
+    "source_revision": null,
+    "builder": null,
+    "sbom_ref": null,
+    "attestation_ref": null
+  },
+  "publication_status": "CANDIDATE"
+}

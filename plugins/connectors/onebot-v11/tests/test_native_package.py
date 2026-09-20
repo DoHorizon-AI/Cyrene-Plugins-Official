@@ -58,13 +58,13 @@ def test_source_metadata_is_formal_native_with_explicit_python_rollback() -> Non
         ).read_text()
     )
 
-    assert manifest["version"] == "0.3.0"
+    assert manifest["version"] == "0.4.0"
     assert manifest["runtime"]["language"] == "csharp"
     assert manifest["runtime"]["launch"] == {
         "executable": "bin/cyrene-onebot-v11"
     }
     assert "requiresPython" not in manifest["compatibility"]
-    assert descriptor["package"]["version"] == "0.3.0"
+    assert descriptor["package"]["version"] == "0.4.0"
     assert descriptor["runtime"]["kind"] == "native-executable"
     assert rollback_manifest["version"] == "0.2.0"
     assert rollback_manifest["runtime"]["language"] == "python"
@@ -91,7 +91,7 @@ def test_native_candidate_contains_only_native_runtime_and_resolvable_refs(
     assert not (package_root / "src").exists()
 
     manifest = json.loads((package_root / "plugin.manifest.json").read_text())
-    assert manifest["version"] == "0.3.0"
+    assert manifest["version"] == "0.4.0"
     assert manifest["runtime"] == {
         **manifest["runtime"],
         "language": "csharp",

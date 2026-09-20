@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "b6e964dff3ebd5c8e85dde5e2f5c573d17f97a1084042f9320b4fbb1be036c92",
-      "size_bytes": 28479
+      "sha256": "6c48c270d35335ebc1460a1c667bd11d0736bbc4e11cbfbf124a1f31d0ceb130",
+      "size_bytes": 36611
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "8bd09c4839f3da5dc4bc3525ccaded04f0a13eb1a5e907a3270d0cec755135b4",
-      "size_bytes": 16535
+      "sha256": "c8d89307df1686cc2e46ce82a584d20215946b14f9c833e3b59c11fc87632e1c",
+      "size_bytes": 16980
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "a988a114814079e56114f4304384f2f6cabbaed0bbab99bd1f11a9d3f09b3812",
-      "size_bytes": 15127
+      "sha256": "ddfd0dcc6e0111f6f83c5032b6587036e1672fe9b14d2ff41e3f840a21422212",
+      "size_bytes": 15851
     },
     {
       "kind": "file",
@@ -676,9 +676,44 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "docs/plans/python-plugin-inventory-2026-09-18.md",
+      "sha256": "53521951e0fe025cba7c2daa3e90314c4f0b191f758b14abc1638bc4ee0e017c",
+      "size_bytes": 8612
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "manifests/plugin.manifest.schema.json",
       "sha256": "46c50d12e8a6524eb59999c98d227e748273804971a97b992828fd7125516d5b",
       "size_bytes": 6442
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/NATIVE_AOT_OPERATIONS.md",
+      "sha256": "a7cf2a6e2a8d85365bbc0fa31691577cc46a8fb6b8200f8c8692421c0f89868c",
+      "size_bytes": 1729
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/QQNT_DIRECT_API_MATRIX.md",
+      "sha256": "385067d45b515390a0e045463074e77da00d661b1d8a43a59183897e4ea4eb6d",
+      "size_bytes": 20187
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/QQNT_DIRECT_PROTOCOL.md",
+      "sha256": "09a5c0762d8656a41efd24f0c51203360c2eb8aa6e73b604a7c0c358db68ba17",
+      "size_bytes": 11257
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/QQNT_DIRECT_REAL_SMOKE.md",
+      "sha256": "e04db88a28ff338bae0df43ebbe4923edad30c53272618243002c74c28cc2273",
+      "size_bytes": 8170
     },
     {
       "kind": "file",
@@ -697,93 +732,254 @@
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/NATIVE_AOT_MIGRATION_PLAN.md",
-      "sha256": "7c3f125bc05bf5fbb97b8a9e3b7bbbd69320268d6d79e54da25f897773326c6d",
-      "size_bytes": 11941
+      "path": "plugins/connectors/im/README.md",
+      "sha256": "fb0b24b086451976eaf3c968b459373605f97a05d80766df56d0da8e4c3b7c29",
+      "size_bytes": 1497
     },
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/NATIVE_AOT_OPERATIONS.md",
-      "sha256": "35843f323e9a40185e21cf4393c46701d1aca2b3e3bc5b3afdce7b0f63162e08",
-      "size_bytes": 7656
+      "path": "plugins/connectors/im/behavior_matrix.json",
+      "sha256": "79bebf05e58f8d4cdd95987d4d2f538fef4d63836f0ff90cca55af7be09bc9ca",
+      "size_bytes": 17961
     },
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
-      "sha256": "8ca31bbb548e718929b7b74a1989b42fa5dd38ce7fa7cb727ada5364667de78e",
-      "size_bytes": 3151
+      "path": "plugins/connectors/im/configuration.schema.json",
+      "sha256": "a5dc705e7f9bd4dcb43451f94014dd3ffe4ea362b31ec7969a929015cb95f115",
+      "size_bytes": 8498
     },
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_API_MATRIX.md",
-      "sha256": "b517b910d6779793cdf7d8a4e797e6abdc027aaf52f3f246c6cda7996d43e52e",
-      "size_bytes": 20239
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_PROTOCOL.md",
-      "sha256": "c4df2ba3d5fcbf6b8c120ae49fe6f494fd24edb77e68b23d0b0b73546d33bf30",
-      "size_bytes": 11261
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/QQNT_DIRECT_REAL_SMOKE.md",
-      "sha256": "9b48df93c25e9af8552ca09bf45f94c05b36a436112490a35cf38efc56b6b95a",
-      "size_bytes": 8179
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "e66fd1785d3c8890c215d2db159c147469c56c3c23f0118aca3a13eae3e8f43f",
-      "size_bytes": 6817
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/behavior_matrix.json",
-      "sha256": "648d6b01dd0d9abd765cb5d5684bfcf7aa1327cabd045f4cf132b5945d888129",
-      "size_bytes": 40829
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/configuration.schema.json",
-      "sha256": "49a9c14e8ce3b7d2eb5048295795e8c7611fd42bfe13777b8015275d6b4fe3a2",
-      "size_bytes": 6669
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/contracts/v1/schema.json",
+      "path": "plugins/connectors/im/contracts/v1/schema.json",
       "sha256": "5ae0b2cb4207669d02705b84d02f71fa5062dfcfdaae3312e2eb620ff720ad15",
       "size_bytes": 153590
     },
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/im/package-descriptor.json",
+      "sha256": "eb381ab63aaebbe106db264ad7405bbdd8e41198268201b67fecb593fc2c4783",
+      "size_bytes": 2482
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/plugin.manifest.json",
+      "sha256": "0b4da7546a2aacc146a2a723dd7fec1e69447cf0a3400c320e60f0b6ea0022b6",
+      "size_bytes": 27112
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/pyproject.toml",
+      "sha256": "52129d131ed2de4c3aaf7fed39deb1f27337260c906592b789aed016c4f66018",
+      "size_bytes": 915
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/requirements.lock",
+      "sha256": "3bcaef8644388390c87280d77687c77749807ebcfa0ab3b4bde3e19ddd5b987f",
+      "size_bytes": 174
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/__init__.py",
+      "sha256": "1dc0f69f8f1553b13d3826cf329c921b9dceb1e513c65e25f5bccbe2ccd1320a",
+      "size_bytes": 2155
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/_generated/__init__.py",
+      "sha256": "6be6c329b89ea76b006e5c6cf54f42bbe14347020751db7ddf56913741d2d7a6",
+      "size_bytes": 78
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/_generated/message_connector_pb2.py",
+      "sha256": "2236b0ac3215bfaa1be71e0ffecaacd697264c01b8af981356640f9e62f4dd17",
+      "size_bytes": 6945
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/plugin.py",
+      "sha256": "94d60e602b33048f8966a7a2d02b5dc88b4affe05e1c726f0a9543a3c9412fa5",
+      "size_bytes": 4755
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/qqnt_direct.py",
+      "sha256": "c5f2b6f3a405742ada2b380e2eb4af8f5575c742950dc3182bc8a87f097607c3",
+      "size_bytes": 73751
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_discovery.py",
+      "sha256": "0bed23cb76540d818d13fe49d03ae2cdba7e2f378813787baa0fbcb07046f396",
+      "size_bytes": 10544
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_host.py",
+      "sha256": "71721d1cfaf86a4c23b4d6dc68ba28ce2372bae9648c299ee8018320647ca52f",
+      "size_bytes": 36130
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_operations.py",
+      "sha256": "c334c039f6ace27458984719652d495711f0caa34828d7bb3b0977ede0633b82",
+      "size_bytes": 41228
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_protocol.py",
+      "sha256": "d6ed0236fe8bcba3917e61b326d235d42ce5635ec613dd98fb936497ea4aa5df",
+      "size_bytes": 4083
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/support.py",
+      "sha256": "b8b8593b56fce8dc9564bb95ba89f2dab309b4eb4a3030c05c4d936a47691910",
+      "size_bytes": 2377
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tests/fixtures/fake_qq_host.py",
+      "sha256": "d70adc205936e653c2154a09df3bd4e3ea1d81d59c017a9f980202855212dd78",
+      "size_bytes": 21529
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tests/test_im_native_package.py",
+      "sha256": "1d3ae48f1ac7b01111a8bbd02da9afc6ac741a6f92385d5b65fa282a55ca33f7",
+      "size_bytes": 2569
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tests/test_package.py",
+      "sha256": "e03599c359db65ed65454549a19e8b680f9fcf259f47863cc8cc94ad48704914",
+      "size_bytes": 12892
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tests/test_qqnt_dependency_boundary.py",
+      "sha256": "4dad822f8665c2998ed4a14ffe0b4e3f1723a850caa876ffd93b231b60dadcb2",
+      "size_bytes": 1834
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tests/test_qqnt_direct.py",
+      "sha256": "790b0e7d7fa32328b87b774010dd0b67be204282ed1f00b814578f43e6faa55d",
+      "size_bytes": 57211
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tests/test_qqnt_host_tck.py",
+      "sha256": "e2ccab03fedbe1d54983257b07925c9b4b8d37ac9bdf39222bc64de06a6f6780",
+      "size_bytes": 10053
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tools/assemble_native_package.py",
+      "sha256": "fc2f271a34e1eecd0bf70a3c8be42f0ef6850d993c34c604c2fa20522b9815c1",
+      "size_bytes": 9590
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tools/assemble_package.py",
+      "sha256": "03681e49d1fe8509657f4488653ac504feb022c4a3b07971dba99aabb6fba2d5",
+      "size_bytes": 9666
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tools/verify_behavior_matrix.py",
+      "sha256": "954710a7851c3a4a1b04ef0e2a582069c8acd3cae868946b60030d790e396462",
+      "size_bytes": 5682
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/tools/verify_direct_dependency_boundary.py",
+      "sha256": "ec3f9326d9c90ae73da0b130b2bcd328dfb31e8ceadde508166fa099abee5bbe",
+      "size_bytes": 7957
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/NATIVE_AOT_MIGRATION_PLAN.md",
+      "sha256": "608f1fecf2fdf9b8a29ac089e204aa68c10feb28d12aa8885ea203e761cdc55f",
+      "size_bytes": 1818
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/NATIVE_AOT_OPERATIONS.md",
+      "sha256": "8c7bccb93a3c629a11538a073fa9c350bbd66d54b8c77401c832a5d5436b5a83",
+      "size_bytes": 1223
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
+      "sha256": "7f4778ac34432257634d5508d117f71fb2e49334309abd064b47640c05979dbf",
+      "size_bytes": 967
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/README.md",
+      "sha256": "93a00c15b161e5419eaf926f8974300dde07fb13a308bbee5a43bbab4486b3e8",
+      "size_bytes": 1158
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/onebot-v11/configuration.schema.json",
+      "sha256": "3d6790c6c7c38784ff3f9d04688df74e7b4ec630ba0733de2b33f0be5da9cf73",
+      "size_bytes": 1964
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/onebot-v11/package-descriptor.json",
-      "sha256": "620cf2cfd5dd03a19efef114a92ac8da955a176663cdf2d829d49c006c657f9b",
-      "size_bytes": 2884
+      "sha256": "2aa453b091d92338bbd9b5febae41fbe56d0847b330f043946bdf5901d9fd984",
+      "size_bytes": 2251
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/plugin.manifest.json",
-      "sha256": "4d18c10b2248d540cc95a8b8852770b66d42d5b23233ac93aa5e7d0cd544db0a",
-      "size_bytes": 27332
+      "sha256": "81c7b370a6c95d41b6f24d5fad639efea0948a778077e26d57656f8866104f1a",
+      "size_bytes": 2131
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/pyproject.toml",
-      "sha256": "cc668bfd6b98cf20a2216c3f0722587cd8ab2206f18ea282577fbf2c20ee74de",
-      "size_bytes": 994
+      "sha256": "f9fc30c2df24e0c6e68a4e722ced112fadf82c4b7d37206e28d004a9fc40c4b9",
+      "size_bytes": 888
     },
     {
       "kind": "file",
@@ -824,15 +1020,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/README.md",
-      "sha256": "b803f094aa9535cab918574c6c082a655f7ac9ad076e073aa85f97a3bce12977",
-      "size_bytes": 1872
+      "sha256": "03db005f08d7bc1a7ec26dd56caa7f010ebba4e4b3ea2e4e40945e11ba90b878",
+      "size_bytes": 1450
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/__init__.py",
-      "sha256": "49dd5bbe772997bb34823d144fd0111832b8e9157929eb6a541a74df25dfb160",
-      "size_bytes": 3576
+      "sha256": "0f883d4cc3b8316c4acd6b5715c08cf7a3188f32ffc68ee0e72659d85f4c59ce",
+      "size_bytes": 2142
     },
     {
       "kind": "file",
@@ -859,50 +1055,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/connector.py",
-      "sha256": "318b608c6c784917bf828d4d38b6e8d98b17e24e26e50c827a0617f0b78f8f06",
-      "size_bytes": 64027
+      "sha256": "82fe95df639240f8857568e400ef2e2b738998c0b144bd13d12f0e6cc4e6aea1",
+      "size_bytes": 63161
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/plugin.py",
-      "sha256": "b5aafbf5fbf5bc9b96ce5375d468012a93b68f833d2da0962404c720a5655858",
-      "size_bytes": 6332
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct.py",
-      "sha256": "0588f4dd2a2bd7b45c9616d5cff348292a4f6d9a3a646158a61e0f4efc9cad17",
-      "size_bytes": 73760
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_discovery.py",
-      "sha256": "0b4cd090197743275598fe82361d8b8f831938311bc29ad7a2864d502d04a26b",
-      "size_bytes": 10543
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_host.py",
-      "sha256": "f2f82260fbe068dbde30da3b5e870b4ace6ee9731a3cc805849c1be36bf4ecd5",
-      "size_bytes": 36129
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_operations.py",
-      "sha256": "d28a872b4549739ffe1f9eeb7888083ebe9294ee5e89894b2f5f7d0cc0644fb5",
-      "size_bytes": 41227
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/qqnt_direct_protocol.py",
-      "sha256": "14419506a62d6cb85e234750f77f4ca8fe99a7927b5a96b681574c5ce720aabe",
-      "size_bytes": 4082
+      "sha256": "30136fb741ca78728b076e1e0eb4c4ab7432eebd13bfe9bde64b95d253f400e0",
+      "size_bytes": 5021
     },
     {
       "kind": "file",
@@ -910,13 +1071,6 @@
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/transport.py",
       "sha256": "ee2ed675fc0cf7900ae39da4a8c34c2320601346228aea6869a909d5b1ec4292",
       "size_bytes": 32245
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/tests/fixtures/fake_qq_host.py",
-      "sha256": "0d08304dd9a4587bbfdab2b7e6c8d8a46461b61a9eb225749864b968ba331346",
-      "size_bytes": 21528
     },
     {
       "kind": "file",
@@ -929,8 +1083,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_connector.py",
-      "sha256": "ac8c21d268001ca202a4920074dc40d8c1c512f2d5b04d9d75e40c5f4825722f",
-      "size_bytes": 23214
+      "sha256": "fca8fe3de5ab4458d99d5b7897a593fc60eeec6a5ab3b60749fa5812189deb6b",
+      "size_bytes": 23049
     },
     {
       "kind": "file",
@@ -943,36 +1097,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_native_package.py",
-      "sha256": "56917ccb9da03b431cf73afb759009808bb21cd4995e36a1d793260de9bf6fce",
+      "sha256": "c8d77b16a8050b2e71bad44788b3318f272114513cdf2f3802a2b8b0e15f5b34",
       "size_bytes": 6599
     },
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/tests/test_package.py",
-      "sha256": "60ea530bb7c7731593901517eba81dc8c667b8d1368788c00b63d92ceafede39",
-      "size_bytes": 12941
+      "path": "plugins/connectors/onebot-v11/tests/test_real_parity.py",
+      "sha256": "7a85378a14c6c229eb9d10aa73722b86c17a9a3896ec1615db121b10c044411e",
+      "size_bytes": 2803
     },
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/tests/test_qqnt_dependency_boundary.py",
-      "sha256": "ea61c6bcd83d31e789d3cceb6a3f4282fde33f33533a9a16b5db27d818696fa2",
-      "size_bytes": 1850
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
-      "sha256": "e870958908a07eba95d5f5cf777533487df07b24d780141561b12489a25f0be3",
-      "size_bytes": 57242
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/tests/test_qqnt_host_tck.py",
-      "sha256": "5437e389e2d586e6aacf875ff539668bcf6e7327a4d2d8f0ca7d058c37d8036b",
-      "size_bytes": 10060
+      "path": "plugins/connectors/onebot-v11/tests/test_reference_artifact.py",
+      "sha256": "4bd27cde737f7c07a5bb6aa59f98a8d59b43cd88937a54f8f301b0ce5aace879",
+      "size_bytes": 2915
     },
     {
       "kind": "file",
@@ -985,15 +1125,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/assemble_native_package.py",
-      "sha256": "8eadc468c4969b6f898a02d4d12127e7c293eb2408b25978f6fca9dc26c6288c",
-      "size_bytes": 10456
+      "sha256": "f4d8bb60f73fb8f3dfd334252265860fc320023c2a5db42a90d82661f11516a5",
+      "size_bytes": 10036
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/assemble_package.py",
-      "sha256": "e6a313f6ddd4694425720c8dea5cb8f76868feda848eff066ea42d10b8742ba5",
-      "size_bytes": 7937
+      "sha256": "58d899a66ba7d421b77909d6de2f08aeb94a00855fe6a174a9a97dff29a8fa0c",
+      "size_bytes": 5204
     },
     {
       "kind": "file",
@@ -1008,20 +1148,6 @@
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
       "sha256": "a7ea1c8fa9dbd0b0cc69b8983b9ebf1a0551274334de81defd067150c4b6b279",
       "size_bytes": 2273
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/tools/verify_behavior_matrix.py",
-      "sha256": "1d5820ee07f9faa2f5530c3455046c36b52dd61bd1c1364ec433128c079486dc",
-      "size_bytes": 16477
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/connectors/onebot-v11/tools/verify_direct_dependency_boundary.py",
-      "sha256": "d6cf4f8a7a7385e71dd296718a02d10da05ac2b8047f826076806e49b1481c02",
-      "size_bytes": 7973
     },
     {
       "kind": "file",
@@ -1390,16 +1516,121 @@
     {
       "kind": "file",
       "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/Cyrene.OneBot.V11.Core.csproj",
-      "sha256": "64c91ce601404d321dfabe8a40d10622b1cd5fc5f253f516849d0cb3b71ee080",
-      "size_bytes": 446
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/Cyrene.Im.Core.csproj",
+      "sha256": "37f88a4c1d2c8e19d7928fe68ee692d62255cee67996368932cb7f9feffdc260",
+      "size_bytes": 516
     },
     {
       "kind": "file",
       "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/DirectInvocationDispatcher.cs",
-      "sha256": "19c0a00cf6b9f78011bf2d697d05520338b298bacd65e44c946c053bdfc7c14f",
-      "size_bytes": 5841
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectEventSubscriptionRegistry.cs",
+      "sha256": "00e1c205579a90df1ac702a5cb7499971290012af2675c786a34d4dad3f8eb9c",
+      "size_bytes": 12478
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectInvocationDispatcher.cs",
+      "sha256": "6735eae11c90388667c8f003217eca02e20ef99e7165a23196c35469f734ffff",
+      "size_bytes": 26382
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectMessageMapper.cs",
+      "sha256": "289b73ae4b5d01a104137ed62859d1cd9d1eff3eb39e3d2243f22a4aab1e8255",
+      "size_bytes": 36324
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectProfile.cs",
+      "sha256": "31b2b157833c2e0c75e0910c85e74713fc592134cc011a5cb6ef7ed863f4370d",
+      "size_bytes": 12190
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostClient.cs",
+      "sha256": "e13a3ddf8fab09fd2eae6c45419804e8cfe70835d2157a68346dcee0d1063a93",
+      "size_bytes": 43100
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostInstallation.cs",
+      "sha256": "e2ebf1cf1d6052d8c636db22b4f744354b50ada913a02c730ccfe5620e31d728",
+      "size_bytes": 11794
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostJsonModels.cs",
+      "sha256": "c91a12df2701d49352e249485f74b50acdb1701e7eb3bed1d0243ffb30159bbf",
+      "size_bytes": 15972
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostOperationRegistry.cs",
+      "sha256": "38394dcb45eed8664be358bc9d4ca1254aebef9ed2d3f6b9e1b7ca2b89ceeb93",
+      "size_bytes": 11781
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostOperationValidator.cs",
+      "sha256": "06a333c72917265f53da3580c28349a1b9e37f0fc6d539e3f4dc25db879084bf",
+      "size_bytes": 27835
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostProtocol.cs",
+      "sha256": "560f68eaa8f0a307095c4df91ce1bf830da78651e0e02f1487df1b65476f4023",
+      "size_bytes": 5452
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Host/Cyrene.Im.Host.csproj",
+      "sha256": "b871b7977107c9d05a9ddb84b90e818c4ce5d90cc5b0d010f454fcd72206d039",
+      "size_bytes": 681
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Host/Program.cs",
+      "sha256": "8bf67fd42cccbcbd7f3272e71feb65b7da108de7e7daf582e54625ec0c35c056",
+      "size_bytes": 6121
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Tests/Cyrene.Im.Tests.csproj",
+      "sha256": "c42d39183a859ef19afaa6f6e9317bd773480e32458b094b844d3b42fc9b7558",
+      "size_bytes": 793
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Tests/DispatcherTests.cs",
+      "sha256": "d595bcd689df46e752b92947f66761c36d263e27dd80728f1e7d8b77a9353a2f",
+      "size_bytes": 35257
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Im.Tests/QqHostParityTests.cs",
+      "sha256": "cfb67ebd0f5362ffa77d85a75fbea93519acc70524c81e068f0fd8c9e8f52b8d",
+      "size_bytes": 17329
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/Cyrene.OneBot.V11.Core.csproj",
+      "sha256": "4c348d6bb0fa43d379369a7dc2d5bc1fa2f5c9821968436bfef207a9b698ea3e",
+      "size_bytes": 523
     },
     {
       "kind": "file",
@@ -1412,8 +1643,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotEventSubscriptionRegistry.cs",
-      "sha256": "ba203e7894b0053fccb751c66b255ee3130ebf0d753295351b049e822cf7ff57",
-      "size_bytes": 13007
+      "sha256": "9d1f8f25470df389672bc16cc7f36c895d30070721f8b12f5eb63b3a26e366ed",
+      "size_bytes": 13040
     },
     {
       "kind": "file",
@@ -1426,8 +1657,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotInvocationDispatcher.cs",
-      "sha256": "ffba5cbafda322e685c87eaa44441253e80723ebcf2b4e9a46b7bb5e47ecd719",
-      "size_bytes": 11472
+      "sha256": "0ff66dfff93f3e51c54860db3e8918e39edad8436d596c0985b63016bcbf3f50",
+      "size_bytes": 11505
     },
     {
       "kind": "file",
@@ -1447,8 +1678,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotProfile.cs",
-      "sha256": "9e6b3cb5bdd75bf0ef6af10f99c3ef493e45b9d4a2a4420b3eb0d6b2bab1b430",
-      "size_bytes": 11669
+      "sha256": "34260316c5e90f46beb379a9e05e75d9b2f35428fef5477d2318514ba32d1489",
+      "size_bytes": 10580
     },
     {
       "kind": "file",
@@ -1474,121 +1705,30 @@
     {
       "kind": "file",
       "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectEventSubscriptionRegistry.cs",
-      "sha256": "5f9262bb01daad7e5ed925b5db466ce6973682eb135bd697bb3e6bd04a514188",
-      "size_bytes": 12452
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectInvocationDispatcher.cs",
-      "sha256": "a8d93ca0670c790cddf176bf1d708d7510be55bfc92463e9ccc83ca7fa9e982f",
-      "size_bytes": 26356
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectMessageMapper.cs",
-      "sha256": "942102a2c349ce703ad7ef35ee04dec2a450d325dad043c39807027761986c1b",
-      "size_bytes": 36331
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqDirectProfile.cs",
-      "sha256": "d47bc328c8c90ca4999d91cff5c4c6157ec1f9dd21d1a3d361cda41fe117f6d1",
-      "size_bytes": 12197
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostClient.cs",
-      "sha256": "1710cdcdaba29867122c65e2ba39ef6f1d58cc98e1be4a1ec07bed6a9e7f7ed0",
-      "size_bytes": 43107
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostInstallation.cs",
-      "sha256": "083f2f2f4d5bc5731bfd2168dec81289059da95c68bfb3141051d5b58633807d",
-      "size_bytes": 11801
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostJsonModels.cs",
-      "sha256": "2ef37013239b2f45769538aebbeebe56f8b00d5e70376ee396f61090f0402021",
-      "size_bytes": 15979
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostOperationRegistry.cs",
-      "sha256": "4441dc3b07a69d72663818b64b3c2da0565299228314da698c28443c2d600d1b",
-      "size_bytes": 11788
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostOperationValidator.cs",
-      "sha256": "e52ad84440ffb144dcab2bea99bdc690a313af66920b68a7f27410672861762d",
-      "size_bytes": 27842
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/QqHostProtocol.cs",
-      "sha256": "0dc27c6a7556067073edc2da5cbee37c4cad0f48570499ec1aa4156c725aed2d",
-      "size_bytes": 5459
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/RuntimeMetadata.cs",
-      "sha256": "4069a7a1afaf3a34aa2f82fc086c4a3df9ca5c09a2c6753cbd342eeeea12e280",
-      "size_bytes": 1662
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Cyrene.OneBot.V11.Host.csproj",
-      "sha256": "27995e89441dd84282953e03b3c16334a940df024514dd6b7f915d6ad31f5478",
-      "size_bytes": 613
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/DirectPluginRuntimeService.cs",
-      "sha256": "21f7da8c081701fb354e34a22a0062f572e990f392ce123e1582db5fca3bce5a",
-      "size_bytes": 4595
+      "sha256": "0c6762d7fdafe1551b2e819b46dd173cd9ed16b3a94bd7d4c0395fc31e6d3de7",
+      "size_bytes": 710
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Program.cs",
-      "sha256": "59b2ead36111bd42ac37042cb870a8a1987184d40478dcd454bd6a8d1f304626",
-      "size_bytes": 8386
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/RuntimeLaunchAnnouncement.cs",
-      "sha256": "1b716405aad6987ffa273a9b535d22ee1d6ab1974f732b54650d6e3282617483",
-      "size_bytes": 2178
+      "sha256": "5a78d7785b429ae04ea5f5d6be5ec5e231bded10a9dd38d71975ea440dad61d5",
+      "size_bytes": 7656
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj",
-      "sha256": "2889e4718d250bd82767b915acc3cf7da21c830a16a7562a332dfe4ffe69dfca",
-      "size_bytes": 712
+      "sha256": "72f4d29b46cbd1a108ab867d169e0dfd85c0dcd55c35ade65b763f6cb221756c",
+      "size_bytes": 809
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/DispatcherTests.cs",
-      "sha256": "684b47ca92e2d8c0cc9d85c5d6e7d561330264e41f00fa6800162822ff79c450",
-      "size_bytes": 35351
+      "sha256": "a6a0f27126293a7981c881f200450d4c2f006585e3eebdb08fc7a724641ff7ef",
+      "size_bytes": 3751
     },
     {
       "kind": "file",
@@ -1601,22 +1741,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/OneBotCoreTests.cs",
-      "sha256": "871d46d8c032349f3934dc37b32940378ab2710f3404bd363498a754b3e9153f",
-      "size_bytes": 31893
+      "sha256": "1daef1a40592808b71682df06bf255370d30288ba9077b4bca470cdf7dbfecfa",
+      "size_bytes": 31930
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/OneBotParityTests.cs",
-      "sha256": "3ab6bb94968de2afacd1bca99d46f322be64d247e2d813e045df12b82889d65f",
-      "size_bytes": 22462
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/QqHostParityTests.cs",
-      "sha256": "2ff5749606196f1e620fb5239c60254ef7a431ad0832d75b73eec3ae834874bd",
-      "size_bytes": 17352
+      "sha256": "c23722176fcbfa87c2b6771910c37e9b5f30ee428ec85fd1e826ab0ec38ef7d7",
+      "size_bytes": 22483
     },
     {
       "kind": "file",
@@ -1680,6 +1813,41 @@
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.NativeLib/PluginNativeAbi.cs",
       "sha256": "40e63e7ac72d909143c0981f86754e3eec242cab225c207d22b472dba725ea40",
       "size_bytes": 18205
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.RuntimeHost/Cyrene.Plugin.RuntimeHost.csproj",
+      "sha256": "4b53e527917c3f116093a96c555c609ffd1d30ee1b1c3f92fb4f175f607a5e40",
+      "size_bytes": 506
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.RuntimeHost/DirectInvocationDispatcher.cs",
+      "sha256": "f798bce509d77788dc6998b5d22826d87216abd80bd86b6aef6c0be8e2a1a309",
+      "size_bytes": 5844
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.RuntimeHost/DirectPluginRuntimeService.cs",
+      "sha256": "fdc62a167d04bbc673274f761b4cd2429a0bb5e34b34aadaf80020ab96d605e8",
+      "size_bytes": 4568
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.RuntimeHost/RuntimeLaunchAnnouncement.cs",
+      "sha256": "888f62ccfa9c889f91a4474871395a75f07253893939bcf8f94578c6c469a205",
+      "size_bytes": 2181
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/dotnet-native-aot/Cyrene.Plugin.RuntimeHost/RuntimeMetadata.cs",
+      "sha256": "c0734e67c5b3f861e36e303059e26221aafa3e4818ad364feb741c1bc8b998a8",
+      "size_bytes": 1665
     },
     {
       "kind": "file",
@@ -4126,6 +4294,13 @@
     },
     {
       "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/assemble_onebot_reference.py",
+      "sha256": "4dedaa11c8c68e1a3a17cd9c2e2c9009b4f3e8882b1c7ac2ae4ffbf85a5a1041",
+      "size_bytes": 10094
+    },
+    {
+      "kind": "file",
       "mode": "100644",
       "path": "tools/ci/assert_no_test_skips.py",
       "sha256": "2b7b25772e76bf48a68936b198ed8efc4268d1bfc60a2013c09c0e6fc7a34e3a",
@@ -4155,9 +4330,9 @@
     {
       "kind": "file",
       "mode": "100755",
-      "path": "tools/ci/exercise_onebot_native_qqnt.py",
-      "sha256": "a255cc85f6da255d384b5ab4dc1fe01314ad47d905271275b247b6a949f5780c",
-      "size_bytes": 16094
+      "path": "tools/ci/exercise_im_native_qqnt.py",
+      "sha256": "2149f29635d32625146c820a5850a2a1127371b497d82ef6511878f5dfcf5dff",
+      "size_bytes": 16066
     },
     {
       "kind": "file",
@@ -4165,6 +4340,27 @@
       "path": "tools/ci/exercise_onebot_native_transports.py",
       "sha256": "4f984065166c94f5fb86d201c37662d3c4e13670a750c2210adb39b8e421b4b4",
       "size_bytes": 22416
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/im_real_smoke.py",
+      "sha256": "763cf5841d499b4a5a8b2dff30884b5f5fbdebc654f8b7b8b620b364139cbc5b",
+      "size_bytes": 22928
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/onebot_real_smoke.py",
+      "sha256": "ba09df86d5e51234d7d85add00b26558cbffe13498fd22df7d3f04a36ac2f8c1",
+      "size_bytes": 17119
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/ci/onebot_reference_parity.py",
+      "sha256": "56455f5150465c2210696901e77ce04e687d1e549cfd005be875766e2156f17a",
+      "size_bytes": 7687
     },
     {
       "kind": "file",
@@ -4189,17 +4385,10 @@
     },
     {
       "kind": "file",
-      "mode": "100644",
-      "path": "tools/ci/qqnt_direct_real_smoke.py",
-      "sha256": "ab015804cda2e9e474518015e3a38f44ed5dc67d8320886a79158eedcde54614",
-      "size_bytes": 22987
-    },
-    {
-      "kind": "file",
       "mode": "100755",
       "path": "tools/ci/update_source_manifest.py",
-      "sha256": "88040a439f62b511a7d7ac0a66cd6ac625f2b80030db83d910c6867283efaf07",
-      "size_bytes": 8126
+      "sha256": "8849ea407cdd17059bb0a9e8de3c7484f3a709550984231b8e7e2c93bbd36d51",
+      "size_bytes": 9462
     },
     {
       "kind": "file",
@@ -4212,8 +4401,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/verify_source_manifest.py",
-      "sha256": "9f96314cd66884887714ec1f537f4b6098e98a40ec1c95dd53a02b1f2e462cae",
-      "size_bytes": 12344
+      "sha256": "698c826abaf03c3542147163500e529030eb3a9917ca3121ca8052d78055f0ee",
+      "size_bytes": 13686
     }
   ],
   "history_policy": "EMPTY_HISTORY_REQUIRED",
@@ -4233,7 +4422,7 @@
     },
     {
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "e66fd1785d3c8890c215d2db159c147469c56c3c23f0118aca3a13eae3e8f43f"
+      "sha256": "93a00c15b161e5419eaf926f8974300dde07fb13a308bbee5a43bbab4486b3e8"
     }
   ],
   "schema_version": "cyrene.public-source-manifest.v1",

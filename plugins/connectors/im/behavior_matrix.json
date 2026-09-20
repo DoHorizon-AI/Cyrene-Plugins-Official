@@ -1,0 +1,602 @@
+{
+  "schema_version": 1,
+  "baseline": {
+    "suite": "plugins/connectors/im/tests",
+    "collection_command": "PYTHONPATH=plugins/connectors/im/src:sdk/python/cyrene_plugin_runtime/src python3 -m pytest --collect-only -q plugins/connectors/im/tests",
+    "function_count": 71,
+    "collected_case_count": 90,
+    "module_case_counts": {
+      "test_im_native_package.py": 1,
+      "test_package.py": 4,
+      "test_qqnt_dependency_boundary.py": 2,
+      "test_qqnt_direct.py": 71,
+      "test_qqnt_host_tck.py": 12
+    }
+  },
+  "evidence_catalog": {
+    "ci:public-ci / dotnet-native-aot": {
+      "kind": "rid-native-aot",
+      "path": ".github/workflows/public-ci.yml"
+    },
+    "ci:public-ci / im-package": {
+      "kind": "clean-im-package",
+      "path": ".github/workflows/public-ci.yml"
+    },
+    "ci:public-ci / im-qq-host-tck": {
+      "kind": "qq-host-contract-tck",
+      "path": ".github/workflows/public-ci.yml"
+    },
+    "ci:public-ci / source-hygiene": {
+      "kind": "source-manifest-and-boundary",
+      "path": ".github/workflows/public-ci.yml"
+    }
+  },
+  "rows": [
+    {
+      "id": "test_im_native_package.py::test_im_native_candidate_contains_only_native_runtime_and_resolvable_refs",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-package",
+        "ci:public-ci / dotnet-native-aot"
+      ]
+    },
+    {
+      "id": "test_package.py::test_assembled_package_contains_runtime_and_resolvable_schema_refs",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-package",
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_package.py::test_package_archive_is_self_contained",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-package",
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_package.py::test_installed_artifact_runs_two_direct_bindings_without_source_checkout",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-package",
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_package.py::test_package_builder_rejects_nonempty_output",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-package",
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_qqnt_dependency_boundary.py::test_current_direct_dependency_boundary_is_clean",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_qqnt_dependency_boundary.py::test_boundary_rejects_forbidden_import_and_lineage",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_manifest_exposes_operation_specific_output_contracts",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_stdio_frame_is_big_endian_and_rejects_malformed_payloads",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_explicit_installation_discovery_canonicalizes_operator_paths",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_installation_manifest_requires_one_exact_candidate",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_installation_manifest_rejects_build_drift",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_host_requires_manifest_paths_to_match_binding_config",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_api_matrix_covers_every_fixed_operation",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_operation_schema_fields_match_the_executable_allow_list",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_self_status_and_callback_operation_metadata_match_the_qq_docs",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_config_rejects_onebot_transport_fields",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_config_requires_exact_host_abi",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_extension_rejects_undeclared_parameter_names",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_restart_supervision_settings_are_bounded",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_extension_rejects_cross_family_parameter_names",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_extension_rejects_invalid_typed_parameters_before_host_start",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_extension_rejects_deep_nested_json_before_host_start",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_hello_incompatibility_fails_closed",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_failed_subscription_does_not_leave_a_stale_emitter",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_protocol_failure_marks_host_unavailable",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_host_diagnostics_redact_credential_like_values",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_binding_data_directory_rejects_symlink",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_login_state_machine_requires_login_then_becomes_ready",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_login_failure_and_account_mismatch_fail_closed",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_password_login_updates_session_readiness",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_crashed_host_recovers_next_operation_without_replaying_the_failure",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_crash_recovery_budget_opens_binding_local_circuit",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_fake_host_start_send_receive_and_shutdown_without_tcp_listener",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_plugin_entrypoint_routes_qqnt_direct_profile_to_direct_adapter",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_plugin_reconfiguration_closes_the_previous_direct_host",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_extension_is_fixed_and_uses_explicit_qq_client_contract",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_host_result_boundary_rejects_unsafe_results",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_host_result_boundary_preserves_optional_null_fields",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_send_result_requires_native_message_identity",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_group_invite_approval_uses_fixed_native_notification_operation",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_every_registered_qq_operation_has_a_fixed_fake_host_dispatch",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_semantic_fake_host_preserves_planned_mapping_shapes",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_canonical_protobuf_send_maps_directly_to_native_message",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_canonical_send_preserves_qq_peer_and_delivery_facts",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_inbound_preserves_all_qq_peer_identity_facts",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_outbound_qq_peer_identity_facts_are_closed_and_unique",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_session_actions_are_not_duplicated_by_implicit_bootstrap",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_send_completion_callback_is_typed_and_request_correlated",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_event_boundary_rejects_unknown_and_cross_generation_events",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_malformed_canonical_protobuf_is_rejected_at_invoke_boundary",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_two_bindings_and_restart_keep_generation_and_events_isolated",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_multiple_subscriptions_share_one_native_listener",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_binding_data_directory_cannot_be_reused_by_another_binding",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_one_binding_cannot_start_two_active_host_processes",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_timeout_cancellation_and_late_response_are_generation_safe",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_cancellation_sends_cancel_and_ignores_late_response",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_out_of_order_and_duplicate_responses_are_correlated",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_duplicate_events_are_emitted_once",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_media_and_file_references_remain_bounded_and_typed",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_shutdown_reaps_binding_process_group",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_cancellation_is_rejected_before_host_dispatch",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_direct_source_does_not_create_tcp_listener",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_negotiates_exact_hello_and_dispatches_all_fixed_operations",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_rejects_passthrough_and_callback_only_requests",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_correlates_callbacks_to_the_current_request",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_cancellation_ignores_late_response",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_fails_closed_on_incompatible_host_hello",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_assigns_a_new_generation_after_restart",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_rejects_a_child_tcp_listener",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_stops_a_listener_opened_after_startup",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    }
+  ]
+}

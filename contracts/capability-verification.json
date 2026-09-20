@@ -77,23 +77,23 @@
     },
     {
       "capability": "qq.client.v1",
-      "implementation": "cyrene.connectors.onebot-v11",
+      "implementation": "cyrene.connectors.im",
       "verification_level": "IMPLEMENTATION_VERIFIED",
       "execution_mode": "SIMULATED",
       "evidence": [
         {
-          "observed_at": "2026-09-15",
-          "environment": "linux / Python 3.12 / independently authored fake QQ Host over inherited stdio",
-          "command": "python3 -m pytest -q plugins/connectors/onebot-v11/tests/test_qqnt_direct.py",
-          "result": "protocol framing, direct mapping, multi-binding isolation, generation restart, cancellation, and shutdown exercised",
+          "observed_at": "2026-09-19",
+          "environment": "linux / .NET 10 / Cyrene.Im.Tests with independently authored fake QQ Host over inherited stdio",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Im.Tests/Cyrene.Im.Tests.csproj --configuration Release --no-restore",
+          "result": "28 passed; fixed operation registry, closed parameter/result validation, bounded framing, fake Host dispatch, cancellation, recovery, callback correlation, and shutdown exercised",
           "notes": "No authorized exact QQ build or official native Host was available; all real QQ API rows remain NOT_RUN."
         },
         {
-          "observed_at": "2026-09-15",
-          "environment": "linux / Python 3.12 / independently authored fake QQ Host over inherited stdio / public-ci qq-host-tck",
-          "command": "python3 -m pytest -q plugins/connectors/onebot-v11/tests/test_qqnt_host_tck.py",
-          "result": "fixed operation dispatch, passthrough rejection, callback correlation, cancellation and late-response handling, fail-closed hello validation, and generation restart exercised",
-          "notes": "This is a protocol contract TCK, not an official QQ runtime smoke; no authorized exact QQ build or native Host was available, so all real QQ API rows remain NOT_RUN."
+          "observed_at": "2026-09-19",
+          "environment": "linux / .NET 10 / OneBot migration regression suite with the IM core referenced",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.OneBot.V11.Tests/Cyrene.OneBot.V11.Tests.csproj --configuration Release --no-restore",
+          "result": "66 passed; QQ dispatcher session bootstrap, canonical send/event mapping, callback and fail-closed behavior remain covered during the split",
+          "notes": "This is simulated/fake-host evidence, not an authorized exact QQ runtime smoke."
         }
       ]
     },
@@ -265,6 +265,21 @@
           "command": "python3 -m pytest -q plugins/connectors/wecom/tests",
           "result": "13 passed; target/content mapping, mentions and markdown, delivery status mapping, token caching and one-shot refresh, typed fail-closed validation, proto round trip, activation environment, and the urllib transport end to end",
           "notes": "Outbound send_message only; inbound callbacks and approvals are not in v1. No live WeCom tenant has been exercised."
+        }
+      ]
+    },
+    {
+      "capability": "message.connector.v1",
+      "implementation": "cyrene.connectors.im",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-19",
+          "environment": "linux / .NET 10 / QQ/IM Native AOT core with fake QQ Host",
+          "command": "dotnet test runtime/dotnet-native-aot/Cyrene.Im.Tests/Cyrene.Im.Tests.csproj --configuration Release --no-restore",
+          "result": "28 passed; canonical QQ message send and QQ event projection remain covered by the migrated core tests",
+          "notes": "No real QQ client or Product consumer was exercised."
         }
       ]
     }

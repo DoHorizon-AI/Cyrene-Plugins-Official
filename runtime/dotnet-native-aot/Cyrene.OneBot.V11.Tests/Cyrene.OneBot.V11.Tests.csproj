@@ -15,5 +15,6 @@
   <ItemGroup>
     <ProjectReference Include="../Cyrene.OneBot.V11.Core/Cyrene.OneBot.V11.Core.csproj" />
     <ProjectReference Include="../Cyrene.OneBot.V11.Host/Cyrene.OneBot.V11.Host.csproj" />
+    <ProjectReference Include="../Cyrene.Plugin.RuntimeHost/Cyrene.Plugin.RuntimeHost.csproj" />
   </ItemGroup>
 </Project>
