@@ -1,0 +1,67 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.serving.vllm-runtime",
+  "name": "vLLM Serving Runtime",
+  "version": "0.1.0",
+  "description": "Runs the vLLM accelerator process for one Reactor deployment and publishes validated model imports into the Platform artifact plane.",
+  "kind": "gateway-runtime",
+  "capabilities": [
+    "execution.engine.v1"
+  ],
+  "methods": [
+    {
+      "name": "import_model",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/ImportRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ImportResponse"
+    },
+    {
+      "name": "start",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/StartRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ExecutionResponse"
+    },
+    {
+      "name": "inspect",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ExecutionResponse"
+    },
+    {
+      "name": "stop",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ExecutionResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "vllm_runtime:main",
+    "protocol": "cyrene.serving.runtime.http.v1",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "vllm_runtime.py",
+        "serve"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": [
+      "linux"
+    ],
+    "accelerators": [
+      "nvidia-cuda"
+    ]
+  },
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

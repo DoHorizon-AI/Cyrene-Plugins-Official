@@ -17,6 +17,7 @@ stop. It never decides composition or lineage.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 import secrets
@@ -32,12 +33,19 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from cy_artifacts import ArtifactKind, LocalArtifactProvider
 from cy_artifacts import ArtifactRef as PlatformArtifactRef
-from cy_artifacts import LocalArtifactProvider
 
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 TERMINAL_RELEASED = "RELEASED"
 DEFAULT_READY_TIMEOUT = 900.0
+WEIGHT_SUFFIXES = (".safetensors", ".bin", ".pt", ".pth", ".gguf")
+TOKENIZER_FILES = (
+    "tokenizer.json",
+    "tokenizer.model",
+    "spiece.model",
+    "tokenizer_config.json",
+)
 
 
 class ServingRuntimeError(RuntimeError):
@@ -71,6 +79,72 @@ def _model_version_artifact(document: dict[str, Any]) -> dict[str, Any]:
     return value
 
 
+def _manifest_digest(root: Path, files: list[Path]) -> str:
+    """Digest the sorted relative path and size manifest of an import."""
+
+    lines = []
+    for path in sorted(files, key=lambda item: item.relative_to(root).as_posix()):
+        lines.append(f"{path.relative_to(root).as_posix()}\0{path.stat().st_size}")
+    return "sha256:" + hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def _chat_template_present(root: Path) -> bool:
+    if (root / "chat_template.jinja").is_file() or (root / "chat_template.json").is_file():
+        return True
+    tokenizer_config = root / "tokenizer_config.json"
+    if not tokenizer_config.is_file():
+        return False
+    try:
+        document = json.loads(tokenizer_config.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    return isinstance(document, dict) and bool(document.get("chat_template"))
+
+
+def _license_name(root: Path) -> str | None:
+    for candidate in sorted(root.iterdir()):
+        if not candidate.is_file():
+            continue
+        upper = candidate.name.upper()
+        if upper.startswith(("LICENSE", "LICENCE", "COPYING", "NOTICE")):
+            try:
+                first_line = candidate.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                return None
+            return first_line[0][:200] if first_line else candidate.name
+    return None
+
+
+def _validate_model_directory(root: Path) -> tuple[dict[str, bool], list[str]]:
+    """Check the minimum portable text-model file set. | 校验最小可移植文本模型文件集。"""
+
+    files = [path for path in root.rglob("*") if path.is_file() and not path.is_symlink()]
+    issues: list[str] = []
+    weights = any(path.name.endswith(WEIGHT_SUFFIXES) for path in files)
+    config = (root / "config.json").is_file()
+    tokenizer = (root / "tokenizer.json").is_file() or (root / "tokenizer.model").is_file() or (
+        (root / "vocab.json").is_file() and (root / "merges.txt").is_file()
+    )
+    chat_template = _chat_template_present(root)
+    if not weights:
+        issues.append("no supported weight file was found")
+    if not config:
+        issues.append("config.json is missing")
+    if not tokenizer:
+        issues.append("no supported tokenizer file was found")
+    if not chat_template:
+        issues.append("no chat template was found; the model may not accept conversations")
+    return (
+        {
+            "weights": weights,
+            "config": config,
+            "tokenizer": tokenizer,
+            "chat_template": chat_template,
+        },
+        issues,
+    )
+
+
 class ServingRuntime:
     """Owns one accelerator process per deployment."""
 
@@ -92,8 +166,10 @@ class ServingRuntime:
         self.poll_interval = poll_interval
         self.executions = home / "executions"
         self.models = home / "models"
+        self.credentials = home / "credentials"
         self.executions.mkdir(parents=True, exist_ok=True)
         self.models.mkdir(parents=True, exist_ok=True)
+        self.credentials.mkdir(parents=True, exist_ok=True, mode=0o700)
         self._processes: dict[str, subprocess.Popen] = {}
         self._lock = threading.RLock()
 
@@ -117,6 +193,146 @@ class ServingRuntime:
         pending = path.with_suffix(".pending")
         pending.write_text(json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         pending.replace(path)
+
+    # ── model import ────────────────────────────────────────────────────
+
+    def _credential(self, credential_ref: str) -> str:
+        """Resolve one CredentialRef from the runtime's private store.
+
+        The ref itself is never a secret: only its digest names the mode-0600
+        file that holds the token, and the token never appears in a response.
+        """
+
+        marker = self.credentials / hashlib.sha256(credential_ref.encode("utf-8")).hexdigest()
+        if not marker.is_file() or marker.stat().st_mode & 0o077:
+            raise ServingRuntimeError(
+                "SERVING_CREDENTIAL_REF_UNRESOLVED",
+                "The referenced credential is not installed for this serving binding.",
+                status=403,
+            )
+        token = marker.read_text(encoding="utf-8").strip()
+        if len(token) < 8:
+            raise ServingRuntimeError(
+                "SERVING_CREDENTIAL_REF_UNRESOLVED",
+                "The referenced credential is empty.",
+                status=403,
+            )
+        return token
+
+    def _download_hugging_face(self, source: dict[str, Any], token: str | None) -> Path:
+        """Materialize a pinned Hugging Face revision through huggingface_hub."""
+
+        try:
+            from huggingface_hub import snapshot_download
+        except ImportError as exc:
+            raise ServingRuntimeError(
+                "SERVING_MODEL_SOURCE_UNAVAILABLE",
+                "huggingface_hub is required to import a Hugging Face repository.",
+                status=503,
+            ) from exc
+        repository = str(source.get("repository") or "")
+        revision = str(source.get("revision") or "")
+        destination = self.models / "imports" / f"{repository.replace('/', '__')}-{revision}"
+        if not (destination / "config.json").is_file():
+            destination.mkdir(parents=True, exist_ok=True)
+            try:
+                snapshot_download(
+                    repo_id=repository,
+                    revision=revision,
+                    local_dir=destination,
+                    token=token,
+                )
+            except Exception as exc:
+                raise ServingRuntimeError(
+                    "SERVING_MODEL_SOURCE_UNAVAILABLE",
+                    "The pinned Hugging Face revision could not be downloaded.",
+                    status=503,
+                    retryable=True,
+                ) from exc
+        return destination
+
+    def import_model(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Validate and publish an external model source. | 校验并发布外部模型来源。"""
+
+        if payload.get("trustRemoteCode"):
+            raise ServingRuntimeError(
+                "SERVING_TRUST_REMOTE_CODE_FORBIDDEN",
+                "trust_remote_code is disabled for the released import path.",
+                status=422,
+            )
+        source = payload.get("source")
+        if not isinstance(source, dict):
+            raise ServingRuntimeError(
+                "SERVING_REQUEST_INVALID", "source is required.", status=422
+            )
+        credential_ref = payload.get("credentialRef")
+        if credential_ref is not None and not isinstance(credential_ref, str):
+            raise ServingRuntimeError(
+                "SERVING_REQUEST_INVALID", "credentialRef must be a string.", status=422
+            )
+        token = self._credential(credential_ref) if credential_ref else None
+        kind = source.get("kind")
+        if kind == "LOCAL_PATH":
+            candidate = Path(str(source.get("path") or ""))
+            if not candidate.is_absolute() or ".." in candidate.parts or candidate.is_symlink():
+                raise ServingRuntimeError(
+                    "SERVING_MODEL_SOURCE_INVALID",
+                    "a local import requires an absolute, traversal-free directory",
+                    status=422,
+                )
+            if not candidate.is_dir():
+                raise ServingRuntimeError(
+                    "SERVING_MODEL_SOURCE_UNAVAILABLE",
+                    "the local model directory does not exist on the execution host",
+                    status=422,
+                )
+            directory = candidate
+            provenance = f"local:{candidate}"
+        elif kind == "HUGGING_FACE":
+            repository = str(source.get("repository") or "")
+            revision = str(source.get("revision") or "")
+            if "/" not in repository or len(revision) != 40:
+                raise ServingRuntimeError(
+                    "SERVING_MODEL_SOURCE_INVALID",
+                    "a Hugging Face import requires a repository and a pinned 40-hex revision",
+                    status=422,
+                )
+            directory = self._download_hugging_face(source, token)
+            provenance = f"huggingface:{repository}@{revision}"
+        else:
+            raise ServingRuntimeError(
+                "SERVING_MODEL_SOURCE_INVALID", "unsupported source kind", status=422
+            )
+
+        checks, issues = _validate_model_directory(directory)
+        if not (checks["weights"] and checks["config"] and checks["tokenizer"]):
+            raise ServingRuntimeError(
+                "SERVING_MODEL_VALIDATION_FAILED",
+                "The model directory is not servable: " + "; ".join(issues),
+                status=422,
+            )
+        files = [
+            path
+            for path in directory.rglob("*")
+            if path.is_file() and not path.is_symlink()
+        ]
+        artifact = LocalArtifactProvider(self.artifact_root).publish_portable_directory(
+            directory, kind=ArtifactKind("model")
+        )
+        return {
+            "modelArtifact": artifact.to_dict(),
+            "validation": {
+                "weights": checks["weights"],
+                "config": checks["config"],
+                "tokenizer": checks["tokenizer"],
+                "chatTemplate": checks["chat_template"],
+                "license": _license_name(directory),
+                "provenance": provenance,
+                "digest": _manifest_digest(directory, files),
+                "trustRemoteCode": False,
+                "issues": issues,
+            },
+        }
 
     # ── operations ──────────────────────────────────────────────────────
 
@@ -345,6 +561,9 @@ class RuntimeHandler(BaseHTTPRequestHandler):
     def _error(self, exc: ServingRuntimeError) -> None:
         self._send(exc.status, {"code": exc.code, "detail": exc.detail, "retryable": exc.retryable})
 
+    def _refuse(self, status: int, code: str, detail: str) -> None:
+        self._send(status, {"code": code, "detail": detail, "retryable": False})
+
     def _read_payload(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0") or "0")
         if length <= 0 or length > 2 * 1024 * 1024:
@@ -359,7 +578,11 @@ class RuntimeHandler(BaseHTTPRequestHandler):
             self._send(200, {"status": "ok"})
             return
         if not self._authorized():
-            self._send(403, {"code": "SERVING_BINDING_PERMISSION_DENIED"})
+            self._refuse(
+                403,
+                "SERVING_BINDING_PERMISSION_DENIED",
+                "The binding credential is missing or invalid.",
+            )
             return
         parts = self.path.strip("/").split("/")
         if len(parts) == 2 and parts[0] == "executions":
@@ -368,14 +591,21 @@ class RuntimeHandler(BaseHTTPRequestHandler):
             except (ValueError, ServingRuntimeError) as exc:
                 self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_EXECUTION_NOT_FOUND", str(exc), status=404))
             return
-        self._send(404, {"code": "SERVING_ROUTE_NOT_FOUND"})
+        self._refuse(404, "SERVING_ROUTE_NOT_FOUND", "no route matches the request")
 
     def do_POST(self) -> None:
         if not self._authorized():
-            self._send(403, {"code": "SERVING_BINDING_PERMISSION_DENIED"})
+            self._refuse(
+                403,
+                "SERVING_BINDING_PERMISSION_DENIED",
+                "The binding credential is missing or invalid.",
+            )
             return
         parts = self.path.strip("/").split("/")
         try:
+            if len(parts) == 1 and parts[0] == "imports":
+                self._send(200, self.runtime.import_model(self._read_payload()))
+                return
             if len(parts) == 2 and parts[0] == "executions":
                 self._send(200, self.runtime.start(UUID(parts[1]), self._read_payload()))
                 return
@@ -388,7 +618,7 @@ class RuntimeHandler(BaseHTTPRequestHandler):
         except (ValueError, ServingRuntimeError) as exc:
             self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_REQUEST_INVALID", str(exc), status=422))
             return
-        self._send(404, {"code": "SERVING_ROUTE_NOT_FOUND"})
+        self._refuse(404, "SERVING_ROUTE_NOT_FOUND", "no route matches the request")
 
     def _proxy(self, deployment_id: UUID, path: str) -> None:
         document = self.runtime.inspect(deployment_id)

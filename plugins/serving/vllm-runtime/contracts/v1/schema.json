@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.dev/serving/vllm-runtime/v1/schema.json",
+  "title": "execution.engine.v1",
+  "description": "Serving execution runtime contract consumed by the Reactor Product over the binding control URL. Reactor owns deployment intent; this runtime owns model import validation, accelera- tor process lifetime, and release evidence.",
+  "type": "object",
+  "$defs": {
+    "ArtifactRef": {
+      "type": "object",
+      "required": ["uri", "digest", "size_bytes", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "uri": { "type": "string", "pattern": "^artifact://sha256/[0-9a-f]{64}$" },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "size_bytes": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" },
+        "manifest_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" }
+      }
+    },
+    "ModelSource": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["HUGGING_FACE", "LOCAL_PATH"] },
+        "repository": { "type": ["string", "null"] },
+        "revision": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+        "path": { "type": ["string", "null"] }
+      }
+    },
+    "ImportRequest": {
+      "type": "object",
+      "required": ["name", "source"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string" },
+        "source": { "$ref": "#/$defs/ModelSource" },
+        "credentialRef": { "type": ["string", "null"] },
+        "trustRemoteCode": { "const": false }
+      }
+    },
+    "ModelImportValidation": {
+      "type": "object",
+      "required": ["weights", "config", "tokenizer", "chatTemplate", "provenance", "digest"],
+      "additionalProperties": false,
+      "properties": {
+        "weights": { "type": "boolean" },
+        "config": { "type": "boolean" },
+        "tokenizer": { "type": "boolean" },
+        "chatTemplate": { "type": "boolean" },
+        "license": { "type": ["string", "null"] },
+        "provenance": { "type": "string" },
+        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "trustRemoteCode": { "const": false },
+        "issues": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "ImportResponse": {
+      "type": "object",
+      "required": ["modelArtifact", "validation"],
+      "additionalProperties": false,
+      "properties": {
+        "modelArtifact": { "$ref": "#/$defs/ArtifactRef" },
+        "validation": { "$ref": "#/$defs/ModelImportValidation" }
+      }
+    },
+    "StartRequest": {
+      "type": "object",
+      "required": ["modelArtifact"],
+      "additionalProperties": false,
+      "properties": {
+        "modelArtifact": { "$ref": "#/$defs/ArtifactRef" },
+        "nodeRef": { "type": "object" },
+        "modelVersion": { "type": "object" }
+      }
+    },
+    "ExecutionResponse": {
+      "type": "object",
+      "required": ["ready", "executionRef", "endpointUrl", "servedModel", "modelArtifact"],
+      "additionalProperties": false,
+      "properties": {
+        "ready": { "type": "boolean" },
+        "executionRef": { "type": "string" },
+        "endpointUrl": { "type": "string" },
+        "servedModel": { "type": "string" },
+        "modelArtifact": { "$ref": "#/$defs/ArtifactRef" },
+        "modelVersion": { "type": "object" },
+        "released": { "type": "boolean" },
+        "detail": { "type": "string" }
+      }
+    },
+    "EngineError": {
+      "type": "object",
+      "required": ["code", "detail", "retryable"],
+      "additionalProperties": false,
+      "properties": {
+        "code": { "type": "string" },
+        "detail": { "type": "string" },
+        "retryable": { "type": "boolean" }
+      }
+    }
+  }
+}

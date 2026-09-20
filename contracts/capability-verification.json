@@ -297,6 +297,21 @@
           "notes": "Launch contract verified without a GPU. Real CUDA training and checkpoint production remain unverified."
         }
       ]
+    },
+    {
+      "capability": "execution.engine.v1",
+      "implementation": "cyrene.serving.vllm-runtime",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-20",
+          "environment": "linux / pytest / HTTP binding with a stand-in accelerator process and a real local artifact CAS",
+          "command": "python -m pytest plugins/serving/vllm-runtime/tests",
+          "result": "6 passed; local model import validates weights/config/tokenizer/chat template, publishes a model artifact, resolves credential refs, and the execution lifecycle starts, inspects, proxies, and releases a stand-in process",
+          "notes": "A real vLLM launch, CUDA inference, and GPU release remain unverified; Reactor binding acceptance must supply that evidence."
+        }
+      ]
     }
   ]
 }

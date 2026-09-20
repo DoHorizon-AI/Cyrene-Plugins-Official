@@ -65,7 +65,7 @@ def _entrypoint() -> list[str]:
 
 def _mapping(value: Any, name: str) -> dict[str, Any]:
     if not isinstance(value, dict):
-        raise ValueError(f"{name} must be an object")
+        raise TypeError(f"{name} must be an object")
     return value
 
 

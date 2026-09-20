@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "6c48c270d35335ebc1460a1c667bd11d0736bbc4e11cbfbf124a1f31d0ceb130",
-      "size_bytes": 36611
+      "sha256": "90b07cffb2725822a8803a3ee8d554ac7b5c6b3c8d9caaaf8ecc4cf32068bede",
+      "size_bytes": 36995
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "723b408699b1668f26c23674cbbd4917443d8d6d9f687e016e168abc54361cab",
-      "size_bytes": 17711
+      "sha256": "f929dbf7d0bb8d085dd9079418a3b24d1c591e8105fd77e7d51b06d8093ed328",
+      "size_bytes": 18546
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "c726f00766b1c813c5e0022a3b394607e795359b61266339dd8a8aec0248b50c",
-      "size_bytes": 16581
+      "sha256": "4175324c3b0efa50940df5e2a225997195704a99b5def79169902615d4fbbbf5",
+      "size_bytes": 17460
     },
     {
       "kind": "file",
@@ -501,6 +501,20 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/tck/execution-engine-v1/README.md",
+      "sha256": "0d6ee6a9d604fcdf43d1944030fbea1011fb8f893305caa25e5686ef7e1c35d8",
+      "size_bytes": 1360
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/execution-engine-v1/test_execution_engine_tck.py",
+      "sha256": "c8d61f7cee7d019d0fb28a5d24ad326c44a3e9e3b043f7a894c9aa3104c4f3f4",
+      "size_bytes": 7246
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/tck/message-connector-v1/README.md",
       "sha256": "db9e7efa7f47c127aca74714ccca6bf4a2fff1ff8fe892c915af4238ca1b6682",
       "size_bytes": 755
@@ -665,6 +679,27 @@
       "path": "contracts/tck/tool-provider-v1/README.md",
       "sha256": "0d78bcdb57e8fbf1ce9e2ef0bb709cef952c6740b70f0916961ee8757a72783a",
       "size_bytes": 1344
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/training-llama-factory-v1/README.md",
+      "sha256": "140376ad012c33154a1f527be2ab2ae323b610f2d4f599a48ed9126c9c695666",
+      "size_bytes": 1078
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/training-llama-factory-v1/capability",
+      "sha256": "635afe321426dafc40da76019b12a189807b23c2c4bdf80650af07a0b9bd73b3",
+      "size_bytes": 26
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/training-llama-factory-v1/test_training_llama_factory_tck.py",
+      "sha256": "ef2a8276812d83673303d098a3a032e193728088bb1c855f84bc944be6beed8e",
+      "size_bytes": 3139
     },
     {
       "kind": "file",
@@ -1418,9 +1453,30 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/PROVENANCE.md",
+      "sha256": "e2b158f2c95e9ec88683600939d636e27bd16b66a15d08ab0a63f4359ab05d18",
+      "size_bytes": 2091
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/serving/vllm-runtime/README.md",
-      "sha256": "d7f1e7996d91a2c6e59089b3d0947c2ae999794c8b9ef86ad0e0896559c6cf27",
-      "size_bytes": 1766
+      "sha256": "3f6ebae672068113f11d77808a9aff3f62c92e52501fb286e8da365cb07b9845",
+      "size_bytes": 2692
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/contracts/v1/schema.json",
+      "sha256": "9a1cea213e443688e7a0b5400fd4d123d21d3f4358fef59e328b1a698f42d0b2",
+      "size_bytes": 3886
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/plugin.manifest.json",
+      "sha256": "6667329c369b07b39b68ca5af85428b61f8950e01d9cb2df339a6c1d98a91cf8",
+      "size_bytes": 1788
     },
     {
       "kind": "file",
@@ -1433,15 +1489,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/tests/test_vllm_runtime.py",
-      "sha256": "4ad3b108482cd2128cce69bb690e7daba3c6b076a47be8f7133ee5af131d13a7",
-      "size_bytes": 7225
+      "sha256": "7f0d4029f5fec3449a8b60b5f032da4b84195f010c4d0d4ca64cd15c809cef63",
+      "size_bytes": 12073
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/vllm_runtime.py",
-      "sha256": "3ebf50cbe4627e1a3b377828ee4488c41047e56410a8563dfcfb9f19a12e122b",
-      "size_bytes": 21467
+      "sha256": "4fbd1f3fccbac71750d74b7f58048d4415fa0ab1c34399dc5db68b810d589f02",
+      "size_bytes": 31305
     },
     {
       "kind": "file",
@@ -1537,6 +1593,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/training/llama-factory/PROVENANCE.md",
+      "sha256": "9a152f607d82610643bf952bf8e28751ceddebd610eb176be13eefbab7e2e6bc",
+      "size_bytes": 1705
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/training/llama-factory/README.md",
       "sha256": "895c48e799bdcef9ddfe22d017dc75ed2cd3b400e8353b4877514d4836f3b190",
       "size_bytes": 1523
@@ -1552,8 +1615,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/llama_factory.py",
-      "sha256": "f2f301a8765f2eaa578243074a61c69d058733e48a52b5147f343bb498163774",
-      "size_bytes": 12969
+      "sha256": "c9d3b559debd6bd2e85bf693a7b54e131096e6ca69d40cb8bb8994c883ed3289",
+      "size_bytes": 12968
     },
     {
       "kind": "file",
@@ -1575,6 +1638,20 @@
       "path": "plugins/training/llama-factory/tests/test_llama_factory.py",
       "sha256": "017ab5d3d2fe0dc0e8db809464178ed885940cc519d7b9acd23e3abe201f4965",
       "size_bytes": 4329
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/PROVENANCE.md",
+      "sha256": "3b190df25e8a0f6635cfa7e91dd4ad942e3c4aac6c985504ba216fd9188339b1",
+      "size_bytes": 2176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/README.md",
+      "sha256": "7577e7e86d2b913e76e85701b86e4337c0bdaf11cc18987f2e6700a83e7d623c",
+      "size_bytes": 2518
     },
     {
       "kind": "file",
@@ -4387,8 +4464,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/capability_catalog.py",
-      "sha256": "6cd5b92ca2cb495344ea8351a496d843f57aca7413c9d18a916da26c933cd018",
-      "size_bytes": 26743
+      "sha256": "3fafb11bc363e6ff520f622ab754b00909553f3e12d99c43b5f02205a443a9f4",
+      "size_bytes": 27180
     },
     {
       "kind": "file",

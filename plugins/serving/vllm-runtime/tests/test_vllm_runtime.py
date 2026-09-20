@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import threading
 import urllib.error
@@ -10,8 +11,9 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from uuid import uuid4
 
+import pytest
 from cy_artifacts import ArtifactKind, LocalArtifactProvider
-from vllm_runtime import RuntimeHandler, ServingRuntime
+from vllm_runtime import RuntimeHandler, ServingRuntime, ServingRuntimeError
 
 TOKEN = "serving-runtime-token-0123456789abcdef"
 
@@ -191,3 +193,134 @@ def test_unknown_execution_fails_closed(tmp_path: Path) -> None:
     finally:
         server.shutdown()
         server.server_close()
+
+
+def _model_directory(tmp_path: Path) -> Path:
+    """Create the minimum servable text-model directory for import tests."""
+
+    model = tmp_path / "candidate"
+    model.mkdir()
+    (model / "config.json").write_text('{"model_type":"qwen2"}', encoding="utf-8")
+    (model / "tokenizer.json").write_text('{"version":"1.0"}', encoding="utf-8")
+    (model / "tokenizer_config.json").write_text(
+        '{"chat_template":"{{ messages }}"}', encoding="utf-8"
+    )
+    (model / "model.safetensors").write_bytes(b"\x00" * 32)
+    (model / "LICENSE").write_text("Apache-2.0\n", encoding="utf-8")
+    return model
+
+
+def test_model_import_validates_and_publishes_a_local_directory(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path, ["python3", "unused"], 0)
+    server = _serve(runtime)
+    try:
+        model = _model_directory(tmp_path)
+        payload = {
+            "name": "candidate",
+            "source": {"kind": "LOCAL_PATH", "path": str(model)},
+        }
+        status, imported = _request(server, "POST", "/imports", payload)
+        assert status == 200, imported
+        assert imported["validation"]["weights"] is True
+        assert imported["validation"]["config"] is True
+        assert imported["validation"]["tokenizer"] is True
+        assert imported["validation"]["chatTemplate"] is True
+        assert imported["validation"]["trustRemoteCode"] is False
+        assert imported["validation"]["license"] == "Apache-2.0"
+        assert imported["validation"]["digest"].startswith("sha256:")
+        assert imported["modelArtifact"]["kind"] == "model"
+        assert imported["modelArtifact"]["uri"].startswith("artifact://sha256/")
+
+        status, replay = _request(server, "POST", "/imports", payload)
+        assert status == 200
+        assert replay["modelArtifact"] == imported["modelArtifact"]
+        assert replay["validation"]["digest"] == imported["validation"]["digest"]
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_model_import_fails_closed_without_a_complete_model(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path, ["python3", "unused"], 0)
+    server = _serve(runtime)
+    try:
+        empty = tmp_path / "empty"
+        empty.mkdir()
+        status, body = _request(
+            server,
+            "POST",
+            "/imports",
+            {"name": "empty", "source": {"kind": "LOCAL_PATH", "path": str(empty)}},
+        )
+        assert status == 422
+        assert body["code"] == "SERVING_MODEL_VALIDATION_FAILED"
+
+        status, body = _request(
+            server,
+            "POST",
+            "/imports",
+            {
+                "name": "remote-code",
+                "source": {"kind": "LOCAL_PATH", "path": str(empty)},
+                "trustRemoteCode": True,
+            },
+        )
+        assert status == 422
+        assert body["code"] == "SERVING_TRUST_REMOTE_CODE_FORBIDDEN"
+
+        status, body = _request(
+            server,
+            "POST",
+            "/imports",
+            {"name": "relative", "source": {"kind": "LOCAL_PATH", "path": "models/candidate"}},
+        )
+        assert status == 422
+        assert body["code"] == "SERVING_MODEL_SOURCE_INVALID"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_model_import_resolves_private_credentials_for_hugging_face(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    runtime = _runtime(tmp_path, ["python3", "unused"], 0)
+    marker = runtime.credentials / hashlib.sha256(b"org/private").hexdigest()
+    marker.write_text("hf-token-value", encoding="utf-8")
+    marker.chmod(0o600)
+    seen: dict[str, object] = {}
+
+    def fake_download(source: dict, token: str | None) -> Path:
+        seen["source"] = source
+        seen["token"] = token
+        return _model_directory(tmp_path)
+
+    monkeypatch.setattr(runtime, "_download_hugging_face", fake_download)
+    revision = "a" * 40
+    result = runtime.import_model(
+        {
+            "name": "private",
+            "source": {
+                "kind": "HUGGING_FACE",
+                "repository": "org/private",
+                "revision": revision,
+            },
+            "credentialRef": "org/private",
+        }
+    )
+    assert seen["token"] == "hf-token-value"
+    assert result["validation"]["provenance"] == f"huggingface:org/private@{revision}"
+
+    with pytest.raises(ServingRuntimeError) as failure:
+        runtime.import_model(
+            {
+                "name": "unresolved",
+                "source": {
+                    "kind": "HUGGING_FACE",
+                    "repository": "org/private",
+                    "revision": revision,
+                },
+                "credentialRef": "org/missing",
+            }
+        )
+    assert failure.value.code == "SERVING_CREDENTIAL_REF_UNRESOLVED"

@@ -107,8 +107,10 @@ jobs:
           -e plugins/evaluation/llm-judge \
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
+            -e plugins/serving/vllm-runtime \
             -e plugins/tools/dataset-preparation \
-            -e plugins/tools/dataset-validator
+            -e plugins/tools/dataset-validator \
+            -e plugins/training/llama-factory
       - name: Lint Python runtime and official Plugin sources
         run: |
           python3 -m ruff check \
@@ -133,8 +135,10 @@ jobs:
             plugins/evaluation/llm-judge \
             plugins/models/hf-model-analyzer \
             plugins/policy/compat-rules \
+            plugins/serving/vllm-runtime \
             plugins/tools/dataset-preparation \
             plugins/tools/dataset-validator \
+            plugins/training/llama-factory \
             tools/ci/capability_catalog.py \
             tools/ci/update_source_manifest.py \
             tools/ci/validate_manifests.py \
@@ -143,13 +147,17 @@ jobs:
         run: |
           python3 -m pytest -q \
             sdk/python/cyrene_plugin_runtime/tests \
+            contracts/tck/execution-engine-v1 \
+            contracts/tck/training-llama-factory-v1 \
             plugins/connectors/onebot-v11/tests \
             plugins/connectors/im/tests \
             plugins/connectors/wecom/tests \
             plugins/evaluation/evaluator-pack/tests \
             plugins/evaluation/llm-judge/tests \
+            plugins/serving/vllm-runtime/tests \
             plugins/tools/dataset-preparation/tests \
-            plugins/tools/dataset-validator/tests
+            plugins/tools/dataset-validator/tests \
+            plugins/training/llama-factory/tests
       - name: Verify Python/native behavior matrix
         run: python3 plugins/connectors/im/tools/verify_behavior_matrix.py
 

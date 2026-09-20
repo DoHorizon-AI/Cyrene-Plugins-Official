@@ -7,6 +7,7 @@ Reactor 拥有部署意图；本运行时只拥有加速器进程。
 
 | Endpoint | Responsibility | 职责 |
 | --- | --- | --- |
+| `POST /imports` | Validate an external model source and publish a `model` artifact | 校验外部模型来源并发布 `model` 制品 |
 | `POST /executions/{id}` | Materialize the artifact, launch vLLM, confirm readiness | 物化制品、拉起 vLLM、确认就绪 |
 | `GET /executions/{id}` | Report the execution and its model readback | 返回执行与模型回读 |
 | `POST /executions/{id}/stop` | Terminate the process and confirm release | 终止进程并确认回收 |
@@ -19,6 +20,17 @@ and launch vLLM with `--enable-lora`; `FULL_MODEL` executions serve the artifact
 
 除探活外，所有路由都要求绑定凭据；`BASE_PLUS_LORA` 会从 `modelVersion` 解析基础模型并以
 LoRA 方式启动，`FULL_MODEL` 直接服务该制品。
+
+`POST /imports` refuses `trustRemoteCode: true`, validates weights, `config.json`,
+tokenizer, chat template, license, and a manifest digest, then publishes a portable
+`model` artifact into the Platform artifact CAS. Private Hugging Face revisions resolve
+through a `CredentialRef`: the ref's SHA-256 names a mode-0600 token file under
+`<runtime-home>/credentials`, and the token is never echoed in a response.
+
+`POST /imports` 拒绝 `trustRemoteCode: true`，校验权重、`config.json`、tokenizer、
+chat template、许可证与清单摘要，然后把可移植 `model` 制品发布到 Platform 制品 CAS。
+私有 Hugging Face revision 通过 `CredentialRef` 解析：ref 的 SHA-256 指向
+`<runtime-home>/credentials` 下的 0600 令牌文件，令牌永不出现在响应中。
 
 ```bash
 cyrene-vllm-runtime serve \

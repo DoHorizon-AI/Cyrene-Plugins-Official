@@ -159,6 +159,36 @@ capabilities:
         execution_mode: SIMULATED
         verified_at: 2026-09-13
     tck: []
+  - id: execution.engine.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/serving/vllm-runtime/contracts/v1/schema.json
+    contract_methods:
+      - import_model
+      - inspect
+      - start
+      - stop
+    implementations:
+      - ref: cyrene.serving.vllm-runtime
+        source: plugins/serving/vllm-runtime/plugin.manifest.json
+        kind: gateway-runtime
+        language: python
+        publication: published
+        methods:
+          - import_model
+          - inspect
+          - start
+          - stop
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-20
+    tck:
+      - contracts/tck/execution-engine-v1
   - id: memory.provider.v1
     interface_versions:
       - "1"
@@ -577,7 +607,8 @@ capabilities:
         verification_level: DISPATCH_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-09-20
-    tck: []
+    tck:
+      - contracts/tck/training-llama-factory-v1
 declared_without_contract:
   - id: rerank.provider.v1
     declared_by: runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs

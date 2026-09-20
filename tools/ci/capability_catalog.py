@@ -411,11 +411,19 @@ def _collect_verification(root: Path) -> dict[tuple[str, str], dict]:
 
 
 def _collect_tck(root: Path) -> dict[str, list[str]]:
-    """Map TCK suite directories to capability IDs."""
+    """Map TCK suite directories to capability IDs.
+
+    A suite directory may declare its exact capability in a ``capability``
+    file; otherwise the directory name maps to a capability by replacing
+    hyphens with dots. The marker exists for capability IDs that contain a
+    hyphen inside a segment, such as ``training.llama-factory.v1``.
+    """
 
     suites: dict[str, list[str]] = {}
     for suite in sorted(path for path in root.glob(TCK_GLOB) if path.is_dir()):
-        capability = suite.name.replace("-", ".")
+        marker = suite / "capability"
+        declared = marker.read_text(encoding="utf-8").strip() if marker.is_file() else ""
+        capability = declared or suite.name.replace("-", ".")
         suites.setdefault(capability, []).append(suite.relative_to(root).as_posix())
     return suites
 
