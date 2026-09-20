@@ -120,7 +120,7 @@ class OneBotInstanceConfig:
     """Configuration for one host-provided capability binding.
 
     ``binding_id`` is the stable identity selected by the Product or resolved
-    through the control plane. It is not a QQ/account/vendor identity and is
+    through the control plane. It is not an account or vendor identity and is
     not regenerated when a worker restarts. ``runtime_profile`` is only an
     external transport label; it does not change connector identity.
     """
@@ -231,32 +231,7 @@ class OneBotInstanceConfig:
         if runtime_profile != "onebot-v11":
             raise ConnectorError(
                 "INVALID_REQUEST",
-                "unsupported OneBot runtime_profile; use onebot-v11 or qqnt-direct",
-            )
-        direct_only = {
-            "host_executable",
-            "host_args",
-            "data_dir",
-            "required_client_version",
-            "required_host_abi",
-            "installation_manifest",
-            "account_id",
-            "login_policy",
-            "platform",
-            "startup_timeout_seconds",
-            "shutdown_timeout_seconds",
-            "secret_refs",
-            "max_restart_attempts",
-            "restart_window_seconds",
-            "restart_backoff_seconds",
-            "restart_backoff_max_seconds",
-            "crash_circuit_cooldown_seconds",
-        }
-        present_direct_only = direct_only.intersection(value)
-        if present_direct_only:
-            raise ConnectorError(
-                "INVALID_REQUEST",
-                "OneBot config contains qqnt-direct-only fields",
+                "unsupported OneBot runtime_profile; use onebot-v11",
             )
 
         account_id = value.get("self_account_id")

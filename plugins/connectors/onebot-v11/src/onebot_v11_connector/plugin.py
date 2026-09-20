@@ -2,9 +2,9 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  📄 plugin.py                                                       │
 │  Module: onebot_v11_connector.plugin                                │
-│  Role: Profile router for the generic and direct connector adapters. │
+│  Role: Python reference entrypoint for the generic OneBot connector.  │
 │                                                                     │
-│  模块职责：按 binding 配置选择 onebot-v11 或 qqnt-direct 实现。          │
+│  模块职责：独立 OneBot v11 Python 参考运行时入口                       │
 └─────────────────────────────────────────────────────────────────────┘
 """
 
@@ -21,28 +21,23 @@ from .connector import (
     CancellationToken,
     OneBotV11Connector,
 )
-from .qqnt_direct import QQ_CAPABILITY_ID, QQNTDirectConfig, QQNTDirectConnector
 
 
 class ConnectorPlugin:
-    """Dispatch one package activation to exactly one selected profile."""
+    """Expose one configured generic OneBot v11 profile."""
 
     plugin_id = "cyrene.connectors.onebot-v11"
-    version = "0.2.0"
-    capabilities = ("message.connector.v1", QQ_CAPABILITY_ID)
+    version = "0.4.0"
+    capabilities = ("message.connector.v1",)
 
     def __init__(
         self,
         config: Mapping[str, Any] | None = None,
         *,
         onebot_transport: Any | None = None,
-        qq_host: Any | None = None,
     ) -> None:
         selected = dict(config) if config is not None else _environment_config()
-        if selected is not None and selected.get("runtime_profile") == "qqnt-direct":
-            self._delegate: Any = QQNTDirectConnector(selected, host=qq_host)
-        else:
-            self._delegate = OneBotV11Connector(selected, transport=onebot_transport)
+        self._delegate: Any = OneBotV11Connector(selected, transport=onebot_transport)
 
     @property
     def configured_binding_id(self) -> str | None:
@@ -57,20 +52,8 @@ class ConnectorPlugin:
         return self._delegate.runtime_profile
 
     def on_configure(self, settings: Mapping[str, str]) -> str | None:
-        """Configure the selected profile through the generic worker seam."""
+        """Configure the generic OneBot profile through the worker seam."""
 
-        if _settings_profile(settings) == "qqnt-direct":
-            try:
-                parsed = QQNTDirectConfig.from_settings(settings)
-                replacement = QQNTDirectConnector(parsed)
-            except Exception as exc:  # noqa: BLE001 - worker seam returns typed text.
-                return str(exc)
-            previous = self._delegate
-            self._delegate = replacement
-            close = getattr(previous, "close", None)
-            if callable(close):
-                close()
-            return None
         return self._delegate.on_configure(settings)
 
     def on_invoke(
@@ -155,17 +138,3 @@ def _environment_config() -> dict[str, Any] | None:
     result = dict(decoded)
     result["binding_id"] = settings["binding_id"]
     return result
-
-
-def _settings_profile(settings: Mapping[str, str]) -> str | None:
-    """Read only the profile discriminator from a worker settings mapping."""
-
-    encoded = settings.get("config", "{}")
-    try:
-        decoded = json.loads(encoded)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(decoded, Mapping):
-        return None
-    profile = decoded.get("runtime_profile")
-    return profile if isinstance(profile, str) else None

@@ -9,6 +9,7 @@ import json
 import os
 import posixpath
 import stat
+import subprocess
 import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -67,6 +68,41 @@ def _verify_hex(value: Any, length: int, field: str) -> str:
     return value.lower()
 
 
+def _ignored_untracked(root: Path) -> set[str]:
+    """Return untracked paths excluded by the repository's ignore rules."""
+
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "ls-files",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "-z",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ManifestVerificationError(
+            "cannot resolve ignored untracked paths from Git"
+        ) from error
+    return {
+        item.decode("utf-8")
+        for item in result.stdout.split(b"\0")
+        if item
+    }
+
+
+def _is_ignored(relative: str, ignored: set[str]) -> bool:
+    """Return whether a path is inside an ignored untracked subtree."""
+
+    return any(relative == item or relative.startswith(item + "/") for item in ignored)
+
+
 def _walk_payload(
     root: Path,
     manifest_path: Path,
@@ -76,8 +112,16 @@ def _walk_payload(
     """List regular payload files and symlinks, rejecting Git metadata."""
 
     observed: set[str] = set()
+    ignored = _ignored_untracked(root)
     for current, directories, filenames in os.walk(root, followlinks=False):
         current_path = Path(current)
+        directories[:] = [
+            name
+            for name in directories
+            if not _is_ignored(
+                (current_path / name).relative_to(root).as_posix(), ignored
+            )
+        ]
         if ".git" in directories and allow_git_metadata:
             directories.remove(".git")
         elif ".git" in directories:
@@ -98,6 +142,8 @@ def _walk_payload(
                 relative = candidate.relative_to(root).as_posix()
                 raise ManifestVerificationError(f"Unexpected Git metadata: {relative}")
             relative = candidate.relative_to(root).as_posix()
+            if _is_ignored(relative, ignored):
+                continue
             if candidate.is_symlink() or stat.S_ISREG(candidate.stat(follow_symlinks=False).st_mode):
                 observed.add(relative)
                 continue
