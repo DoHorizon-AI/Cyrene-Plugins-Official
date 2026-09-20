@@ -40,6 +40,23 @@ def test_instruction_preparation_is_deterministic_and_deduplicated(tmp_path) -> 
     assert duplicates[0]["duplicateOfSampleIndex"] == 1
 
 
+def test_inspect_projects_duckdb_temporal_cells_back_to_json(tmp_path) -> None:
+    source = tmp_path / "source.jsonl"
+    source.write_text(
+        '{"instruction":"q","output":"a","annotation":{"createdAt":"2026-09-20T18:39:12.541157Z"}}\n',
+        encoding="utf-8",
+    )
+    result_path = tmp_path / "result.json"
+
+    result = DatasetPreparationPlugin().inspect(source, result_path)
+
+    assert result["row_count"] == 1
+    rows = json.loads(result_path.read_text(encoding="utf-8"))["rows"]
+    projected = rows[0]["annotation"]["createdAt"]
+    assert isinstance(projected, str)
+    assert projected.startswith("2026-09-20T18:39:12.541157")
+
+
 def test_direct_endpoint_writes_verified_exports(tmp_path) -> None:
     source = tmp_path / "source.jsonl"
     source.write_text(

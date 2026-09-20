@@ -10,6 +10,8 @@
 
 from __future__ import annotations
 
+import datetime
+import decimal
 import hashlib
 import json
 import unicodedata
@@ -225,6 +227,29 @@ def detect_format(data: bytes) -> str:
     return "TEXT"
 
 
+def _json_native(value: Any) -> Any:
+    """Project one DuckDB cell onto a JSON-native value. | 归一为 JSON 原生值。
+
+    DuckDB infers JSON scalars into rich SQL types, so an ISO timestamp becomes
+    a ``datetime``. The capability wire type is JSON, therefore every cell is
+    projected back onto values ``json`` can serialize without a fallback.
+    """
+
+    if value is None or isinstance(value, bool | int | float | str):
+        return value
+    if isinstance(value, datetime.datetime | datetime.date | datetime.time):
+        return value.isoformat()
+    if isinstance(value, decimal.Decimal):
+        return str(value)
+    if isinstance(value, bytes | bytearray):
+        return bytes(value).decode("utf-8", "replace")
+    if isinstance(value, dict):
+        return {str(key): _json_native(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_json_native(item) for item in value]
+    return str(value)
+
+
 def parse_rows(source: Path, source_format: str) -> list[dict[str, Any]]:
     """Parse JSON/JSONL with DuckDB or non-empty plain-text lines."""
 
@@ -245,7 +270,8 @@ def parse_rows(source: Path, source_format: str) -> list[dict[str, Any]]:
         )
         columns = list(relation.columns)
         return [
-            dict(zip(columns, values, strict=True)) for values in relation.fetchall()
+            {key: _json_native(value) for key, value in zip(columns, values, strict=True)}
+            for values in relation.fetchall()
         ]
     finally:
         connection.close()
