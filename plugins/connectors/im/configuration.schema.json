@@ -1,0 +1,369 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyrene.dev/schemas/im-qqnt-direct-configuration-v0.1.json",
+  "title": "Cyrene QQ/IM Connector Configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "binding_id"
+  ],
+  "properties": {
+    "binding_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+    },
+    "runtime_profile": {
+      "const": "qqnt-direct",
+      "default": "qqnt-direct"
+    },
+    "http_base_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https?://"
+    },
+    "websocket_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^wss?://"
+    },
+    "transport_profile": {
+      "type": "string",
+      "enum": [
+        "http_api",
+        "forward_websocket",
+        "reverse_websocket"
+      ],
+      "default": "http_api"
+    },
+    "reverse_listen_host": {
+      "type": "string",
+      "minLength": 1,
+      "default": "127.0.0.1"
+    },
+    "reverse_listen_port": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 6199
+    },
+    "access_token": {
+      "type": "string"
+    },
+    "self_account_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "host_executable": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute path to the authorized QQ Host child executable."
+    },
+    "host_args": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "data_dir": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Absolute binding-private data directory."
+    },
+    "required_client_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "required_host_abi": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Exact authorized QQ Host ABI returned by the hello handshake."
+    },
+    "installation_manifest": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^/",
+      "description": "Absolute operator-authored QQ installation manifest."
+    },
+    "account_id": {
+      "type": [
+        "string",
+        "integer"
+      ],
+      "minimum": 1
+    },
+    "login_policy": {
+      "type": "string",
+      "enum": [
+        "existing_session",
+        "qr"
+      ],
+      "default": "existing_session"
+    },
+    "platform": {
+      "const": "linux-x86_64"
+    },
+    "startup_timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "shutdown_timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "secret_refs": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "max_restart_attempts": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 5,
+      "default": 2,
+      "description": "Maximum automatic crash recoveries in the rolling window."
+    },
+    "restart_window_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 3600,
+      "default": 60,
+      "description": "Rolling window used to bound automatic crash recovery."
+    },
+    "restart_backoff_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 60,
+      "default": 0.25,
+      "description": "Initial delay before an automatic crash recovery."
+    },
+    "restart_backoff_max_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 300,
+      "default": 5,
+      "description": "Maximum exponential backoff before an automatic recovery."
+    },
+    "crash_circuit_cooldown_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 3600,
+      "default": 60,
+      "description": "Cooldown after the automatic crash recovery budget is exhausted."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "runtime_profile"
+        ],
+        "properties": {
+          "runtime_profile": {
+            "const": "qqnt-direct"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "host_executable",
+          "data_dir",
+          "required_client_version",
+          "required_host_abi"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "http_base_url"
+              ]
+            },
+            {
+              "required": [
+                "websocket_url"
+              ]
+            },
+            {
+              "required": [
+                "access_token"
+              ]
+            },
+            {
+              "required": [
+                "transport_profile"
+              ]
+            },
+            {
+              "required": [
+                "reverse_listen_host"
+              ]
+            },
+            {
+              "required": [
+                "reverse_listen_port"
+              ]
+            }
+          ]
+        }
+      },
+      "else": {
+        "allOf": [
+          {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "host_executable"
+                  ]
+                },
+                {
+                  "required": [
+                    "host_args"
+                  ]
+                },
+                {
+                  "required": [
+                    "data_dir"
+                  ]
+                },
+                {
+                  "required": [
+                    "required_client_version"
+                  ]
+                },
+                {
+                  "required": [
+                    "required_host_abi"
+                  ]
+                },
+                {
+                  "required": [
+                    "installation_manifest"
+                  ]
+                },
+                {
+                  "required": [
+                    "account_id"
+                  ]
+                },
+                {
+                  "required": [
+                    "login_policy"
+                  ]
+                },
+                {
+                  "required": [
+                    "platform"
+                  ]
+                },
+                {
+                  "required": [
+                    "startup_timeout_seconds"
+                  ]
+                },
+                {
+                  "required": [
+                    "shutdown_timeout_seconds"
+                  ]
+                },
+                {
+                  "required": [
+                    "secret_refs"
+                  ]
+                },
+                {
+                  "required": [
+                    "max_restart_attempts"
+                  ]
+                },
+                {
+                  "required": [
+                    "restart_window_seconds"
+                  ]
+                },
+                {
+                  "required": [
+                    "restart_backoff_seconds"
+                  ]
+                },
+                {
+                  "required": [
+                    "restart_backoff_max_seconds"
+                  ]
+                },
+                {
+                  "required": [
+                    "crash_circuit_cooldown_seconds"
+                  ]
+                }
+              ]
+            }
+          },
+          {
+            "anyOf": [
+              {
+                "required": [
+                  "http_base_url"
+                ]
+              },
+              {
+                "required": [
+                  "websocket_url"
+                ]
+              },
+              {
+                "required": [
+                  "transport_profile"
+                ],
+                "properties": {
+                  "transport_profile": {
+                    "const": "reverse_websocket"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "transport_profile"
+        ],
+        "properties": {
+          "transport_profile": {
+            "const": "http_api"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "http_base_url"
+        ]
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "transport_profile"
+        ],
+        "properties": {
+          "transport_profile": {
+            "const": "forward_websocket"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "websocket_url"
+        ]
+      }
+    }
+  ]
+}

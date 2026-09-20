@@ -3,7 +3,7 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  📄 assemble_native_package.py                                       │
 │  Module: onebot_v11_connector.tools                                 │
-│  Role: Assemble a RID-specific Native AOT migration candidate.       │
+│  Role: Assemble a RID-specific generic OneBot Native AOT package.    │
 │                                                                     │
 │  模块职责：组装按 RID 区分、无 Python runtime 的 Native AOT 迁移候选包     │
 └─────────────────────────────────────────────────────────────────────┘
@@ -25,7 +25,7 @@ SUPPORTED_RIDS = {
     "linux-x64": "x86_64",
     "linux-arm64": "aarch64",
 }
-PACKAGE_VERSION = "0.3.0"
+PACKAGE_VERSION = "0.4.0"
 PLUGIN_ID = "cyrene.connectors.onebot-v11"
 EXECUTABLE = "bin/cyrene-onebot-v11"
 PROTOCOL = "cyrene.plugin.runtime.v1.DirectPluginRuntime"
@@ -33,7 +33,6 @@ PACKAGE_FILES = (
     "README.md",
     "NATIVE_AOT_OPERATIONS.md",
     "configuration.schema.json",
-    "contracts/v1/schema.json",
     "contracts/json/message-connector-v1-inbound-request.schema.json",
     "contracts/json/message-connector-v1-request-response.schema.json",
 )
@@ -117,24 +116,14 @@ def _rewrite_descriptor(descriptor: dict[str, Any], rid: str) -> dict[str, Any]:
         "kind": "onebot_v11_runtime",
         "artifact_ref": EXECUTABLE,
     }
-    for profile in projected.get("profiles", []):
-        profile_runtime = profile.get("runtime")
-        if not isinstance(profile_runtime, dict):
-            continue
-        if profile.get("name") == "qqnt-direct":
-            profile_runtime["kind"] = "configured-native-child"
-            profile_runtime.pop("entrypoint", None)
     projected["compatibility"] = {
         "platformVersion": ">=0.1.0",
-        "capability_interface": [
-            "message.connector.v1@1",
-            "qq.client.v1@1",
-        ],
+        "capability_interface": ["message.connector.v1@1"],
         "os": ["linux"],
         "architectures": [SUPPORTED_RIDS[rid]],
     }
     lifecycle = projected["lifecycle"]
-    lifecycle["rollback_identity"] = f"{PLUGIN_ID}@0.2.0"
+    lifecycle["rollback_identity"] = f"{PLUGIN_ID}@0.3.0"
     lifecycle["cache_identity"] = f"{PLUGIN_ID}@{PACKAGE_VERSION}"
     return projected
 

@@ -8,6 +8,7 @@
 
 using System.Text.Json;
 using Cyrene.Message.Connector.V1;
+using Cyrene.Plugin.RuntimeHost;
 using Cyrene.Plugin.Runtime.V1;
 using Google.Protobuf;
 

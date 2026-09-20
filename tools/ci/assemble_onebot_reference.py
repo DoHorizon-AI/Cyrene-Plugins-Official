@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Any
 
 PLUGIN_ID = "cyrene.connectors.onebot-v11"
-REFERENCE_VERSION = "0.2.0"
+REFERENCE_VERSION = "0.4.0"
 REFERENCE_SCHEMA = "cyrene.onebot.python-reference.v1"
 PACKAGE_BUILDER = (
     "plugins/connectors/onebot-v11/tools/assemble_package.py"
@@ -126,7 +126,7 @@ def _write_manifest(root: Path, repository_root: Path) -> None:
         "formal_runtime": "csharp-native-aot",
         "reference_runtime": "python",
         "rollback_identity": f"{PLUGIN_ID}@{REFERENCE_VERSION}",
-        "qqnt_real_smoke": "NOT_RUN",
+        "onebot_real_smoke": "NOT_RUN",
         "entries": _entries(root),
     }
     (root / "reference-manifest.json").write_text(

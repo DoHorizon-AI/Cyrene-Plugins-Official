@@ -102,28 +102,6 @@ public sealed class OneBotConfigurationException : Exception
 /// </summary>
 public static class OneBotProfileLoader
 {
-    private static readonly HashSet<string> QqntDirectOnlyFields =
-        new(StringComparer.Ordinal)
-        {
-            "host_executable",
-            "host_args",
-            "data_dir",
-            "required_client_version",
-            "required_host_abi",
-            "installation_manifest",
-            "account_id",
-            "login_policy",
-            "platform",
-            "startup_timeout_seconds",
-            "shutdown_timeout_seconds",
-            "secret_refs",
-            "max_restart_attempts",
-            "restart_window_seconds",
-            "restart_backoff_seconds",
-            "restart_backoff_max_seconds",
-            "crash_circuit_cooldown_seconds"
-        };
-
     public static OneBotProfile FromJson(string json, string? bindingIdOverride = null)
     {
         if (string.IsNullOrWhiteSpace(json))
@@ -183,15 +161,6 @@ public static class OneBotProfileLoader
     {
         if (document.UnknownFields is not null)
         {
-            string? directOnly = document.UnknownFields.Keys
-                .FirstOrDefault(QqntDirectOnlyFields.Contains);
-            if (directOnly is not null)
-            {
-                throw new OneBotConfigurationException(
-                    "QQNT_DIRECT_ONLY_FIELD",
-                    $"OneBot configuration contains QQNT-direct-only field '{directOnly}'.");
-            }
-
             string? unknown = document.UnknownFields.Keys.FirstOrDefault();
             if (unknown is not null)
             {

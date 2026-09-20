@@ -8,6 +8,7 @@
 
 using System.Text.Json;
 using System.Threading.Channels;
+using Cyrene.Plugin.RuntimeHost;
 using Cyrene.Plugin.Runtime.V1;
 
 namespace Cyrene.OneBot.V11.Core;

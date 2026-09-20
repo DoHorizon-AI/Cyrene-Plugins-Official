@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Description>AOT-safe QQNT and IM connector core.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Cyrene.Plugin.RuntimeHost/Cyrene.Plugin.RuntimeHost.csproj" />
+    <ProjectReference Include="../../../contracts/dotnet/Cyrene.Plugin.Contracts/Cyrene.Plugin.Contracts.csproj" />
+  </ItemGroup>
+</Project>

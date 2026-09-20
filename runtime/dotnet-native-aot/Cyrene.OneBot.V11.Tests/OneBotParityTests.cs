@@ -12,6 +12,7 @@ using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
 using Cyrene.Message.Connector.V1;
+using Cyrene.Plugin.RuntimeHost;
 using Cyrene.OneBot.V11.Core;
 using Cyrene.Plugin.Runtime.V1;
 using Google.Protobuf;
@@ -50,17 +51,17 @@ public sealed class OneBotParityTests
     }
 
     [Fact]
-    public void RejectsUnknownAndQqDirectOnlyConfigurationFields()
+    public void RejectsUnknownConfigurationFields()
     {
         OneBotConfigurationException unknown = Assert.Throws<OneBotConfigurationException>(
             () => OneBotProfileLoader.FromJson(
                 "{\"binding_id\":\"main\",\"http_base_url\":\"http://127.0.0.1\",\"future\":true}"));
         Assert.Equal("UNKNOWN_CONFIGURATION_FIELD", unknown.DomainCode);
 
-        OneBotConfigurationException directOnly = Assert.Throws<OneBotConfigurationException>(
+        OneBotConfigurationException hostField = Assert.Throws<OneBotConfigurationException>(
             () => OneBotProfileLoader.FromJson(
                 "{\"binding_id\":\"main\",\"http_base_url\":\"http://127.0.0.1\",\"host_executable\":\"/opt/qq\"}"));
-        Assert.Equal("QQNT_DIRECT_ONLY_FIELD", directOnly.DomainCode);
+        Assert.Equal("UNKNOWN_CONFIGURATION_FIELD", hostField.DomainCode);
     }
 
     [Fact]

@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="../Cyrene.OneBot.V11.Core/Cyrene.OneBot.V11.Core.csproj" />
+    <ProjectReference Include="../Cyrene.Plugin.RuntimeHost/Cyrene.Plugin.RuntimeHost.csproj" />
     <PackageReference Include="Grpc.AspNetCore" Version="2.67.0" />
   </ItemGroup>
 </Project>

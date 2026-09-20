@@ -7,6 +7,7 @@
 // └─────────────────────────────────────────────────────────────────────────┘
 
 using Cyrene.OneBot.V11.Core;
+using Cyrene.Plugin.RuntimeHost;
 using Microsoft.AspNetCore.Server.Kestrel.Core;
 using System.Text.Json;
 
@@ -15,7 +16,7 @@ namespace Cyrene.OneBot.V11.Host;
 public static class Program
 {
     private static readonly IReadOnlyList<string> Capabilities =
-        new[] { "message.connector.v1", "qq.client.v1" };
+        new[] { "message.connector.v1" };
 
     public static async Task<int> Main(string[] args)
     {
@@ -34,22 +35,8 @@ public static class Program
             builder.Services.AddGrpc();
             builder.Services.AddSingleton(CreateMetadata());
 
-            QqDirectProfile? qqProfile = QqDirectProfileLoader.FromEnvironment();
-            OneBotProfile? profile = qqProfile is null
-                ? OneBotProfileLoader.FromEnvironment()
-                : null;
-            if (qqProfile is not null)
-            {
-                builder.Services.AddSingleton(qqProfile);
-                builder.Services.AddSingleton<QqHostClient>(serviceProvider =>
-                    new QqHostClient(qqProfile.HostLaunch));
-                builder.Services.AddSingleton<IDirectInvocationDispatcher>(serviceProvider =>
-                    new QqDirectInvocationDispatcher(
-                        qqProfile,
-                        serviceProvider.GetRequiredService<QqHostClient>()));
-                builder.Services.AddSingleton(RuntimeReadiness.Serving());
-            }
-            else if (profile is null)
+            OneBotProfile? profile = OneBotProfileLoader.FromEnvironment();
+            if (profile is null)
             {
                 builder.Services.AddSingleton<IDirectInvocationDispatcher,
                     NotConfiguredInvocationDispatcher>();
@@ -120,7 +107,7 @@ public static class Program
         Environment.GetEnvironmentVariable("CYRENE_PLUGIN_ID")
             ?? "cyrene.connectors.onebot-v11",
         Environment.GetEnvironmentVariable("CYRENE_PLUGIN_VERSION")
-            ?? "0.3.0",
+            ?? "0.4.0",
         Capabilities);
 
     private static string ResolveListenAddress(string[] args)

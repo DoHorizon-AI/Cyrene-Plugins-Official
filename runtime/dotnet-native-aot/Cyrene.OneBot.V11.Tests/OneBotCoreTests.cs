@@ -14,6 +14,7 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Cyrene.Message.Connector.V1;
+using Cyrene.Plugin.RuntimeHost;
 using Cyrene.OneBot.V11.Core;
 using Cyrene.Plugin.Runtime.V1;
 using Google.Protobuf;
@@ -37,13 +38,13 @@ public sealed class OneBotCoreTests
     }
 
     [Fact]
-    public void RejectsQqntOnlyConfigurationFields()
+    public void RejectsUnknownConfigurationFields()
     {
         OneBotConfigurationException exception = Assert.Throws<OneBotConfigurationException>(
             () => OneBotProfileLoader.FromJson(
                 "{\"binding_id\":\"qq-main\",\"http_base_url\":\"http://127.0.0.1\",\"host_executable\":\"/opt/qq\"}"));
 
-        Assert.Equal("QQNT_DIRECT_ONLY_FIELD", exception.DomainCode);
+        Assert.Equal("UNKNOWN_CONFIGURATION_FIELD", exception.DomainCode);
     }
 
     [Fact]

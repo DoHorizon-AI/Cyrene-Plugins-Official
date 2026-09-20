@@ -205,6 +205,21 @@ capabilities:
       - respond_request
       - send_message
     implementations:
+      - ref: cyrene.connectors.im
+        source: plugins/connectors/im/plugin.manifest.json
+        kind: capability-plugin
+        language: csharp
+        publication: published
+        methods:
+          - inbound_message
+          - inbound_request
+          - respond_request
+          - send_message
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-19
       - ref: cyrene.connectors.onebot-v11
         source: plugins/connectors/onebot-v11/plugin.manifest.json
         kind: capability-plugin
@@ -315,7 +330,7 @@ capabilities:
     contract:
       kind: owner-scoped
       paths:
-        - plugins/connectors/onebot-v11/contracts/v1/schema.json
+        - plugins/connectors/im/contracts/v1/schema.json
     contract_methods:
       - qq.account.core
       - qq.account.simple
@@ -397,8 +412,8 @@ capabilities:
       - qq.session.init
       - qq.session.start_nt
     implementations:
-      - ref: cyrene.connectors.onebot-v11
-        source: plugins/connectors/onebot-v11/plugin.manifest.json
+      - ref: cyrene.connectors.im
+        source: plugins/connectors/im/plugin.manifest.json
         kind: capability-plugin
         language: csharp
         publication: published
@@ -486,7 +501,7 @@ capabilities:
           - "1"
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: SIMULATED
-        verified_at: 2026-09-15
+        verified_at: 2026-09-19
     tck: []
   - id: tool.dataset.validator.v1
     interface_versions:

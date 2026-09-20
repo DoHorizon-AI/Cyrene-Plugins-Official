@@ -25,7 +25,6 @@ from onebot_v11_connector import (
     INBOUND_REQUEST_EVENT_TYPE,
     INBOUND_REQUEST_TYPE_URL,
     ONEBOT_VENDOR,
-    QQ_CAPABILITY_ID,
     RESPOND_REQUEST_METHOD,
     RESPOND_REQUEST_TYPE_URL,
     RESPOND_RESULT_TYPE_URL,
@@ -215,7 +214,7 @@ def inbound_event(account_id: str, message_id: str) -> dict[str, Any]:
     }
 
 
-def test_manifest_and_package_descriptor_project_both_connector_profiles() -> None:
+def test_manifest_and_package_descriptor_project_generic_connector() -> None:
     package_root = Path(__file__).parents[1]
     manifest = json.loads(
         (package_root / "plugin.manifest.json").read_text(encoding="utf-8")
@@ -225,8 +224,8 @@ def test_manifest_and_package_descriptor_project_both_connector_profiles() -> No
     )
 
     assert manifest["id"] == "cyrene.connectors.onebot-v11"
-    assert manifest["version"] == "0.3.0"
-    assert manifest["capabilities"] == [CAPABILITY_ID, QQ_CAPABILITY_ID]
+    assert manifest["version"] == "0.4.0"
+    assert manifest["capabilities"] == [CAPABILITY_ID]
     assert manifest["runtime"]["language"] == "csharp"
     assert manifest["runtime"]["launch"] == {
         "executable": "bin/cyrene-onebot-v11"
@@ -234,7 +233,7 @@ def test_manifest_and_package_descriptor_project_both_connector_profiles() -> No
     assert "requiresPython" not in manifest["compatibility"]
     assert manifest["compatibility"]["architectures"] == ["x86_64", "aarch64"]
     assert descriptor["capability"]["id"] == CAPABILITY_ID
-    assert descriptor["package"]["version"] == "0.3.0"
+    assert descriptor["package"]["version"] == "0.4.0"
     assert descriptor["connector"]["type"] == "onebot_v11"
     assert descriptor["publication_status"] == "CANDIDATE"
     assert descriptor["runtime"]["kind"] == "native-executable"
@@ -242,9 +241,9 @@ def test_manifest_and_package_descriptor_project_both_connector_profiles() -> No
     assert descriptor["implementation"]["artifact"]["status"] == "NOT_PUBLISHED"
     assert descriptor["dependencies"]["lock"]["status"] == "NOT_REQUIRED"
     assert descriptor["runtime"]["external"]["kind"] == "onebot_v11_runtime"
-    assert descriptor["profiles"][1]["name"] == "qqnt-direct"
-    assert descriptor["profiles"][1]["runtime"]["ipc"] == "inherited-stdio"
-    assert descriptor["profiles"][1]["runtime"]["external"]["required"] is True
+    assert [profile["name"] for profile in descriptor["profiles"]] == [
+        "onebot-v11"
+    ]
 
 
 def test_worker_activation_can_receive_one_binding_from_environment(

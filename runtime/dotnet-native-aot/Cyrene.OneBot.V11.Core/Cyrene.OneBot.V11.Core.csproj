@@ -3,10 +3,11 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Description>AOT-safe DirectPluginRuntime core for the OneBot v11 connector.</Description>
+    <Description>AOT-safe generic OneBot v11 connector core.</Description>
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="../Cyrene.Plugin.RuntimeHost/Cyrene.Plugin.RuntimeHost.csproj" />
     <ProjectReference Include="../../../contracts/dotnet/Cyrene.Plugin.Contracts/Cyrene.Plugin.Contracts.csproj" />
   </ItemGroup>
 </Project>

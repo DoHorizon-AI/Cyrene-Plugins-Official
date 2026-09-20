@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-im-connector-reference"
+version = "0.1.0"
+description = "Python behavioral reference for the Cyrene QQ/IM connector"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "grpcio>=1.62,<1.63",
+  "protobuf>=4.21,<5",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.connectors.im" = [
+  "plugin.manifest.json",
+  "package-descriptor.json",
+  "configuration.schema.json",
+]
+"share/cyrene/plugins/cyrene.connectors.im/contracts/v1" = [
+  "contracts/v1/schema.json",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

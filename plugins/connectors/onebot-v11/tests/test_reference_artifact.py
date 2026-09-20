@@ -44,7 +44,7 @@ def test_reference_archive_contains_provenance_and_python_payload(
     assert manifest["plugin_id"] == "cyrene.connectors.onebot-v11"
     assert manifest["reference_runtime"] == "python"
     assert manifest["formal_runtime"] == "csharp-native-aot"
-    assert manifest["qqnt_real_smoke"] == "NOT_RUN"
+    assert manifest["onebot_real_smoke"] == "NOT_RUN"
     assert len(manifest["source_revision"]) == 40
     assert all(entry["path"] for entry in manifest["entries"])
 
