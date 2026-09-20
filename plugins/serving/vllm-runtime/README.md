@@ -29,5 +29,5 @@ cyrene-vllm-runtime serve \
   --vllm-command "vllm serve"
 ```
 
-Verification: `python -m pytest plugins/serving/vllm-runtime/tests` exercises the whole
+Verification: `cd plugins/serving/vllm-runtime && python -m pytest tests` exercises the whole
 lifecycle against a stand-in process; a real vLLM launch and GPU inference are not verified.

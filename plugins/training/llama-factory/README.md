@@ -25,5 +25,5 @@ executor owns `CUDA_VISIBLE_DEVICES`, mounts, and process lifetime.
 | `CYRENE_LLAMA_FACTORY_PYTHON` | Interpreter used as `<python> -m llamafactory.cli` when no entrypoint is set |
 | `CYRENE_LLAMA_FACTORY_VERSION` | Version reported by `inspect` |
 
-Verification: `python -m pytest plugins/training/llama-factory/tests`.
+Verification: `cd plugins/training/llama-factory && python -m pytest tests`.
 Real CUDA training is not verified by these tests; see `contracts/capability-verification.json`.

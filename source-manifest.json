@@ -1419,8 +1419,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/README.md",
-      "sha256": "95fdcdaac0cf1110abbd917ce510e305e292fc18df9f16d76b42d6cff09e881c",
-      "size_bytes": 1760
+      "sha256": "d7f1e7996d91a2c6e59089b3d0947c2ae999794c8b9ef86ad0e0896559c6cf27",
+      "size_bytes": 1766
     },
     {
       "kind": "file",
@@ -1538,8 +1538,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/README.md",
-      "sha256": "6150937a05f02f23668de4c43c084671604e0269126ccf9b047a5afeab83e518",
-      "size_bytes": 1517
+      "sha256": "895c48e799bdcef9ddfe22d017dc75ed2cd3b400e8353b4877514d4836f3b190",
+      "size_bytes": 1523
     },
     {
       "kind": "file",
