@@ -282,6 +282,21 @@
           "notes": "No real QQ client or Product consumer was exercised."
         }
       ]
+    },
+    {
+      "capability": "training.llama-factory.v1",
+      "implementation": "cyrene.training.llama-factory",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-20",
+          "environment": "linux / pytest / in-process DirectPluginRuntime gRPC endpoint compiling a real LLaMA-Factory run directory",
+          "command": "python -m pytest plugins/training/llama-factory/tests",
+          "result": "5 passed; inspect, compile, and parse_event dispatched over the real runtime",
+          "notes": "Launch contract verified without a GPU. Real CUDA training and checkpoint production remain unverified."
+        }
+      ]
     }
   ]
 }

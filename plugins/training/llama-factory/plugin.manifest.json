@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.training.llama-factory",
+  "name": "LLaMA-Factory Trainer",
+  "version": "0.1.0",
+  "description": "Compiles Product training intent into a LLaMA-Factory run directory and launch description.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "training.llama-factory.v1"
+  ],
+  "methods": [
+    {
+      "name": "inspect",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/InspectRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/InspectResponse"
+    },
+    {
+      "name": "compile",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/CompileRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/CompileResponse"
+    },
+    {
+      "name": "parse_event",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/ParseEventRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ParseEventResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "llama_factory:LlamaFactoryTrainingPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "llama_factory:LlamaFactoryTrainingPlugin"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": [
+      "linux"
+    ]
+  },
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

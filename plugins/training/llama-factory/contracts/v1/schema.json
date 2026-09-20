@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.dev/training/llama-factory/v1/schema.json",
+  "title": "training.llama-factory.v1",
+  "description": "Launch contract for the Plugins-owned LLaMA-Factory trainer.",
+  "type": "object",
+  "$defs": {
+    "InspectRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {}
+    },
+    "InspectResponse": {
+      "type": "object",
+      "required": ["engine", "available", "supported_strategies", "supported_finetune_types", "notes"],
+      "additionalProperties": false,
+      "properties": {
+        "engine": { "const": "llamafactory" },
+        "available": { "type": "boolean" },
+        "version": { "type": ["string", "null"] },
+        "supported_strategies": { "type": "array", "items": { "type": "string" } },
+        "supported_finetune_types": { "type": "array", "items": { "type": "string" } },
+        "notes": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "CompileRequest": {
+      "type": "object",
+      "required": ["spec"],
+      "additionalProperties": false,
+      "properties": {
+        "spec": { "$ref": "#/$defs/TrainingSpec" }
+      }
+    },
+    "TrainingSpec": {
+      "type": "object",
+      "required": ["engine", "model", "dataset", "output_dir"],
+      "additionalProperties": true,
+      "properties": {
+        "engine": { "type": "string" },
+        "model": {
+          "type": "object",
+          "required": ["path"],
+          "additionalProperties": true,
+          "properties": { "path": { "type": "string" } }
+        },
+        "dataset": {
+          "type": "object",
+          "required": ["path"],
+          "additionalProperties": true,
+          "properties": { "path": { "type": "string" } }
+        },
+        "output_dir": { "type": "string" },
+        "stage": { "type": "string" },
+        "finetuning_type": { "type": "string" },
+        "lora": { "type": "object" },
+        "hyperparams": { "type": "object" },
+        "distributed": { "type": "object" },
+        "checkpoint": { "type": "object" },
+        "environment": { "type": "object" },
+        "extra": { "type": "object" }
+      }
+    },
+    "CompileResponse": {
+      "type": "object",
+      "required": ["launch"],
+      "additionalProperties": false,
+      "properties": {
+        "launch": {
+          "type": "object",
+          "required": ["engine", "argv", "work_dir", "distributed", "checkpoint", "launch_kind"],
+          "additionalProperties": true,
+          "properties": {
+            "engine": { "const": "llamafactory" },
+            "argv": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+            "work_dir": { "type": "string" },
+            "cwd": { "type": "string" },
+            "launch_kind": { "const": "direct" },
+            "env": { "type": "object", "additionalProperties": { "type": "string" } },
+            "resources": { "type": "object" },
+            "mounts": { "type": "array", "items": { "type": "object" } },
+            "output_layout": { "type": "object" },
+            "spec_artifact_path": { "type": "string" }
+          }
+        }
+      }
+    },
+    "ParseEventRequest": {
+      "type": "object",
+      "required": ["line"],
+      "additionalProperties": false,
+      "properties": { "line": { "type": "string" } }
+    },
+    "ParseEventResponse": {
+      "type": "object",
+      "required": ["kind", "message", "raw"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "enum": ["progress", "log"] },
+        "message": { "type": "string" },
+        "payload": { "type": "object" },
+        "raw": { "type": "string" }
+      }
+    }
+  }
+}

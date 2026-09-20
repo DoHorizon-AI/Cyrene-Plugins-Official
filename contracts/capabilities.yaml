@@ -551,6 +551,33 @@ capabilities:
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs
       - contracts/tck/tool-provider-v1
+  - id: training.llama-factory.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/training/llama-factory/contracts/v1/schema.json
+    contract_methods:
+      - compile
+      - inspect
+      - parse_event
+    implementations:
+      - ref: cyrene.training.llama-factory
+        source: plugins/training/llama-factory/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - compile
+          - inspect
+          - parse_event
+        interface_versions:
+          - "1"
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-20
+    tck: []
 declared_without_contract:
   - id: rerank.provider.v1
     declared_by: runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs

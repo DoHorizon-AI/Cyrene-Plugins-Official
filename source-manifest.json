@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "c8d89307df1686cc2e46ce82a584d20215946b14f9c833e3b59c11fc87632e1c",
-      "size_bytes": 16980
+      "sha256": "723b408699b1668f26c23674cbbd4917443d8d6d9f687e016e168abc54361cab",
+      "size_bytes": 17711
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "ddfd0dcc6e0111f6f83c5032b6587036e1672fe9b14d2ff41e3f840a21422212",
-      "size_bytes": 15851
+      "sha256": "c726f00766b1c813c5e0022a3b394607e795359b61266339dd8a8aec0248b50c",
+      "size_bytes": 16581
     },
     {
       "kind": "file",
@@ -1418,6 +1418,34 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/README.md",
+      "sha256": "95fdcdaac0cf1110abbd917ce510e305e292fc18df9f16d76b42d6cff09e881c",
+      "size_bytes": 1760
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/pyproject.toml",
+      "sha256": "abb2b93f6520121082e9c1c5dc0f9a93b17a5e12a84b0106082111bab0dc4a32",
+      "size_bytes": 677
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/tests/test_vllm_runtime.py",
+      "sha256": "4ad3b108482cd2128cce69bb690e7daba3c6b076a47be8f7133ee5af131d13a7",
+      "size_bytes": 7225
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/vllm_runtime.py",
+      "sha256": "3ebf50cbe4627e1a3b377828ee4488c41047e56410a8563dfcfb9f19a12e122b",
+      "size_bytes": 21467
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/computer-runtime/plugin.manifest.json",
       "sha256": "505fb457cbabb2d796ee774f674e7cd93d74b76466f90b2a4adf5c8c06d309b3",
       "size_bytes": 1680
@@ -1440,8 +1468,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/dataset_preparation.py",
-      "sha256": "13fd58001453e828017becff70d1552dc0fd772caebeee61be94ec7514542662",
-      "size_bytes": 21081
+      "sha256": "292d3ba81feb9611b210e75a98029c50500920e6be44bd76b6172788ce86295a",
+      "size_bytes": 22125
     },
     {
       "kind": "file",
@@ -1461,8 +1489,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/tests/test_dataset_preparation.py",
-      "sha256": "5fe67673d6d870f4475e775b77f08d4161bb91c5298d2ac3c3e924df71cbadf3",
-      "size_bytes": 4026
+      "sha256": "7ee92505e92d81f3813e46a485fa8adc117f0e3b9adb6d78d72fa9f61530c2b9",
+      "size_bytes": 4677
     },
     {
       "kind": "file",
@@ -1505,6 +1533,48 @@
       "path": "plugins/tools/dataset-validator/tests/test_dataset_validator.py",
       "sha256": "a9ad9c86a8d0dcf677bf30f6f3393a8d4046448afd8afaee1c924381069e81b8",
       "size_bytes": 2214
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/training/llama-factory/README.md",
+      "sha256": "6150937a05f02f23668de4c43c084671604e0269126ccf9b047a5afeab83e518",
+      "size_bytes": 1517
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/training/llama-factory/contracts/v1/schema.json",
+      "sha256": "56a6404b49e550744a3044da9e729f7c1262b4bae9503cd7bcef6de453e94a6c",
+      "size_bytes": 3702
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/training/llama-factory/llama_factory.py",
+      "sha256": "f2f301a8765f2eaa578243074a61c69d058733e48a52b5147f343bb498163774",
+      "size_bytes": 12969
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/training/llama-factory/plugin.manifest.json",
+      "sha256": "df135030e30346d72f2822c21ecf8beafac5642394c7376c94714759dbab82d6",
+      "size_bytes": 1733
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/training/llama-factory/pyproject.toml",
+      "sha256": "e6f2ba94c1793b38cfa4393b9f1e0fc5e6c5b58052a20558d64ae51ed70035bc",
+      "size_bytes": 616
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/training/llama-factory/tests/test_llama_factory.py",
+      "sha256": "017ab5d3d2fe0dc0e8db809464178ed885940cc519d7b9acd23e3abe201f4965",
+      "size_bytes": 4329
     },
     {
       "kind": "file",
