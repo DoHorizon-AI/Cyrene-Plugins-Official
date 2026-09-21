@@ -18,6 +18,8 @@ import grpc
 
 from ._generated import direct_plugin_runtime_pb2 as wire
 from ._generated import direct_plugin_runtime_pb2_grpc as wire_grpc
+from .errors import map_plugin_error
+from .logging import emit_diagnostic_error, sanitize_request_id
 
 _MAX_ID_BYTES = 256
 _MAX_TYPE_URL_BYTES = 512
@@ -332,7 +334,13 @@ def _wire_payload(value: Any) -> wire.DirectPayload:
     return wire.DirectPayload(type_url=type_url, value=payload)
 
 
-def _wire_error(value: Any) -> wire.DirectInvocationError:
+def _wire_error(
+    value: Any,
+    *,
+    request_id: str | None = None,
+    capability: str | None = None,
+    method: str | None = None,
+) -> wire.DirectInvocationError:
     text = str(value).strip() or "EXECUTION_FAILED: plugin invocation failed"
     prefix, separator, detail = text.partition(":")
     code_name = prefix.strip().upper() if separator else "EXECUTION_FAILED"
@@ -352,6 +360,28 @@ def _wire_error(value: Any) -> wire.DirectInvocationError:
         "EXECUTION_FAILED": wire.DirectInvocationError.CODE_EXECUTION_FAILED,
     }
     code = mapping.get(code_name, wire.DirectInvocationError.CODE_EXECUTION_FAILED)
+
+    # Diagnostic errors strictly to stderr; stdout is reserved for machine protocols
+    mapped = map_plugin_error(code_name)
+    attrs: dict[str, Any] = {
+        "cause_kind": mapped.get("cause_kind"),
+        "recovery_action": mapped.get("recovery_action"),
+    }
+    sanitized_req = sanitize_request_id(request_id)
+    if sanitized_req:
+        attrs["request_id"] = sanitized_req
+    if capability:
+        attrs["plugin.capability"] = capability
+    if method:
+        attrs["plugin.method"] = method
+
+    emit_diagnostic_error(
+        "plugin.runtime.invocation_error",
+        mapped["code"],
+        message[:4096],
+        attributes=attrs,
+    )
+
     return wire.DirectInvocationError(
         code=code,
         message=message[:4096],
