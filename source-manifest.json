@@ -1692,8 +1692,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.test.ts",
-      "sha256": "0ab075860a12736be61ab9b9a754c731bb0862a965250e52669ffb9aafa58893",
-      "size_bytes": 8397
+      "sha256": "15dbf3a86e6886dc0e46e617d13808707d35318487c96f6d9643593a81fb7d14",
+      "size_bytes": 8366
     },
     {
       "kind": "file",

@@ -186,7 +186,7 @@ describe("NavigatorApi", () => {
             state: "ACTIVE",
             modelScope: ["llama-3-8b"],
             createdAt: "2026-09-21T00:00:00Z",
-            secret: "cyk_live_test_secret_12345",
+            secret: "test-secret",
           });
         }
         return response([
@@ -219,7 +219,7 @@ describe("NavigatorApi", () => {
     expect(routes[0]?.["modelPattern"]).toBe("llama-3-8b");
 
     const created = await api.createApiKey("route-1", { name: "test-key" });
-    expect(created.secret).toBe("cyk_live_test_secret_12345");
+    expect(created.secret).toBe("test-secret");
     expect(created.key.name).toBe("test-key");
 
     const keys = await api.listApiKeys();
@@ -230,4 +230,3 @@ describe("NavigatorApi", () => {
     expect(revoked.state).toBe("REVOKED");
   });
 });
-
