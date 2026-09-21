@@ -18,6 +18,33 @@ export interface SessionPayload {
   refreshed: boolean;
 }
 
+export interface GpuDeviceStatus {
+  name: string;
+  totalMib: number;
+  usedMib: number;
+  utilizationPct: number;
+}
+
+export interface GpuStatus {
+  available: boolean;
+  gpus?: GpuDeviceStatus[];
+}
+
+export interface DiskStatus {
+  available?: boolean;
+  totalGib?: number;
+  usedGib?: number;
+  freeGib?: number;
+  usedPct?: number;
+}
+
+export interface ServiceHealthStatus {
+  name: string;
+  url: string;
+  status: "UP" | "DOWN";
+  latencyMs: number;
+}
+
 /** Safe host status; it intentionally contains no credential material. */
 export interface SystemStatus {
   service: string;
@@ -29,6 +56,9 @@ export interface SystemStatus {
     active: number;
     revoked: number;
   };
+  gpu?: GpuStatus;
+  disk?: DiskStatus;
+  services?: ServiceHealthStatus[];
   observedAt: string;
 }
 
@@ -42,6 +72,25 @@ export interface CredentialMetadata {
   credentialRef: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** Gateway API key metadata returned by Exchange. */
+export interface ApiKeyMetadata {
+  id: string;
+  name: string;
+  credentialRef: string;
+  state: "ACTIVE" | "REVOKED";
+  modelScope: string[];
+  createdAt: string;
+  expiresAt?: string | null;
+  revokedAt?: string | null;
+  resourceVersion?: number;
+}
+
+export interface CreateApiKeyInput {
+  name: string;
+  expiresAt?: string | null;
+  modelScope?: string[];
 }
 
 /** Model import command accepted by the Reactor Product API. */
@@ -342,6 +391,64 @@ export class NavigatorApi {
     );
   }
 
+  /** Read Gateway routes configured on Exchange. */
+  async getGatewayRoutes(): Promise<JsonRecord[]> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/gateway-routes`,
+      { method: "GET" },
+      parseResourceArray,
+    );
+  }
+
+  /** Read Gateway endpoints configured on Exchange. */
+  async getGatewayEndpoints(): Promise<JsonRecord[]> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/gateway-endpoints`,
+      { method: "GET" },
+      parseResourceArray,
+    );
+  }
+
+  /** Confirm and publish a draft gateway route. */
+  async confirmGatewayRoute(routeId: string, resourceVersion: number): Promise<JsonRecord> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/gateway-route-drafts/${encodeURIComponent(routeId)}/actions/confirm`,
+      jsonRequest("POST", { resourceVersion }, true),
+      parseResource,
+    );
+  }
+
+  /** List Exchange gateway API keys. */
+  async listApiKeys(): Promise<ApiKeyMetadata[]> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/api-keys`,
+      { method: "GET" },
+      parseApiKeyArray,
+    );
+  }
+
+  /** Create an Exchange gateway API key; secret is returned exactly once. */
+  async createApiKey(
+    routeId: string,
+    input: CreateApiKeyInput | JsonRecord,
+  ): Promise<{ key: ApiKeyMetadata; secret: string }> {
+    void routeId;
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/api-keys`,
+      jsonRequest("POST", input, true),
+      parseCreatedApiKey,
+    );
+  }
+
+  /** Revoke an Exchange gateway API key. */
+  async revokeApiKey(id: string): Promise<ApiKeyMetadata> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/api-keys/${encodeURIComponent(id)}/actions/revoke`,
+      jsonRequest("POST", {}, true),
+      parseApiKey,
+    );
+  }
+
   private async requestJson<T>(
     path: string,
     init: RequestInit,
@@ -472,6 +579,52 @@ function parseSystemStatus(value: unknown): SystemStatus {
   if (!Array.isArray(prefixes) || !prefixes.every((prefix) => typeof prefix === "string")) {
     throw new NavigatorContractError("Navigator returned invalid proxy prefix metadata.");
   }
+
+  let gpu: GpuStatus | undefined;
+  if (record.gpu && typeof record.gpu === "object") {
+    const gpuRec = record.gpu as Record<string, unknown>;
+    const gpus = Array.isArray(gpuRec.gpus)
+      ? gpuRec.gpus.map((g) => {
+          const gr = requireRecord(g, "gpu device");
+          return {
+            name: requireString(gr, "name", "gpu name"),
+            totalMib: requireNumber(gr, "totalMib", "gpu totalMib"),
+            usedMib: requireNumber(gr, "usedMib", "gpu usedMib"),
+            utilizationPct: requireNumber(gr, "utilizationPct", "gpu utilizationPct"),
+          };
+        })
+      : undefined;
+    gpu = {
+      available: Boolean(gpuRec.available),
+      gpus,
+    };
+  }
+
+  let disk: DiskStatus | undefined;
+  if (record.disk && typeof record.disk === "object") {
+    const diskRec = record.disk as Record<string, unknown>;
+    disk = {
+      available: diskRec.available !== undefined ? Boolean(diskRec.available) : undefined,
+      totalGib: typeof diskRec.totalGib === "number" ? diskRec.totalGib : undefined,
+      usedGib: typeof diskRec.usedGib === "number" ? diskRec.usedGib : undefined,
+      freeGib: typeof diskRec.freeGib === "number" ? diskRec.freeGib : undefined,
+      usedPct: typeof diskRec.usedPct === "number" ? diskRec.usedPct : undefined,
+    };
+  }
+
+  let services: ServiceHealthStatus[] | undefined;
+  if (Array.isArray(record.services)) {
+    services = record.services.map((s) => {
+      const sr = requireRecord(s, "service health");
+      return {
+        name: requireString(sr, "name", "service name"),
+        url: requireString(sr, "url", "service url"),
+        status: sr.status === "UP" ? ("UP" as const) : ("DOWN" as const),
+        latencyMs: requireNumber(sr, "latencyMs", "service latencyMs"),
+      };
+    });
+  }
+
   return {
     service: requireString(record, "service", "system status"),
     status: requireString(record, "status", "system status"),
@@ -482,8 +635,44 @@ function parseSystemStatus(value: unknown): SystemStatus {
       active: requireNumber(credentials, "active", "credential counts"),
       revoked: requireNumber(credentials, "revoked", "credential counts"),
     },
+    gpu,
+    disk,
+    services,
     observedAt: requireString(record, "observedAt", "system status"),
   };
+}
+
+function parseApiKey(value: unknown): ApiKeyMetadata {
+  const record = requireRecord(value, "api key");
+  const rawState = requireString(record, "state", "api key state");
+  const state: "ACTIVE" | "REVOKED" = rawState === "REVOKED" ? "REVOKED" : "ACTIVE";
+  const modelScopeRaw = record.modelScope ?? record.model_scope;
+  const modelScope = Array.isArray(modelScopeRaw)
+    ? modelScopeRaw.map((item) => String(item))
+    : [];
+
+  return {
+    id: requireString(record, "id", "api key id"),
+    name: requireString(record, "name", "api key name"),
+    credentialRef: String(record.credentialRef ?? record.credential_ref ?? ""),
+    state,
+    modelScope,
+    createdAt: String(record.createdAt ?? record.created_at ?? ""),
+    expiresAt: readNullableString(record, "expiresAt") ?? readNullableString(record, "expires_at"),
+    revokedAt: readNullableString(record, "revokedAt") ?? readNullableString(record, "revoked_at"),
+    resourceVersion: typeof record.resourceVersion === "number" ? record.resourceVersion : undefined,
+  };
+}
+
+function parseApiKeyArray(value: unknown): ApiKeyMetadata[] {
+  return requireArray(value, "api keys").map((item) => parseApiKey(item));
+}
+
+function parseCreatedApiKey(value: unknown): { key: ApiKeyMetadata; secret: string } {
+  const record = requireRecord(value, "created api key");
+  const key = parseApiKey(record);
+  const secret = requireString(record, "secret", "api key secret");
+  return { key, secret };
 }
 
 function parseCredentialArray(value: unknown): CredentialMetadata[] {

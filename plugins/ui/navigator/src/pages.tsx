@@ -20,9 +20,11 @@ import {
   text,
 } from "./components";
 import {
+  type ApiKeyMetadata,
   type CredentialMetadata,
   type CreateModelImportInput,
   type JsonRecord,
+  NAVIGATOR_PROXY_PATHS,
   NavigatorApi,
   NavigatorContractError,
   NavigatorHttpError,
@@ -171,6 +173,45 @@ export function OverviewPage({ api }: PageProps) {
                   </div>
                 ))}
               </div>
+            )}
+          </Panel>
+
+          <Panel
+            title="GPU & Accelerators"
+            meta={<StatusPill value={system?.gpu?.available ? "AVAILABLE" : "UNAVAILABLE"} />}
+          >
+            {system?.gpu?.available && system.gpu.gpus && system.gpu.gpus.length > 0 ? (
+              <div className="service-list">
+                {system.gpu.gpus.map((gpu, idx) => (
+                  <div className="service-row" key={idx}>
+                    <span className="service-dot service-dot--good" aria-hidden="true" />
+                    <span><strong>{gpu.name}</strong></span>
+                    <span>{gpu.usedMib} / {gpu.totalMib} MiB ({gpu.utilizationPct}% util)</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <StateBlock
+                kind="empty"
+                title="No GPU detected"
+                detail={system?.gpu?.available === false ? "nvidia-smi unavailable or no supported GPU found." : "Hardware information not reported."}
+              />
+            )}
+          </Panel>
+
+          <Panel
+            title="Storage & Disk"
+            meta={<StatusPill value={system?.disk?.available !== false ? "MOUNTED" : "UNAVAILABLE"} />}
+          >
+            {system?.disk?.totalGib ? (
+              <dl className="detail-grid">
+                <Detail label="Total space" value={`${system.disk.totalGib} GiB`} />
+                <Detail label="Used space" value={`${system.disk.usedGib ?? "-"} GiB`} />
+                <Detail label="Free space" value={`${system.disk.freeGib ?? "-"} GiB`} />
+                <Detail label="Utilization" value={`${system.disk.usedPct ?? "-"}%`} />
+              </dl>
+            ) : (
+              <StateBlock kind="empty" title="Storage usage unavailable" detail="Filesystem statistics not reported by host." />
             )}
           </Panel>
         </div>
@@ -582,6 +623,14 @@ export function RunsPage({ api }: PageProps) {
   const [attemptError, setAttemptError] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
 
+  // SSE Realtime events stream state
+  const [events, setEvents] = useState<JsonRecord[]>([]);
+  const [latestLoss, setLatestLoss] = useState<number | null>(null);
+  const [currentStep, setCurrentStep] = useState<number | null>(null);
+  const [totalSteps, setTotalSteps] = useState<number | null>(null);
+  const [streamActive, setStreamActive] = useState(false);
+  const [streamDone, setStreamDone] = useState(false);
+
   useEffect(() => {
     const value = initialRunId();
     if (!value) {
@@ -615,6 +664,101 @@ export function RunsPage({ api }: PageProps) {
     };
   }, [api]);
 
+  const currentRunId = run ? text(run["id"], "") : "";
+  const runState = text(run?.["state"], "");
+  const canCancel = ["QUEUED", "RUNNING", "AWAITING_RETRY"].includes(runState);
+
+  useEffect(() => {
+    if (!currentRunId || !["RUNNING", "QUEUED"].includes(runState)) {
+      return;
+    }
+
+    let canceled = false;
+    let retryCount = 0;
+    let controller = new AbortController();
+
+    const connect = async () => {
+      if (canceled) return;
+      controller = new AbortController();
+      const url = `${NAVIGATOR_PROXY_PATHS.yield}/api/v1/training-runs/${currentRunId}/events/stream`;
+      try {
+        setStreamActive(true);
+        const response = await fetch(url, {
+          signal: controller.signal,
+          headers: { Accept: "text/event-stream" },
+          credentials: "same-origin",
+        });
+        if (!response.ok || !response.body) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        retryCount = 0;
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (!canceled) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            if (trimmed.startsWith("event:")) {
+              const eventKind = trimmed.substring(6).trim();
+              if (eventKind === "done") {
+                setStreamDone(true);
+                setStreamActive(false);
+                void api.getTrainingRun(currentRunId).then((updated) => setRun(updated));
+                return;
+              }
+            } else if (trimmed.startsWith("data:")) {
+              const jsonStr = trimmed.substring(5).trim();
+              try {
+                const parsed = JSON.parse(jsonStr) as Record<string, unknown>;
+                setEvents((prev) => [...prev.slice(-49), parsed]);
+                const payload = (parsed["payload"] ?? parsed) as Record<string, unknown>;
+                if (typeof payload["loss"] === "number") {
+                  setLatestLoss(payload["loss"]);
+                }
+                const step = payload["step"] ?? payload["currentStep"] ?? payload["current_step"];
+                if (typeof step === "number") {
+                  setCurrentStep(Number(step));
+                }
+                const total = payload["totalSteps"] ?? payload["total_steps"] ?? payload["total"];
+                if (typeof total === "number") {
+                  setTotalSteps(Number(total));
+                }
+              } catch {
+                // Ignore parse errors
+              }
+            }
+          }
+        }
+      } catch {
+        if (canceled) return;
+        setStreamActive(false);
+        if (retryCount < 3) {
+          retryCount += 1;
+          setTimeout(() => {
+            if (!canceled) {
+              void connect();
+            }
+          }, 5000);
+        }
+      }
+    };
+
+    void connect();
+
+    return () => {
+      canceled = true;
+      controller.abort();
+    };
+  }, [currentRunId, runState, api]);
+
   const lookupRun = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const value = runId.trim();
@@ -628,6 +772,11 @@ export function RunsPage({ api }: PageProps) {
     setAttemptError(null);
     setRun(null);
     setAttempts(null);
+    setEvents([]);
+    setLatestLoss(null);
+    setCurrentStep(null);
+    setTotalSteps(null);
+    setStreamDone(false);
     try {
       const result = await api.getTrainingRun(value);
       setRun(result);
@@ -658,9 +807,6 @@ export function RunsPage({ api }: PageProps) {
       setCanceling(false);
     }
   };
-
-  const runState = text(run?.["state"], "");
-  const canCancel = ["QUEUED", "RUNNING", "AWAITING_RETRY"].includes(runState);
 
   return (
     <div className="page-stack">
@@ -706,6 +852,63 @@ export function RunsPage({ api }: PageProps) {
                 <p><strong>{text(nestedRecord(run, "failure")?.["code"], "Run failure")}</strong> {text(nestedRecord(run, "failure")?.["message"])}</p>
               </div>
             ) : null}
+          </Panel>
+
+          <Panel
+            title="Realtime execution stream"
+            meta={
+              <div className="panel-actions">
+                <StatusPill value={streamActive ? "STREAMING" : streamDone || ["SUCCEEDED", "FAILED", "CANCELLED"].includes(runState) ? "FINISHED" : "IDLE"} />
+                {(streamDone || ["SUCCEEDED", "FAILED", "CANCELLED"].includes(runState)) && (
+                  <Button onClick={() => void api.getTrainingRun(currentRunId).then((res) => setRun(res))}>
+                    查看结果
+                  </Button>
+                )}
+              </div>
+            }
+          >
+            <div className="metric-grid">
+              <MetricCard
+                label="Loss"
+                value={latestLoss !== null ? latestLoss.toFixed(4) : "--"}
+                detail="Current training loss"
+                accent="orange"
+              />
+              <MetricCard
+                label="Progress"
+                value={currentStep !== null && totalSteps !== null ? `${currentStep} / ${totalSteps}` : currentStep !== null ? `Step ${currentStep}` : "--"}
+                detail={currentStep !== null && totalSteps ? `${Math.round((currentStep / totalSteps) * 100)}% steps completed` : "Step progress"}
+                accent="blue"
+              />
+              <MetricCard
+                label="Stream status"
+                value={streamActive ? "Active" : streamDone ? "Finished" : "Standby"}
+                detail={streamActive ? "SSE live connection" : "Stream completed or disconnected"}
+                accent={streamActive ? "lime" : "gray"}
+              />
+            </div>
+
+            <div style={{ marginTop: "16px" }}>
+              <strong style={{ display: "block", marginBottom: "8px", fontSize: "13px" }}>Event logs (last 50):</strong>
+              <div style={{ maxHeight: "260px", overflowY: "auto", background: "var(--color-bg-subtle, #181c20)", padding: "12px", borderRadius: "6px", fontFamily: "monospace", fontSize: "12px" }}>
+                {events.length === 0 ? (
+                  <div style={{ color: "var(--muted, #888)" }}>No realtime stream events captured yet.</div>
+                ) : (
+                  events.map((evt, idx) => {
+                    const seq = String(evt["sequence"] ?? idx + 1);
+                    const kind = String(evt["kind"] ?? evt["event"] ?? "event");
+                    const payload = evt["payload"] ? JSON.stringify(evt["payload"]) : evt["message"] ?? JSON.stringify(evt);
+                    return (
+                      <div key={idx} style={{ marginBottom: "4px", lineHeight: "1.4" }}>
+                        <span style={{ color: "var(--muted, #888)", marginRight: "8px" }}>#{seq}</span>
+                        <span style={{ color: "var(--blue, #64B5F6)", marginRight: "8px" }}>[{kind}]</span>
+                        <span>{String(payload)}</span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
           </Panel>
 
           <Panel title="Attempt diagnostics" meta={attempts ? `${attempts.length} attempts` : "OWNER READ"}>
@@ -832,6 +1035,434 @@ export function DeploymentsPage({ api }: PageProps) {
           </>
         ) : (
           <StateBlock kind="empty" title="No deployments" detail="A validated model version must be handed to Reactor before a serving deployment can exist." />
+        )}
+      </Panel>
+    </div>
+  );
+}
+
+/** Exchange Gateway routes, invocation snippets, and API key lifecycle administration. */
+export function GatewayPage({ api }: PageProps) {
+  const [reloadKey, setReloadKey] = useState(0);
+  const [routes, setRoutes] = useState<JsonRecord[] | null>(null);
+  const [selectedRoute, setSelectedRoute] = useState<JsonRecord | null>(null);
+  const [apiKeys, setApiKeys] = useState<ApiKeyMetadata[] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [activeCodeTab, setActiveCodeTab] = useState<"curl" | "python" | "javascript">("curl");
+
+  // New key form state
+  const [keyName, setKeyName] = useState("");
+  const [expiresDays, setExpiresDays] = useState("");
+  const [modelScope, setModelScope] = useState("");
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createdSecret, setCreatedSecret] = useState<string | null>(null);
+  const [createdKeyName, setCreatedKeyName] = useState<string | null>(null);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
+  const [copiedBaseUrl, setCopiedBaseUrl] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    void Promise.allSettled([api.getGatewayRoutes(), api.listApiKeys()]).then(
+      ([routesRes, keysRes]) => {
+        if (!active) return;
+        if (routesRes.status === "fulfilled") {
+          setRoutes(routesRes.value);
+          if (routesRes.value.length > 0) {
+            setSelectedRoute((prev) => prev ?? routesRes.value[0]);
+          }
+          setError(null);
+        } else {
+          setRoutes(null);
+          setError(errorMessage(routesRes.reason));
+        }
+
+        if (keysRes.status === "fulfilled") {
+          setApiKeys(keysRes.value);
+        } else {
+          setApiKeys([]);
+        }
+        setLoading(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [api, reloadKey]);
+
+  const refresh = () => setReloadKey((v) => v + 1);
+
+  const confirmRoute = async (route: JsonRecord) => {
+    const id = text(route["id"]);
+    const version = typeof route["resourceVersion"] === "number" ? route["resourceVersion"] : 1;
+    setActionError(null);
+    setActionNotice(null);
+    try {
+      await api.confirmGatewayRoute(id, version);
+      setActionNotice(`Route ${text(route["modelPattern"] || route["model_pattern"] || id)} confirmed and published.`);
+      refresh();
+    } catch (err) {
+      setActionError(errorMessage(err));
+    }
+  };
+
+  const handleCreateKey = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const name = keyName.trim();
+    if (!name) return;
+    setCreatingKey(true);
+    setActionError(null);
+    try {
+      let expiresAt: string | null = null;
+      const days = parseInt(expiresDays, 10);
+      if (!isNaN(days) && days > 0) {
+        expiresAt = new Date(Date.now() + days * 86400000).toISOString();
+      }
+      const scope = modelScope
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      const res = await api.createApiKey(text(selectedRoute?.["id"] ?? ""), {
+        name,
+        expiresAt,
+        modelScope: scope,
+      });
+      setCreatedSecret(res.secret);
+      setCreatedKeyName(res.key.name);
+      setKeyName("");
+      setExpiresDays("");
+      setModelScope("");
+      refresh();
+    } catch (err) {
+      setActionError(errorMessage(err));
+    } finally {
+      setCreatingKey(false);
+    }
+  };
+
+  const handleRevokeKey = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to revoke API key "${name}"? This action is immediate and permanent.`)) {
+      return;
+    }
+    setActionError(null);
+    try {
+      await api.revokeApiKey(id);
+      refresh();
+    } catch (err) {
+      setActionError(errorMessage(err));
+    }
+  };
+
+  const baseUrl = typeof window !== "undefined"
+    ? `${window.location.protocol}//${window.location.hostname}:8003/v1`
+    : "http://localhost:8003/v1";
+
+  const modelId = text(
+    selectedRoute?.["modelPattern"] ?? selectedRoute?.["model_pattern"] ?? selectedRoute?.["targetModel"] ?? "default-model"
+  );
+
+  const snippets = {
+    curl: `curl ${baseUrl}/chat/completions \\
+  -H "Authorization: Bearer <API_KEY>" \\
+  -H "Content-Type: application/json" \\
+  -d '{"model": "${modelId}", "messages": [{"role":"user","content":"Hello"}]}'`,
+    python: `from openai import OpenAI
+
+client = OpenAI(api_key="<API_KEY>", base_url="${baseUrl}")
+response = client.chat.completions.create(
+    model="${modelId}",
+    messages=[{"role": "user", "content": "Hello"}]
+)
+print(response.choices[0].message.content)`,
+    javascript: `import OpenAI from 'openai';
+
+const client = new OpenAI({ apiKey: '<API_KEY>', baseURL: '${baseUrl}' });
+const response = await client.chat.completions.create({
+    model: '${modelId}',
+    messages: [{ role: 'user', content: 'Hello' }],
+});
+console.log(response.choices[0].message.content);`,
+  };
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Exchange / Gateway"
+        title="Routes, API keys, and client configuration."
+        description="Exchange acts as the single OpenAI-compatible data plane. Publish model routes, copy client integration code, and manage caller API keys."
+        action={
+          <Button onClick={refresh} disabled={loading} aria-label="Refresh gateway">
+            {loading ? "Reading..." : "Refresh"}
+          </Button>
+        }
+      />
+
+      {actionNotice ? (
+        <div className="callout callout--blue">
+          <span className="callout__mark" aria-hidden="true">✓</span>
+          <p>{actionNotice}</p>
+        </div>
+      ) : null}
+      {actionError ? (
+        <div className="callout callout--red">
+          <span className="callout__mark" aria-hidden="true">!</span>
+          <p><strong>Error:</strong> {actionError}</p>
+        </div>
+      ) : null}
+
+      {/* 1. Gateway Routes Table */}
+      <Panel
+        title="Gateway routes"
+        meta={routes ? `${routes.length} configured` : "EXCHANGE OWNER"}
+      >
+        {loading && !routes ? (
+          <StateBlock kind="loading" title="Reading Gateway routes" detail="Exchange is returning published model routes." />
+        ) : error ? (
+          <StateBlock kind="error" title="Routes unavailable" detail={error} />
+        ) : routes && routes.length > 0 ? (
+          <ResourceTable
+            rows={routes}
+            rowKey={resourceId}
+            caption="Exchange published routes"
+            columns={[
+              {
+                label: "Model alias",
+                render: (row) => {
+                  const pattern = text(row["modelPattern"] || row["model_pattern"]);
+                  const isSelected = selectedRoute && text(selectedRoute["id"]) === text(row["id"]);
+                  return (
+                    <button
+                      className="link-button"
+                      onClick={() => setSelectedRoute(row)}
+                      style={{ fontWeight: isSelected ? "bold" : "normal", textDecoration: "underline", background: "none", border: "none", cursor: "pointer", color: "inherit", padding: 0 }}
+                    >
+                      {pattern} {isSelected ? "◀ (Selected)" : ""}
+                    </button>
+                  );
+                },
+              },
+              {
+                label: "Target binding",
+                render: (row) => <span className="input-mono">{text(row["targetBindingId"] || row["target_binding_id"])}</span>,
+              },
+              {
+                label: "Status",
+                render: (row) => {
+                  const state = text(row["state"], "ACTIVE");
+                  return <StatusPill value={state} />;
+                },
+              },
+              {
+                label: "Action",
+                render: (row) => {
+                  const state = text(row["state"], "ACTIVE");
+                  if (state === "DRAFT") {
+                    return (
+                      <Button tone="primary" onClick={() => void confirmRoute(row)}>
+                        确认发布
+                      </Button>
+                    );
+                  }
+                  return (
+                    <Button onClick={() => setSelectedRoute(row)}>
+                      View detail
+                    </Button>
+                  );
+                },
+              },
+            ]}
+          />
+        ) : (
+          <StateBlock
+            kind="empty"
+            title="No Gateway routes"
+            detail="Publish a serving deployment or add a route draft in Exchange to expose models."
+          />
+        )}
+      </Panel>
+
+      {/* 2. Selected Route Detail Panel */}
+      {selectedRoute ? (
+        <Panel
+          title={`Route detail: ${modelId}`}
+          meta={<StatusPill value={text(selectedRoute["state"], "ACTIVE")} />}
+        >
+          <dl className="detail-grid">
+            <Detail label="Model ID" value={modelId} mono />
+            <Detail
+              label="Base URL"
+              value={baseUrl}
+              mono
+            />
+            <Detail label="Target binding" value={text(selectedRoute["targetBindingId"] || selectedRoute["target_binding_id"])} mono />
+            <Detail label="Created" value={formatDate(selectedRoute["createdAt"] || selectedRoute["created_at"])} />
+          </dl>
+
+          <div style={{ marginTop: "12px", marginBottom: "16px" }}>
+            <Button
+              onClick={() => {
+                void navigator.clipboard.writeText(baseUrl);
+                setCopiedBaseUrl(true);
+                setTimeout(() => setCopiedBaseUrl(false), 2000);
+              }}
+            >
+              {copiedBaseUrl ? "Base URL Copied!" : "Copy Base URL"}
+            </Button>
+          </div>
+
+          <div style={{ marginTop: "20px" }}>
+            <div style={{ display: "flex", gap: "8px", marginBottom: "12px", alignItems: "center" }}>
+              <strong style={{ marginRight: "12px" }}>Integration code:</strong>
+              {(["curl", "python", "javascript"] as const).map((tab) => (
+                <Button
+                  key={tab}
+                  tone={activeCodeTab === tab ? "primary" : "quiet"}
+                  onClick={() => setActiveCodeTab(tab)}
+                >
+                  {tab === "curl" ? "cURL" : tab === "python" ? "Python" : "JavaScript"}
+                </Button>
+              ))}
+              <Button
+                onClick={() => {
+                  void navigator.clipboard.writeText(snippets[activeCodeTab]);
+                  setCopiedSnippet(true);
+                  setTimeout(() => setCopiedSnippet(false), 2000);
+                }}
+              >
+                {copiedSnippet ? "Copied!" : "Copy snippet"}
+              </Button>
+            </div>
+            <pre style={{ background: "var(--color-bg-subtle, #181c20)", padding: "16px", borderRadius: "6px", overflowX: "auto", fontSize: "13px", lineHeight: "1.5" }}>
+              <code>{snippets[activeCodeTab]}</code>
+            </pre>
+          </div>
+        </Panel>
+      ) : null}
+
+      {/* 3. API Keys Management Panel */}
+      <Panel
+        title="Gateway API keys"
+        meta={apiKeys ? `${apiKeys.filter((k) => k.state === "ACTIVE").length} active` : "EXCHANGE KEYS"}
+      >
+        {createdSecret ? (
+          <div className="callout callout--orange" style={{ marginBottom: "20px", display: "block" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "8px" }}>
+              <span className="callout__mark" aria-hidden="true" style={{ fontSize: "18px", fontWeight: "bold" }}>⚠</span>
+              <strong style={{ color: "var(--orange, #FF9800)" }}>API Key Created: {createdKeyName}</strong>
+            </div>
+            <p style={{ marginBottom: "12px" }}>
+              此密钥不会再次显示，请立即复制并安全保存。关闭后将无法重新查看完整明文。
+            </p>
+            <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "12px" }}>
+              <input
+                readOnly
+                value={createdSecret}
+                className="input-mono"
+                style={{ flex: 1, padding: "8px 12px", fontSize: "14px", background: "rgba(0,0,0,0.3)" }}
+              />
+              <Button
+                tone="primary"
+                onClick={() => {
+                  void navigator.clipboard.writeText(createdSecret);
+                  setCopiedKey(true);
+                  setTimeout(() => setCopiedKey(false), 2000);
+                }}
+              >
+                {copiedKey ? "Copied!" : "Copy key"}
+              </Button>
+              <Button onClick={() => setCreatedSecret(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        ) : null}
+
+        <form className="credential-form" onSubmit={handleCreateKey} style={{ marginBottom: "24px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "12px", alignItems: "flex-end" }}>
+            <Field label="Key name *" hint="Human-readable identifier">
+              <input
+                value={keyName}
+                onChange={(e) => setKeyName(e.target.value)}
+                placeholder="e.g. production-client"
+                required
+              />
+            </Field>
+            <Field label="Expiration (days)" hint="Optional (leave blank for no expiry)">
+              <input
+                type="number"
+                min="1"
+                value={expiresDays}
+                onChange={(e) => setExpiresDays(e.target.value)}
+                placeholder="e.g. 90"
+              />
+            </Field>
+            <Field label="Model scope" hint="Optional comma-separated aliases">
+              <input
+                value={modelScope}
+                onChange={(e) => setModelScope(e.target.value)}
+                placeholder="default: all models"
+              />
+            </Field>
+            <div>
+              <Button tone="primary" type="submit" disabled={creatingKey || !keyName.trim()}>
+                {creatingKey ? "Creating..." : "Create API Key"}
+              </Button>
+            </div>
+          </div>
+        </form>
+
+        {apiKeys && apiKeys.length > 0 ? (
+          <ResourceTable
+            rows={apiKeys}
+            rowKey={(row) => row.id}
+            caption="Exchange API keys"
+            columns={[
+              { label: "Name", render: (row) => <strong>{row.name}</strong> },
+              {
+                label: "Key",
+                render: (row) => <span className="input-mono">{`cyk_...${row.id.slice(-4)}`}</span>,
+              },
+              {
+                label: "Status",
+                render: (row) => <StatusPill value={row.state} />,
+              },
+              {
+                label: "Model scope",
+                render: (row) => row.modelScope && row.modelScope.length > 0 ? row.modelScope.join(", ") : "All models",
+              },
+              {
+                label: "Created",
+                render: (row) => formatDate(row.createdAt),
+              },
+              {
+                label: "Expires",
+                render: (row) => row.expiresAt ? formatDate(row.expiresAt) : "Never",
+              },
+              {
+                label: "Action",
+                render: (row) => {
+                  if (row.state === "ACTIVE") {
+                    return (
+                      <Button tone="danger" onClick={() => void handleRevokeKey(row.id, row.name)}>
+                        Revoke
+                      </Button>
+                    );
+                  }
+                  return <span style={{ color: "var(--muted)" }}>Revoked</span>;
+                },
+              },
+            ]}
+          />
+        ) : (
+          <StateBlock
+            kind="empty"
+            title="No API keys"
+            detail="Create an API key above to allow client applications to authenticate with the Exchange gateway."
+          />
         )}
       </Panel>
     </div>

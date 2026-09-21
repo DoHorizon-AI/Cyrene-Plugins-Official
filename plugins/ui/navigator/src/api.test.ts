@@ -119,4 +119,115 @@ describe("NavigatorApi", () => {
     expect(headers.get("Idempotency-Key")).toBeTruthy();
     expect(mutation?.path).toBe("/api/v1/catalyst/datasets");
   });
+
+  it("parses system status including GPU, disk, and service reachability", async () => {
+    const api = new NavigatorApi(async () => {
+      return response({
+        service: "cyrene-navigator-web-host",
+        status: "ok",
+        version: "1.0.0",
+        authenticated: true,
+        proxyPrefixes: ["/api/v1/yield", "/api/v1/exchange"],
+        credentials: { active: 2, revoked: 1 },
+        gpu: {
+          available: true,
+          gpus: [{ name: "RTX 5070", totalMib: 12227, usedMib: 4200, utilizationPct: 15 }],
+        },
+        disk: {
+          available: true,
+          totalGib: 1000,
+          usedGib: 250,
+          freeGib: 750,
+          usedPct: 25,
+        },
+        services: [
+          { name: "yield", url: "http://127.0.0.1:8001/health", status: "UP", latencyMs: 2.5 },
+        ],
+        observedAt: "2026-09-21T00:00:00Z",
+      });
+    });
+
+    const status = await api.getSystemStatus();
+    expect(status.status).toBe("ok");
+    expect(status.gpu?.available).toBe(true);
+    expect(status.gpu?.gpus?.[0]?.name).toBe("RTX 5070");
+    expect(status.disk?.totalGib).toBe(1000);
+    expect(status.services?.[0]?.status).toBe("UP");
+  });
+
+  it("handles Gateway API routes, endpoints, and API key management", async () => {
+    const calls: Array<{ path: string; method?: string }> = [];
+    const api = new NavigatorApi(async (input, init) => {
+      const path = String(input);
+      calls.push({ path, method: init?.method });
+      if (path === "/api/v1/auth/session") {
+        return response({
+          authenticated: true,
+          state: "AUTHENTICATED",
+          sessionId: "session-1",
+          expiresAt: "2030-01-01T00:00:00Z",
+          refreshExpiresAt: "2030-01-02T00:00:00Z",
+          refreshable: true,
+          csrfToken: "csrf-token",
+          refreshed: false,
+        });
+      }
+      if (path === "/api/v1/exchange/api/v1/gateway-routes") {
+        return response([
+          { id: "route-1", modelPattern: "llama-3-8b", targetBindingId: "local-gpu", state: "ACTIVE" },
+        ]);
+      }
+      if (path === "/api/v1/exchange/api/v1/api-keys") {
+        if (init?.method === "POST") {
+          return response({
+            id: "key-1",
+            name: "test-key",
+            credentialRef: "api-key://uuid-1",
+            state: "ACTIVE",
+            modelScope: ["llama-3-8b"],
+            createdAt: "2026-09-21T00:00:00Z",
+            secret: "cyk_live_test_secret_12345",
+          });
+        }
+        return response([
+          {
+            id: "key-1",
+            name: "test-key",
+            credentialRef: "api-key://uuid-1",
+            state: "ACTIVE",
+            modelScope: ["llama-3-8b"],
+            createdAt: "2026-09-21T00:00:00Z",
+          },
+        ]);
+      }
+      if (path === "/api/v1/exchange/api/v1/api-keys/key-1/actions/revoke") {
+        return response({
+          id: "key-1",
+          name: "test-key",
+          credentialRef: "api-key://uuid-1",
+          state: "REVOKED",
+          modelScope: ["llama-3-8b"],
+          createdAt: "2026-09-21T00:00:00Z",
+        });
+      }
+      throw new Error(`Unexpected path: ${path}`);
+    });
+
+    await api.getSession();
+    const routes = await api.getGatewayRoutes();
+    expect(routes).toHaveLength(1);
+    expect(routes[0]?.["modelPattern"]).toBe("llama-3-8b");
+
+    const created = await api.createApiKey("route-1", { name: "test-key" });
+    expect(created.secret).toBe("cyk_live_test_secret_12345");
+    expect(created.key.name).toBe("test-key");
+
+    const keys = await api.listApiKeys();
+    expect(keys).toHaveLength(1);
+    expect(keys[0]?.state).toBe("ACTIVE");
+
+    const revoked = await api.revokeApiKey("key-1");
+    expect(revoked.state).toBe("REVOKED");
+  });
 });
+

@@ -11,6 +11,7 @@ import { NavigatorApi, NavigatorHttpError, type SessionPayload } from "./api";
 import {
   DatasetsPage,
   DeploymentsPage,
+  GatewayPage,
   ModelsPage,
   OverviewPage,
   RunsPage,
@@ -273,6 +274,8 @@ function renderPage(route: RouteId, api: NavigatorApi, session: SessionPayload):
       return <RunsPage api={api} />;
     case "deployments":
       return <DeploymentsPage api={api} />;
+    case "gateway":
+      return <GatewayPage api={api} />;
     case "settings":
       return <SettingsPage api={api} session={session} />;
     case "overview":
@@ -289,6 +292,7 @@ function navGlyph(route: RouteId): string {
     training: "TR",
     runs: "RN",
     deployments: "DP",
+    gateway: "GW",
     settings: "ST",
   }[route];
 }

@@ -7,13 +7,14 @@ import { pathForRoute, routeForPath } from "./router";
 import { describe, expect, it } from "vitest";
 
 describe("Navigator routes", () => {
-  it("resolves all seven page paths", () => {
+  it("resolves all page paths", () => {
     expect(routeForPath("/")).toBe("overview");
     expect(routeForPath("/models")).toBe("models");
     expect(routeForPath("/datasets/")).toBe("datasets");
     expect(routeForPath("/training")).toBe("training");
     expect(routeForPath("/runs?runId=run-1")).toBe("runs");
     expect(routeForPath("/deployments")).toBe("deployments");
+    expect(routeForPath("/gateway")).toBe("gateway");
     expect(routeForPath("/settings")).toBe("settings");
   });
 
@@ -26,5 +27,6 @@ describe("Navigator routes", () => {
     expect(pathForRoute("overview")).toBe("/");
     expect(pathForRoute("models")).toBe("/models");
     expect(pathForRoute("deployments")).toBe("/deployments");
+    expect(pathForRoute("gateway")).toBe("/gateway");
   });
 });
