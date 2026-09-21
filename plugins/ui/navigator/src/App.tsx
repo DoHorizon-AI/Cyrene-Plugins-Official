@@ -9,6 +9,7 @@ import type { FormEvent, ReactNode } from "react";
 import { Button, formatDate, StateBlock } from "./components";
 import { NavigatorApi, NavigatorHttpError, type SessionPayload } from "./api";
 import {
+  ChatPage,
   DatasetsPage,
   DeploymentsPage,
   GatewayPage,
@@ -276,6 +277,8 @@ function renderPage(route: RouteId, api: NavigatorApi, session: SessionPayload):
       return <DeploymentsPage api={api} />;
     case "gateway":
       return <GatewayPage api={api} />;
+    case "chat":
+      return <ChatPage api={api} />;
     case "settings":
       return <SettingsPage api={api} session={session} />;
     case "overview":
@@ -293,6 +296,7 @@ function navGlyph(route: RouteId): string {
     runs: "RN",
     deployments: "DP",
     gateway: "GW",
+    chat: "CH",
     settings: "ST",
   }[route];
 }

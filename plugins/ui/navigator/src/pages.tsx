@@ -20,9 +20,12 @@ import {
   text,
 } from "./components";
 import {
+  type ActiveRoutePayload,
   type ApiKeyMetadata,
   type CredentialMetadata,
   type CreateModelImportInput,
+  type DatasetPreview,
+  type DeploymentEvent,
   type JsonRecord,
   NAVIGATOR_PROXY_PATHS,
   NavigatorApi,
@@ -31,6 +34,7 @@ import {
   type SessionPayload,
   type SystemStatus,
 } from "./api";
+import { pushRoute } from "./router";
 
 export interface PageProps {
   api: NavigatorApi;
@@ -212,6 +216,66 @@ export function OverviewPage({ api }: PageProps) {
               </dl>
             ) : (
               <StateBlock kind="empty" title="Storage usage unavailable" detail="Filesystem statistics not reported by host." />
+            )}
+          </Panel>
+
+          <Panel
+            title="Workspace blockers"
+            meta={
+              system?.blockers && system.blockers.length > 0 ? (
+                <StatusPill value="BLOCKED" />
+              ) : (
+                <StatusPill value="READY" />
+              )
+            }
+          >
+            {system?.blockers && system.blockers.length > 0 ? (
+              <div className="attention-list">
+                {system.blockers.map((blocker) => (
+                  <div className="attention-item" key={blocker.code}>
+                    <span className="attention-item__icon" aria-hidden="true" style={{ color: "var(--red)", borderColor: "var(--red)" }}>!</span>
+                    <div>
+                      <strong style={{ color: "var(--red)" }}>{blocker.code}</strong>
+                      <p>{blocker.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <StateBlock
+                kind="empty"
+                title="No blockers detected"
+                detail="All system requirements, GPU resources, disk space, and service dependencies are ready."
+              />
+            )}
+          </Panel>
+
+          <Panel
+            title="Installed plugins"
+            meta={<span className="mono-label">RUNTIME ENGINES</span>}
+          >
+            {system?.plugins && system.plugins.length > 0 ? (
+              <div className="service-list">
+                {system.plugins.map((plugin) => (
+                  <div className="service-row" key={plugin.name}>
+                    <span
+                      className={`service-dot ${plugin.state === "READY" ? "service-dot--good" : "service-dot--bad"}`}
+                      aria-hidden="true"
+                    />
+                    <div>
+                      <strong>{plugin.name}</strong>
+                      {plugin.kind ? <span style={{ marginLeft: "8px", color: "var(--muted)", fontSize: "11px" }}>({plugin.kind})</span> : null}
+                    </div>
+                    <StatusPill value={plugin.state} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <StateBlock
+                kind="empty"
+                title="No plugins detected"
+                detail="No runtime plugins currently registered or reported by host."
+              />
             )}
           </Panel>
         </div>
@@ -409,6 +473,34 @@ export function DatasetsPage({ api }: PageProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
+  // Sample preview state
+  const [previewVersionId, setPreviewVersionId] = useState("");
+  const [previewLimit, setPreviewLimit] = useState(10);
+  const [previewOffset, setPreviewOffset] = useState(0);
+  const [previewLoading, setPreviewLoading] = useState(false);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewData, setPreviewData] = useState<DatasetPreview | null>(null);
+
+  const loadPreview = async (versionId: string, limit = 10, offset = 0) => {
+    const vid = versionId.trim();
+    if (!vid) {
+      setPreviewError("Enter or select a DatasetVersion ID to preview samples.");
+      return;
+    }
+    setPreviewVersionId(vid);
+    setPreviewLoading(true);
+    setPreviewError(null);
+    try {
+      const result = await api.getDatasetVersionPreview(vid, limit, offset);
+      setPreviewData(result);
+    } catch (err) {
+      setPreviewError(errorMessage(err));
+      setPreviewData(null);
+    } finally {
+      setPreviewLoading(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -497,17 +589,203 @@ export function DatasetsPage({ api }: PageProps) {
               { label: "Description", render: (row) => text(row["description"], "No description") },
               { label: "Version", render: (row) => <span className="input-mono">v{text(row["resourceVersion"], "-")}</span> },
               { label: "Updated", render: (row) => formatDate(row["updatedAt"]) },
+              {
+                label: "Action",
+                render: (row) => {
+                  const id = text(row["id"] || row["datasetId"]);
+                  return (
+                    <Button
+                      onClick={() => {
+                        setPreviewVersionId(id);
+                        void loadPreview(id, previewLimit, previewOffset);
+                      }}
+                    >
+                      预览样本
+                    </Button>
+                  );
+                },
+              },
             ]}
           />
         ) : (
           <StateBlock kind="empty" title="No dataset containers" detail="Create the container that will own your next preparation flow." />
         )}
       </Panel>
+
+      <Panel
+        title="Dataset version sample preview"
+        meta={previewData ? `${previewData.totalRows} total rows` : "CATALYST DUCKDB"}
+      >
+        <form
+          className="form-grid form-grid--compact"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void loadPreview(previewVersionId, previewLimit, previewOffset);
+          }}
+        >
+          <div style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
+            <div style={{ flex: "1 1 300px" }}>
+              <Field label="Dataset version ID" hint="UUID of the prepared dataset version">
+                <input
+                  className="input-mono"
+                  value={previewVersionId}
+                  onChange={(e) => setPreviewVersionId(e.target.value)}
+                  placeholder="e.g. 11111111-2222-3333-4444-555555555555"
+                />
+              </Field>
+            </div>
+            <div style={{ width: "100px" }}>
+              <Field label="Limit">
+                <select
+                  value={previewLimit}
+                  onChange={(e) => setPreviewLimit(Number(e.target.value))}
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                </select>
+              </Field>
+            </div>
+            <div style={{ width: "100px" }}>
+              <Field label="Offset">
+                <input
+                  type="number"
+                  min="0"
+                  value={previewOffset}
+                  onChange={(e) => setPreviewOffset(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className="input-mono"
+                />
+              </Field>
+            </div>
+            <div>
+              <Button
+                tone="primary"
+                type="submit"
+                disabled={previewLoading || !previewVersionId.trim()}
+              >
+                {previewLoading ? "Loading..." : "预览样本"}
+              </Button>
+            </div>
+          </div>
+        </form>
+
+        {previewLoading ? (
+          <StateBlock
+            kind="loading"
+            title="Loading sample preview"
+            detail="Catalyst DuckDB is reading sample rows from the CAS parquet/jsonl artifact."
+          />
+        ) : previewError ? (
+          <StateBlock kind="error" title="Preview unavailable" detail={previewError} />
+        ) : previewData ? (
+          <div style={{ marginTop: "16px" }}>
+            <p style={{ fontSize: "12px", color: "var(--muted)", marginBottom: "12px" }}>
+              Displaying {previewData.rows.length} rows (out of {previewData.totalRows} total rows) for version <code className="input-mono">{previewData.versionId}</code>
+            </p>
+            <div style={{ display: "grid", gap: "12px" }}>
+              {previewData.rows.map((row) => (
+                <div
+                  key={row.index}
+                  style={{
+                    background: "rgba(17, 29, 34, 0.6)",
+                    border: "1px solid var(--line)",
+                    borderRadius: "6px",
+                    padding: "12px",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "8px" }}>
+                    <span className="mono-label">ROW #{row.index + 1}</span>
+                  </div>
+                  <div style={{ display: "grid", gap: "6px", fontSize: "13px" }}>
+                    {row.mapped["instruction"] !== undefined ? (
+                      <div>
+                        <strong style={{ color: "var(--blue)" }}>Instruction: </strong>
+                        <span>{String(row.mapped["instruction"])}</span>
+                      </div>
+                    ) : null}
+                    {row.mapped["input"] ? (
+                      <div>
+                        <strong style={{ color: "var(--muted)" }}>Input: </strong>
+                        <span>{String(row.mapped["input"])}</span>
+                      </div>
+                    ) : null}
+                    {row.mapped["output"] !== undefined ? (
+                      <div>
+                        <strong style={{ color: "var(--lime)" }}>Output: </strong>
+                        <span>{String(row.mapped["output"])}</span>
+                      </div>
+                    ) : null}
+                  </div>
+                  <details style={{ marginTop: "8px", fontSize: "12px", color: "var(--faint)" }}>
+                    <summary style={{ cursor: "pointer", userSelect: "none" }}>Raw record JSON</summary>
+                    <pre
+                      style={{
+                        background: "var(--ink-soft)",
+                        padding: "8px",
+                        borderRadius: "4px",
+                        overflowX: "auto",
+                        marginTop: "6px",
+                        color: "var(--text)",
+                        fontFamily: "var(--mono)",
+                        fontSize: "11px",
+                      }}
+                    >
+                      {JSON.stringify(row.raw, null, 2)}
+                    </pre>
+                  </details>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <StateBlock
+            kind="empty"
+            title="No samples loaded"
+            detail="Enter a version ID above or click preview on a dataset container to inspect mapped samples."
+          />
+        )}
+      </Panel>
     </div>
   );
 }
 
-/** Training draft list with explicit launch actions and no fabricated run list. */
+export interface ParamFieldProps {
+  label: string;
+  hint: string;
+  llamaKey: string;
+  children: React.ReactNode;
+}
+
+/** Parameter field with user-friendly hint and toggleable LLaMA Factory key. */
+export function ParamField({ label, hint, llamaKey, children }: ParamFieldProps) {
+  const [showKey, setShowKey] = useState(false);
+  return (
+    <div className="field">
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
+        <span className="field__label">{label}</span>
+        <button
+          type="button"
+          className="button button--quiet"
+          style={{ padding: "2px 6px", fontSize: "11px", height: "auto" }}
+          onClick={() => setShowKey((v) => !v)}
+        >
+          {showKey ? "Hide LLaMA key" : "LLaMA Factory key"}
+        </button>
+      </div>
+      {children}
+      <span className="field__hint">
+        {hint}
+        {showKey && (
+          <code style={{ marginLeft: "8px", color: "var(--lime)", fontFamily: "var(--mono)" }}>
+            ({llamaKey})
+          </code>
+        )}
+      </span>
+    </div>
+  );
+}
+
+/** Training draft list with explicit launch actions and hyperparameter reference. */
 export function TrainingPage({ api }: PageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [drafts, setDrafts] = useState<JsonRecord[] | null>(null);
@@ -515,6 +793,16 @@ export function TrainingPage({ api }: PageProps) {
   const [error, setError] = useState<string | null>(null);
   const [actionId, setActionId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Hyperparameter fields state
+  const [epochs, setEpochs] = useState("3");
+  const [learningRate, setLearningRate] = useState("0.0002");
+  const [batchSize, setBatchSize] = useState("2");
+  const [gradAccum, setGradAccum] = useState("4");
+  const [cutoffLen, setCutoffLen] = useState("2048");
+  const [loraRank, setLoraRank] = useState("8");
+  const [loraAlpha, setLoraAlpha] = useState("16");
+  const [loraDropout, setLoraDropout] = useState("0.05");
 
   useEffect(() => {
     let active = true;
@@ -566,6 +854,129 @@ export function TrainingPage({ api }: PageProps) {
         <span className="callout__mark" aria-hidden="true">i</span>
         <p><strong>Preflight belongs to the owner.</strong> The UI never infers GPU readiness from browser state; Yield returns the authoritative preflight and launch result.</p>
       </div>
+
+      <Panel
+        title="Training hyperparameters & LLaMA Factory mapping"
+        meta={<span className="mono-label">LLAMA-FACTORY ENGINE</span>}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+          <ParamField
+            label="Epochs / 训练轮数"
+            hint="完整遍历数据集的次数"
+            llamaKey="num_train_epochs"
+          >
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={epochs}
+              onChange={(e) => setEpochs(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+
+          <ParamField
+            label="Learning rate / 学习率"
+            hint="每步权重更新幅度"
+            llamaKey="learning_rate"
+          >
+            <input
+              type="text"
+              value={learningRate}
+              onChange={(e) => setLearningRate(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+
+          <ParamField
+            label="Batch size / 批次大小"
+            hint="每步处理的样本数（越大越快但 VRAM 更多）"
+            llamaKey="per_device_train_batch_size"
+          >
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={batchSize}
+              onChange={(e) => setBatchSize(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+
+          <ParamField
+            label="Gradient accumulation / 梯度累积"
+            hint="累积梯度的步数（等效放大 batch size）"
+            llamaKey="gradient_accumulation_steps"
+          >
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={gradAccum}
+              onChange={(e) => setGradAccum(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+
+          <ParamField
+            label="Sequence length / 截断长度"
+            hint="单条样本最大 token 数"
+            llamaKey="cutoff_len"
+          >
+            <input
+              type="number"
+              min="128"
+              step="128"
+              value={cutoffLen}
+              onChange={(e) => setCutoffLen(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+
+          <ParamField
+            label="LoRA rank / LoRA 秩"
+            hint="LoRA 矩阵秩（越大参数越多）"
+            llamaKey="lora_rank"
+          >
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={loraRank}
+              onChange={(e) => setLoraRank(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+
+          <ParamField
+            label="LoRA alpha / LoRA 缩放系数"
+            hint="LoRA 缩放因子（通常 = 2 × rank）"
+            llamaKey="lora_alpha"
+          >
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={loraAlpha}
+              onChange={(e) => setLoraAlpha(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+
+          <ParamField
+            label="LoRA dropout / LoRA 丢弃率"
+            hint="LoRA 层丢弃率（防过拟合）"
+            llamaKey="lora_dropout"
+          >
+            <input
+              type="text"
+              value={loraDropout}
+              onChange={(e) => setLoraDropout(e.target.value)}
+              className="input-mono"
+            />
+          </ParamField>
+        </div>
+      </Panel>
 
       <Panel title="Training drafts" meta={drafts ? `${drafts.length} records` : "LIVE READ"}>
         {loading ? (
@@ -949,6 +1360,27 @@ export function DeploymentsPage({ api }: PageProps) {
   const [stopId, setStopId] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
 
+  // Deployment events timeline state
+  const [selectedDeploymentId, setSelectedDeploymentId] = useState<string | null>(null);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventsError, setEventsError] = useState<string | null>(null);
+  const [deploymentEvents, setDeploymentEvents] = useState<DeploymentEvent[] | null>(null);
+
+  const loadDeploymentEvents = async (id: string) => {
+    setSelectedDeploymentId(id);
+    setEventsLoading(true);
+    setEventsError(null);
+    try {
+      const res = await api.getDeploymentEvents(id);
+      setDeploymentEvents(res.events);
+    } catch (err) {
+      setEventsError(errorMessage(err));
+      setDeploymentEvents(null);
+    } finally {
+      setEventsLoading(false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -1022,6 +1454,21 @@ export function DeploymentsPage({ api }: PageProps) {
                 { label: "Binding", render: (row) => <span className="input-mono">{text(row["servingBindingId"])}</span> },
                 { label: "Endpoint", render: (row) => endpointSummary(row) },
                 {
+                  label: "Timeline",
+                  render: (row) => {
+                    const id = text(row["id"], "");
+                    const isSelected = selectedDeploymentId === id;
+                    return (
+                      <Button
+                        tone={isSelected ? "primary" : "quiet"}
+                        onClick={() => void loadDeploymentEvents(id)}
+                      >
+                        加载历史
+                      </Button>
+                    );
+                  },
+                },
+                {
                   label: "Action",
                   render: (row) => {
                     const id = text(row["id"], "");
@@ -1037,6 +1484,129 @@ export function DeploymentsPage({ api }: PageProps) {
           <StateBlock kind="empty" title="No deployments" detail="A validated model version must be handed to Reactor before a serving deployment can exist." />
         )}
       </Panel>
+
+      {selectedDeploymentId ? (
+        <Panel
+          title={`加载历史时间线: ${selectedDeploymentId}`}
+          meta={
+            deploymentEvents ? (
+              <span className="mono-label">{deploymentEvents.length} EVENTS</span>
+            ) : undefined
+          }
+        >
+          {eventsLoading ? (
+            <StateBlock
+              kind="loading"
+              title="Loading deployment phase events"
+              detail="Reactor SQLite store is returning the phase transition timeline."
+            />
+          ) : eventsError ? (
+            <StateBlock kind="error" title="Events unavailable" detail={eventsError} />
+          ) : deploymentEvents && deploymentEvents.length > 0 ? (
+            <div style={{ marginTop: "12px" }}>
+              {/* Phase sequence visualization */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  marginBottom: "20px",
+                  overflowX: "auto",
+                  padding: "8px 0",
+                }}
+              >
+                {["QUEUED", "LOADING", "PROBING", "READY"].map((p, idx) => {
+                  const hasPassed = deploymentEvents.some((e) => e.phase === p);
+                  return (
+                    <div key={p} style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                      <span
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: "12px",
+                          fontSize: "12px",
+                          fontWeight: 600,
+                          fontFamily: "var(--mono)",
+                          background: hasPassed ? "rgba(201, 242, 123, 0.15)" : "rgba(255, 255, 255, 0.05)",
+                          color: hasPassed ? "var(--lime)" : "var(--faint)",
+                          border: `1px solid ${hasPassed ? "var(--lime)" : "var(--line)"}`,
+                        }}
+                      >
+                        {p}
+                      </span>
+                      {idx < 3 ? <span style={{ color: "var(--faint)" }}>→</span> : null}
+                    </div>
+                  );
+                })}
+                {deploymentEvents.some((e) => e.phase === "FAILED") ? (
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ color: "var(--red)" }}>→</span>
+                    <span
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: "12px",
+                        fontSize: "12px",
+                        fontWeight: 600,
+                        fontFamily: "var(--mono)",
+                        background: "rgba(255, 139, 120, 0.15)",
+                        color: "var(--red)",
+                        border: "1px solid var(--red)",
+                      }}
+                    >
+                      FAILED
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Detailed event timeline list */}
+              <div className="service-list">
+                {deploymentEvents.map((evt) => (
+                  <div
+                    key={evt.sequence}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "40px 100px 1fr auto",
+                      alignItems: "center",
+                      gap: "12px",
+                      padding: "10px 0",
+                      borderBottom: "1px solid var(--line)",
+                      fontSize: "12px",
+                    }}
+                  >
+                    <span className="mono-label">#{evt.sequence}</span>
+                    <StatusPill value={evt.phase} />
+                    <div>
+                      <span>{evt.message}</span>
+                      {evt.failureCode ? (
+                        <span
+                          style={{
+                            display: "block",
+                            color: "var(--red)",
+                            fontWeight: 600,
+                            marginTop: "2px",
+                            fontFamily: "var(--mono)",
+                          }}
+                        >
+                          Failure: {evt.failureCode}
+                        </span>
+                      ) : null}
+                    </div>
+                    <span style={{ color: "var(--muted)", fontSize: "11px" }}>
+                      {formatDate(evt.occurredAt)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <StateBlock
+              kind="empty"
+              title="No events recorded"
+              detail="Reactor has not published loading events for this deployment yet."
+            />
+          )}
+        </Panel>
+      ) : null}
     </div>
   );
 }
@@ -1161,6 +1731,22 @@ export function GatewayPage({ api }: PageProps) {
     ? `${window.location.protocol}//${window.location.hostname}:8003/v1`
     : "http://localhost:8003/v1";
 
+  const handleUseInNavigator = async (route: JsonRecord) => {
+    const gatewayEndpointId = text(route["gatewayEndpointId"] || route["gateway_endpoint_id"] || route["id"]);
+    const model = text(route["modelPattern"] || route["model_pattern"] || route["targetModel"] || "default-model");
+    try {
+      await api.setActiveRoute({
+        gatewayEndpointId,
+        modelId: model,
+        baseUrl,
+        apiKeyHint: text(route["name"] || model),
+      });
+      pushRoute("chat");
+    } catch (err) {
+      setActionError(errorMessage(err));
+    }
+  };
+
   const modelId = text(
     selectedRoute?.["modelPattern"] ?? selectedRoute?.["model_pattern"] ?? selectedRoute?.["targetModel"] ?? "default-model"
   );
@@ -1268,9 +1854,14 @@ console.log(response.choices[0].message.content);`,
                     );
                   }
                   return (
-                    <Button onClick={() => setSelectedRoute(row)}>
-                      View detail
-                    </Button>
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <Button onClick={() => setSelectedRoute(row)}>
+                        View detail
+                      </Button>
+                      <Button tone="primary" onClick={() => void handleUseInNavigator(row)}>
+                        在 Navigator 中使用
+                      </Button>
+                    </div>
                   );
                 },
               },
@@ -1302,7 +1893,7 @@ console.log(response.choices[0].message.content);`,
             <Detail label="Created" value={formatDate(selectedRoute["createdAt"] || selectedRoute["created_at"])} />
           </dl>
 
-          <div style={{ marginTop: "12px", marginBottom: "16px" }}>
+          <div style={{ marginTop: "12px", marginBottom: "16px", display: "flex", gap: "8px" }}>
             <Button
               onClick={() => {
                 void navigator.clipboard.writeText(baseUrl);
@@ -1311,6 +1902,12 @@ console.log(response.choices[0].message.content);`,
               }}
             >
               {copiedBaseUrl ? "Base URL Copied!" : "Copy Base URL"}
+            </Button>
+            <Button
+              tone="primary"
+              onClick={() => void handleUseInNavigator(selectedRoute)}
+            >
+              在 Navigator 中使用
             </Button>
           </div>
 
@@ -1635,6 +2232,312 @@ export function SettingsPage({ api, session }: SettingsPageProps) {
           <StateBlock kind="empty" title="No credentials configured" detail="Add a write-only credential metadata record when a configured Product proxy needs it." />
         )}
       </Panel>
+    </div>
+  );
+}
+
+/** Interactive test chat surface bound to the session's active Gateway route. */
+export function ChatPage({ api }: PageProps) {
+  const [activeRoute, setActiveRoute] = useState<ActiveRoutePayload | null>(null);
+  const [loadingRoute, setLoadingRoute] = useState(true);
+  const [routeError, setRouteError] = useState<string | null>(null);
+
+  // API Key stored in sessionStorage ONLY (never localStorage or server)
+  const [apiKey, setApiKey] = useState(() => {
+    if (typeof window !== "undefined" && window.sessionStorage) {
+      return window.sessionStorage.getItem("cyrene_chat_api_key") ?? "";
+    }
+    return "";
+  });
+
+  const handleApiKeyChange = (val: string) => {
+    setApiKey(val);
+    if (typeof window !== "undefined" && window.sessionStorage) {
+      window.sessionStorage.setItem("cyrene_chat_api_key", val);
+    }
+  };
+
+  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant" | "system"; content: string }>>([
+    { role: "system", content: "You are a helpful AI assistant." },
+  ]);
+  const [inputMessage, setInputMessage] = useState("");
+  const [sending, setSending] = useState(false);
+  const [chatError, setChatError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setLoadingRoute(true);
+    void api.getActiveRoute().then(
+      (res) => {
+        if (!active) return;
+        setActiveRoute(res);
+        setRouteError(null);
+        setLoadingRoute(false);
+      },
+      (err) => {
+        if (!active) return;
+        setActiveRoute(null);
+        setRouteError(errorMessage(err));
+        setLoadingRoute(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [api]);
+
+  const sendMessage = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const prompt = inputMessage.trim();
+    if (!prompt || sending || !activeRoute) return;
+    if (!apiKey.trim()) {
+      setChatError("Please enter your Exchange API key to send messages.");
+      return;
+    }
+
+    const updatedMessages = [...messages, { role: "user" as const, content: prompt }];
+    setMessages(updatedMessages);
+    setInputMessage("");
+    setSending(true);
+    setChatError(null);
+
+    const assistantIndex = updatedMessages.length;
+    setMessages((prev) => [...prev, { role: "assistant", content: "" }]);
+
+    try {
+      const response = await fetch("/api/proxy/exchange-gateway/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey.trim()}`,
+          Accept: "text/event-stream, application/json",
+        },
+        body: JSON.stringify({
+          model: activeRoute.modelId,
+          messages: updatedMessages,
+          stream: true,
+        }),
+      });
+
+      if (!response.ok) {
+        let errDetail = `HTTP ${response.status}`;
+        try {
+          const errJson = (await response.json()) as Record<string, unknown>;
+          if (errJson && typeof errJson["detail"] === "string") {
+            errDetail = errJson["detail"];
+          }
+        } catch {
+          // ignore parse error
+        }
+        throw new Error(errDetail);
+      }
+
+      if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let accumulated = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(":")) continue;
+            if (trimmed.startsWith("data:")) {
+              const dataStr = trimmed.slice(5).trim();
+              if (dataStr === "[DONE]") {
+                break;
+              }
+              try {
+                const parsed = JSON.parse(dataStr) as {
+                  choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>;
+                };
+                const delta =
+                  parsed.choices?.[0]?.delta?.content ??
+                  parsed.choices?.[0]?.message?.content ??
+                  "";
+                accumulated += delta;
+                setMessages((prev) => {
+                  const copy = [...prev];
+                  copy[assistantIndex] = { role: "assistant", content: accumulated };
+                  return copy;
+                });
+              } catch {
+                // Ignore parse errors on stream chunks
+              }
+            }
+          }
+        }
+      } else {
+        const data = (await response.json()) as { choices?: Array<{ message?: { content?: string } }> };
+        const content = data.choices?.[0]?.message?.content ?? "";
+        setMessages((prev) => {
+          const copy = [...prev];
+          copy[assistantIndex] = { role: "assistant", content };
+          return copy;
+        });
+      }
+    } catch (err) {
+      setChatError(errorMessage(err));
+      setMessages((prev) => {
+        const copy = [...prev];
+        if (copy[assistantIndex] && !copy[assistantIndex]?.content) {
+          copy.splice(assistantIndex, 1);
+        }
+        return copy;
+      });
+    } finally {
+      setSending(false);
+    }
+  };
+
+  return (
+    <div className="page-stack">
+      <PageHeader
+        eyebrow="Exchange / Interactive Chat"
+        title="Test models with active route."
+        description="Interact directly with the model bound to this session through Exchange Gateway proxy."
+      />
+
+      {loadingRoute ? (
+        <StateBlock kind="loading" title="Loading active route" detail="Checking session active route configuration." />
+      ) : routeError || !activeRoute ? (
+        <Panel title="No active route selected">
+          <StateBlock
+            kind="empty"
+            title="Active route required"
+            detail={routeError ?? "No gateway route has been activated for this session yet. Go to Gateway to select and activate a route."}
+            action={
+              <Button tone="primary" onClick={() => pushRoute("gateway")}>
+                Go to Gateway
+              </Button>
+            }
+          />
+        </Panel>
+      ) : (
+        <>
+          <Panel
+            title={`Active route: ${activeRoute.modelId}`}
+            meta={<StatusPill value="CONNECTED" />}
+          >
+            <dl className="detail-grid">
+              <Detail label="Model ID" value={activeRoute.modelId} mono />
+              <Detail label="Base URL" value={activeRoute.baseUrl} mono />
+              <Detail label="Endpoint ID" value={activeRoute.gatewayEndpointId} mono />
+              {activeRoute.apiKeyHint ? <Detail label="Key hint" value={activeRoute.apiKeyHint} /> : null}
+            </dl>
+
+            <div style={{ marginTop: "16px" }}>
+              <Field
+                label="Exchange API Key"
+                hint="Key is held strictly in browser sessionStorage and sent via Authorization: Bearer."
+              >
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => handleApiKeyChange(e.target.value)}
+                  placeholder="cyk_live_..."
+                  className="input-mono"
+                />
+              </Field>
+            </div>
+          </Panel>
+
+          <Panel
+            title="Chat conversation"
+            meta={
+              <Button
+                onClick={() =>
+                  setMessages([{ role: "system", content: "You are a helpful AI assistant." }])
+                }
+              >
+                Clear history
+              </Button>
+            }
+          >
+            {chatError ? (
+              <div className="callout callout--red" style={{ marginBottom: "12px" }}>
+                <span className="callout__mark" aria-hidden="true">!</span>
+                <p><strong>Error:</strong> {chatError}</p>
+              </div>
+            ) : null}
+
+            <div
+              style={{
+                display: "grid",
+                gap: "12px",
+                maxHeight: "450px",
+                overflowY: "auto",
+                padding: "12px",
+                background: "var(--ink-soft)",
+                borderRadius: "6px",
+                border: "1px solid var(--line)",
+                marginBottom: "16px",
+              }}
+            >
+              {messages.filter((m) => m.role !== "system").length === 0 ? (
+                <div style={{ color: "var(--muted)", textAlign: "center", padding: "24px 0" }}>
+                  Start conversation with <code>{activeRoute.modelId}</code>
+                </div>
+              ) : (
+                messages
+                  .filter((m) => m.role !== "system")
+                  .map((msg, idx) => (
+                    <div
+                      key={idx}
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: msg.role === "user" ? "flex-end" : "flex-start",
+                      }}
+                    >
+                      <span className="mono-label" style={{ marginBottom: "4px" }}>
+                        {msg.role === "user" ? "YOU" : activeRoute.modelId}
+                      </span>
+                      <div
+                        style={{
+                          maxWidth: "85%",
+                          padding: "10px 14px",
+                          borderRadius: "8px",
+                          background:
+                            msg.role === "user"
+                              ? "rgba(201, 242, 123, 0.12)"
+                              : "rgba(17, 29, 34, 0.9)",
+                          border: `1px solid ${
+                            msg.role === "user" ? "var(--lime)" : "var(--line)"
+                          }`,
+                          whiteSpace: "pre-wrap",
+                          fontSize: "13px",
+                          lineHeight: "1.5",
+                        }}
+                      >
+                        {msg.content || (sending && idx === messages.length - 1 ? "..." : "")}
+                      </div>
+                    </div>
+                  ))
+              )}
+            </div>
+
+            <form onSubmit={sendMessage} style={{ display: "flex", gap: "8px" }}>
+              <input
+                style={{ flex: 1, padding: "10px 14px", borderRadius: "6px" }}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                placeholder="Type a message..."
+                disabled={sending || !apiKey.trim()}
+              />
+              <Button tone="primary" type="submit" disabled={sending || !inputMessage.trim() || !apiKey.trim()}>
+                {sending ? "Sending..." : "Send"}
+              </Button>
+            </form>
+          </Panel>
+        </>
+      )}
     </div>
   );
 }

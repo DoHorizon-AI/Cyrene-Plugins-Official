@@ -45,6 +45,49 @@ export interface ServiceHealthStatus {
   latencyMs: number;
 }
 
+export interface BlockerInfo {
+  code: string;
+  message: string;
+}
+
+export interface PluginInfo {
+  name: string;
+  kind?: string;
+  state: string;
+}
+
+export interface ActiveRoutePayload {
+  gatewayEndpointId: string;
+  modelId: string;
+  baseUrl: string;
+  apiKeyHint?: string;
+}
+
+export interface PreviewRow {
+  index: number;
+  mapped: Record<string, unknown>;
+  raw: Record<string, unknown>;
+}
+
+export interface DatasetPreview {
+  versionId: string;
+  totalRows: number;
+  rows: PreviewRow[];
+}
+
+export interface DeploymentEvent {
+  sequence: number;
+  phase: string;
+  message: string;
+  occurredAt: string;
+  failureCode?: string | null;
+}
+
+export interface DeploymentEventsResponse {
+  deploymentId: string;
+  events: DeploymentEvent[];
+}
+
 /** Safe host status; it intentionally contains no credential material. */
 export interface SystemStatus {
   service: string;
@@ -59,6 +102,8 @@ export interface SystemStatus {
   gpu?: GpuStatus;
   disk?: DiskStatus;
   services?: ServiceHealthStatus[];
+  blockers?: BlockerInfo[];
+  plugins?: PluginInfo[];
   observedAt: string;
 }
 
@@ -449,6 +494,46 @@ export class NavigatorApi {
     );
   }
 
+  /** Read dataset version sample preview through Catalyst proxy. */
+  async getDatasetVersionPreview(
+    versionId: string,
+    limit: number = 10,
+    offset: number = 0,
+  ): Promise<DatasetPreview> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/dataset-versions/${encodeURIComponent(versionId)}/preview?limit=${limit}&offset=${offset}`,
+      { method: "GET" },
+      parseDatasetPreview,
+    );
+  }
+
+  /** Read deployment loading phase events through Reactor proxy. */
+  async getDeploymentEvents(deploymentId: string): Promise<DeploymentEventsResponse> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.reactor}/deployments/${encodeURIComponent(deploymentId)}/events`,
+      { method: "GET" },
+      parseDeploymentEventsResponse,
+    );
+  }
+
+  /** Read active gateway route from Navigator Web Host session. */
+  async getActiveRoute(): Promise<ActiveRoutePayload> {
+    return this.requestJson(
+      "/api/v1/navigator/active-route",
+      { method: "GET" },
+      parseActiveRoute,
+    );
+  }
+
+  /** Store active gateway route into Navigator Web Host session. */
+  async setActiveRoute(payload: ActiveRoutePayload): Promise<ActiveRoutePayload> {
+    return this.requestJson(
+      "/api/v1/navigator/active-route",
+      jsonRequest("POST", payload, true),
+      parseActiveRoute,
+    );
+  }
+
   private async requestJson<T>(
     path: string,
     init: RequestInit,
@@ -625,6 +710,29 @@ function parseSystemStatus(value: unknown): SystemStatus {
     });
   }
 
+  let blockers: BlockerInfo[] | undefined;
+  if (Array.isArray(record.blockers)) {
+    blockers = record.blockers.map((b) => {
+      const br = requireRecord(b, "blocker");
+      return {
+        code: requireString(br, "code", "blocker code"),
+        message: requireString(br, "message", "blocker message"),
+      };
+    });
+  }
+
+  let plugins: PluginInfo[] | undefined;
+  if (Array.isArray(record.plugins)) {
+    plugins = record.plugins.map((p) => {
+      const pr = requireRecord(p, "plugin");
+      return {
+        name: requireString(pr, "name", "plugin name"),
+        kind: typeof pr.kind === "string" ? pr.kind : undefined,
+        state: requireString(pr, "state", "plugin state"),
+      };
+    });
+  }
+
   return {
     service: requireString(record, "service", "system status"),
     status: requireString(record, "status", "system status"),
@@ -638,7 +746,50 @@ function parseSystemStatus(value: unknown): SystemStatus {
     gpu,
     disk,
     services,
+    blockers,
+    plugins,
     observedAt: requireString(record, "observedAt", "system status"),
+  };
+}
+
+function parseDatasetPreview(value: unknown): DatasetPreview {
+  const record = requireRecord(value, "dataset preview");
+  const versionId = String(record.versionId ?? record.version_id ?? "");
+  const totalRows = typeof record.totalRows === "number" ? record.totalRows : typeof record.total_rows === "number" ? record.total_rows : 0;
+  const rows = requireArray(record.rows, "preview rows").map((row, index) => {
+    const r = requireRecord(row, "preview row");
+    return {
+      index: typeof r.index === "number" ? r.index : index,
+      mapped: isRecord(r.mapped) ? r.mapped : {},
+      raw: isRecord(r.raw) ? r.raw : {},
+    };
+  });
+  return { versionId, totalRows, rows };
+}
+
+function parseDeploymentEventsResponse(value: unknown): DeploymentEventsResponse {
+  const record = requireRecord(value, "deployment events response");
+  const deploymentId = String(record.deploymentId ?? record.deployment_id ?? "");
+  const events = requireArray(record.events, "deployment events").map((evt) => {
+    const e = requireRecord(evt, "deployment event");
+    return {
+      sequence: typeof e.sequence === "number" ? e.sequence : 0,
+      phase: requireString(e, "phase", "event phase"),
+      message: requireString(e, "message", "event message"),
+      occurredAt: String(e.occurredAt ?? e.occurred_at ?? ""),
+      failureCode: typeof (e.failureCode ?? e.failure_code) === "string" ? String(e.failureCode ?? e.failure_code) : null,
+    };
+  });
+  return { deploymentId, events };
+}
+
+function parseActiveRoute(value: unknown): ActiveRoutePayload {
+  const record = requireRecord(value, "active route");
+  return {
+    gatewayEndpointId: String(record.gatewayEndpointId ?? record.gateway_endpoint_id ?? ""),
+    modelId: String(record.modelId ?? record.model_id ?? ""),
+    baseUrl: String(record.baseUrl ?? record.base_url ?? ""),
+    apiKeyHint: typeof (record.apiKeyHint ?? record.api_key_hint) === "string" ? String(record.apiKeyHint ?? record.api_key_hint) : undefined,
   };
 }
 

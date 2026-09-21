@@ -12,7 +12,8 @@ export type RouteId =
   | "runs"
   | "deployments"
   | "gateway"
-  | "settings";
+  | "settings"
+  | "chat";
 
 /** Navigation metadata used by both the shell and the route resolver. */
 export interface RouteDefinition {
@@ -64,6 +65,12 @@ export const ROUTES: readonly RouteDefinition[] = [
     label: "Gateway",
     path: "/gateway",
     description: "Routes, API keys, and client configuration",
+  },
+  {
+    id: "chat",
+    label: "Chat",
+    path: "/chat",
+    description: "Exchange model testing with active route",
   },
   {
     id: "settings",

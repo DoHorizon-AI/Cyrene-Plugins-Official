@@ -155,6 +155,128 @@ describe("NavigatorApi", () => {
     expect(status.services?.[0]?.status).toBe("UP");
   });
 
+  it("parses system status blockers and installed plugins", async () => {
+    const api = new NavigatorApi(async () => {
+      return response({
+        service: "cyrene-navigator-web-host",
+        status: "ok",
+        version: "1.0.0",
+        authenticated: true,
+        proxyPrefixes: ["/api/v1/yield"],
+        credentials: { active: 1, revoked: 0 },
+        blockers: [
+          { code: "GPU_VRAM_INSUFFICIENT", message: "GPU VRAM is less than 12 GiB." },
+        ],
+        plugins: [
+          { name: "llama-factory", kind: "training.engine", state: "READY" },
+          { name: "vllm-runtime", kind: "serving.engine", state: "READY" },
+        ],
+        observedAt: "2026-09-21T00:00:00Z",
+      });
+    });
+
+    const status = await api.getSystemStatus();
+    expect(status.blockers).toHaveLength(1);
+    expect(status.blockers?.[0]?.code).toBe("GPU_VRAM_INSUFFICIENT");
+    expect(status.plugins).toHaveLength(2);
+    expect(status.plugins?.[0]?.name).toBe("llama-factory");
+    expect(status.plugins?.[0]?.state).toBe("READY");
+  });
+
+  it("fetches dataset version sample preview through Catalyst proxy", async () => {
+    let requestedPath = "";
+    const api = new NavigatorApi(async (input) => {
+      requestedPath = String(input);
+      return response({
+        versionId: "11111111-2222-3333-4444-555555555555",
+        totalRows: 100,
+        rows: [
+          {
+            index: 0,
+            mapped: { instruction: "Say hi", output: "Hi" },
+            raw: { prompt: "Say hi", response: "Hi" },
+          },
+        ],
+      });
+    });
+
+    const preview = await api.getDatasetVersionPreview("11111111-2222-3333-4444-555555555555", 10, 0);
+    expect(requestedPath).toBe("/api/v1/catalyst/dataset-versions/11111111-2222-3333-4444-555555555555/preview?limit=10&offset=0");
+    expect(preview.versionId).toBe("11111111-2222-3333-4444-555555555555");
+    expect(preview.totalRows).toBe(100);
+    expect(preview.rows).toHaveLength(1);
+    expect(preview.rows[0]?.mapped["instruction"]).toBe("Say hi");
+  });
+
+  it("fetches deployment loading phase events through Reactor proxy", async () => {
+    let requestedPath = "";
+    const api = new NavigatorApi(async (input) => {
+      requestedPath = String(input);
+      return response({
+        deploymentId: "dep-123",
+        events: [
+          {
+            sequence: 1,
+            phase: "QUEUED",
+            message: "Queued for scheduling",
+            occurredAt: "2026-09-21T00:00:00Z",
+          },
+          {
+            sequence: 2,
+            phase: "LOADING",
+            message: "Loading model weights",
+            occurredAt: "2026-09-21T00:00:01Z",
+          },
+        ],
+      });
+    });
+
+    const eventsRes = await api.getDeploymentEvents("dep-123");
+    expect(requestedPath).toBe("/api/v1/reactor/deployments/dep-123/events");
+    expect(eventsRes.deploymentId).toBe("dep-123");
+    expect(eventsRes.events).toHaveLength(2);
+    expect(eventsRes.events[0]?.phase).toBe("QUEUED");
+    expect(eventsRes.events[1]?.phase).toBe("LOADING");
+  });
+
+  it("reads and sets active gateway route in Navigator session", async () => {
+    let lastMethod = "";
+    let lastPath = "";
+    let lastBody: unknown;
+    const api = new NavigatorApi(async (input, init) => {
+      lastPath = String(input);
+      lastMethod = init?.method ?? "GET";
+      lastBody = init?.body ? JSON.parse(String(init.body)) : undefined;
+      return response({
+        gatewayEndpointId: "gw-1",
+        modelId: "qwen-2.5",
+        baseUrl: "http://localhost:8003/v1",
+        apiKeyHint: "qwen-hint",
+      });
+    });
+
+    const getRes = await api.getActiveRoute();
+    expect(lastPath).toBe("/api/v1/navigator/active-route");
+    expect(lastMethod).toBe("GET");
+    expect(getRes.modelId).toBe("qwen-2.5");
+
+    const setRes = await api.setActiveRoute({
+      gatewayEndpointId: "gw-1",
+      modelId: "qwen-2.5",
+      baseUrl: "http://localhost:8003/v1",
+      apiKeyHint: "qwen-hint",
+    });
+    expect(lastPath).toBe("/api/v1/navigator/active-route");
+    expect(lastMethod).toBe("POST");
+    expect(lastBody).toEqual({
+      gatewayEndpointId: "gw-1",
+      modelId: "qwen-2.5",
+      baseUrl: "http://localhost:8003/v1",
+      apiKeyHint: "qwen-hint",
+    });
+    expect(setRes.modelId).toBe("qwen-2.5");
+  });
+
   it("handles Gateway API routes, endpoints, and API key management", async () => {
     const calls: Array<{ path: string; method?: string }> = [];
     const api = new NavigatorApi(async (input, init) => {

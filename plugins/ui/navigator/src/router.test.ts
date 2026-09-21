@@ -15,6 +15,7 @@ describe("Navigator routes", () => {
     expect(routeForPath("/runs?runId=run-1")).toBe("runs");
     expect(routeForPath("/deployments")).toBe("deployments");
     expect(routeForPath("/gateway")).toBe("gateway");
+    expect(routeForPath("/chat")).toBe("chat");
     expect(routeForPath("/settings")).toBe("settings");
   });
 
@@ -28,5 +29,7 @@ describe("Navigator routes", () => {
     expect(pathForRoute("models")).toBe("/models");
     expect(pathForRoute("deployments")).toBe("/deployments");
     expect(pathForRoute("gateway")).toBe("/gateway");
+    expect(pathForRoute("chat")).toBe("/chat");
+    expect(pathForRoute("settings")).toBe("/settings");
   });
 });
