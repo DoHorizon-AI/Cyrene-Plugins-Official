@@ -33,6 +33,7 @@ class ScriptedTransport:
         self,
         token_responses: list[Mapping[str, Any]] | None = None,
         send_responses: list[Mapping[str, Any]] | None = None,
+        upload_responses: list[Mapping[str, Any]] | None = None,
     ) -> None:
         self.token_responses = list(
             token_responses
@@ -48,8 +49,12 @@ class ScriptedTransport:
         self.send_responses = list(
             send_responses or [{"errcode": 0, "errmsg": "ok", "msgid": "MSG-1"}]
         )
+        self.upload_responses = list(
+            upload_responses or [{"errcode": 0, "errmsg": "ok", "media_id": "MEDIA-1"}]
+        )
         self.token_calls: list[WeComInstanceConfig] = []
         self.sends: list[tuple[str, dict[str, Any]]] = []
+        self.uploads: list[dict[str, Any]] = []
 
     def get_token(
         self, config: WeComInstanceConfig, *, cancellation: Any | None = None
@@ -72,6 +77,31 @@ class ScriptedTransport:
         if not self.send_responses:
             raise AssertionError("unexpected send_agent_message call")
         return self.send_responses.pop(0)
+
+    def upload_media(
+        self,
+        token: str,
+        media_type: str,
+        remote_uri: str,
+        file_name: str,
+        mime_type: str,
+        config: WeComInstanceConfig,
+        *,
+        cancellation: Any | None = None,
+    ) -> Mapping[str, Any]:
+        del config, cancellation
+        self.uploads.append(
+            {
+                "token": token,
+                "media_type": media_type,
+                "remote_uri": remote_uri,
+                "file_name": file_name,
+                "mime_type": mime_type,
+            }
+        )
+        if not self.upload_responses:
+            raise AssertionError("unexpected upload_media call")
+        return self.upload_responses.pop(0)
 
 
 def conversation(**overrides: Any) -> dict[str, Any]:
@@ -247,7 +277,7 @@ def test_unsupported_targets_and_content_fail_with_typed_errors() -> None:
             }
         )
     assert media.value.code == "INVALID_REQUEST"
-    assert "media upload" in media.value.message
+    assert "reference" in media.value.message
 
     with pytest.raises(ConnectorError) as fact:
         plugin.send_message(
@@ -258,6 +288,118 @@ def test_unsupported_targets_and_content_fail_with_typed_errors() -> None:
             }
         )
     assert fact.value.code == "INVALID_REQUEST"
+
+
+def test_remote_media_uploads_then_sends_the_returned_media_id() -> None:
+    transport = ScriptedTransport()
+    plugin = connector(transport)
+
+    result = plugin.send_message(
+        {
+            "conversation": conversation(),
+            "content": [
+                {
+                    "kind": "image",
+                    "reference": {"remote_uri": "https://cdn.example.test/photo.png"},
+                    "mime_type": "image/png",
+                }
+            ],
+        }
+    )
+
+    assert result["status"] == "accepted"
+    assert transport.uploads == [
+        {
+            "token": "token-1",
+            "media_type": "image",
+            "remote_uri": "https://cdn.example.test/photo.png",
+            "file_name": "",
+            "mime_type": "image/png",
+        }
+    ]
+    assert transport.sends == [
+        (
+            "token-1",
+            {
+                "touser": "zhangsan",
+                "msgtype": "image",
+                "agentid": 1000002,
+                "image": {"media_id": "MEDIA-1"},
+            },
+        )
+    ]
+
+
+def test_existing_vendor_media_is_reused_only_for_the_bound_agent() -> None:
+    transport = ScriptedTransport()
+    plugin = connector(transport)
+    reference = {
+        "vendor_media": {
+            "vendor": "wecom.app",
+            "account_id": "agent:1000002",
+            "media_id": "MEDIA-EXISTING",
+        }
+    }
+
+    plugin.send_message(
+        {
+            "conversation": conversation(),
+            "content": [
+                {
+                    "kind": "file",
+                    "reference": reference,
+                    "file_name": "report.pdf",
+                    "mime_type": "application/pdf",
+                }
+            ],
+        }
+    )
+    assert transport.uploads == []
+    assert transport.sends[0][1]["file"] == {"media_id": "MEDIA-EXISTING"}
+
+    reference["vendor_media"]["account_id"] = "agent:other"
+    with pytest.raises(ConnectorError) as mismatch:
+        plugin.send_message(
+            {
+                "conversation": conversation(),
+                "content": [{"kind": "file", "reference": reference}],
+            }
+        )
+    assert mismatch.value.code == "INVALID_REQUEST"
+    assert "binding" in mismatch.value.message
+
+
+def test_media_upload_refreshes_an_expired_token_and_rejects_mixed_content() -> None:
+    transport = ScriptedTransport(
+        token_responses=[
+            {"errcode": 0, "access_token": "token-old", "expires_in": 7200},
+            {"errcode": 0, "access_token": "token-new", "expires_in": 7200},
+        ],
+        upload_responses=[
+            {"errcode": 42001, "errmsg": "access_token expired"},
+            {"errcode": 0, "errmsg": "ok", "media_id": "MEDIA-NEW"},
+        ],
+    )
+    plugin = connector(transport)
+    image = {
+        "kind": "image",
+        "reference": {"remote_uri": "https://cdn.example.test/photo.png"},
+        "mime_type": "image/png",
+    }
+
+    plugin.send_message({"conversation": conversation(), "content": [image]})
+    assert [item["token"] for item in transport.uploads] == ["token-old", "token-new"]
+    assert transport.sends[0][0] == "token-new"
+
+    with pytest.raises(ConnectorError) as mixed:
+        plugin.send_message(
+            {
+                "conversation": conversation(),
+                "content": [image, {"kind": "text", "text": "caption"}],
+            }
+        )
+    assert mixed.value.code == "INVALID_REQUEST"
+    assert "one media part" in mixed.value.message
 
 
 def test_payload_validation_fails_closed() -> None:
@@ -357,6 +499,34 @@ def test_on_invoke_round_trips_the_typed_contract() -> None:
     )
     assert ok is False
     assert message.startswith("INVALID_REQUEST")
+
+
+def test_on_invoke_preserves_typed_attachment_references() -> None:
+    transport = ScriptedTransport()
+    plugin = connector(transport)
+    request = message_contract.SendMessageRequest()
+    request.conversation.vendor = "wecom.app"
+    request.conversation.account_id = "agent:1000002"
+    request.conversation.conversation_id = "zhangsan"
+    request.conversation.kind = message_contract.CONVERSATION_KIND_PRIVATE
+    request.content.add().file.reference.remote_uri = (
+        "https://cdn.example.test/report.pdf"
+    )
+    request.content[0].file.file_name = "quarterly-report.pdf"
+    request.content[0].file.mime_type = "application/pdf"
+
+    ok, typed = plugin.on_invoke(
+        CAPABILITY_ID,
+        "send_message",
+        request.SerializeToString(),
+        request_type_url=SEND_MESSAGE_REQUEST_TYPE_URL,
+    )
+
+    assert ok is True
+    assert typed.type_url == DELIVERY_RESULT_TYPE_URL
+    assert transport.uploads[0]["remote_uri"].endswith("report.pdf")
+    assert transport.uploads[0]["file_name"] == "quarterly-report.pdf"
+    assert transport.sends[0][1]["file"] == {"media_id": "MEDIA-1"}
 
 
 def test_configuration_comes_from_the_standard_environment(monkeypatch) -> None:

@@ -9,7 +9,7 @@ its manifest; a Product binding that requires other methods fails closed.
 
 | Method | Status |
 | --- | --- |
-| `send_message` | implemented (text / markdown, `touser` / `toparty`, mentions) |
+| `send_message` | implemented (text / markdown / image / file, `touser` / `toparty`, mentions) |
 | `inbound_message` | **not in v1**: WeCom callbacks require an owned HTTP callback surface plus URL verification and AES decryption; that surface is not invented here and is tracked as a follow-up |
 | `inbound_request` / `respond_request` | not in v1: WeCom approval flows need their own mapping and vendor-request identity work |
 
@@ -40,8 +40,13 @@ returned as rejected delivery results instead of guessing a target.
 - Transport failures raise `UNAVAILABLE` instead of claiming a delivery
   outcome; a `reply` reference is reported back as the vendor fact
   `reply_reference_ignored` because WeCom application messages do not thread.
-- Media parts (`image`/`file`) fail closed with `INVALID_REQUEST` in v1: media
-  upload is a follow-up.
+- Image and file parts accept either a binding-owned `vendor_media` reference or
+  an absolute HTTP(S) `remote_uri`. Remote bytes are downloaded with the binding
+  timeout, bounded to WeCom's 2 MiB image / 20 MiB file limits, uploaded through
+  `/cgi-bin/media/upload`, and then sent with the returned temporary `media_id`.
+- WeCom application messages allow one media part per outbound message. Media
+  references from another vendor or agent binding, mixed text/media payloads,
+  undersized files, oversized files, and non-JPEG/PNG images fail closed.
 
 ```bash
 python3 -m pytest plugins/connectors/wecom/tests

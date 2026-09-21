@@ -14,13 +14,16 @@
 from __future__ import annotations
 
 import json
+import mimetypes
+import secrets
 import threading
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any, Protocol
 
 from google.protobuf.message import DecodeError
@@ -37,9 +40,13 @@ SEND_MESSAGE_REQUEST_TYPE_URL = (
 DELIVERY_RESULT_TYPE_URL = "type.cyrene.io/cyrene.message.connector.v1.DeliveryResult"
 
 DEFAULT_BASE_URL = "https://qyapi.weixin.qq.com"
-SUPPORTED_MSG_TYPES = ("text", "markdown")
+SUPPORTED_TEXT_MSG_TYPES = ("text", "markdown")
 INVALID_TOKEN_CODES = (40001, 40014, 42001)
 RATE_LIMIT_CODES = (45009, 45047)
+MIN_MEDIA_BYTES = 6
+MAX_IMAGE_BYTES = 2 * 1024 * 1024
+MAX_FILE_BYTES = 20 * 1024 * 1024
+IMAGE_MIME_TYPES = {"image/jpeg", "image/jpg", "image/png"}
 
 _KIND_NAMES = {
     message_contract.CONVERSATION_KIND_UNSPECIFIED: "unspecified",
@@ -66,7 +73,7 @@ class CancellationToken(Protocol):
 
 
 class WeComTransport(Protocol):
-    """Injectable transport for the two WeCom REST calls this connector makes."""
+    """Injectable transport for token, upload, and message REST calls."""
 
     def get_token(
         self,
@@ -79,6 +86,18 @@ class WeComTransport(Protocol):
         self,
         token: str,
         payload: Mapping[str, Any],
+        config: WeComInstanceConfig,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> Mapping[str, Any]: ...
+
+    def upload_media(
+        self,
+        token: str,
+        media_type: str,
+        remote_uri: str,
+        file_name: str,
+        mime_type: str,
         config: WeComInstanceConfig,
         *,
         cancellation: CancellationToken | None = None,
@@ -206,7 +225,115 @@ class UrllibWeComTransport:
             body,
             config,
             cancellation,
+            content_type="application/json; charset=utf-8",
         )
+
+    def upload_media(
+        self,
+        token: str,
+        media_type: str,
+        remote_uri: str,
+        file_name: str,
+        mime_type: str,
+        config: WeComInstanceConfig,
+        *,
+        cancellation: CancellationToken | None = None,
+    ) -> Mapping[str, Any]:
+        """Fetch one canonical remote attachment and upload it as temporary media."""
+
+        content, resolved_name, resolved_mime = self._download_media(
+            remote_uri,
+            media_type,
+            file_name,
+            mime_type,
+            config,
+            cancellation,
+        )
+        boundary = f"cyrene-{secrets.token_hex(16)}"
+        disposition_name = _multipart_filename(resolved_name)
+        prefix = (
+            f"--{boundary}\r\n"
+            'Content-Disposition: form-data; name="media"; '
+            f'filename="{disposition_name}"; filelength={len(content)}\r\n'
+            f"Content-Type: {resolved_mime}\r\n\r\n"
+        ).encode()
+        body = prefix + content + f"\r\n--{boundary}--\r\n".encode()
+        query = urllib.parse.urlencode({"access_token": token, "type": media_type})
+        return self._json_request(
+            f"{config.base_url}/cgi-bin/media/upload?{query}",
+            body,
+            config,
+            cancellation,
+            content_type=f"multipart/form-data; boundary={boundary}",
+        )
+
+    def _download_media(
+        self,
+        remote_uri: str,
+        media_type: str,
+        file_name: str,
+        mime_type: str,
+        config: WeComInstanceConfig,
+        cancellation: CancellationToken | None,
+    ) -> tuple[bytes, str, str]:
+        _raise_if_cancelled(cancellation)
+        request = urllib.request.Request(remote_uri, headers={"Accept": "*/*"})
+        limit = MAX_IMAGE_BYTES if media_type == "image" else MAX_FILE_BYTES
+        try:
+            with urllib.request.urlopen(
+                request, timeout=config.timeout_seconds
+            ) as response:
+                final_url = urllib.parse.urlsplit(response.geturl())
+                if final_url.scheme not in {"http", "https"}:
+                    raise ConnectorError(
+                        "INVALID_REQUEST", "media redirect must remain http(s)"
+                    )
+                declared_length = response.headers.get("Content-Length")
+                if declared_length is not None:
+                    try:
+                        declared_size = int(declared_length)
+                    except ValueError as exc:
+                        raise ConnectorError(
+                            "UNAVAILABLE",
+                            "media response has an invalid Content-Length",
+                        ) from exc
+                    if declared_size > limit:
+                        raise ConnectorError(
+                            "INVALID_REQUEST",
+                            f"{media_type} exceeds the {limit}-byte upload limit",
+                        )
+                content = response.read(limit + 1)
+                response_mime = response.headers.get_content_type()
+        except ConnectorError:
+            raise
+        except (TimeoutError, urllib.error.URLError, OSError) as exc:
+            raise ConnectorError(
+                "UNAVAILABLE",
+                f"media download failed: {type(exc).__name__}: {exc}",
+            ) from exc
+        _raise_if_cancelled(cancellation)
+        if len(content) < MIN_MEDIA_BYTES:
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                f"{media_type} must contain at least {MIN_MEDIA_BYTES} bytes",
+            )
+        if len(content) > limit:
+            raise ConnectorError(
+                "INVALID_REQUEST", f"{media_type} exceeds the {limit}-byte upload limit"
+            )
+
+        resolved_name = file_name or _remote_file_name(remote_uri, media_type)
+        resolved_mime = mime_type or response_mime
+        if resolved_mime == "application/octet-stream":
+            guessed, _ = mimetypes.guess_type(resolved_name)
+            resolved_mime = guessed or resolved_mime
+        if media_type == "image" and resolved_mime.lower() not in IMAGE_MIME_TYPES:
+            raise ConnectorError(
+                "INVALID_REQUEST", "WeCom images must use JPEG or PNG media"
+            )
+        if "\r" in resolved_mime or "\n" in resolved_mime:
+            raise ConnectorError("INVALID_REQUEST", "media MIME type is invalid")
+        return content, resolved_name, resolved_mime
 
     def _json_request(
         self,
@@ -214,13 +341,15 @@ class UrllibWeComTransport:
         body: bytes | None,
         config: WeComInstanceConfig,
         cancellation: CancellationToken | None,
+        *,
+        content_type: str | None = None,
     ) -> Mapping[str, Any]:
         _raise_if_cancelled(cancellation)
         request = urllib.request.Request(
             url, data=body, method="POST" if body else "GET"
         )
-        if body is not None:
-            request.add_header("Content-Type", "application/json; charset=utf-8")
+        if content_type is not None:
+            request.add_header("Content-Type", content_type)
         try:
             with urllib.request.urlopen(
                 request, timeout=config.timeout_seconds
@@ -322,7 +451,14 @@ class WeComConnector:
                 ),
             }
 
-        body = _build_agent_message(request, conversation, config)
+        body = _build_agent_message(
+            request,
+            conversation,
+            config,
+            media_resolver=lambda media_type, part: self._resolve_media_id(
+                media_type, part, config, cancellation
+            ),
+        )
         response = self._send_with_token_retry(body, config, cancellation)
         return _delivery_result(response, conversation.get("reply_message_id"))
 
@@ -415,6 +551,98 @@ class WeComConnector:
             )
         return response
 
+    def _resolve_media_id(
+        self,
+        media_type: str,
+        part: Mapping[str, Any],
+        config: WeComInstanceConfig,
+        cancellation: CancellationToken | None,
+    ) -> str:
+        reference = part.get("reference")
+        if not isinstance(reference, Mapping):
+            raise ConnectorError(
+                "INVALID_REQUEST", f"{media_type}.reference must be an object"
+            )
+        remote_uri = reference.get("remote_uri")
+        vendor_media = reference.get("vendor_media")
+        if (remote_uri is None) == (vendor_media is None):
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                f"{media_type}.reference must contain exactly one location",
+            )
+
+        if vendor_media is not None:
+            if not isinstance(vendor_media, Mapping):
+                raise ConnectorError(
+                    "INVALID_REQUEST", f"{media_type}.reference.vendor_media is invalid"
+                )
+            vendor = _required_text(
+                vendor_media.get("vendor"),
+                f"{media_type}.reference.vendor_media.vendor",
+            )
+            account_id = _required_text(
+                vendor_media.get("account_id"),
+                f"{media_type}.reference.vendor_media.account_id",
+            )
+            if vendor != VENDOR or account_id != f"agent:{config.agent_id}":
+                raise ConnectorError(
+                    "INVALID_REQUEST",
+                    "vendor media must belong to this wecom.app agent binding",
+                )
+            return _required_text(
+                vendor_media.get("media_id"),
+                f"{media_type}.reference.vendor_media.media_id",
+            )
+
+        remote_uri = _validated_remote_uri(
+            remote_uri, f"{media_type}.reference.remote_uri"
+        )
+        file_name = part.get("file_name", "") if media_type == "file" else ""
+        if not isinstance(file_name, str):
+            raise ConnectorError("INVALID_REQUEST", "file.file_name must be a string")
+        mime_type = part.get("mime_type", "")
+        if not isinstance(mime_type, str):
+            raise ConnectorError(
+                "INVALID_REQUEST", f"{media_type}.mime_type must be a string"
+            )
+
+        transport = self._transport_for(config)
+        token = self._access_token(transport, config, cancellation)
+        response = transport.upload_media(
+            token,
+            media_type,
+            remote_uri,
+            file_name,
+            mime_type,
+            config,
+            cancellation=cancellation,
+        )
+        if _errcode(response) in INVALID_TOKEN_CODES:
+            token = self._access_token(
+                transport, config, cancellation, force_refresh=True
+            )
+            response = transport.upload_media(
+                token,
+                media_type,
+                remote_uri,
+                file_name,
+                mime_type,
+                config,
+                cancellation=cancellation,
+            )
+        if _errcode(response) != 0:
+            raise ConnectorError(
+                "UNAVAILABLE",
+                "wecom media upload failed: "
+                f"errcode={_errcode(response)} errmsg={response.get('errmsg', '')}",
+            )
+        media_id = response.get("media_id")
+        if not isinstance(media_id, str) or not media_id:
+            raise ConnectorError(
+                "UNAVAILABLE", "wecom media upload response has no media_id"
+            )
+        return media_id
+
     def _access_token(
         self,
         transport: WeComTransport,
@@ -473,6 +701,34 @@ def _required_text(value: Any, field: str) -> str:
     return value
 
 
+def _validated_remote_uri(value: Any, field: str) -> str:
+    uri = _required_text(value, field)
+    parsed = urllib.parse.urlsplit(uri)
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ConnectorError(
+            "INVALID_REQUEST", f"{field} must be an absolute http(s) URL"
+        )
+    if parsed.username is not None or parsed.password is not None:
+        raise ConnectorError("INVALID_REQUEST", f"{field} must not contain credentials")
+    return uri
+
+
+def _remote_file_name(remote_uri: str, media_type: str) -> str:
+    name = PurePosixPath(
+        urllib.parse.unquote(urllib.parse.urlsplit(remote_uri).path)
+    ).name
+    return name or ("image.png" if media_type == "image" else "attachment.bin")
+
+
+def _multipart_filename(value: str) -> str:
+    name = PurePosixPath(value.replace("\\", "/")).name.strip()
+    if not name or name in {".", ".."}:
+        raise ConnectorError("INVALID_REQUEST", "media file name is invalid")
+    if "\r" in name or "\n" in name or '"' in name:
+        raise ConnectorError("INVALID_REQUEST", "media file name is invalid")
+    return name
+
+
 def _conversation_for_send(
     request: Mapping[str, Any], config: WeComInstanceConfig
 ) -> dict[str, Any]:
@@ -518,6 +774,8 @@ def _build_agent_message(
     request: Mapping[str, Any],
     conversation: Mapping[str, Any],
     config: WeComInstanceConfig,
+    *,
+    media_resolver: Callable[[str, Mapping[str, Any]], str],
 ) -> dict[str, Any]:
     raw_content = request.get("content")
     if not isinstance(raw_content, list) or not raw_content:
@@ -535,11 +793,36 @@ def _build_agent_message(
             f"unsupported vendor fact(s) {unsupported}; wecom.app v1 accepts 'msgtype'",
         )
     msgtype = vendor_facts.get("msgtype", "text")
-    if msgtype not in SUPPORTED_MSG_TYPES:
+    if msgtype not in SUPPORTED_TEXT_MSG_TYPES:
         raise ConnectorError(
             "INVALID_REQUEST",
-            f"msgtype must be one of {SUPPORTED_MSG_TYPES}",
+            f"msgtype must be one of {SUPPORTED_TEXT_MSG_TYPES}",
         )
+
+    media_parts = [
+        part
+        for part in raw_content
+        if isinstance(part, Mapping) and part.get("kind") in {"image", "file"}
+    ]
+    if media_parts:
+        if len(raw_content) != 1 or len(media_parts) != 1:
+            raise ConnectorError(
+                "INVALID_REQUEST",
+                "WeCom application messages require one media part per message",
+            )
+        if "msgtype" in vendor_facts:
+            raise ConnectorError(
+                "INVALID_REQUEST", "media content determines msgtype automatically"
+            )
+        part = media_parts[0]
+        media_type = str(part["kind"])
+        media_id = media_resolver(media_type, part)
+        return {
+            _TARGET_KEYS[conversation["kind"]]: conversation["conversation_id"],
+            "msgtype": media_type,
+            "agentid": config.agent_id,
+            media_type: {"media_id": media_id},
+        }
 
     text_parts: list[str] = []
     mentioned: list[str] = []
@@ -569,12 +852,6 @@ def _build_agent_message(
                 raise ConnectorError(
                     "INVALID_REQUEST", f"unsupported mention target {target!r}"
                 )
-        elif kind in ("image", "file"):
-            raise ConnectorError(
-                "INVALID_REQUEST",
-                "wecom.app v1 supports text and markdown content only; "
-                "media upload is not implemented",
-            )
         else:
             raise ConnectorError(
                 "INVALID_REQUEST", f"unsupported content part kind {kind!r}"
@@ -664,8 +941,23 @@ def _send_request_to_mapping(request: Any) -> dict[str, Any]:
                     "display_name": part.mention.display_name,
                 }
             )
-        elif kind in ("image", "file"):
-            content.append({"kind": kind})
+        elif kind == "image":
+            content.append(
+                {
+                    "kind": "image",
+                    "reference": _attachment_reference_to_mapping(part.image.reference),
+                    "mime_type": part.image.mime_type,
+                }
+            )
+        elif kind == "file":
+            content.append(
+                {
+                    "kind": "file",
+                    "reference": _attachment_reference_to_mapping(part.file.reference),
+                    "file_name": part.file.file_name,
+                    "mime_type": part.file.mime_type,
+                }
+            )
         else:
             content.append({"kind": "unspecified"})
     mapping: dict[str, Any] = {
@@ -680,6 +972,21 @@ def _send_request_to_mapping(request: Any) -> dict[str, Any]:
             fact.name: fact.value for fact in request.vendor_extension.facts
         }
     return mapping
+
+
+def _attachment_reference_to_mapping(reference: Any) -> dict[str, Any]:
+    location = reference.WhichOneof("location")
+    if location == "remote_uri":
+        return {"remote_uri": reference.remote_uri}
+    if location == "vendor_media":
+        return {
+            "vendor_media": {
+                "vendor": reference.vendor_media.vendor,
+                "account_id": reference.vendor_media.account_id,
+                "media_id": reference.vendor_media.media_id,
+            }
+        }
+    return {}
 
 
 def _apply_delivery_result(target: Any, result: Mapping[str, Any]) -> None:

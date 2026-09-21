@@ -1188,8 +1188,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/README.md",
-      "sha256": "92089ade9513ddea14efd7ff9fb20aa3062c818dec20e1bc068e2d707bd50cd9",
-      "size_bytes": 2264
+      "sha256": "3e15478949b6a796ef6dff5bcd10b41f5ad8c5099d849abe5b8f1b5e4a897b5a",
+      "size_bytes": 2729
     },
     {
       "kind": "file",
@@ -1230,22 +1230,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/connector.py",
-      "sha256": "c378cbcac4ff73fcce3d478b5006e98ef49cb1bf1a28f055291bba106ec7f2b0",
-      "size_bytes": 26430
+      "sha256": "5900edc5267868ce52dd04b716507ebcc491584f62ee6d3072cd11b423ace963",
+      "size_bytes": 38132
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_connector.py",
-      "sha256": "04b814339d94d3822e520e5eeadfc65191c3344ab3e66a10d2af02735ca9fac9",
-      "size_bytes": 12104
+      "sha256": "29af6a24256297cc548a25eec5ef5d1f439a0cbd0a4660ad4278767fbf71e89e",
+      "size_bytes": 17670
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_transport.py",
-      "sha256": "7a414320e0aa716ec2cd2c6bcb0cbc297be44c0089173e64a749ed54eb58e16d",
-      "size_bytes": 4877
+      "sha256": "304de10400464c011db6a2b23b25bab78dfd331caf2362c453a9b1f92ce67978",
+      "size_bytes": 7523
     },
     {
       "kind": "file",
@@ -1685,22 +1685,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/App.tsx",
-      "sha256": "dea4146dca0af348c9e2e247dde041bcffed55abf41f0af2b44156815b9ef0ad",
-      "size_bytes": 10360
+      "sha256": "3e5ed18ce10368f9038bc9074638b5b79a4f7b599e8c1ea1b95e42d13f65e214",
+      "size_bytes": 10454
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.test.ts",
-      "sha256": "c0c709e94e279ec543948acd2df52c65f8bd6a0f222f9d8f08502ad57ad253dd",
-      "size_bytes": 4658
+      "sha256": "0ab075860a12736be61ab9b9a754c731bb0862a965250e52669ffb9aafa58893",
+      "size_bytes": 8397
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.ts",
-      "sha256": "9572e723b96068eaa421df5ddebeee98c3e8bacc6ccb944da4a085d9a1d0b580",
-      "size_bytes": 18960
+      "sha256": "afc4c27bf9b9c6d217a76ccd93a8839413038d34bf62ec6ae7f8127d70873c74",
+      "size_bytes": 25035
     },
     {
       "kind": "file",
@@ -1720,22 +1720,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/pages.tsx",
-      "sha256": "c96220df4dfb08745550618806094017b49b6b3dabc0456a591d4a25ddacb65c",
-      "size_bytes": 45426
+      "sha256": "e45cff70c221dc59a9806ed91dbe5a702e51101d29d01211b4a3ab6bcfa74fe6",
+      "size_bytes": 70303
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/router.test.ts",
-      "sha256": "331cf6158c51d8df45d23d25c268fb0ac36a5a3771383e933ed48c098758cdb9",
-      "size_bytes": 1262
+      "sha256": "ea76a13dc339a5caf161cb22da5594a2ba188a983b17b88b185bca744f1f4545",
+      "size_bytes": 1364
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/router.ts",
-      "sha256": "24a85a315a7e4af4e0702c265d352eab85f823cba085e6292a86ee5ffd72910c",
-      "size_bytes": 2602
+      "sha256": "2fdb4195cb94bbda41b9886e5998548e8c2e4489b53da8f51c78cf825dcc4724",
+      "size_bytes": 2751
     },
     {
       "kind": "file",
