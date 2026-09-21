@@ -1,0 +1,30 @@
+// -----------------------------------------------------------------------------
+// Module: src/router.test.ts
+// Role: Route resolution tests for the Navigator console navigation rail.
+// -----------------------------------------------------------------------------
+
+import { pathForRoute, routeForPath } from "./router";
+import { describe, expect, it } from "vitest";
+
+describe("Navigator routes", () => {
+  it("resolves all seven page paths", () => {
+    expect(routeForPath("/")).toBe("overview");
+    expect(routeForPath("/models")).toBe("models");
+    expect(routeForPath("/datasets/")).toBe("datasets");
+    expect(routeForPath("/training")).toBe("training");
+    expect(routeForPath("/runs?runId=run-1")).toBe("runs");
+    expect(routeForPath("/deployments")).toBe("deployments");
+    expect(routeForPath("/settings")).toBe("settings");
+  });
+
+  it("keeps unknown paths on the safe overview surface", () => {
+    expect(routeForPath("/not-a-page")).toBe("overview");
+    expect(routeForPath("/runs/run-1")).toBe("runs");
+  });
+
+  it("returns canonical paths for route ids", () => {
+    expect(pathForRoute("overview")).toBe("/");
+    expect(pathForRoute("models")).toBe("/models");
+    expect(pathForRoute("deployments")).toBe("/deployments");
+  });
+});

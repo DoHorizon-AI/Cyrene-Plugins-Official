@@ -1489,15 +1489,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/tests/test_vllm_runtime.py",
-      "sha256": "7f0d4029f5fec3449a8b60b5f032da4b84195f010c4d0d4ca64cd15c809cef63",
-      "size_bytes": 12073
+      "sha256": "71eeaa8e861be0d955fe01299c8ab62df9e495a8e522101756cd861dc8b88e04",
+      "size_bytes": 12233
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/vllm_runtime.py",
-      "sha256": "4fbd1f3fccbac71750d74b7f58048d4415fa0ab1c34399dc5db68b810d589f02",
-      "size_bytes": 31305
+      "sha256": "50cebcb84ce5170c1e3fe719382a83523a5eb198f8b4dcb01eac79501a08356b",
+      "size_bytes": 31826
     },
     {
       "kind": "file",
@@ -1615,8 +1615,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/llama_factory.py",
-      "sha256": "c9d3b559debd6bd2e85bf693a7b54e131096e6ca69d40cb8bb8994c883ed3289",
-      "size_bytes": 12968
+      "sha256": "9731fb298bead5a6e4c192d5de52f735f93246be8084123a80f860553d4c4369",
+      "size_bytes": 13615
     },
     {
       "kind": "file",
@@ -1631,6 +1631,13 @@
       "path": "plugins/training/llama-factory/pyproject.toml",
       "sha256": "e6f2ba94c1793b38cfa4393b9f1e0fc5e6c5b58052a20558d64ae51ed70035bc",
       "size_bytes": 616
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/training/llama-factory/tests/test_checkpoint_mapping.py",
+      "sha256": "f619245ac92aa3a581e1d306f89f96837c3d8ea11bd0f7a505748dc5ca1dbe64",
+      "size_bytes": 1290
     },
     {
       "kind": "file",
@@ -1650,8 +1657,106 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/README.md",
-      "sha256": "7577e7e86d2b913e76e85701b86e4337c0bdaf11cc18987f2e6700a83e7d623c",
-      "size_bytes": 2518
+      "sha256": "d73e28509a2b1fdf94416a0774069c3b7693f6dc5c10b95d3f5d703c4699ec07",
+      "size_bytes": 3176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/index.html",
+      "sha256": "0244469a8bab05e81b450eb9f8d70d36604b73b570ae7b20f5b8fcc6a05e76f0",
+      "size_bytes": 445
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/package-lock.json",
+      "sha256": "d56000555c82b772761eba0a5dd2f9dd91d8d6e9c58b6b40cac2def21ad86d43",
+      "size_bytes": 70378
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/package.json",
+      "sha256": "4ff2992fcfc9e5d7c1fcc691a3bdc774e516c23142139d184b75d765997b3269",
+      "size_bytes": 683
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/App.tsx",
+      "sha256": "dea4146dca0af348c9e2e247dde041bcffed55abf41f0af2b44156815b9ef0ad",
+      "size_bytes": 10360
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/api.test.ts",
+      "sha256": "c0c709e94e279ec543948acd2df52c65f8bd6a0f222f9d8f08502ad57ad253dd",
+      "size_bytes": 4658
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/api.ts",
+      "sha256": "9572e723b96068eaa421df5ddebeee98c3e8bacc6ccb944da4a085d9a1d0b580",
+      "size_bytes": 18960
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/components.tsx",
+      "sha256": "89084b5bfe93b2369e4d3edfcfe4751f791c3dc3932124bb92c6b3ca64210736",
+      "size_bytes": 6402
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/main.tsx",
+      "sha256": "9daa690d1589323888b1d94e84e14eb1d8e5e1654866cd228b4a64e58ac8e925",
+      "size_bytes": 580
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/pages.tsx",
+      "sha256": "c96220df4dfb08745550618806094017b49b6b3dabc0456a591d4a25ddacb65c",
+      "size_bytes": 45426
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/router.test.ts",
+      "sha256": "331cf6158c51d8df45d23d25c268fb0ac36a5a3771383e933ed48c098758cdb9",
+      "size_bytes": 1262
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/router.ts",
+      "sha256": "24a85a315a7e4af4e0702c265d352eab85f823cba085e6292a86ee5ffd72910c",
+      "size_bytes": 2602
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/src/styles.css",
+      "sha256": "3f49b2476840e4a7fc0336e54ccdef6b9d751e309a3aeb917f2cd348f9a2bb2e",
+      "size_bytes": 21237
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/tsconfig.json",
+      "sha256": "af14c3fc32422755048cd22dcff7e5d149de3e4032f5c7c623a549bdd1023e97",
+      "size_bytes": 587
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/ui/navigator/vite.config.ts",
+      "sha256": "f843541a53fa858b1e79248ac3a8c9c7a02ac94d80dfab1461fbfcbd29b8b833",
+      "size_bytes": 1053
     },
     {
       "kind": "file",

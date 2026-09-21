@@ -143,6 +143,10 @@ def test_execution_lifecycle_serves_and_releases(tmp_path: Path) -> None:
         assert started["servedModel"] == f"reactor-{deployment_id}"
         assert started["endpointUrl"].endswith(f"/serving/{deployment_id}/v1")
 
+        status, models = _request(server, "GET", f"/serving/{deployment_id}/v1/models")
+        assert status == 200
+        assert models["object"] == "list"
+
         status, inspected = _request(server, "GET", f"/executions/{deployment_id}")
         assert status == 200
         assert inspected["modelArtifact"] == artifact

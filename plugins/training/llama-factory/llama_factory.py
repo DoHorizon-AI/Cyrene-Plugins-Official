@@ -97,6 +97,7 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
     lora = _mapping(spec.get("lora") or {}, "lora")
     hyperparams = _mapping(spec.get("hyperparams") or {}, "hyperparams")
     extras = _mapping(spec.get("extra") or {}, "extra")
+    checkpoint = _mapping(spec.get("checkpoint") or {}, "checkpoint")
     output_dir = _text(spec.get("output_dir"), "output_dir")
     if output_dir is None:
         raise ValueError("output_dir is required")
@@ -149,6 +150,16 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
     max_train_samples = _positive_int(extras.get("max_train_samples"), "extra.max_train_samples")
     if max_train_samples is not None:
         arguments["max_samples"] = max_train_samples
+    resume_from = _text(checkpoint.get("resume_from"), "checkpoint.resume_from")
+    if resume_from is not None:
+        arguments["resume_from_checkpoint"] = resume_from
+    save_steps = _positive_int(checkpoint.get("save_steps"), "checkpoint.save_steps")
+    if save_steps is not None:
+        arguments["save_strategy"] = "steps"
+        arguments["save_steps"] = save_steps
+    save_total_limit = _positive_int(checkpoint.get("save_total_limit"), "checkpoint.save_total_limit")
+    if save_total_limit is not None:
+        arguments["save_total_limit"] = save_total_limit
     overrides = _mapping(extras.get("llamafactory_args") or {}, "extra.llamafactory_args")
     for key, value in overrides.items():
         if key in {"model_name_or_path", "dataset_dir", "dataset", "output_dir"}:

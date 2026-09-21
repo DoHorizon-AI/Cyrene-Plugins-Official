@@ -14,31 +14,48 @@ Navigator 历史中仅探测 API 的预览页。
 | Field | Value |
 | --- | --- |
 | Package | `cyrene.ui.navigator` |
-| Wave 0 | Directory restored with provenance; no implementation yet |
-| Wave 1..2 | React + TypeScript + Vite console, OpenAPI-generated client, runtime-validated types |
+| Wave 0 | Directory restored with provenance |
+| Wave 1 | React + TypeScript + Vite console with same-origin Web Host session handling |
+| Wave 2 | Product adapters remain on Navigator proxy prefixes; owner contracts are read live |
 | Owner | Plugins (UI surfaces), Navigator (Conversation/AgentRun authority) |
 
 ## Planned surface / 计划界面
 
 | Page | Responsibility |
 | --- | --- |
-| Home & diagnostics | GPU, disk, services, plugins, credentials, blockers |
-| Models | Model import, validation state, artifacts |
-| Datasets | Dataset import, preview, mapping, quality, split |
-| Training | TrainingSpec, preflight, events, checkpoints, cancel, resume |
-| Deployments | Deployment drafts, vLLM lifecycle, ready probes |
-| Gateway | Endpoints, routes, API keys, base URL, client snippets |
-| Settings | Workspace, credentials metadata, session management |
+| Overview | Host readiness, Product reachability, resource counts, blockers |
+| Models | Model import, validation state, serving bindings, artifacts |
+| Datasets | Dataset containers and preparation handoff boundary |
+| Training | Training drafts, owner preflight, explicit launch |
+| Runs | Run lookup, current state, attempt diagnostics, cancel request |
+| Deployments | Deployment lifecycle, serving bindings, endpoint readiness |
+| Settings | Workspace session, proxy paths, write-only credentials |
 
 UI rules fixed by the RC plan / RC 计划固定的 UI 规则:
 
 - The UI does not copy Product state and never treats browser cache as
   authority; every view re-reads its owning Product API.
-- The client is generated from the published OpenAPI contracts and validates
-  responses at runtime.
+- The client follows the published OpenAPI contracts and validates response
+  envelopes at runtime.
 - No page asks the user to edit the database, environment variables, JSON files,
   or copy artifact paths by hand.
 - Every cross-Product step is an explicit Import, Send to, Open in, or Publish.
+
+## Local verification / 本地验证
+
+```bash
+npm install
+npm run check
+```
+
+Set `NAVIGATOR_WEB_HOST_URL` when the local Vite server should proxy `/api/*` to
+a Navigator Web Host on another address. Browser code itself only uses relative
+same-origin paths such as `/api/v1/reactor/model-imports` and
+`/api/v1/auth/session/refresh`.
+
+设置 `NAVIGATOR_WEB_HOST_URL` 可让本地 Vite 服务将 `/api/*` 代理到其他地址的
+Navigator Web Host。浏览器代码只使用 `/api/v1/reactor/model-imports`、
+`/api/v1/auth/session/refresh` 等同源相对路径。
 
 ## Provenance / 来源
 

@@ -591,6 +591,12 @@ class RuntimeHandler(BaseHTTPRequestHandler):
             except (ValueError, ServingRuntimeError) as exc:
                 self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_EXECUTION_NOT_FOUND", str(exc), status=404))
             return
+        if len(parts) >= 4 and parts[0] == "serving" and parts[2] == "v1":
+            try:
+                self._proxy(UUID(parts[1]), "/" + "/".join(parts[2:]), method="GET")
+            except (ValueError, ServingRuntimeError) as exc:
+                self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_REQUEST_INVALID", str(exc), status=422))
+            return
         self._refuse(404, "SERVING_ROUTE_NOT_FOUND", "no route matches the request")
 
     def do_POST(self) -> None:
@@ -613,26 +619,26 @@ class RuntimeHandler(BaseHTTPRequestHandler):
                 self._send(200, self.runtime.stop(UUID(parts[1])))
                 return
             if len(parts) >= 4 and parts[0] == "serving" and parts[2] == "v1":
-                self._proxy(UUID(parts[1]), "/" + "/".join(parts[2:]))
+                self._proxy(UUID(parts[1]), "/" + "/".join(parts[2:]), method="POST")
                 return
         except (ValueError, ServingRuntimeError) as exc:
             self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_REQUEST_INVALID", str(exc), status=422))
             return
         self._refuse(404, "SERVING_ROUTE_NOT_FOUND", "no route matches the request")
 
-    def _proxy(self, deployment_id: UUID, path: str) -> None:
+    def _proxy(self, deployment_id: UUID, path: str, *, method: str) -> None:
         document = self.runtime.inspect(deployment_id)
         if not document.get("ready"):
             raise ServingRuntimeError("MODEL_NOT_READY", "the execution is not serving", status=503, retryable=True)
         port = self.runtime._load(deployment_id).get("port")
         if not isinstance(port, int):
             raise ServingRuntimeError("SERVING_RESPONSE_INCOMPATIBLE", "execution has no serving port")
-        payload = self._read_payload()
+        payload = self._read_payload() if method != "GET" else None
         request = urllib.request.Request(
             f"http://127.0.0.1:{port}{path}",
-            data=json.dumps(payload).encode("utf-8"),
-            headers={"Content-Type": "application/json"},
-            method="POST",
+            data=None if payload is None else json.dumps(payload).encode("utf-8"),
+            headers={} if payload is None else {"Content-Type": "application/json"},
+            method=method,
         )
         try:
             with urllib.request.urlopen(request, timeout=self.upstream_timeout) as response:
