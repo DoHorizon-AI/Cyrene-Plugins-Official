@@ -1523,16 +1523,16 @@
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/providers/model-api-connector/tests/test_connector.py",
-      "sha256": "a9910b881098ed53e167092ec28516de25d3632441f4b1e858114bdcbbb37b7f",
-      "size_bytes": 13046
+      "path": "plugins/providers/model-api-connector/tests/test_chat_mapping.py",
+      "sha256": "737bd198d30659e75e20956d866e2f738d9eda96edeef6390b7f6efeed75e733",
+      "size_bytes": 9951
     },
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/providers/model-api-connector/tests/test_mapping.py",
-      "sha256": "737bd198d30659e75e20956d866e2f738d9eda96edeef6390b7f6efeed75e733",
-      "size_bytes": 9951
+      "path": "plugins/providers/model-api-connector/tests/test_model_api_connector.py",
+      "sha256": "a9910b881098ed53e167092ec28516de25d3632441f4b1e858114bdcbbb37b7f",
+      "size_bytes": 13046
     },
     {
       "kind": "file",
