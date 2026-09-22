@@ -320,6 +320,20 @@ capabilities:
       - chat_completion_v2
       - embeddings
     implementations:
+      - ref: cyrene.providers.model-api-connector
+        source: plugins/providers/model-api-connector/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - chat_completion
+          - chat_completion_v2
+        interface_versions:
+          - "1"
+          - "2"
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-09-22
       - ref: cyrene.runtime.dotnet-native-aot-anthropic
         source: contracts/runtime-implementations.json
         language: csharp

@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/model.provider.v1.model-api-connector/configuration.schema.json",
+  "title": "model-api-connector activation configuration",
+  "type": "object",
+  "required": ["base_url"],
+  "properties": {
+    "binding_id": {"type": "string", "minLength": 1},
+    "base_url": {"type": "string", "pattern": "^https?://"},
+    "api_key": {"type": "string", "minLength": 1},
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
+    "embeddings_supported": {"type": "boolean", "default": false}
+  },
+  "additionalProperties": false
+}

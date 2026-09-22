@@ -107,6 +107,7 @@ jobs:
           -e plugins/evaluation/llm-judge \
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
+            -e plugins/providers/model-api-connector \
             -e plugins/serving/vllm-runtime \
             -e plugins/tools/dataset-preparation \
             -e plugins/tools/dataset-validator \
@@ -135,6 +136,7 @@ jobs:
             plugins/evaluation/llm-judge \
             plugins/models/hf-model-analyzer \
             plugins/policy/compat-rules \
+            plugins/providers/model-api-connector \
             plugins/serving/vllm-runtime \
             plugins/tools/dataset-preparation \
             plugins/tools/dataset-validator \
@@ -154,6 +156,7 @@ jobs:
             plugins/connectors/wecom/tests \
             plugins/evaluation/evaluator-pack/tests \
             plugins/evaluation/llm-judge/tests \
+            plugins/providers/model-api-connector/tests \
             plugins/serving/vllm-runtime/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests \

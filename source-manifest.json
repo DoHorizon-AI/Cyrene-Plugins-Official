@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "90b07cffb2725822a8803a3ee8d554ac7b5c6b3c8d9caaaf8ecc4cf32068bede",
-      "size_bytes": 36995
+      "sha256": "90f71632f59896db2e503fdc97918f5629916993e58dfa33fe04094af763495d",
+      "size_bytes": 37160
     },
     {
       "kind": "file",
@@ -131,15 +131,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "2842c4fb6b97e2a8b594c788f37d948a0a0c542c85f51384a34d33d0c48201bf",
-      "size_bytes": 18590
+      "sha256": "6497b18a1e7243d28ad934c270ac89ef5e75d0e994d18cd1b9ef57a9a7bea0e8",
+      "size_bytes": 19051
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "4175324c3b0efa50940df5e2a225997195704a99b5def79169902615d4fbbbf5",
-      "size_bytes": 17460
+      "sha256": "daae34a2fcca4dde58fd1930d91f6da59b1eda5806b873f9364efd1d3b843952",
+      "size_bytes": 18891
     },
     {
       "kind": "file",
@@ -1456,6 +1456,83 @@
       "path": "plugins/policy/compat-rules/pyproject.toml",
       "sha256": "591f5bf911bcc19eeab6e3c39d04f6c7a4ff3ca98b21c2f41973912cc356b284",
       "size_bytes": 427
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/README.md",
+      "sha256": "159bb0805aadaf9268deaaa4cef39a443b7a1e41935d28f11b6d646ae83677dc",
+      "size_bytes": 2413
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/configuration.schema.json",
+      "sha256": "e984161cddd01df5f52395300e5d0c6b2638167103ff797614871849ed13fb16",
+      "size_bytes": 629
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/plugin.manifest.json",
+      "sha256": "dfff86f742dbbf4032abd0b06e2208910febfdd36b08ee11bedceb0bb7460353",
+      "size_bytes": 1404
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/pyproject.toml",
+      "sha256": "9442e30d619b3adbfa4a4f445de8f3c27b916bd11957693ece25e7cff46b4125",
+      "size_bytes": 887
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/src/model_api_connector/__init__.py",
+      "sha256": "0158f65ec748f252159d56f48aeca7560e0ea31a5aee0b0d28ef65bec46a6b3a",
+      "size_bytes": 1007
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/src/model_api_connector/mapping.py",
+      "sha256": "2a2b969c80f49cd0ad40bee430765fb68c1b1e7bfcb003d606bd3520d3f544b2",
+      "size_bytes": 10120
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/src/model_api_connector/plugin.py",
+      "sha256": "1d59ffc3b3bb8dc7f3e96d8070bce3ca1dd7b0db56c2cd0795516a962399b511",
+      "size_bytes": 7884
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/src/model_api_connector/settings.py",
+      "sha256": "63bd53506276a7161da0141e1dbc746139f443d12ab6ffd80ef76a47abc8705e",
+      "size_bytes": 2669
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/src/model_api_connector/upstream.py",
+      "sha256": "dd953766b73e360882773091a81a2972cd3539c5b0e387604232fa655d060646",
+      "size_bytes": 11218
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/tests/test_connector.py",
+      "sha256": "a9910b881098ed53e167092ec28516de25d3632441f4b1e858114bdcbbb37b7f",
+      "size_bytes": 13046
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/tests/test_mapping.py",
+      "sha256": "737bd198d30659e75e20956d866e2f738d9eda96edeef6390b7f6efeed75e733",
+      "size_bytes": 9951
     },
     {
       "kind": "file",

@@ -312,6 +312,28 @@
           "notes": "A real vLLM launch, CUDA inference, and GPU release remain unverified; Reactor binding acceptance must supply that evidence."
         }
       ]
+    },
+    {
+      "capability": "model.provider.v1",
+      "implementation": "cyrene.providers.model-api-connector",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-09-22",
+          "environment": "linux / python 3.12 / direct Plugin runtime against a local OpenAI-compatible peer",
+          "command": "python3 -m pytest plugins/providers/model-api-connector/tests -q",
+          "result": "21 passed covering v1/v2 chunk mapping, streamed tool fragments, provider-reported usage and upstream cancellation",
+          "notes": "The upstream peer is a deterministic test double; no model was executed."
+        },
+        {
+          "observed_at": "2026-09-22",
+          "environment": "linux / real cyrene-capability-resolver binary / nine launched Plugin processes / Cyrene-Exchange gateway",
+          "command": "CYRENE_PLUGINS_WORKTREE=<checkout> CYRENE_PLATFORM_WORKTREE=<checkout> uv run --no-sync pytest tests/test_platform_integration.py -q",
+          "result": "14 passed including route resolution, streamed tool fragments, role-only preamble, usage reporting and client-disconnect cancellation reaching the upstream socket",
+          "notes": "Cross-repository dispatch is real; the provider behind the connector is still a test double, and RTX 50 / real vLLM acceptance is not performed here."
+        }
+      ]
     }
   ]
 }

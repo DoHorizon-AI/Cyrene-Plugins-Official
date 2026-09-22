@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.providers.model-api-connector",
+  "name": "Official Model API Connector",
+  "version": "0.1.0",
+  "description": "OpenAI-compatible model.provider.v1 connector that adapts the typed Cyrene chat contract onto one configured upstream HTTP endpoint, including streamed tool-call fragments and provider-reported usage.",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "model.provider.v1"
+  ],
+  "methods": [
+    {
+      "name": "chat_completion",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "chat_completion_v2",
+      "interfaceVersion": "2",
+      "executionMode": "service"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "model_api_connector:ModelApiConnector",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "model_api_connector:ModelApiConnector"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11"
+  },
+  "configuration": {
+    "schemaRef": "configuration.schema.json"
+  },
+  "secrets": {
+    "requiredSecretRefs": []
+  },
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}
