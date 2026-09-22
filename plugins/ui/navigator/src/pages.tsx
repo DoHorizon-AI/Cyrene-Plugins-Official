@@ -3,7 +3,7 @@
 // Role: The seven Navigator console pages and their owning Product reads.
 // -----------------------------------------------------------------------------
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 
 import {
@@ -33,6 +33,7 @@ import {
   NavigatorHttpError,
   type SessionPayload,
   type SystemStatus,
+  type TrainingParametersInput,
 } from "./api";
 import { pushRoute } from "./router";
 
@@ -302,11 +303,16 @@ export function ModelsPage({ api }: PageProps) {
   const [localPath, setLocalPath] = useState("");
   const [servingBindingId, setServingBindingId] = useState("");
   const [credentialRef, setCredentialRef] = useState("");
+  const [credentials, setCredentials] = useState<CredentialMetadata[] | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    void Promise.allSettled([api.getModelImports(), api.getServingBindings()]).then(([modelResult, bindingResult]) => {
+    void Promise.allSettled([
+      api.getModelImports(),
+      api.getServingBindings(),
+      api.getCredentials(),
+    ]).then(([modelResult, bindingResult, credentialResult]) => {
       if (!active) {
         return;
       }
@@ -324,6 +330,8 @@ export function ModelsPage({ api }: PageProps) {
         setBindings([]);
         setBindingError(errorMessage(bindingResult.reason));
       }
+      // Credentials are metadata only; the select exposes names, never secrets.
+      setCredentials(credentialResult.status === "fulfilled" ? credentialResult.value : null);
       setLoading(false);
     });
     return () => {
@@ -424,8 +432,27 @@ export function ModelsPage({ api }: PageProps) {
               <input className="input-mono" value={localPath} onChange={(event) => setLocalPath(event.target.value)} placeholder="/models/weights" />
             </Field>
           )}
-          <Field label="Credential reference" hint="Optional write-only Web Host credential reference.">
-            <input className="input-mono" value={credentialRef} onChange={(event) => setCredentialRef(event.target.value)} placeholder="credential://..." />
+          <Field
+            label="Credential"
+            hint="Optional. Private repositories need one; names are shown, secrets never are."
+          >
+            <select
+              className="input-mono"
+              value={credentialRef}
+              onChange={(event) => setCredentialRef(event.target.value)}
+            >
+              <option value="">No credential (public repository)</option>
+              {credentials?.map((credential) => (
+                <option key={credential.id} value={credential.credentialRef}>
+                  {credential.name} ({credential.provider})
+                </option>
+              ))}
+            </select>
+            {credentials === null ? (
+              <span className="field__hint">
+                Credentials could not be loaded — add one on the Settings page first.
+              </span>
+            ) : null}
           </Field>
           <div className="form-actions">
             <Button tone="primary" type="submit" disabled={submitting}>{submitting ? "Submitting..." : "Start import"}</Button>
@@ -462,6 +489,16 @@ export function ModelsPage({ api }: PageProps) {
 }
 
 /** Catalyst dataset containers with a deliberately small create surface. */
+/** Media type to send when the browser reports none. */
+function contentTypeFor(filename: string): string {
+  const suffix = filename.slice(filename.lastIndexOf(".")).toLowerCase();
+  if (suffix === ".csv") return "text/csv";
+  if (suffix === ".jsonl" || suffix === ".ndjson") return "application/x-ndjson";
+  if (suffix === ".json") return "application/json";
+  if (suffix === ".parquet") return "application/vnd.apache.parquet";
+  return "text/plain";
+}
+
 export function DatasetsPage({ api }: PageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [datasets, setDatasets] = useState<JsonRecord[] | null>(null);
@@ -480,6 +517,24 @@ export function DatasetsPage({ api }: PageProps) {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
   const [previewData, setPreviewData] = useState<DatasetPreview | null>(null);
+
+  // Preparation workflow: upload -> map -> confirm -> publish -> hand to Yield.
+  const [selectedDatasetId, setSelectedDatasetId] = useState("");
+  const [preparations, setPreparations] = useState<JsonRecord[] | null>(null);
+  const [preparationId, setPreparationId] = useState("");
+  const [uploadName, setUploadName] = useState("");
+  const [workflowBusy, setWorkflowBusy] = useState(false);
+  const [workflowError, setWorkflowError] = useState<string | null>(null);
+  const [workflowNotice, setWorkflowNotice] = useState<string | null>(null);
+  const [instructionField, setInstructionField] = useState("");
+  const [inputField, setInputField] = useState("");
+  const [outputField, setOutputField] = useState("");
+
+  const detectedFields = (() => {
+    const row = preparations?.find((item) => text(item["id"]) === preparationId);
+    const raw = row?.["detectedFields"];
+    return Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+  })();
 
   const loadPreview = async (versionId: string, limit = 10, offset = 0) => {
     const vid = versionId.trim();
@@ -548,6 +603,76 @@ export function DatasetsPage({ api }: PageProps) {
     }
   };
 
+  const runWorkflow = async (label: string, action: () => Promise<JsonRecord>) => {
+    setWorkflowBusy(true);
+    setWorkflowError(null);
+    setWorkflowNotice(null);
+    try {
+      const result = await action();
+      const refreshed = await api.getPreparations(selectedDatasetId);
+      setPreparations(refreshed);
+      const nextId = text(result["id"], preparationId);
+      if (nextId) setPreparationId(nextId);
+      setWorkflowNotice(`${label} completed.${result["state"] ? ` State: ${text(result["state"])}.` : ""}`);
+    } catch (workflowErr) {
+      setWorkflowError(errorMessage(workflowErr));
+    } finally {
+      setWorkflowBusy(false);
+    }
+  };
+
+  const onDatasetChosen = (id: string) => {
+    setSelectedDatasetId(id);
+    setPreparationId("");
+    setPreparations(null);
+    if (!id) return;
+    void api.getPreparations(id).then(setPreparations, () => setPreparations(null));
+  };
+
+  const handleUpload = async (file: File) => {
+    if (!selectedDatasetId) {
+      setWorkflowError("Choose a dataset before uploading.");
+      return;
+    }
+    setWorkflowBusy(true);
+    setWorkflowError(null);
+    setWorkflowNotice(null);
+    try {
+      // Catalyst reads the raw body, so the text is sent as-is. Browsers often
+      // report no MIME type for .jsonl, and Catalyst derives CSV/Parquet from
+      // the media type, so fall back to the suffix instead of assuming JSON.
+      const content = await file.text();
+      const created = await api.createPreparation(
+        selectedDatasetId,
+        uploadName.trim() || file.name,
+        file.name,
+        content,
+        file.type || contentTypeFor(file.name),
+      );
+      const refreshed = await api.getPreparations(selectedDatasetId);
+      setPreparations(refreshed);
+      setPreparationId(text(created["id"], ""));
+      setWorkflowNotice(`Uploaded ${file.name}. Map the detected fields next.`);
+    } catch (uploadError) {
+      setWorkflowError(errorMessage(uploadError));
+    } finally {
+      setWorkflowBusy(false);
+    }
+  };
+
+  const handleMap = () =>
+    runWorkflow("Mapping", () =>
+      api.configurePreparationMapping(preparationId, {
+        mapping: {
+          mode: "instruction",
+          instruction: instructionField ? { field: instructionField } : null,
+          input: inputField ? { field: inputField } : null,
+          output: outputField ? { field: outputField } : null,
+        },
+        normalization: { trimWhitespace: true, collapseWhitespace: true, unicodeNfc: true },
+      }),
+    );
+
   return (
     <div className="page-stack">
       <PageHeader
@@ -571,6 +696,120 @@ export function DatasetsPage({ api }: PageProps) {
             {notice ? <span className="form-message form-message--success">{notice}</span> : null}
           </div>
         </form>
+      </Panel>
+
+      <Panel title="Prepare data" meta={<span className="mono-label">UPLOAD → MAP → PREPARE → PUBLISH</span>}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+          <Field label="Dataset" hint="Preparation always belongs to one dataset.">
+            <select
+              className="input-mono"
+              value={selectedDatasetId}
+              onChange={(event) => onDatasetChosen(event.target.value)}
+            >
+              <option value="">Select a dataset</option>
+              {datasets?.map((row, index) => (
+                <option key={text(row["id"], `dataset-${index}`)} value={text(row["id"], "")}>
+                  {text(row["name"], "Unnamed dataset")}
+                </option>
+              ))}
+            </select>
+          </Field>
+
+          <Field label="Preparation name" hint="Optional; defaults to the filename.">
+            <input
+              className="input-mono"
+              value={uploadName}
+              onChange={(event) => setUploadName(event.target.value)}
+              placeholder="instruction-tuning-v1"
+            />
+          </Field>
+
+          <Field label="Upload source file" hint="JSONL / JSON / CSV / TEXT. The file is sent as the request body.">
+            <input
+              type="file"
+              accept=".jsonl,.json,.csv,.txt,application/json,text/csv,text/plain"
+              disabled={!selectedDatasetId || workflowBusy}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void handleUpload(file);
+                event.target.value = "";
+              }}
+            />
+          </Field>
+        </div>
+
+        <Field label="Preparation" hint="Pick the uploaded preparation to map and publish.">
+          <select
+            className="input-mono"
+            value={preparationId}
+            onChange={(event) => setPreparationId(event.target.value)}
+            disabled={!preparations?.length}
+          >
+            <option value="">
+              {preparations ? (preparations.length ? "Select a preparation" : "No preparations yet") : "Choose a dataset first"}
+            </option>
+            {preparations?.map((row, index) => (
+              <option key={text(row["id"], `prep-${index}`)} value={text(row["id"], "")}>
+                {`${text(row["name"], "unnamed")} — ${text(row["state"], "UNKNOWN")}`}
+              </option>
+            ))}
+          </select>
+        </Field>
+
+        {preparationId ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+            <Field label="Instruction field" hint="Detected columns from the upload.">
+              <select className="input-mono" value={instructionField} onChange={(event) => setInstructionField(event.target.value)}>
+                <option value="">(none)</option>
+                {detectedFields.map((field) => (
+                  <option key={field} value={field}>{field}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Input field" hint="Optional context column.">
+              <select className="input-mono" value={inputField} onChange={(event) => setInputField(event.target.value)}>
+                <option value="">(none)</option>
+                {detectedFields.map((field) => (
+                  <option key={field} value={field}>{field}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Output field" hint="Target completion column.">
+              <select className="input-mono" value={outputField} onChange={(event) => setOutputField(event.target.value)}>
+                <option value="">(none)</option>
+                {detectedFields.map((field) => (
+                  <option key={field} value={field}>{field}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        ) : null}
+
+        <div className="form-actions">
+          <Button tone="primary" disabled={!preparationId || workflowBusy} onClick={() => void handleMap()}>
+            {workflowBusy ? "Working..." : "Save mapping"}
+          </Button>
+          <Button
+            disabled={!preparationId || workflowBusy}
+            onClick={() => void runWorkflow("Preparation", () => api.confirmPreparation(preparationId))}
+          >
+            Prepare
+          </Button>
+          <Button
+            disabled={!preparationId || workflowBusy}
+            onClick={() => void runWorkflow("Publish", () => api.publishPreparation(preparationId))}
+          >
+            Publish version
+          </Button>
+          <Button
+            disabled={!preparationId || workflowBusy}
+            onClick={() => void runWorkflow("Handoff", () => api.sendPreparationToYield(preparationId))}
+          >
+            Send to Yield
+          </Button>
+        </div>
+        {workflowError ? <p className="inline-error" role="alert">{workflowError}</p> : null}
+        {workflowNotice ? <p className="form-message form-message--success">{workflowNotice}</p> : null}
       </Panel>
 
       <Panel title="Dataset containers" meta={datasets ? `${datasets.length} records` : "LIVE READ"}>
@@ -752,7 +991,8 @@ export function DatasetsPage({ api }: PageProps) {
 export interface ParamFieldProps {
   label: string;
   hint: string;
-  llamaKey: string;
+  /** Omitted for fields that are not LLaMA Factory parameters, such as pickers. */
+  llamaKey?: string;
   children: React.ReactNode;
 }
 
@@ -763,19 +1003,21 @@ export function ParamField({ label, hint, llamaKey, children }: ParamFieldProps)
     <div className="field">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "4px" }}>
         <span className="field__label">{label}</span>
-        <button
-          type="button"
-          className="button button--quiet"
-          style={{ padding: "2px 6px", fontSize: "11px", height: "auto" }}
-          onClick={() => setShowKey((v) => !v)}
-        >
-          {showKey ? "Hide LLaMA key" : "LLaMA Factory key"}
-        </button>
+        {llamaKey ? (
+          <button
+            type="button"
+            className="button button--quiet"
+            style={{ padding: "2px 6px", fontSize: "11px", height: "auto" }}
+            onClick={() => setShowKey((v) => !v)}
+          >
+            {showKey ? "Hide LLaMA key" : "LLaMA Factory key"}
+          </button>
+        ) : null}
       </div>
       {children}
       <span className="field__hint">
         {hint}
-        {showKey && (
+        {showKey && llamaKey && (
           <code style={{ marginLeft: "8px", color: "var(--lime)", fontFamily: "var(--mono)" }}>
             ({llamaKey})
           </code>
@@ -783,6 +1025,19 @@ export function ParamField({ label, hint, llamaKey, children }: ParamFieldProps)
       </span>
     </div>
   );
+}
+
+/** Read a prepared draft's base model so a relaunch does not have to re-choose one. */
+function draftBaseModel(row: JsonRecord): JsonRecord | null {
+  const configuration = row["configuration"];
+  if (typeof configuration !== "object" || configuration === null) {
+    return null;
+  }
+  const baseModel = (configuration as JsonRecord)["baseModel"];
+  if (typeof baseModel !== "object" || baseModel === null) {
+    return null;
+  }
+  return baseModel as JsonRecord;
 }
 
 /** Training draft list with explicit launch actions and hyperparameter reference. */
@@ -803,6 +1058,63 @@ export function TrainingPage({ api }: PageProps) {
   const [loraRank, setLoraRank] = useState("8");
   const [loraAlpha, setLoraAlpha] = useState("16");
   const [loraDropout, setLoraDropout] = useState("0.05");
+
+  // Picker sources: a draft is launched from a chosen dataset version and base
+  // model rather than from identifiers typed by hand.
+  const [datasets, setDatasets] = useState<JsonRecord[] | null>(null);
+  const [datasetId, setDatasetId] = useState("");
+  const [versions, setVersions] = useState<JsonRecord[] | null>(null);
+  const [versionId, setVersionId] = useState("");
+  const [modelImports, setModelImports] = useState<JsonRecord[] | null>(null);
+  const [baseModelId, setBaseModelId] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    void api.getDatasets().then(
+      (value) => {
+        if (active) setDatasets(value);
+      },
+      () => {
+        if (active) setDatasets(null);
+      },
+    );
+    void api.getModelImports().then(
+      (value) => {
+        if (active) setModelImports(value);
+      },
+      () => {
+        if (active) setModelImports(null);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [api]);
+
+  useEffect(() => {
+    if (!datasetId) {
+      setVersions(null);
+      setVersionId("");
+      return;
+    }
+    let active = true;
+    setVersions(null);
+    setVersionId("");
+    void api.getDatasetVersions(datasetId).then(
+      (value) => {
+        if (!active) return;
+        setVersions(value);
+        const published = value.find((row) => text(row["state"]) === "PUBLISHED");
+        setVersionId(text((published ?? value[0])?.["id"], ""));
+      },
+      () => {
+        if (active) setVersions(null);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [api, datasetId]);
 
   useEffect(() => {
     let active = true;
@@ -828,14 +1140,62 @@ export function TrainingPage({ api }: PageProps) {
     };
   }, [api, reloadKey]);
 
-  const startDraft = async (id: string) => {
+  /**
+   * The chosen base model, but only when Reactor published everything Yield
+   * needs. `PrepareTrainingDraft.baseModel` requires both a portable model
+   * artifact and a pinned {repository, revision} source, and the model is
+   * declared with extra="forbid", so a partial payload would be rejected.
+   */
+  const selectedBaseModel = (() => {
+    if (!baseModelId || !modelImports) return null;
+    const row = modelImports.find((candidate) => text(candidate["id"]) === baseModelId);
+    if (!row) return null;
+    const artifact = row["artifact"];
+    const source = row["source"];
+    if (typeof artifact !== "object" || artifact === null) return null;
+    if (typeof source !== "object" || source === null) return null;
+    const typedSource = source as JsonRecord;
+    if (!text(typedSource["repository"], "") || !text(typedSource["revision"], "")) return null;
+    return { artifact: artifact as JsonRecord, source: typedSource } as JsonRecord;
+  })();
+
+  const collectParameters = (): TrainingParametersInput => ({
+    epochs: Number(epochs),
+    perDeviceBatchSize: Number(batchSize),
+    gradientAccumulationSteps: Number(gradAccum),
+    learningRate: Number(learningRate),
+    maxSequenceLength: Number(cutoffLen),
+    loraRank: Number(loraRank),
+    loraAlpha: Number(loraAlpha),
+    loraDropout: Number(loraDropout),
+  });
+
+  /**
+   * Persist the edited hyperparameters to Yield, then launch.
+   *
+   * Launching without the PATCH silently trains with whatever the draft already
+   * carried, so every value edited here would be discarded with no error.
+   */
+  const startDraft = async (id: string, row: JsonRecord) => {
     setActionId(id);
     setActionError(null);
     try {
+      const parameters = collectParameters();
+      const invalid = Object.entries(parameters)
+        .filter(([, value]) => !Number.isFinite(value))
+        .map(([name]) => name);
+      if (invalid.length > 0) {
+        throw new Error(`Invalid hyperparameter value(s): ${invalid.join(", ")}`);
+      }
+      const baseModel = selectedBaseModel ?? draftBaseModel(row);
+      if (!baseModel) {
+        throw new Error("This draft has no base model configured; prepare it in Yield first.");
+      }
+      await api.updateTrainingDraft(id, { baseModel, parameters });
       await api.startTrainingDraft(id);
       setReloadKey((value) => value + 1);
-    } catch (startError) {
-      setActionError(errorMessage(startError));
+    } catch (launchError) {
+      setActionError(errorMessage(launchError));
     } finally {
       setActionId(null);
     }
@@ -976,6 +1336,75 @@ export function TrainingPage({ api }: PageProps) {
             />
           </ParamField>
         </div>
+        <p className="field__hint">
+          These values are submitted to Yield when you press <strong>Save and start</strong> on a
+          draft. Nothing here edits anything until that button is used.
+        </p>
+      </Panel>
+
+      <Panel title="Choose the training inputs" meta="PICKERS, NOT IDENTIFIERS">
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: "16px" }}>
+          <ParamField label="Dataset" hint="Catalyst owns preparation and publishing.">
+            <select
+              className="input-mono"
+              value={datasetId}
+              onChange={(event) => setDatasetId(event.target.value)}
+            >
+              <option value="">{datasets ? "Select a dataset" : "Loading datasets..."}</option>
+              {datasets?.map((row, index) => (
+                <option key={text(row["id"], `dataset-${index}`)} value={text(row["id"], "")}>
+                  {text(row["name"], "Unnamed dataset")}
+                </option>
+              ))}
+            </select>
+          </ParamField>
+
+          <ParamField label="Dataset version" hint="Published versions only; newest first.">
+            <select
+              className="input-mono"
+              value={versionId}
+              onChange={(event) => setVersionId(event.target.value)}
+              disabled={!datasetId}
+            >
+              <option value="">
+                {!datasetId
+                  ? "Choose a dataset first"
+                  : versions
+                    ? "Select a version"
+                    : "Loading versions..."}
+              </option>
+              {versions?.map((row, index) => (
+                <option key={text(row["id"], `version-${index}`)} value={text(row["id"], "")}>
+                  {`v${text(row["version"], "?")} — ${text(row["state"], "UNKNOWN")}`}
+                </option>
+              ))}
+            </select>
+          </ParamField>
+
+          <ParamField
+            label="Base model"
+            hint="Selecting one overrides the draft's current base model at launch."
+          >
+            <select
+              className="input-mono"
+              value={baseModelId}
+              onChange={(event) => setBaseModelId(event.target.value)}
+            >
+              <option value="">{modelImports ? "Keep the draft's base model" : "Loading models..."}</option>
+              {modelImports?.map((row, index) => (
+                <option key={text(row["id"], `model-${index}`)} value={text(row["id"], "")}>
+                  {text(row["name"], text(row["id"], `model-${index}`))}
+                </option>
+              ))}
+            </select>
+          </ParamField>
+        </div>
+        {baseModelId && !selectedBaseModel ? (
+          <p className="inline-error" role="alert">
+            This model import does not expose a portable artifact and source yet, so the draft's
+            existing base model will be used.
+          </p>
+        ) : null}
       </Panel>
 
       <Panel title="Training drafts" meta={drafts ? `${drafts.length} records` : "LIVE READ"}>
@@ -1000,14 +1429,23 @@ export function TrainingPage({ api }: PageProps) {
                   render: (row) => {
                     const id = text(row["id"], "");
                     const prepared = text(row["state"], "") === "PREPARED";
+                    const baseModel = draftBaseModel(row);
+                    const launchable = prepared && baseModel !== null;
+                    const busy = actionId === id;
                     return (
                       <Button
                         tone="primary"
-                        disabled={!prepared || actionId !== null}
-                        onClick={() => void startDraft(id)}
-                        title={prepared ? "Start this prepared draft" : "Prepare this draft in Yield first"}
+                        disabled={!launchable || actionId !== null}
+                        onClick={() => void startDraft(id, row)}
+                        title={
+                          !prepared
+                            ? "Prepare this draft in Yield first"
+                            : !baseModel
+                              ? "This draft has no base model; prepare it in Yield first"
+                              : "Save these hyperparameters to Yield, then start the run"
+                        }
                       >
-                        {actionId === id ? "Launching..." : prepared ? "Start run" : "Not ready"}
+                        {busy ? "Saving and launching..." : launchable ? "Save and start" : "Not ready"}
                       </Button>
                     );
                   },
@@ -1025,6 +1463,55 @@ export function TrainingPage({ api }: PageProps) {
 }
 
 /** Run lookup and attempt diagnostics, reflecting the published Yield API shape. */
+/** Minimal canvas loss curve so the console needs no charting dependency. */
+function LossChart({ series }: { series: number[] }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas || series.length < 2) return;
+    const context = canvas.getContext("2d");
+    if (!context) return;
+    const { width, height } = canvas;
+    context.clearRect(0, 0, width, height);
+    const min = Math.min(...series);
+    const max = Math.max(...series);
+    const span = max - min || 1;
+    context.beginPath();
+    series.forEach((value, index) => {
+      const x = (index / (series.length - 1)) * (width - 2) + 1;
+      const y = height - 1 - ((value - min) / span) * (height - 2);
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    });
+    context.strokeStyle = "#7dd3fc";
+    context.lineWidth = 1.5;
+    context.stroke();
+  }, [series]);
+
+  if (series.length < 2) return null;
+  return (
+    <canvas
+      ref={canvasRef}
+      width={480}
+      height={120}
+      style={{ width: "100%", height: "120px" }}
+      aria-label="Training loss over steps"
+    />
+  );
+}
+
+/** Human-readable duration for an ETA in seconds. */
+function formatDuration(seconds: number): string {
+  const total = Math.max(0, Math.round(seconds));
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const secs = total % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${secs}s`;
+  return `${secs}s`;
+}
+
 export function RunsPage({ api }: PageProps) {
   const [runId, setRunId] = useState(() => initialRunId());
   const [run, setRun] = useState<JsonRecord | null>(null);
@@ -1041,6 +1528,11 @@ export function RunsPage({ api }: PageProps) {
   const [totalSteps, setTotalSteps] = useState<number | null>(null);
   const [streamActive, setStreamActive] = useState(false);
   const [streamDone, setStreamDone] = useState(false);
+  const [lossSeries, setLossSeries] = useState<number[]>([]);
+  const [etaSeconds, setEtaSeconds] = useState<number | null>(null);
+  const [latestCheckpoint, setLatestCheckpoint] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [actionNotice, setActionNotice] = useState<string | null>(null);
 
   useEffect(() => {
     const value = initialRunId();
@@ -1078,6 +1570,41 @@ export function RunsPage({ api }: PageProps) {
   const currentRunId = run ? text(run["id"], "") : "";
   const runState = text(run?.["state"], "");
   const canCancel = ["QUEUED", "RUNNING", "AWAITING_RETRY"].includes(runState);
+  const resultRecord = (run?.["result"] ?? null) as JsonRecord | null;
+  const resultId = resultRecord ? text(resultRecord["id"], "") : "";
+  // Resume needs both a terminal failure state and the checkpoint to resume from.
+  const canResume = ["FAILED", "CANCELLED"].includes(runState) && latestCheckpoint !== null;
+  const canDeploy = Boolean(resultId);
+
+  const resumeRun = async () => {
+    if (!currentRunId) return;
+    setActionBusy(true);
+    setActionNotice(null);
+    try {
+      await api.resumeTrainingRun(currentRunId, latestCheckpoint ?? undefined);
+      setActionNotice("Resume accepted. Yield is restarting from the latest checkpoint.");
+      setStreamDone(false);
+      setRun(await api.getTrainingRun(currentRunId));
+    } catch (resumeError) {
+      setError(errorMessage(resumeError));
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
+  const deployResult = async () => {
+    if (!resultId) return;
+    setActionBusy(true);
+    setActionNotice(null);
+    try {
+      await api.sendResultToReactor(resultId);
+      setActionNotice("Sent to Reactor. Continue on the Deployments page.");
+    } catch (deployError) {
+      setError(errorMessage(deployError));
+    } finally {
+      setActionBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (!currentRunId || !["RUNNING", "QUEUED"].includes(runState)) {
@@ -1132,7 +1659,9 @@ export function RunsPage({ api }: PageProps) {
                 setEvents((prev) => [...prev.slice(-49), parsed]);
                 const payload = (parsed["payload"] ?? parsed) as Record<string, unknown>;
                 if (typeof payload["loss"] === "number") {
-                  setLatestLoss(payload["loss"]);
+                  const loss = payload["loss"];
+                  setLatestLoss(loss);
+                  setLossSeries((prev) => [...prev.slice(-199), loss]);
                 }
                 const step = payload["step"] ?? payload["currentStep"] ?? payload["current_step"];
                 if (typeof step === "number") {
@@ -1141,6 +1670,22 @@ export function RunsPage({ api }: PageProps) {
                 const total = payload["totalSteps"] ?? payload["total_steps"] ?? payload["total"];
                 if (typeof total === "number") {
                   setTotalSteps(Number(total));
+                }
+                const eta = payload["etaSeconds"] ?? payload["eta_seconds"];
+                if (typeof eta === "number") {
+                  setEtaSeconds(eta);
+                }
+                const checkpoint = payload["checkpoint"];
+                if (checkpoint && typeof checkpoint === "object") {
+                  const record = checkpoint as Record<string, unknown>;
+                  const label =
+                    record["name"] ?? record["checkpointName"] ?? record["artifact"] ?? record["digest"];
+                  if (typeof label === "string") {
+                    setLatestCheckpoint(label);
+                  } else if (typeof label === "object" && label !== null) {
+                    const digest = (label as Record<string, unknown>)["digest"];
+                    if (typeof digest === "string") setLatestCheckpoint(digest);
+                  }
                 }
               } catch {
                 // Ignore parse errors
@@ -1297,7 +1842,53 @@ export function RunsPage({ api }: PageProps) {
                 detail={streamActive ? "SSE live connection" : "Stream completed or disconnected"}
                 accent={streamActive ? "lime" : "gray"}
               />
+              <MetricCard
+                label="ETA"
+                value={etaSeconds !== null ? formatDuration(etaSeconds) : "--"}
+                detail="Estimated time remaining"
+                accent="gray"
+              />
+              <MetricCard
+                label="Checkpoint"
+                value={latestCheckpoint ?? "--"}
+                detail="Latest checkpoint reported by Yield"
+                accent="gray"
+              />
             </div>
+
+            {currentStep !== null && totalSteps ? (
+              <div style={{ marginTop: "16px" }}>
+                <div
+                  role="progressbar"
+                  aria-valuenow={currentStep}
+                  aria-valuemin={0}
+                  aria-valuemax={totalSteps}
+                  style={{ height: "8px", background: "var(--color-bg-subtle, #181c20)", borderRadius: "4px", overflow: "hidden" }}
+                >
+                  <div
+                    style={{
+                      width: `${Math.min(100, Math.round((currentStep / totalSteps) * 100))}%`,
+                      height: "100%",
+                      background: "var(--lime, #7dd3fc)",
+                    }}
+                  />
+                </div>
+              </div>
+            ) : null}
+
+            <div style={{ marginTop: "16px" }}>
+              <LossChart series={lossSeries} />
+            </div>
+
+            <div className="form-actions" style={{ marginTop: "16px" }}>
+              <Button disabled={!canResume || actionBusy} onClick={() => void resumeRun()}>
+                {actionBusy ? "Working..." : "Resume from checkpoint"}
+              </Button>
+              <Button disabled={!canDeploy || actionBusy} onClick={() => void deployResult()}>
+                Deploy this model
+              </Button>
+            </div>
+            {actionNotice ? <p className="form-message form-message--success">{actionNotice}</p> : null}
 
             <div style={{ marginTop: "16px" }}>
               <strong style={{ display: "block", marginBottom: "8px", fontSize: "13px" }}>Event logs (last 50):</strong>
@@ -1633,32 +2224,39 @@ export function GatewayPage({ api }: PageProps) {
   const [copiedKey, setCopiedKey] = useState(false);
   const [copiedSnippet, setCopiedSnippet] = useState(false);
   const [copiedBaseUrl, setCopiedBaseUrl] = useState(false);
+  const [system, setSystem] = useState<SystemStatus | null>(null);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
-    void Promise.allSettled([api.getGatewayRoutes(), api.listApiKeys()]).then(
-      ([routesRes, keysRes]) => {
-        if (!active) return;
-        if (routesRes.status === "fulfilled") {
-          setRoutes(routesRes.value);
-          if (routesRes.value.length > 0) {
-            setSelectedRoute((prev) => prev ?? routesRes.value[0]);
-          }
-          setError(null);
-        } else {
-          setRoutes(null);
-          setError(errorMessage(routesRes.reason));
+    void Promise.allSettled([
+      api.getGatewayRoutes(),
+      api.listApiKeys(),
+      api.getSystemStatus(),
+    ]).then(([routesRes, keysRes, systemRes]) => {
+      if (!active) return;
+      if (routesRes.status === "fulfilled") {
+        setRoutes(routesRes.value);
+        if (routesRes.value.length > 0) {
+          setSelectedRoute((prev) => prev ?? routesRes.value[0]);
         }
+        setError(null);
+      } else {
+        setRoutes(null);
+        setError(errorMessage(routesRes.reason));
+      }
 
-        if (keysRes.status === "fulfilled") {
-          setApiKeys(keysRes.value);
-        } else {
-          setApiKeys([]);
-        }
-        setLoading(false);
-      },
-    );
+      if (keysRes.status === "fulfilled") {
+        setApiKeys(keysRes.value);
+      } else {
+        setApiKeys([]);
+      }
+
+      // A missing status only costs us the published gateway URL; the route and
+      // key panels above must still render.
+      setSystem(systemRes.status === "fulfilled" ? systemRes.value : null);
+      setLoading(false);
+    });
     return () => {
       active = false;
     };
@@ -1727,9 +2325,14 @@ export function GatewayPage({ api }: PageProps) {
     }
   };
 
-  const baseUrl = typeof window !== "undefined"
-    ? `${window.location.protocol}//${window.location.hostname}:8003/v1`
-    : "http://localhost:8003/v1";
+  // The published gateway URL wins. Deriving it in the browser assumed Exchange
+  // sits on one fixed port, which is wrong for the dev stack (8000) and for any
+  // HTTPS deployment, so every snippet below was pointing at a dead endpoint.
+  const baseUrl =
+    system?.gatewayBaseUrl ??
+    (typeof window !== "undefined"
+      ? `${window.location.protocol}//${window.location.hostname}:8003/v1`
+      : "http://localhost:8003/v1");
 
   const handleUseInNavigator = async (route: JsonRecord) => {
     const gatewayEndpointId = text(route["gatewayEndpointId"] || route["gateway_endpoint_id"] || route["id"]);
