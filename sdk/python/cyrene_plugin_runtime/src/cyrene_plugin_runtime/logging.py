@@ -12,11 +12,11 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import sys
+from collections.abc import Mapping
 from datetime import datetime, timezone
-from typing import Any, Mapping
+from typing import Any
 from uuid import uuid4
 
 _TRACEPARENT_RE = re.compile(r"^00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}$")

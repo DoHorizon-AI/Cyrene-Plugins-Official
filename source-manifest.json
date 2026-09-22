@@ -4520,8 +4520,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/logging.py",
-      "sha256": "bb1678335a76164e1db1f42ca84b86368249d654202f8bc34d1965c9308c35af",
-      "size_bytes": 5789
+      "sha256": "1d3110515de04ad21713d24e12e05fdb6e31ffe7192008cea739ba4e79ccee30",
+      "size_bytes": 5806
     },
     {
       "kind": "file",
