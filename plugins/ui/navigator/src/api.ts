@@ -104,6 +104,13 @@ export interface SystemStatus {
   services?: ServiceHealthStatus[];
   blockers?: BlockerInfo[];
   plugins?: PluginInfo[];
+  /**
+   * Base URL of the Exchange OpenAI-compatible gateway, published by the Web
+   * Host. Optional so an older Web Host keeps working; consumers must fall back
+   * to their previous behaviour when it is absent. The port differs between the
+   * dev stack and packaged deployments, so it must never be hardcoded.
+   */
+  gatewayBaseUrl?: string;
   observedAt: string;
 }
 
@@ -156,6 +163,35 @@ export interface CreateModelImportInput {
 export interface CreateDatasetInput {
   name: string;
   description: string;
+}
+
+/**
+ * Hyperparameters accepted by Yield's `TrainingParameters` model.
+ *
+ * Property names are camelCase because Yield's ContractModel generates aliases
+ * with `to_camel`. The model is declared with `extra="forbid"`, so a typo here
+ * is rejected with 422 rather than quietly ignored.
+ */
+export interface TrainingParametersInput {
+  epochs: number;
+  perDeviceBatchSize: number;
+  gradientAccumulationSteps: number;
+  learningRate: number;
+  maxSequenceLength: number;
+  loraRank: number;
+  loraAlpha: number;
+  loraDropout: number;
+}
+
+/**
+ * Body of `PATCH /api/v1/training-drafts/{id}` (Yield "Prepare Draft").
+ *
+ * `baseModel` is required by Yield, so it is echoed back from the draft's
+ * existing configuration rather than being re-selected on every launch.
+ */
+export interface TrainingDraftSpecInput {
+  baseModel: JsonRecord;
+  parameters: TrainingParametersInput;
 }
 
 /** A stable set of same-origin proxy prefixes exposed by Navigator. */
@@ -364,6 +400,92 @@ export class NavigatorApi {
     );
   }
 
+  /** List Preparations of one Catalyst dataset in insertion order. */
+  async getPreparations(datasetId: string): Promise<JsonRecord[]> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/datasets/${encodeURIComponent(datasetId)}/preparations`,
+      { method: "GET" },
+      parseResourceArray,
+    );
+  }
+
+  /**
+   * Upload a source file as a new Preparation.
+   *
+   * Catalyst reads the raw request body (not multipart) and takes the display
+   * name and original filename from the query string.
+   */
+  async createPreparation(
+    datasetId: string,
+    name: string,
+    filename: string,
+    body: string,
+    contentType: string,
+  ): Promise<JsonRecord> {
+    const query = new URLSearchParams({ name, filename });
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/datasets/${encodeURIComponent(datasetId)}/preparations?${query}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": contentType },
+        body,
+      },
+      parseResource,
+    );
+  }
+
+  /** Declare how imported fields map onto the SFT training shape. */
+  async configurePreparationMapping(
+    preparationId: string,
+    command: Record<string, unknown>,
+  ): Promise<JsonRecord> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/preparations/${encodeURIComponent(preparationId)}/mapping`,
+      jsonRequest("PATCH", command, true),
+      parseResource,
+    );
+  }
+
+  /** Run preparation (validate + deduplicate) on a mapped Preparation. */
+  async confirmPreparation(preparationId: string): Promise<JsonRecord> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/preparations/${encodeURIComponent(preparationId)}/confirm`,
+      jsonRequest("POST", {}, true),
+      parseResource,
+    );
+  }
+
+  /** Publish a confirmed Preparation into an immutable DatasetVersion. */
+  async publishPreparation(preparationId: string): Promise<JsonRecord> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/preparations/${encodeURIComponent(preparationId)}/publish`,
+      jsonRequest("POST", {}, true),
+      parseResource,
+    );
+  }
+
+  /** Hand the published version to Yield as a training draft. */
+  async sendPreparationToYield(preparationId: string): Promise<JsonRecord> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/preparations/${encodeURIComponent(preparationId)}/yield-draft`,
+      jsonRequest("POST", {}, true),
+      parseResource,
+    );
+  }
+
+  /**
+   * List the DatasetVersions of one Catalyst dataset, newest first.
+   *
+   * Lets the console offer a picker instead of making the user paste a UUID.
+   */
+  async getDatasetVersions(datasetId: string): Promise<JsonRecord[]> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.catalyst}/datasets/${encodeURIComponent(datasetId)}/versions`,
+      { method: "GET" },
+      parseResourceArray,
+    );
+  }
+
   /** Create a dataset container; file preparation remains Catalyst-owned. */
   async createDataset(input: CreateDatasetInput): Promise<JsonRecord> {
     return this.requestJson(
@@ -382,6 +504,20 @@ export class NavigatorApi {
     );
   }
 
+  /**
+   * Persist a draft's base model and hyperparameters before launch.
+   *
+   * Yield owns these values; without this call the training run starts with
+   * whatever the draft already carried and any UI edits are silently lost.
+   */
+  async updateTrainingDraft(id: string, spec: TrainingDraftSpecInput): Promise<JsonRecord> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.yield}/training-drafts/${encodeURIComponent(id)}`,
+      jsonRequest("PATCH", spec, true),
+      parseResource,
+    );
+  }
+
   /** Start one prepared training draft. */
   async startTrainingDraft(id: string): Promise<JsonRecord> {
     return this.requestJson(
@@ -396,6 +532,33 @@ export class NavigatorApi {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.yield}/training-runs/${encodeURIComponent(id)}`,
       { method: "GET" },
+      parseResource,
+    );
+  }
+
+  /**
+   * Resume a stopped run from a complete checkpoint.
+   *
+   * Yield requires an explicit checkpoint, so the caller passes the name
+   * observed in the event stream rather than relying on an implicit "latest".
+   */
+  async resumeTrainingRun(
+    runId: string,
+    checkpointName?: string,
+  ): Promise<JsonRecord> {
+    const body = checkpointName ? { checkpointName } : {};
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.yield}/training-runs/${encodeURIComponent(runId)}/actions/resume`,
+      jsonRequest("POST", body, true),
+      parseResource,
+    );
+  }
+
+  /** Hand a completed training result to Reactor for deployment. */
+  async sendResultToReactor(resultId: string): Promise<JsonRecord> {
+    return this.requestJson(
+      `${NAVIGATOR_PROXY_PATHS.yield}/training-results/${encodeURIComponent(resultId)}/actions/send-to-reactor`,
+      jsonRequest("POST", {}, false),
       parseResource,
     );
   }
