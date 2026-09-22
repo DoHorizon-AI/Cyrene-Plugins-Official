@@ -47,3 +47,6 @@ data/
 # Release Artifacts & Test Executables
 artifacts/
 contracts/cabi/tests/cabi_harness
+
+# SDK package builds produce a uv.lock locally; only TCK packages ship one.
+sdk/python/*/uv.lock

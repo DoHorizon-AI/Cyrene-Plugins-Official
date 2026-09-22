@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".gitignore",
-      "sha256": "bd0f4e8b860ff0cccbaf78c58eca1719842c8499a08fc6404f8101386bab3052",
-      "size_bytes": 587
+      "sha256": "550d105216235bebd7ff642f61d37cf79e4428b454be8191c9630ed9c7d5daa3",
+      "size_bytes": 685
     },
     {
       "kind": "file",
@@ -700,6 +700,13 @@
       "path": "contracts/tck/training-llama-factory-v1/test_training_llama_factory_tck.py",
       "sha256": "ef2a8276812d83673303d098a3a032e193728088bb1c855f84bc944be6beed8e",
       "size_bytes": 3139
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "docs/logging-and-errors.md",
+      "sha256": "12867e353b01b476defb30d7b2f5f54e772bf4d3b7b01e074fbb0779c381936b",
+      "size_bytes": 34667
     },
     {
       "kind": "file",
@@ -1699,8 +1706,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.ts",
-      "sha256": "c9ab44c5a499f05da9963d147addb60714f38c05501c6699f68e2234a1340fda",
-      "size_bytes": 29903
+      "sha256": "93b73bba2a76cc6f58ad756b3c45892090980371b6e1f521ab35107c6ad0f875",
+      "size_bytes": 35475
     },
     {
       "kind": "file",
@@ -1720,8 +1727,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/pages.tsx",
-      "sha256": "bd573a32ccac43090f38cbb7643bb616f5ff1d5249cdc67203e5704e6717d408",
-      "size_bytes": 103533
+      "sha256": "af5273ccf801d2d323b34b1c2eced98ef4078b0e45a465c1b33d6cb386865ea8",
+      "size_bytes": 128027
     },
     {
       "kind": "file",
@@ -4443,8 +4450,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/__init__.py",
-      "sha256": "f9eaeea57a83907985630124d62304df053465e6bf2be9d555c2cd50bb464c01",
-      "size_bytes": 1234
+      "sha256": "404014d9d9895c15f0e33c061017d15c891c681f4093163ef8d135126846de3b",
+      "size_bytes": 1930
     },
     {
       "kind": "file",
@@ -4498,9 +4505,23 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/errors.py",
+      "sha256": "405e54ca6da7d541302e3eafe6f9a4b748171809d590a327a159e0df6a908a9c",
+      "size_bytes": 3723
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/execution_engine.py",
       "sha256": "2229021d4f7f71c66c25719afb43ba358f2dbc52c1aacb63f0f891b05e51feb1",
       "size_bytes": 11068
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/logging.py",
+      "sha256": "bb1678335a76164e1db1f42ca84b86368249d654202f8bc34d1965c9308c35af",
+      "size_bytes": 5789
     },
     {
       "kind": "file",
@@ -4513,8 +4534,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/server.py",
-      "sha256": "6ed7065b8819366d105448404b071807cd8c7892e39f2af9706990f518a212e8",
-      "size_bytes": 17643
+      "sha256": "31b4738ec07db2653f9122d461038b668204fc67f63cdc5cfdeeff8ffcd22367",
+      "size_bytes": 18520
     },
     {
       "kind": "file",
@@ -4522,6 +4543,13 @@
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_configuration.py",
       "sha256": "9efc271152e2b5a92526b6879bdb4f9687b02615c15fbe96ccbc5115246c1a72",
       "size_bytes": 1248
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_correlation_and_errors.py",
+      "sha256": "94d263fd1ab20062925c83ed9a7043bc639f933e6edabdc1e848f2b0988abdf1",
+      "size_bytes": 5597
     },
     {
       "kind": "file",
