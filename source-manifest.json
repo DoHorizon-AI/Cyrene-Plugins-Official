@@ -1510,43 +1510,43 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/README.md",
-      "sha256": "5f6a3b3404ea88605ede0137ed5c1f6e219749329a28908a2f53e605b3b356e8",
-      "size_bytes": 802
+      "sha256": "d348399550483bb3dc477ba8f3aa4443a828e3e459a2fa48309be07d54e68c69",
+      "size_bytes": 1051
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/contracts/v1/schema.json",
-      "sha256": "ce30e2e65db71f85a8261c7accb642ad1866f3ae3eaddfba3877b39b314114c4",
-      "size_bytes": 3305
+      "sha256": "520b98bb38c79fce1096b2505c04658d44f96042f1eb6f3450f5a7e195f66ad2",
+      "size_bytes": 3419
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/dataset_preparation.py",
-      "sha256": "292d3ba81feb9611b210e75a98029c50500920e6be44bd76b6172788ce86295a",
-      "size_bytes": 22125
+      "sha256": "fdf16d77f65da77ac3e7a3069e26d450229e02ab18baf6bf8ebf5aafc0958673",
+      "size_bytes": 22795
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/plugin.manifest.json",
-      "sha256": "23b7db0849516183f788ada83a8448d58e0a3e6a457dea21ec0408feabd3136f",
+      "sha256": "c25a90f73c8bea01bc25d4cf649e714e155dda3a93da67add5cdd1ec1e06fa58",
       "size_bytes": 1764
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/pyproject.toml",
-      "sha256": "b50a8c2535b29042141a9f4246510b59f525659204fd4d86a6ec803130ffe1b3",
+      "sha256": "77e8ceae107067a2f26eca1ce5e92821a9cf2aaa01f49e12150bb2b0e5a3ee05",
       "size_bytes": 654
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/tests/test_dataset_preparation.py",
-      "sha256": "7ee92505e92d81f3813e46a485fa8adc117f0e3b9adb6d78d72fa9f61530c2b9",
-      "size_bytes": 4677
+      "sha256": "d0bc87dd7f6460207a92152ee3103dadbc37da2a60cdd766deee8d8b3049882c",
+      "size_bytes": 7991
     },
     {
       "kind": "file",
@@ -1685,22 +1685,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/App.tsx",
-      "sha256": "3e5ed18ce10368f9038bc9074638b5b79a4f7b599e8c1ea1b95e42d13f65e214",
-      "size_bytes": 10454
+      "sha256": "b20de600651c8b904802735a5b7232c0f7be6c3f5a8ac818e19eea0af309ea9a",
+      "size_bytes": 10536
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.test.ts",
-      "sha256": "15dbf3a86e6886dc0e46e617d13808707d35318487c96f6d9643593a81fb7d14",
-      "size_bytes": 8366
+      "sha256": "ff0f05ce9927b97154ea089b6ca68570e3f22a905b4731995b497517109ced44",
+      "size_bytes": 12659
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.ts",
-      "sha256": "afc4c27bf9b9c6d217a76ccd93a8839413038d34bf62ec6ae7f8127d70873c74",
-      "size_bytes": 25035
+      "sha256": "c9ab44c5a499f05da9963d147addb60714f38c05501c6699f68e2234a1340fda",
+      "size_bytes": 29903
     },
     {
       "kind": "file",
@@ -1720,22 +1720,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/pages.tsx",
-      "sha256": "e45cff70c221dc59a9806ed91dbe5a702e51101d29d01211b4a3ab6bcfa74fe6",
-      "size_bytes": 70303
+      "sha256": "bd573a32ccac43090f38cbb7643bb616f5ff1d5249cdc67203e5704e6717d408",
+      "size_bytes": 103533
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/router.test.ts",
-      "sha256": "ea76a13dc339a5caf161cb22da5594a2ba188a983b17b88b185bca744f1f4545",
-      "size_bytes": 1364
+      "sha256": "2f74b92b66db59ee3c182349539926b8cc56c06b9cd964ff0a8e9fc38fd5e662",
+      "size_bytes": 1516
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/router.ts",
-      "sha256": "2fdb4195cb94bbda41b9886e5998548e8c2e4489b53da8f51c78cf825dcc4724",
-      "size_bytes": 2751
+      "sha256": "d9561e749a8d35fb8ee8a87ab3c2bac424c0ef5a24444c7f5109e270c985f653",
+      "size_bytes": 2886
     },
     {
       "kind": "file",

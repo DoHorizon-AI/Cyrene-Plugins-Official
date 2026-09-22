@@ -1,8 +1,8 @@
 # Dataset Preparation / 数据集整理
 
 This stateless Plugin is the canonical implementation of
-`dataset.preparation.v1`. It owns content-based import detection, JSON/JSONL/text
-parsing, field mapping, Unicode normalization, quality errors, content
+`dataset.preparation.v1`. It owns content-based import detection, JSON/JSONL/text,
+CSV, and Parquet parsing, field mapping, Unicode normalization, quality errors, content
 deduplication, deterministic group splitting, standard JSONL exports, and
 DuckDB JSONL-to-Parquet conversion.
 
@@ -13,3 +13,7 @@ Products pass absolute paths inside a Platform-supervised shared staging scope.
 The capability never resolves ArtifactRef identity and never owns Product state.
 All calls use typed `DirectPluginRuntime` methods: `inspect`, `prepare`, and
 `transform`.
+
+`inspect` accepts an optional `format_hint` for staged files whose content does
+not identify CSV unambiguously. `prepare` consumes the confirmed `source_format`;
+both methods support `JSONL`, `JSON`, `TEXT`, `CSV`, and `PARQUET`.

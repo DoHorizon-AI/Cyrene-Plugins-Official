@@ -26,6 +26,7 @@ INTERFACE_VERSION = "1"
 TYPE_PREFIX = f"type.cyrene.io/{CAPABILITY_ID}"
 MAX_SOURCE_BYTES = 64 * 1024 * 1024
 MAX_EXCERPT_LENGTH = 200
+SOURCE_FORMATS = {"JSONL", "JSON", "TEXT", "CSV", "PARQUET"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,7 +51,7 @@ class DatasetPreparationPlugin:
     """Run stateless deterministic dataset preparation over staged paths."""
 
     plugin_id = "cyrene.tools.dataset-preparation"
-    version = "0.1.0"
+    version = "0.1.1"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
@@ -87,6 +88,7 @@ class DatasetPreparationPlugin:
                 result = self.inspect(
                     _path(request.get("source_path"), "source_path"),
                     _path(request.get("result_path"), "result_path"),
+                    format_hint=request.get("format_hint"),
                 )
             elif action == "prepare":
                 result = self.prepare(
@@ -119,11 +121,21 @@ class DatasetPreparationPlugin:
             type_url=f"{TYPE_PREFIX}.{action}.response",
         )
 
-    def inspect(self, source_path: Path, result_path: Path) -> dict[str, Any]:
+    def inspect(
+        self,
+        source_path: Path,
+        result_path: Path,
+        *,
+        format_hint: str | None = None,
+    ) -> dict[str, Any]:
         """Parse a staged source and persist its generic row projection."""
 
         _validate_source(source_path)
-        source_format = detect_format(source_path.read_bytes())
+        source_format = (
+            detect_format(source_path.read_bytes())
+            if format_hint is None
+            else _enum_text(format_hint, "format_hint", SOURCE_FORMATS)
+        )
         rows = parse_rows(source_path, source_format)
         result = {"format": source_format, "rows": rows}
         receipt = _write_json_result(result_path, result)
@@ -149,9 +161,7 @@ class DatasetPreparationPlugin:
         source_path = _path(source_path, "source_path")
         result_path = _path(result_path, "result_path")
         _validate_source(source_path)
-        source_format = _enum_text(
-            source_format, "source_format", {"JSONL", "JSON", "TEXT"}
-        )
+        source_format = _enum_text(source_format, "source_format", SOURCE_FORMATS)
         mapping = _mapping(mapping, "mapping")
         normalization = _mapping(normalization, "normalization")
         if split is not None:
@@ -211,6 +221,8 @@ def detect_format(data: bytes) -> str:
 
     if not data.strip():
         raise ValueError("source is empty")
+    if len(data) >= 8 and data.startswith(b"PAR1") and data.endswith(b"PAR1"):
+        return "PARQUET"
     for magic, label in (
         (b"%PDF", "PDF"),
         (b"\xd0\xcf\x11\xe0", "Legacy Office"),
@@ -251,7 +263,7 @@ def _json_native(value: Any) -> Any:
 
 
 def parse_rows(source: Path, source_format: str) -> list[dict[str, Any]]:
-    """Parse JSON/JSONL with DuckDB or non-empty plain-text lines."""
+    """Parse supported structured formats with DuckDB or plain-text lines."""
 
     if source_format == "TEXT":
         rows = [
@@ -264,10 +276,15 @@ def parse_rows(source: Path, source_format: str) -> list[dict[str, Any]]:
         return rows
     connection = duckdb.connect()
     try:
-        relation = connection.read_json(
-            str(source),
-            format="newline_delimited" if source_format == "JSONL" else "array",
-        )
+        if source_format == "CSV":
+            relation = connection.read_csv(str(source), header=True)
+        elif source_format == "PARQUET":
+            relation = connection.read_parquet(str(source))
+        else:
+            relation = connection.read_json(
+                str(source),
+                format="newline_delimited" if source_format == "JSONL" else "array",
+            )
         columns = list(relation.columns)
         return [
             {key: _json_native(value) for key, value in zip(columns, values, strict=True)}
@@ -561,8 +578,7 @@ def _sample_error(
 
 
 def _path(value: Any, field: str) -> Path:
-    text = _required_text(value, field)
-    path = Path(text)
+    path = value if isinstance(value, Path) else Path(_required_text(value, field))
     if not path.is_absolute():
         raise ValueError(f"{field} must be an absolute staged path")
     return path

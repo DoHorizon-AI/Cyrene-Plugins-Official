@@ -17,7 +17,8 @@
       "required": ["source_path", "result_path"],
       "properties": {
         "source_path": {"$ref": "#/$defs/AbsolutePath"},
-        "result_path": {"$ref": "#/$defs/AbsolutePath"}
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "format_hint": {"enum": ["JSONL", "JSON", "TEXT", "CSV", "PARQUET"]}
       },
       "additionalProperties": false
     },
@@ -28,7 +29,7 @@
           "type": "object",
           "required": ["format", "row_count", "detected_fields"],
           "properties": {
-            "format": {"enum": ["JSONL", "JSON", "TEXT"]},
+            "format": {"enum": ["JSONL", "JSON", "TEXT", "CSV", "PARQUET"]},
             "row_count": {"type": "integer", "minimum": 0},
             "detected_fields": {"type": "array", "items": {"type": "string"}}
           }
@@ -40,7 +41,7 @@
       "required": ["source_path", "source_format", "mapping", "normalization", "result_path"],
       "properties": {
         "source_path": {"$ref": "#/$defs/AbsolutePath"},
-        "source_format": {"enum": ["JSONL", "JSON", "TEXT"]},
+        "source_format": {"enum": ["JSONL", "JSON", "TEXT", "CSV", "PARQUET"]},
         "mapping": {"type": "object"},
         "normalization": {"type": "object"},
         "split": {"type": ["object", "null"]},
