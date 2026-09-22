@@ -167,6 +167,7 @@ capabilities:
       paths:
         - plugins/serving/vllm-runtime/contracts/v1/schema.json
     contract_methods:
+      - diagnostics
       - import_model
       - inspect
       - start
@@ -178,6 +179,7 @@ capabilities:
         language: python
         publication: published
         methods:
+          - diagnostics
           - import_model
           - inspect
           - start

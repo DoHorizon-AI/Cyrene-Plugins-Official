@@ -7,96 +7,335 @@
   "$defs": {
     "ArtifactRef": {
       "type": "object",
-      "required": ["uri", "digest", "size_bytes", "kind"],
+      "required": [
+        "uri",
+        "digest",
+        "size_bytes",
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
-        "uri": { "type": "string", "pattern": "^artifact://sha256/[0-9a-f]{64}$" },
-        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-        "size_bytes": { "type": "integer", "minimum": 0 },
-        "kind": { "type": "string" },
-        "manifest_digest": { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" }
+        "uri": {
+          "type": "string",
+          "pattern": "^artifact://sha256/[0-9a-f]{64}$"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "kind": {
+          "type": "string"
+        },
+        "manifest_digest": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
       }
     },
     "ModelSource": {
       "type": "object",
-      "required": ["kind"],
+      "required": [
+        "kind"
+      ],
       "additionalProperties": false,
       "properties": {
-        "kind": { "enum": ["HUGGING_FACE", "LOCAL_PATH"] },
-        "repository": { "type": ["string", "null"] },
-        "revision": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
-        "path": { "type": ["string", "null"] }
+        "kind": {
+          "enum": [
+            "HUGGING_FACE",
+            "LOCAL_PATH"
+          ]
+        },
+        "repository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
       }
     },
     "ImportRequest": {
       "type": "object",
-      "required": ["name", "source"],
+      "required": [
+        "name",
+        "source"
+      ],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string" },
-        "source": { "$ref": "#/$defs/ModelSource" },
-        "credentialRef": { "type": ["string", "null"] },
-        "trustRemoteCode": { "const": false }
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ModelSource"
+        },
+        "credentialRef": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "trustRemoteCode": {
+          "const": false
+        }
       }
     },
     "ModelImportValidation": {
       "type": "object",
-      "required": ["weights", "config", "tokenizer", "chatTemplate", "provenance", "digest"],
+      "required": [
+        "weights",
+        "config",
+        "tokenizer",
+        "chatTemplate",
+        "provenance",
+        "digest"
+      ],
       "additionalProperties": false,
       "properties": {
-        "weights": { "type": "boolean" },
-        "config": { "type": "boolean" },
-        "tokenizer": { "type": "boolean" },
-        "chatTemplate": { "type": "boolean" },
-        "license": { "type": ["string", "null"] },
-        "provenance": { "type": "string" },
-        "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-        "trustRemoteCode": { "const": false },
-        "issues": { "type": "array", "items": { "type": "string" } }
+        "weights": {
+          "type": "boolean"
+        },
+        "config": {
+          "type": "boolean"
+        },
+        "tokenizer": {
+          "type": "boolean"
+        },
+        "chatTemplate": {
+          "type": "boolean"
+        },
+        "license": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "provenance": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        "trustRemoteCode": {
+          "const": false
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       }
     },
     "ImportResponse": {
       "type": "object",
-      "required": ["modelArtifact", "validation"],
+      "required": [
+        "modelArtifact",
+        "validation"
+      ],
       "additionalProperties": false,
       "properties": {
-        "modelArtifact": { "$ref": "#/$defs/ArtifactRef" },
-        "validation": { "$ref": "#/$defs/ModelImportValidation" }
+        "modelArtifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "validation": {
+          "$ref": "#/$defs/ModelImportValidation"
+        }
       }
     },
     "StartRequest": {
       "type": "object",
-      "required": ["modelArtifact"],
+      "required": [
+        "modelArtifact"
+      ],
       "additionalProperties": false,
       "properties": {
-        "modelArtifact": { "$ref": "#/$defs/ArtifactRef" },
-        "nodeRef": { "type": "object" },
-        "modelVersion": { "type": "object" }
+        "modelArtifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "nodeRef": {
+          "type": "object"
+        },
+        "modelVersion": {
+          "type": "object"
+        }
       }
     },
     "ExecutionResponse": {
       "type": "object",
-      "required": ["ready", "executionRef", "endpointUrl", "servedModel", "modelArtifact"],
+      "required": [
+        "ready",
+        "executionRef",
+        "endpointUrl",
+        "servedModel",
+        "modelArtifact"
+      ],
       "additionalProperties": false,
       "properties": {
-        "ready": { "type": "boolean" },
-        "executionRef": { "type": "string" },
-        "endpointUrl": { "type": "string" },
-        "servedModel": { "type": "string" },
-        "modelArtifact": { "$ref": "#/$defs/ArtifactRef" },
-        "modelVersion": { "type": "object" },
-        "released": { "type": "boolean" },
-        "detail": { "type": "string" }
+        "ready": {
+          "type": "boolean"
+        },
+        "executionRef": {
+          "type": "string"
+        },
+        "endpointUrl": {
+          "type": "string"
+        },
+        "servedModel": {
+          "type": "string"
+        },
+        "modelArtifact": {
+          "$ref": "#/$defs/ArtifactRef"
+        },
+        "modelVersion": {
+          "type": "object"
+        },
+        "released": {
+          "type": "boolean"
+        },
+        "detail": {
+          "type": "string"
+        }
       }
     },
     "EngineError": {
       "type": "object",
-      "required": ["code", "detail", "retryable"],
+      "required": [
+        "code",
+        "detail",
+        "retryable"
+      ],
       "additionalProperties": false,
       "properties": {
-        "code": { "type": "string" },
-        "detail": { "type": "string" },
-        "retryable": { "type": "boolean" }
+        "code": {
+          "type": "string"
+        },
+        "detail": {
+          "type": "string"
+        },
+        "retryable": {
+          "type": "boolean"
+        }
+      }
+    },
+    "DiagnosticRecord": {
+      "type": "object",
+      "required": [
+        "sequence",
+        "timestamp",
+        "level",
+        "source",
+        "stream",
+        "message",
+        "truncated"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "sequence": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "level": {
+          "type": "string",
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "product",
+            "trainer",
+            "runtime",
+            "platform"
+          ]
+        },
+        "stream": {
+          "type": "string",
+          "enum": [
+            "stdout",
+            "stderr",
+            "combined"
+          ]
+        },
+        "code": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "requestId": {
+          "type": "string"
+        },
+        "operationId": {
+          "type": "string"
+        },
+        "resourceId": {
+          "type": "string"
+        },
+        "attemptId": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      }
+    },
+    "DiagnosticsPage": {
+      "type": "object",
+      "required": [
+        "resourceId",
+        "items",
+        "nextSequence",
+        "terminal",
+        "diagnosticsDegraded"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resourceId": {
+          "type": "string"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DiagnosticRecord"
+          }
+        },
+        "nextSequence": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "terminal": {
+          "type": "boolean"
+        },
+        "diagnosticsDegraded": {
+          "type": "boolean"
+        }
       }
     }
   }

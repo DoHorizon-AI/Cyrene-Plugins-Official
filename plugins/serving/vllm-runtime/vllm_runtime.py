@@ -20,6 +20,7 @@ import argparse
 import hashlib
 import json
 import os
+import queue
 import secrets
 import shutil
 import signal
@@ -28,9 +29,11 @@ import threading
 import time
 import urllib.error
 import urllib.request
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 from cy_artifacts import ArtifactKind, LocalArtifactProvider
@@ -46,6 +49,181 @@ TOKENIZER_FILES = (
     "spiece.model",
     "tokenizer_config.json",
 )
+
+
+# One deployment keeps at most two diagnostic files of 50 MiB: a vLLM log is
+# the only record of why a model failed to load, so it is bounded rather than
+# unbounded, and old terminal deployments are the only ones ever reclaimed.
+DIAGNOSTICS_FILE_BUDGET_BYTES = 50 * 1024 * 1024
+DIAGNOSTICS_RETAINED_FILES = 2
+DIAGNOSTICS_PAGE_LIMIT = 500
+DIAGNOSTICS_PAGE_MAX_BYTES = 1024 * 1024
+MAX_DIAGNOSTIC_LINE_CHARS = 4096
+
+
+class ServingDiagnostics:
+    """Capture a serving process's two output streams as tagged NDJSON.
+
+    Both pipes are drained concurrently: vLLM writes a great deal to stderr, and
+    a process that fills one pipe while the reader sits on the other stalls.
+    """
+
+    def __init__(
+        self, directory: Path, deployment_id: str, *, budget_bytes: int = DIAGNOSTICS_FILE_BUDGET_BYTES
+    ) -> None:
+        self._directory = directory
+        self._deployment_id = deployment_id
+        self._budget_bytes = budget_bytes
+        self._current = directory / f"{deployment_id}.ndjson"
+        self._rotated = directory / f"{deployment_id}.ndjson.1"
+        self._degraded = directory / f"{deployment_id}.degraded"
+        self._pending: queue.Queue[tuple[str, str] | None] = queue.Queue()
+        self._sequence = self._resume_sequence()
+        self._bytes_written = self._current_file_size()
+        self._failed = False
+        self._thread = threading.Thread(target=self._drain, daemon=True)
+
+    @property
+    def degraded(self) -> bool:
+        return self._failed or self._degraded.exists()
+
+    def start(self) -> None:
+        self._thread.start()
+
+    def close(self, timeout: float = 10.0) -> bool:
+        self._pending.put(None)
+        self._thread.join(timeout)
+        return self.degraded
+
+    def pump(self, pipe: Any, stream: str) -> None:
+        """Forward one pipe into the sink; never let a full pipe stall vLLM."""
+
+        try:
+            for line in pipe:
+                self._pending.put((stream, line.rstrip("\n")))
+        except (OSError, ValueError):
+            pass
+        finally:
+            try:
+                pipe.close()
+            except (OSError, ValueError):
+                pass
+
+    def page(self, after_sequence: int = 0, limit: int = 200) -> tuple[list[dict[str, Any]], bool]:
+        """Return records after one sequence, newest file last, budget applied."""
+
+        bounded = max(1, min(int(limit), DIAGNOSTICS_PAGE_LIMIT))
+        items: list[dict[str, Any]] = []
+        for path in (self._rotated, self._current):
+            if not path.is_file():
+                continue
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
+            for line in lines:
+                try:
+                    record = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(record, dict) and int(record.get("sequence", -1)) > after_sequence:
+                    items.append(record)
+        items = items[:bounded]
+        while items and len(json.dumps(items, separators=(",", ":"))) > DIAGNOSTICS_PAGE_MAX_BYTES:
+            items.pop()
+        return items, self.degraded
+
+    def _current_file_size(self) -> int:
+        try:
+            return self._current.stat().st_size
+        except OSError:
+            return 0
+
+    def _resume_sequence(self) -> int:
+        """Continue from the highest sequence already on disk, if it is readable."""
+
+        highest = 0
+        for path in (self._rotated, self._current):
+            if not path.is_file():
+                continue
+            try:
+                lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
+            except OSError:
+                continue
+            for line in lines[-200:]:
+                try:
+                    highest = max(highest, int(json.loads(line).get("sequence", 0)))
+                except (json.JSONDecodeError, AttributeError, TypeError, ValueError):
+                    continue
+        return highest + 1
+
+    def _rotate(self, handle: Any) -> Any:
+        handle.close()
+        try:
+            if self._current.exists():
+                self._current.replace(self._rotated)
+        except OSError:
+            self._mark_degraded()
+        try:
+            return self._current.open("a", encoding="utf-8")
+        except OSError:
+            self._mark_degraded()
+            return None
+
+    def _mark_degraded(self) -> None:
+        self._failed = True
+        try:
+            self._degraded.write_text("", encoding="utf-8")
+        except OSError:
+            pass
+
+    def _record(self, stream: str, text: str) -> str:
+        trimmed = text[:MAX_DIAGNOSTIC_LINE_CHARS]
+        record = {
+            "sequence": self._sequence,
+            "timestamp": datetime.now(UTC).isoformat(),
+            "stream": stream,
+            "level": "warn" if stream == "stderr" else "info",
+            "source": "runtime",
+            "truncated": len(text) > MAX_DIAGNOSTIC_LINE_CHARS,
+            "message": trimmed,
+        }
+        self._sequence += 1
+        return json.dumps(record, ensure_ascii=False, separators=(",", ":")) + "\n"
+
+    def _drain(self) -> None:
+        try:
+            handle = self._current.open("a", encoding="utf-8")
+        except OSError:
+            self._mark_degraded()
+            self._consume_without_writing()
+            return
+        while True:
+            item = self._pending.get()
+            if item is None:
+                handle.close()
+                return
+            stream, text = item
+            if handle is None:
+                continue
+            if self._bytes_written >= self._budget_bytes:
+                handle = self._rotate(handle)
+                self._bytes_written = self._current_file_size()
+                if handle is None:
+                    continue
+            line = self._record(stream, text)
+            try:
+                handle.write(line)
+                handle.flush()
+            except OSError:
+                self._mark_degraded()
+                continue
+            self._bytes_written += len(line.encode("utf-8"))
+
+    def _consume_without_writing(self) -> None:
+        while True:
+            if self._pending.get() is None:
+                return
 
 
 class ServingRuntimeError(RuntimeError):
@@ -171,6 +349,7 @@ class ServingRuntime:
         self.models.mkdir(parents=True, exist_ok=True)
         self.credentials.mkdir(parents=True, exist_ok=True, mode=0o700)
         self._processes: dict[str, subprocess.Popen] = {}
+        self._diagnostics: dict[str, ServingDiagnostics] = {}
         self._lock = threading.RLock()
 
     # ── persistence ─────────────────────────────────────────────────────
@@ -369,17 +548,24 @@ class ServingRuntime:
                 document.update(state="FAILED", detail=exc.detail, code=exc.code)
                 self._save(deployment_id, document)
                 raise
-            log = (self.home / "logs").joinpath(f"{deployment_id}.log")
-            log.parent.mkdir(parents=True, exist_ok=True)
-            with log.open("ab") as stream:
-                process = subprocess.Popen(
-                    argv,
-                    stdout=stream,
-                    stderr=subprocess.STDOUT,
-                    start_new_session=True,
-                )
+            logs = self.home / "logs"
+            logs.mkdir(parents=True, exist_ok=True)
+            diagnostics = ServingDiagnostics(logs, str(deployment_id))
+            diagnostics.start()
+            process = subprocess.Popen(
+                argv,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                errors="replace",
+                bufsize=1,
+                start_new_session=True,
+            )
+            for pipe, name in ((process.stdout, "stdout"), (process.stderr, "stderr")):
+                threading.Thread(target=diagnostics.pump, args=(pipe, name), daemon=True).start()
             document.update(pid=process.pid, port=port, state="STARTING")
             self._processes[str(deployment_id)] = process
+            self._diagnostics[str(deployment_id)] = diagnostics
             self._save(deployment_id, document)
             if not self._await_ready(process, port):
                 self._terminate(str(deployment_id), process.pid)
@@ -402,6 +588,25 @@ class ServingRuntime:
             document = self._load(deployment_id)
             return self._public(deployment_id, document)
 
+    def diagnostics(
+        self, deployment_id: UUID, *, after_sequence: int = 0, limit: int = 200
+    ) -> dict[str, Any]:
+        """Return one bounded page of the serving process's own output."""
+
+        with self._lock:
+            document = self._load(deployment_id)
+            sink = self._diagnostics.get(str(deployment_id))
+            if sink is None:
+                sink = ServingDiagnostics(self.home / "logs", str(deployment_id))
+            items, degraded = sink.page(after_sequence=after_sequence, limit=limit)
+        return {
+            "resourceId": str(deployment_id),
+            "items": items,
+            "nextSequence": items[-1]["sequence"] if items else after_sequence,
+            "terminal": document.get("state") == TERMINAL_RELEASED,
+            "diagnosticsDegraded": degraded,
+        }
+
     def stop(self, deployment_id: UUID) -> dict[str, Any]:
         """Terminate the accelerator process and confirm the release."""
 
@@ -412,6 +617,12 @@ class ServingRuntime:
             pid = document.get("pid")
             if isinstance(pid, int):
                 self._terminate(str(deployment_id), pid)
+            sink = self._diagnostics.pop(str(deployment_id), None)
+            if sink is not None:
+                # Closing drains the tail first, so the reason a stop failed is
+                # not lost behind the process teardown.
+                degraded = sink.close()
+                document["diagnosticsDegraded"] = degraded
             document.update(state=TERMINAL_RELEASED, ready=False, released=True)
             document.pop("pid", None)
             self._save(deployment_id, document)
@@ -584,16 +795,30 @@ class RuntimeHandler(BaseHTTPRequestHandler):
                 "The binding credential is missing or invalid.",
             )
             return
-        parts = self.path.strip("/").split("/")
+        parsed = urlsplit(self.path)
+        parts = parsed.path.strip("/").split("/")
         if len(parts) == 2 and parts[0] == "executions":
             try:
                 self._send(200, self.runtime.inspect(UUID(parts[1])))
             except (ValueError, ServingRuntimeError) as exc:
                 self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_EXECUTION_NOT_FOUND", str(exc), status=404))
             return
+        if len(parts) == 3 and parts[0] == "executions" and parts[2] == "diagnostics":
+            try:
+                query = parse_qs(parsed.query)
+                after = int(query.get("afterSequence", ["0"])[0])
+                limit = int(query.get("limit", ["200"])[0])
+            except ValueError:
+                self._refuse(422, "SERVING_REQUEST_INVALID", "afterSequence and limit must be integers")
+                return
+            try:
+                self._send(200, self.runtime.diagnostics(UUID(parts[1]), after_sequence=after, limit=limit))
+            except (ValueError, ServingRuntimeError) as exc:
+                self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_EXECUTION_NOT_FOUND", str(exc), status=404))
+            return
         if len(parts) >= 4 and parts[0] == "serving" and parts[2] == "v1":
             try:
-                self._proxy(UUID(parts[1]), "/" + "/".join(parts[2:]), method="GET")
+                self._proxy(UUID(parts[1]), self._proxy_path(parts, parsed.query), method="GET")
             except (ValueError, ServingRuntimeError) as exc:
                 self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_REQUEST_INVALID", str(exc), status=422))
             return
@@ -607,7 +832,8 @@ class RuntimeHandler(BaseHTTPRequestHandler):
                 "The binding credential is missing or invalid.",
             )
             return
-        parts = self.path.strip("/").split("/")
+        parsed = urlsplit(self.path)
+        parts = parsed.path.strip("/").split("/")
         try:
             if len(parts) == 1 and parts[0] == "imports":
                 self._send(200, self.runtime.import_model(self._read_payload()))
@@ -619,12 +845,19 @@ class RuntimeHandler(BaseHTTPRequestHandler):
                 self._send(200, self.runtime.stop(UUID(parts[1])))
                 return
             if len(parts) >= 4 and parts[0] == "serving" and parts[2] == "v1":
-                self._proxy(UUID(parts[1]), "/" + "/".join(parts[2:]), method="POST")
+                self._proxy(UUID(parts[1]), self._proxy_path(parts, parsed.query), method="POST")
                 return
         except (ValueError, ServingRuntimeError) as exc:
             self._error(exc if isinstance(exc, ServingRuntimeError) else ServingRuntimeError("SERVING_REQUEST_INVALID", str(exc), status=422))
             return
         self._refuse(404, "SERVING_ROUTE_NOT_FOUND", "no route matches the request")
+
+    @staticmethod
+    def _proxy_path(parts: list[str], query: str) -> str:
+        """Rebuild the upstream path from the serving prefix, keeping the query."""
+
+        path = "/" + "/".join(parts[2:])
+        return f"{path}?{query}" if query else path
 
     def _proxy(self, deployment_id: UUID, path: str, *, method: str) -> None:
         document = self.runtime.inspect(deployment_id)

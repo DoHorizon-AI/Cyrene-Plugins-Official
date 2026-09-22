@@ -34,6 +34,12 @@
       "interfaceVersion": "1",
       "executionMode": "service",
       "outputSchema": "contracts/v1/schema.json#/$defs/ExecutionResponse"
+    },
+    {
+      "name": "diagnostics",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "outputSchema": "contracts/v1/schema.json#/$defs/DiagnosticsPage"
     }
   ],
   "runtime": {
