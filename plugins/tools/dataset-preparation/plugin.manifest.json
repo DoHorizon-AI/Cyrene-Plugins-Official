@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.tools.dataset-preparation",
   "name": "Dataset Preparation",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Deterministic dataset import, mapping, normalization, deduplication, splitting, and DuckDB conversion.",
   "kind": "capability-plugin",
   "capabilities": ["dataset.preparation.v1"],

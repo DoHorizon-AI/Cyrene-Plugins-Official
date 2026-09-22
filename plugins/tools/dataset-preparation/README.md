@@ -18,4 +18,5 @@ All calls use typed `DirectPluginRuntime` methods: `inspect`, `prepare`, and
 not identify CSV unambiguously. `prepare` consumes the confirmed `source_format`;
 both methods support `JSONL`, `JSON`, `TEXT`, `CSV`, and `PARQUET`.
 `transform` accepts `JSONL`, `JSON`, `CSV`, and `PARQUET` sources and produces
-a compressed Parquet artifact.
+a compressed Parquet artifact. CSV inputs are rejected when headers are blank
+or duplicated, or when any row has missing or extra columns.

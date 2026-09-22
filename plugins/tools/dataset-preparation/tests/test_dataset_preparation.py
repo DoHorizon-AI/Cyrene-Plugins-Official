@@ -6,6 +6,7 @@ import hashlib
 import json
 
 import duckdb
+import pytest
 from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, serve
 from dataset_preparation import DatasetPreparationPlugin, run_pipeline
 
@@ -89,6 +90,16 @@ def test_inspect_and_prepare_csv_with_explicit_format_hint(tmp_path) -> None:
     assert json.loads(prepare_result.read_text(encoding="utf-8"))["samples"][0][
         "content"
     ] == {"instruction": "hello", "output": "world"}
+
+
+def test_inspect_rejects_ragged_csv_rows(tmp_path) -> None:
+    source = tmp_path / "source.csv"
+    source.write_text("question,answer\nhello,world,unexpected\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unknown or missing columns"):
+        DatasetPreparationPlugin().inspect(
+            source, tmp_path / "result.json", format_hint="CSV"
+        )
 
 
 def test_inspect_parquet_from_content_or_hint(tmp_path) -> None:

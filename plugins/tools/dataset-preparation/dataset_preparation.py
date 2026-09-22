@@ -52,7 +52,7 @@ class DatasetPreparationPlugin:
     """Run stateless deterministic dataset preparation over staged paths."""
 
     plugin_id = "cyrene.tools.dataset-preparation"
-    version = "0.1.2"
+    version = "0.1.3"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
@@ -307,6 +307,7 @@ def _structured_relation(
     """Open one supported structured source through its typed DuckDB reader."""
 
     if source_format == "CSV":
+        _validate_csv_source(source)
         return connection.read_csv(str(source), header=True)
     if source_format == "PARQUET":
         return connection.read_parquet(str(source))
@@ -316,6 +317,28 @@ def _structured_relation(
             format="newline_delimited" if source_format == "JSONL" else "array",
         )
     raise ValueError(f"{source_format} is not a structured source format")
+
+
+def _validate_csv_source(source: Path) -> None:
+    """Reject blank, duplicate, or ragged CSV columns before typed parsing."""
+
+    try:
+        with source.open("r", encoding="utf-8-sig", newline="") as stream:
+            rows = csv.reader(stream)
+            header = next(rows, None)
+            if (
+                not header
+                or any(not column for column in header)
+                or len(set(header)) != len(header)
+            ):
+                raise ValueError("CSV source must contain unique non-empty column names")
+            for row_index, row in enumerate(rows, start=2):
+                if len(row) != len(header):
+                    raise ValueError(
+                        f"CSV row {row_index} contains unknown or missing columns"
+                    )
+    except (OSError, UnicodeError, csv.Error) as exc:
+        raise ValueError("CSV source header is invalid") from exc
 
 
 def run_pipeline(
