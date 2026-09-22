@@ -157,11 +157,22 @@ def test_direct_endpoint_writes_verified_exports(tmp_path) -> None:
     assert response.type_url == "type.cyrene.io/dataset.preparation.v1.prepare.response"
     assert payload["unique_samples"] == 1
     assert payload["files"]["train.jsonl"]["row_count"] == 1
+    assert set(payload["files"]) == {
+        f"{bundle}.{suffix}"
+        for bundle in ("train", "val", "errors")
+        for suffix in ("jsonl", "csv", "parquet")
+    }
     assert payload["result_digest"] == (
         "sha256:" + hashlib.sha256(result_path.read_bytes()).hexdigest()
     )
     exported = json.loads((output_dir / "train.jsonl").read_text(encoding="utf-8"))
     assert exported["conversations"][1] == {"from": "assistant", "value": "world"}
+    assert (output_dir / "train.csv").read_text(encoding="utf-8").splitlines()[0] == (
+        "conversations"
+    )
+    with duckdb.connect() as connection:
+        parquet_rows = connection.read_parquet(str(output_dir / "train.parquet")).fetchall()
+    assert len(parquet_rows) == 1
 
 
 def test_direct_endpoint_inspects_csv_with_format_hint(tmp_path) -> None:
@@ -207,6 +218,21 @@ def test_transform_writes_real_parquet(tmp_path) -> None:
     source.write_text('{"instruction":"a","output":"b"}\n', encoding="utf-8")
 
     result = DatasetPreparationPlugin().transform(source, destination)
+
+    assert result["row_count"] == 1
+    assert result["schema_fields"] == ["instruction", "output"]
+    with duckdb.connect() as connection:
+        assert connection.read_parquet(str(destination)).fetchall() == [("a", "b")]
+
+
+def test_transform_accepts_csv_source_format(tmp_path) -> None:
+    source = tmp_path / "opaque-source"
+    destination = tmp_path / "result.parquet"
+    source.write_text("instruction,output\na,b\n", encoding="utf-8")
+
+    result = DatasetPreparationPlugin().transform(
+        source, destination, source_format="CSV"
+    )
 
     assert result["row_count"] == 1
     assert result["schema_fields"] == ["instruction", "output"]

@@ -3,8 +3,8 @@
 This stateless Plugin is the canonical implementation of
 `dataset.preparation.v1`. It owns content-based import detection, JSON/JSONL/text,
 CSV, and Parquet parsing, field mapping, Unicode normalization, quality errors, content
-deduplication, deterministic group splitting, standard JSONL exports, and
-DuckDB JSONL-to-Parquet conversion.
+deduplication, deterministic group splitting, and verified JSONL, CSV, and
+Parquet exports.
 
 本无状态插件是 `dataset.preparation.v1` 的唯一实现。Catalyst 仍拥有 Dataset、
 DatasetVersion、Preparation 状态机、人工确认、ArtifactRef 发布及数据谱系。
@@ -17,3 +17,5 @@ All calls use typed `DirectPluginRuntime` methods: `inspect`, `prepare`, and
 `inspect` accepts an optional `format_hint` for staged files whose content does
 not identify CSV unambiguously. `prepare` consumes the confirmed `source_format`;
 both methods support `JSONL`, `JSON`, `TEXT`, `CSV`, and `PARQUET`.
+`transform` accepts `JSONL`, `JSON`, `CSV`, and `PARQUET` sources and produces
+a compressed Parquet artifact.

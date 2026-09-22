@@ -75,7 +75,8 @@
       "required": ["source_path", "destination_path"],
       "properties": {
         "source_path": {"$ref": "#/$defs/AbsolutePath"},
-        "destination_path": {"$ref": "#/$defs/AbsolutePath"}
+        "destination_path": {"$ref": "#/$defs/AbsolutePath"},
+        "source_format": {"enum": ["JSONL", "JSON", "CSV", "PARQUET"]}
       },
       "additionalProperties": false
     },

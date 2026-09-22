@@ -1510,43 +1510,43 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/README.md",
-      "sha256": "d348399550483bb3dc477ba8f3aa4443a828e3e459a2fa48309be07d54e68c69",
-      "size_bytes": 1051
+      "sha256": "0420289a1927bcb32cb6e8b0cbaa7a67866d62dee39dba0f04e094dd3e1205ef",
+      "size_bytes": 1143
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/contracts/v1/schema.json",
-      "sha256": "520b98bb38c79fce1096b2505c04658d44f96042f1eb6f3450f5a7e195f66ad2",
-      "size_bytes": 3419
+      "sha256": "92702369626d731184dd16368421a2996bd461b84b09750700c48ed994e29512",
+      "size_bytes": 3491
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/dataset_preparation.py",
-      "sha256": "fdf16d77f65da77ac3e7a3069e26d450229e02ab18baf6bf8ebf5aafc0958673",
-      "size_bytes": 22795
+      "sha256": "961c6d17ba0ba58d1ad69bab0aae64bdbe5056655121604364a209499e196cd7",
+      "size_bytes": 26543
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/plugin.manifest.json",
-      "sha256": "c25a90f73c8bea01bc25d4cf649e714e155dda3a93da67add5cdd1ec1e06fa58",
+      "sha256": "a3484a0ed444a88fc4ff534cb765bf83f5bac8c7d5507190fe9613e3aa6b3033",
       "size_bytes": 1764
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/pyproject.toml",
-      "sha256": "77e8ceae107067a2f26eca1ce5e92821a9cf2aaa01f49e12150bb2b0e5a3ee05",
+      "sha256": "ece11269610939d1c358777005c26a4fceec5ec991bd580db785576d7952793e",
       "size_bytes": 654
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/tests/test_dataset_preparation.py",
-      "sha256": "d0bc87dd7f6460207a92152ee3103dadbc37da2a60cdd766deee8d8b3049882c",
-      "size_bytes": 7991
+      "sha256": "2744ee3188069f12bdbe92fc7232f0249ea02641b54e57cbabe9e3c1a8b313a0",
+      "size_bytes": 9002
     },
     {
       "kind": "file",

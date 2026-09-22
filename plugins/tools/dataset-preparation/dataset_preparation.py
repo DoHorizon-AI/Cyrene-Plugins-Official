@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import csv
 import datetime
 import decimal
 import hashlib
@@ -51,7 +52,7 @@ class DatasetPreparationPlugin:
     """Run stateless deterministic dataset preparation over staged paths."""
 
     plugin_id = "cyrene.tools.dataset-preparation"
-    version = "0.1.1"
+    version = "0.1.2"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
@@ -104,6 +105,7 @@ class DatasetPreparationPlugin:
                 result = self.transform(
                     _path(request.get("source_path"), "source_path"),
                     _path(request.get("destination_path"), "destination_path"),
+                    source_format=request.get("source_format"),
                 )
         except (
             TypeError,
@@ -183,7 +185,7 @@ class DatasetPreparationPlugin:
                 raise ValueError("split is required when output_dir is provided")
             output_dir = _path(output_dir, "output_dir")
             output_dir.mkdir(parents=True, exist_ok=True)
-            files = _write_exports(output_dir, samples, errors, assignment)
+            files = _write_exports(output_dir, samples, errors, assignment, mapping)
         return {
             **receipt,
             "row_count": len(rows),
@@ -194,16 +196,27 @@ class DatasetPreparationPlugin:
             "files": files,
         }
 
-    def transform(self, source_path: Path, destination_path: Path) -> dict[str, Any]:
-        """Convert newline-delimited JSON to compressed Parquet."""
+    def transform(
+        self,
+        source_path: Path,
+        destination_path: Path,
+        *,
+        source_format: str | None = None,
+    ) -> dict[str, Any]:
+        """Convert a supported structured source to compressed Parquet."""
 
         _validate_source(source_path)
+        source_format = (
+            detect_format(source_path.read_bytes())
+            if source_format is None
+            else _enum_text(source_format, "source_format", SOURCE_FORMATS)
+        )
+        if source_format == "TEXT":
+            raise ValueError("TEXT cannot be transformed to a tabular artifact")
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         connection = duckdb.connect()
         try:
-            relation = connection.read_json(
-                str(source_path), format="newline_delimited"
-            )
+            relation = _structured_relation(connection, source_path, source_format)
             row = relation.aggregate("count(*) AS row_count").fetchone()
             relation.write_parquet(str(destination_path), compression="zstd")
             return {
@@ -276,15 +289,7 @@ def parse_rows(source: Path, source_format: str) -> list[dict[str, Any]]:
         return rows
     connection = duckdb.connect()
     try:
-        if source_format == "CSV":
-            relation = connection.read_csv(str(source), header=True)
-        elif source_format == "PARQUET":
-            relation = connection.read_parquet(str(source))
-        else:
-            relation = connection.read_json(
-                str(source),
-                format="newline_delimited" if source_format == "JSONL" else "array",
-            )
+        relation = _structured_relation(connection, source, source_format)
         columns = list(relation.columns)
         return [
             {key: _json_native(value) for key, value in zip(columns, values, strict=True)}
@@ -292,6 +297,25 @@ def parse_rows(source: Path, source_format: str) -> list[dict[str, Any]]:
         ]
     finally:
         connection.close()
+
+
+def _structured_relation(
+    connection: duckdb.DuckDBPyConnection,
+    source: Path,
+    source_format: str,
+) -> duckdb.DuckDBPyRelation:
+    """Open one supported structured source through its typed DuckDB reader."""
+
+    if source_format == "CSV":
+        return connection.read_csv(str(source), header=True)
+    if source_format == "PARQUET":
+        return connection.read_parquet(str(source))
+    if source_format in {"JSON", "JSONL"}:
+        return connection.read_json(
+            str(source),
+            format="newline_delimited" if source_format == "JSONL" else "array",
+        )
+    raise ValueError(f"{source_format} is not a structured source format")
 
 
 def run_pipeline(
@@ -496,7 +520,9 @@ def _write_exports(
     samples: list[PreparedSample],
     errors: list[dict[str, Any]],
     assignment: dict[int, str],
+    mapping: dict[str, Any],
 ) -> dict[str, dict[str, Any]]:
+    error_rows = [_error_export_row(error) for error in errors]
     bundles = {
         "train.jsonl": [
             sample.content for sample in samples if assignment[sample.index] == "train"
@@ -504,19 +530,100 @@ def _write_exports(
         "val.jsonl": [
             sample.content for sample in samples if assignment[sample.index] == "val"
         ],
-        "errors.jsonl": errors,
+        "errors.jsonl": error_rows,
     }
-    receipts = {}
+    receipts: dict[str, dict[str, Any]] = {}
     for name, rows in bundles.items():
         path = output_dir / name
         payload = b"".join(_canonical_json(row) + b"\n" for row in rows)
         path.write_bytes(payload)
-        receipts[name] = {
-            "row_count": len(rows),
-            "digest": f"sha256:{hashlib.sha256(payload).hexdigest()}",
-            "size": len(payload),
-        }
+        receipts[name] = _export_receipt(path, len(rows))
+
+    sample_fields = _sample_fields(mapping)
+    fields_by_bundle = {
+        "train": sample_fields,
+        "val": sample_fields,
+        "errors": ["rowIndex", "reasonCode", "message", "field", "excerpt"],
+    }
+    rows_by_bundle = {
+        "train": bundles["train.jsonl"],
+        "val": bundles["val.jsonl"],
+        "errors": error_rows,
+    }
+    for bundle, rows in rows_by_bundle.items():
+        fields = fields_by_bundle[bundle]
+        csv_path = output_dir / f"{bundle}.csv"
+        _write_csv(csv_path, rows, fields)
+        receipts[csv_path.name] = _export_receipt(csv_path, len(rows))
+
+        parquet_path = output_dir / f"{bundle}.parquet"
+        _write_parquet(parquet_path, output_dir / f"{bundle}.jsonl", fields)
+        receipts[parquet_path.name] = _export_receipt(parquet_path, len(rows))
     return receipts
+
+
+def _sample_fields(mapping: dict[str, Any]) -> list[str]:
+    if mapping.get("mode") == "conversation":
+        return ["conversations"]
+    fields = ["instruction"]
+    if mapping.get("input") is not None:
+        fields.append("input")
+    fields.append("output")
+    return fields
+
+
+def _error_export_row(error: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "rowIndex": error.get("row_index"),
+        "reasonCode": error.get("reason_code"),
+        "message": error.get("message"),
+        "field": error.get("field"),
+        "excerpt": error.get("excerpt"),
+    }
+
+
+def _csv_value(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, dict | list):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return str(value)
+
+
+def _write_csv(path: Path, rows: list[dict[str, Any]], fields: list[str]) -> None:
+    with path.open("w", encoding="utf-8", newline="") as stream:
+        writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="raise")
+        writer.writeheader()
+        for row in rows:
+            writer.writerow({field: _csv_value(row.get(field)) for field in fields})
+
+
+def _quote_identifier(value: str) -> str:
+    return '"' + value.replace('"', '""') + '"'
+
+
+def _write_parquet(path: Path, jsonl_path: Path, fields: list[str]) -> None:
+    connection = duckdb.connect()
+    try:
+        if jsonl_path.stat().st_size:
+            relation = connection.read_json(str(jsonl_path), format="newline_delimited")
+        else:
+            definitions = ", ".join(
+                f"CAST(NULL AS VARCHAR) AS {_quote_identifier(field)}" for field in fields
+            )
+            connection.execute(f"CREATE TABLE export AS SELECT {definitions} WHERE FALSE")
+            relation = connection.table("export")
+        relation.write_parquet(str(path), compression="zstd")
+    finally:
+        connection.close()
+
+
+def _export_receipt(path: Path, row_count: int) -> dict[str, Any]:
+    return {
+        "row_count": row_count,
+        "digest": f"sha256:{_sha256_file(path)}",
+        "size": path.stat().st_size,
+    }
 
 
 def _write_json_result(path: Path, value: dict[str, Any]) -> dict[str, Any]:
