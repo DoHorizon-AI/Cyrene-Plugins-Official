@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -354,3 +356,30 @@ def test_runtime_source_has_no_platform_import_or_proxy_client() -> None:
     assert "cyrene_capability_client" not in source
     assert "cy_platform" not in source
     assert "CapabilityExecutionService" not in source
+
+
+def test_running_the_bootstrap_by_path_does_not_shadow_stdlib_modules() -> None:
+    """A vendored package must not hide standard-library modules.
+
+    The packaged launcher executes ``src/cyrene_plugin_runtime/bootstrap.py`` by
+    path, so the package directory becomes ``sys.path[0]``; without normalizing
+    it, ``cyrene_plugin_runtime/logging.py`` shadows ``logging`` and importing the
+    server fails with ``AttributeError: module 'logging' has no attribute
+    'getLogger'``.
+    """
+
+    bootstrap = (
+        Path(__file__).resolve().parents[1]
+        / "src"
+        / "cyrene_plugin_runtime"
+        / "bootstrap.py"
+    )
+    result = subprocess.run(
+        [sys.executable, "-B", str(bootstrap), "--help"],
+        capture_output=True,
+        text=True,
+        cwd=bootstrap.parent,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "usage" in result.stdout.lower()

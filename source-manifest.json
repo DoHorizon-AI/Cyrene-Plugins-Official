@@ -4562,8 +4562,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/bootstrap.py",
-      "sha256": "7ce80932b07d83bcbb3c3a83545e21ab0f96bdcb51bbf3fe22ea59a5a4e0ebd9",
-      "size_bytes": 1170
+      "sha256": "9df1de6b983f1c24f016c7cedbc220b42d9a42a653ceb15a18550dbd57a0b528",
+      "size_bytes": 1778
     },
     {
       "kind": "file",
@@ -4646,8 +4646,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_direct_runtime.py",
-      "sha256": "b8629694f4a9af1f5d2a225b3c14de970b8a45ba1aca8c018d053ff71981bae1",
-      "size_bytes": 12356
+      "sha256": "3133feb9c5300053aa50346d9262f868fb9b4d347b172736f7ce8be0b9a8f209",
+      "size_bytes": 13289
     },
     {
       "kind": "file",

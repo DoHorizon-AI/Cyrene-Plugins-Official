@@ -15,7 +15,21 @@ from importlib import import_module
 from pathlib import Path
 
 if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    # Executed by path, which puts this package directory on sys.path[0] and
+    # would let a module inside the package shadow a standard-library module of
+    # the same name (``cyrene_plugin_runtime/logging.py`` shadowing ``logging``).
+    # Replace that entry with the source root the runtime expects.
+    package_dir = Path(__file__).resolve().parent
+    source_root = str(package_dir.parent)
+    normalized: list[str] = []
+    for entry in sys.path:
+        try:
+            if Path(entry or ".").resolve() == package_dir:
+                continue
+        except OSError:
+            pass
+        normalized.append(entry)
+    sys.path[:] = [source_root, *normalized]
 
 main = import_module("cyrene_plugin_runtime.server").main
 
