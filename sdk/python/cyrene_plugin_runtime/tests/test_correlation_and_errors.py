@@ -9,14 +9,11 @@ import io
 import json
 import sys
 
-import pytest
-
 from cyrene_plugin_runtime.errors import (
     PLUGIN_RUNTIME_ERROR_MAPPINGS,
     map_plugin_error,
 )
 from cyrene_plugin_runtime.logging import (
-    MAX_RECORD_BYTES,
     emit_diagnostic_error,
     format_cyrene_log,
     is_sensitive_key,

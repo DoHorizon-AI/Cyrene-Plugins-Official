@@ -379,6 +379,7 @@ def test_running_the_bootstrap_by_path_does_not_shadow_stdlib_modules() -> None:
         capture_output=True,
         text=True,
         cwd=bootstrap.parent,
+        check=False,
     )
 
     assert result.returncode == 0, result.stderr
