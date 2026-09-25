@@ -95,7 +95,9 @@ class QQNTDirectConfig:
     installation is guessed, and no password or session file is accepted as a
     configuration value.
 
-        中文:此配置限定到单个 binding 的 direct QQ runtime。可执行文件与数据目录必须由操作人员显式提供;不会猜测 QQ 安装位置,也不接受密码或会话文件作为配置值。
+        中文：此配置限定到单个 binding 的 direct QQ runtime。
+        可执行文件与数据目录必须由操作人员显式提供;不会猜测 QQ 安装位置,
+        也不接受密码或会话文件作为配置值。
     """
 
     binding_id: str
@@ -657,7 +659,9 @@ class QQNTDirectConnector:
             # Explicit lifecycle actions are authoritative. Do not invoke the
             # complete bootstrap sequence before the action requested by the
             # caller, otherwise create/init/startNT would be duplicated.
-            # 中文:生命周期操作显式指定时,以该操作为准。不要在执行调用方请求的操作前运行完整 bootstrap 流程,否则会重复执行 create/init/startNT。
+            # 中文：生命周期操作显式指定时,以该操作为准。
+            # 不要在执行调用方请求的操作前运行完整 bootstrap 流程,
+            # 否则会重复执行 create/init/startNT。
             self._ensure_host_started()
         else:
             self._ensure_started()
@@ -1122,14 +1126,16 @@ class QQNTDirectConnector:
                 if not isinstance(request_id, str):
                     # A callback without a generation-scoped originating
                     # request is ambiguous; never expose it as a generic event.
-                    # 中文:没有按代次关联的发起请求时,无法判定回调属于哪个操作;绝不能将其作为通用事件公开。
+                    # 中文：没有按代次关联的发起请求时,无法判定回调属于哪个操作;
+                    # 绝不能将其作为通用事件公开。
                     return 0
                 with self._callback_lock:
                     originating_operation = self._callback_requests.get(request_id)
                 if originating_operation not in originating_operations:
                     # A callback without a generation-scoped originating
                     # request is ambiguous; never expose it as a generic event.
-                    # 中文:没有按代次关联的发起请求时,无法判定回调属于哪个操作;绝不能将其作为通用事件公开。
+                    # 中文：没有按代次关联的发起请求时,无法判定回调属于哪个操作;
+                    # 绝不能将其作为通用事件公开。
                     return 0
                 normalized_callback = _normalize_callback(
                     callback_operation, request_id, event.get("event_id"), payload
@@ -1139,7 +1145,9 @@ class QQNTDirectConnector:
                     # request identity makes a second callback with a different
                     # event_id harmless as well as making same-id duplicates
                     # harmless through the event-id deduplication above.
-                    # 中文:完成回调是终态记录。消费请求标识后,即使后续回调使用不同的 event_id 也会被安全忽略;上方的 event-id 去重逻辑同样会忽略相同 ID 的重复回调。
+                    # 中文：完成回调是终态记录。消费请求标识后,
+                    # 即使后续回调使用不同的 event_id 也会被安全忽略;
+                    # 上方的 event-id 去重逻辑同样会忽略相同 ID 的重复回调。
                     self._callback_requests.pop(request_id, None)
                 return self._emit(
                     "qq_callback", normalized_callback, QQ_CALLBACK_TYPE_URL
@@ -1369,7 +1377,10 @@ def _qq_peer_identity_facts(request: Mapping[str, Any]) -> dict[str, str]:
     values when the caller has them, so the adapter never has to guess which
     native identifier a generic conversation ID represents.
 
-        中文:提取原生发送操作明确提供的 QQ 对端身份。`conversation_id` 始终是规范 connector 标识符;如果调用方提供了可选的供应商事实,这些事实会携带彼此独立的 QQ UID/UIN/peerUid/群号。适配器绝不会猜测通用会话 ID 对应哪个原生标识。
+        中文：提取原生发送操作明确提供的 QQ 对端身份。`conversation_id` 始终是规范
+        connector 标识符;如果调用方提供了可选的供应商事实,
+        这些事实会携带彼此独立的 QQ UID/UIN/peerUid/群号。
+        适配器绝不会猜测通用会话 ID 对应哪个原生标识。
     """
 
     extension = request.get("vendor_extension")

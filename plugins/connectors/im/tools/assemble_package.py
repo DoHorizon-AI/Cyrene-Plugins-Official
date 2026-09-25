@@ -5,7 +5,10 @@ The formal package is the C# Native AOT artifact assembled by
 reference used for cross-language parity and fake-Host TCK runs. It never
 copies a QQ installation, native Host, account data, or credentials.
 
-中文:组装隔离的 Python IM parity reference package。正式 package 是由 `assemble_native_package.py` 组装的 C# Native AOT 制品。此 builder 生成 Python 实现参考,用于跨语言 parity 和 fake-Host TCK。它绝不复制 QQ 安装、原生 Host、账户数据或凭据。
+中文：组装隔离的 Python IM parity reference package。
+正式 package 是由 `assemble_native_package.py` 组装的 C# Native AOT 制品。
+此 builder 生成 Python 实现参考,用于跨语言 parity 和 fake-Host TCK。它绝不复制 QQ 安装、
+原生 Host、账户数据或凭据。
 """
 
 from __future__ import annotations
@@ -179,7 +182,9 @@ def assemble_package(repository_root: Path, output_root: Path) -> Path:
 
         中文:组装一个未打包的 package 根目录,并返回解析后的路径。
 
-参数 `repository_root` 是包含 connector 和 SDK 的 Plugins 仓库;`output_root` 是接收 package 负载的空目录。返回解析后的 package 根目录。如果输入缺失或输出目录非空,则抛出 `PackageAssemblyError`。
+参数 `repository_root` 是包含 connector 和 SDK 的 Plugins 仓库;
+`output_root` 是接收 package 负载的空目录。返回解析后的 package 根目录。
+如果输入缺失或输出目录非空,则抛出 `PackageAssemblyError`。
     """
 
     repository_root = repository_root.resolve(strict=True)

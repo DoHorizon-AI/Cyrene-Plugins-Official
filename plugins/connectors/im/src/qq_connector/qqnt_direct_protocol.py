@@ -100,7 +100,8 @@ def read_frame(stream: BinaryIO) -> dict[str, Any] | None:
 
         中文:从标准输入输出流读取并验证一个带长度前缀的 JSON 对象。
 
-        中文:正常 EOF 会返回 ``None``。部分标头、无效 UTF-8、格式错误的 JSON,以及非对象 JSON 值都会触发 :class:`QQHostProtocolError`,并按失败即拒绝处理。
+        中文：正常 EOF 会返回 ``None``。部分标头、无效 UTF-8、格式错误的 JSON,
+        以及非对象 JSON 值都会触发 :class:`QQHostProtocolError`,并按失败即拒绝处理。
     """
 
     raw_length = _read_exact(stream, FRAME_HEADER_BYTES)

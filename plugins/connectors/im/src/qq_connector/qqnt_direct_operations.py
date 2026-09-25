@@ -54,7 +54,9 @@ def _op(
 # This table is the executable counterpart of QQNT_DIRECT_API_MATRIX.md. The
 # host receives the stable operation name and never receives an arbitrary
 # service/method pair from a Product request.
-# 中文:此表是 `QQNT_DIRECT_API_MATRIX.md` 的可执行对应物。Host 接收稳定的 operation 名称,绝不会从 Product 请求中接收任意 service／method 名称对。
+# 中文：此表是 `QQNT_DIRECT_API_MATRIX.md` 的可执行对应物。
+# Host 接收稳定的 operation 名称,绝不会从 Product 请求中接收任意 service／method
+# 名称对。
 QQ_OPERATIONS = (
     _op("qq.session.create", "NodeIQQNTWrapperSession", "create", "P0", "session"),
     _op("qq.session.init", "NodeIQQNTWrapperSession", "init", "P0", "session"),
@@ -412,7 +414,11 @@ CALLBACK_ONLY_OPERATION_NAMES = frozenset(
 # configured QQ build, but the worker rejects fields from unrelated operation
 # families before IPC.  This keeps the operation allow-list meaningful without
 # inventing a generic service/method or raw-payload escape hatch.
-# 中文:只有下列顶层参数名称可以穿过 Worker／Host 边界。原生 Host 仍负责校验当前 QQ build 对应的精确重载;但 Worker 会在 IPC 之前拒绝来自无关 operation 家族的字段。这样可以确保 operation allow-list 有效,同时不引入通用 service／method 或原始负载逃逸口。
+# 中文：只有下列顶层参数名称可以穿过 Worker／Host 边界。
+# 原生 Host 仍负责校验当前 QQ build 对应的精确重载;
+# 但 Worker 会在 IPC 之前拒绝来自无关 operation 家族的字段。
+# 这样可以确保 operation allow-list 有效,
+# 同时不引入通用 service／method 或原始负载逃逸口。
 _PARAMETER_FIELDS_BY_MAPPING = {
     "session": frozenset(
         {
@@ -633,7 +639,9 @@ def _fields(*names: str) -> frozenset[str]:
 # field from its family.  This table is intentionally conservative: it only
 # exposes names declared by QQ_API_PLAN.md/QQ_SIDE_INTERFACES.md and leaves
 # exact version-specific overload validation to the authorized Host.
-# 中文:matrix 描述的是参数类别,但公共 operation 不能继承其所属类别的全部字段。此表有意保持保守:只公开 `QQ_API_PLAN.md`／`QQ_SIDE_INTERFACES.md` 中声明的名称;版本相关的精确重载校验仍由已授权 Host 负责。
+# 中文：matrix 描述的是参数类别,但公共 operation 不能继承其所属类别的全部字段。
+# 此表有意保持保守:只公开 `QQ_API_PLAN.md`／`QQ_SIDE_INTERFACES.md` 中声明的名称;
+# 版本相关的精确重载校验仍由已授权 Host 负责。
 _OPERATION_PARAMETER_FIELDS = {
     "qq.session.create": _fields(
         "account_id",
@@ -891,7 +899,9 @@ def allowed_qq_parameter_fields(operation: str) -> frozenset[str]:
     worker-level envelope nevertheless has a closed vocabulary, so callers
     cannot smuggle arbitrary native requests through an allow-listed action.
 
-        中文:返回某个 operation 声明的顶层参数字段。原生重载的精确规则仍由特定版本的 Host 负责。尽管如此,Worker 层封套仍采用封闭词汇表,调用方不能借助已允许的 action 偷带任意原生请求。
+        中文：返回某个 operation 声明的顶层参数字段。
+        原生重载的精确规则仍由特定版本的 Host 负责。尽管如此,
+        Worker 层封套仍采用封闭词汇表,调用方不能借助已允许的 action 偷带任意原生请求。
     """
 
     spec = get_qq_operation(operation)
@@ -1035,7 +1045,10 @@ def validate_qq_parameters(
     finite numeric values, collection bounds, and closed top-level vocabulary
     before a request reaches the native Host.
 
-        中文:校验并复制一个固定 operation 使用的有界 JSON 参数对象。公共 JSON Schema 会在 CI 中校验,但生产 package 不能假设安装了 schema validator。因此,这个精简的标准库 validator 会在请求到达原生 Host 前,执行相同的基本类型、有限数值、集合边界和封闭顶层词汇校验。
+        中文：校验并复制一个固定 operation 使用的有界 JSON 参数对象。
+        公共 JSON Schema 会在 CI 中校验,但生产 package 不能假设安装了 schema validator。
+        因此,这个精简的标准库 validator 会在请求到达原生 Host 前,执行相同的基本类型、
+        有限数值、集合边界和封闭顶层词汇校验。
     """
 
     spec = get_qq_operation(operation)
@@ -1081,9 +1094,14 @@ def validate_qq_result(operation: str, result: Any) -> dict[str, Any]:
         QQOperationValidationError: If the result is not a safe normalized
             object for the fixed operation.
 
-        中文:校验 QQ Host 返回的一个有界、规范化结果。原生 Host 按版本区分,因此由它负责重载处理;但结果仍要穿过公共 Worker 边界。此 validator 会拒绝格式错误或包含凭据的数据,并保持足够的类型约束,而不会猜测未来 QQ build 可能公开的所有字段。
+        中文：校验 QQ Host 返回的一个有界、规范化结果。原生 Host 按版本区分,
+        因此由它负责重载处理;但结果仍要穿过公共 Worker 边界。
+        此 validator 会拒绝格式错误或包含凭据的数据,并保持足够的类型约束,
+        而不会猜测未来 QQ build 可能公开的所有字段。
 
-参数:`operation` 是产生此结果的固定 QQ operation;`result` 是与 JSON 兼容的 Host 结果对象。返回经过校验结果对象的浅拷贝。若结果不是适用于该固定 operation 的安全规范化对象,则抛出 `QQOperationValidationError`。
+参数:`operation` 是产生此结果的固定 QQ operation;
+`result` 是与 JSON 兼容的 Host 结果对象。返回经过校验结果对象的浅拷贝。
+若结果不是适用于该固定 operation 的安全规范化对象,则抛出 `QQOperationValidationError`。
     """
 
     spec = get_qq_operation(operation)

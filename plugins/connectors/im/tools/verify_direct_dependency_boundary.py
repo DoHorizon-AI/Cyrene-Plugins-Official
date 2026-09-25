@@ -8,7 +8,10 @@ runtime through its executable surface.
 
 中文:验证 QQNT 直连运行时的依赖边界。
 
-中文:这是高置信度的仓库门禁,不构成法律或来源许可审查。直连配置可以使用共享 Plugin 运行时及其锁定的 protobuf/grpc 依赖,但不得通过可执行接口引入 NapCat/AstrBot 运行时、连接器自有网络传输,或复制的第三方运行时。
+中文：这是高置信度的仓库门禁,不构成法律或来源许可审查。
+直连配置可以使用共享 Plugin 运行时及其锁定的 protobuf/grpc 依赖,
+但不得通过可执行接口引入 NapCat/AstrBot 运行时、连接器自有网络传输,
+或复制的第三方运行时。
 """
 
 from __future__ import annotations

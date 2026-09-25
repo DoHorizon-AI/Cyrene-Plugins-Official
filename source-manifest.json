@@ -859,36 +859,36 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct.py",
-      "sha256": "66fd257047196f32d3deeb21f8f11051c3e08566a2c26fee6c850d018fb2dc90",
-      "size_bytes": 79085
+      "sha256": "a03fda2c54468150e4469e222962cff6ed6503bf3832c664bff629c0341bb186",
+      "size_bytes": 79263
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_discovery.py",
-      "sha256": "673068f78393b45dd9bab97cc27d043a4c0cff279aa4807f95c7d8d02e67dfb4",
-      "size_bytes": 11959
+      "sha256": "89fbc0ae1aae7762f541ad33886f1a291fed0cc698522613c20a383cb6caf102",
+      "size_bytes": 11979
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_host.py",
-      "sha256": "de1ea71c7ae51692af907ed4fe1c9dc00b300484496387db05267c5a2d551f20",
-      "size_bytes": 39921
+      "sha256": "477c4e7a06ba892befae4d40bbf789ef9c9381e2275aba41b4ba67e7c193965d",
+      "size_bytes": 40060
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_operations.py",
-      "sha256": "94db3badcb11b808cd54c75b2885313cb7afd961d8ae02feece89019837c7ecd",
-      "size_bytes": 44069
+      "sha256": "be3e5abc85774b6974017d43a02336a6219bd2e5c218b73fe0878c4ec534dd06",
+      "size_bytes": 44178
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_protocol.py",
-      "sha256": "a3435ef189feb595e51246bdf9dc0c4036815a71bc27152d7f141e7f2a069b48",
-      "size_bytes": 4932
+      "sha256": "81b23221cef70583ca8ae34a1b50e2ec68a688b1fbb64dcd7c14505250f23ff7",
+      "size_bytes": 4943
     },
     {
       "kind": "file",
@@ -950,8 +950,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tools/assemble_package.py",
-      "sha256": "accea39db4ac07730fd91b1349ca818ae59650070c6302692cfc5231b38d6427",
-      "size_bytes": 11137
+      "sha256": "9d815e7bebbd15a247ead207551c4b313161e97b038fcaf17d67ac50327d3c4e",
+      "size_bytes": 11144
     },
     {
       "kind": "file",
@@ -964,8 +964,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tools/verify_direct_dependency_boundary.py",
-      "sha256": "2a2cdedead42d21e755f2419e6b347097cef653b2d55fa1174eff55bbe26742d",
-      "size_bytes": 8785
+      "sha256": "93488392787e3ab922ec1ede01c6021a809d5aad5e1adfcbadecc3774f02f7fa",
+      "size_bytes": 8790
     },
     {
       "kind": "file",
@@ -1097,8 +1097,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/connector.py",
-      "sha256": "b4060d7fa98b26834a656b22e01e477a90e5144b21466e5edab36c8773ebf2a5",
-      "size_bytes": 67702
+      "sha256": "49344b7e7e6e44ffc46d96d7d27206d74790914c26b7aed5373648132173f6e4",
+      "size_bytes": 67805
     },
     {
       "kind": "file",
@@ -1111,8 +1111,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/transport.py",
-      "sha256": "ba05be555e54fa09587721c8d4bd7ff27e20c6999036a6c1ebdcab33669ae26a",
-      "size_bytes": 34206
+      "sha256": "2cbd439dd415d1acaf35964bcecd1e2d85cf58683fe32228f728aafe5fb04f62",
+      "size_bytes": 34249
     },
     {
       "kind": "file",
@@ -1181,15 +1181,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/generate_equivalence_fixtures.py",
-      "sha256": "b0c4571f5d6229f0eac112002d96cd48d9b9e3f11a7044fc54d10a30745593f2",
-      "size_bytes": 13260
+      "sha256": "a8503e018f424601e549d546f5a2c3552b9ee89f8b4aded706a14aca515c45d1",
+      "size_bytes": 13264
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
-      "sha256": "2d30057067f96e53e43be15ce3c6a4d21123e333730cafc631d52b54b6d3a0ab",
-      "size_bytes": 2538
+      "sha256": "25458ad7a13f821af023e215edaad083aa17f1b59472f1ffd6a4969c96af66d9",
+      "size_bytes": 2540
     },
     {
       "kind": "file",
@@ -1258,8 +1258,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tools/generate_message_connector_bindings.py",
-      "sha256": "6984eebd65b70f1356d8470dba3ac0e0e4871da4e0ee6618f0f68e642aa11f82",
-      "size_bytes": 2427
+      "sha256": "85386692ac421a7513eb942034da11b92d303aaf73a6e2e468848d44b541a841",
+      "size_bytes": 2290
     },
     {
       "kind": "file",
@@ -1496,8 +1496,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/mapping.py",
-      "sha256": "d60297699f8e3f64c400157a21f63d8419f6669c25722dc9c582370c9281db61",
-      "size_bytes": 11175
+      "sha256": "560c0c71d94b713e3165424cb52c06c244e9335825dc44f0439a8d4a28c34358",
+      "size_bytes": 11197
     },
     {
       "kind": "file",
@@ -1517,8 +1517,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/upstream.py",
-      "sha256": "7264c0cbf99e09a9c0bf35f47852517f63e03acf3b0b517d005bb971d696c213",
-      "size_bytes": 12570
+      "sha256": "bc92a1fe08646ff56d9edafa7474249953077e5962293b64e41693c164cda417",
+      "size_bytes": 12628
     },
     {
       "kind": "file",
@@ -2427,8 +2427,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/tck/mod.rs",
-      "sha256": "7b4e471873d10aae4218235b0fd2c4e4639fd33277990d63ffeacaab0e25ed71",
-      "size_bytes": 19567
+      "sha256": "dbc90bb9b0a50a393ca64b1f654372d9df310b3ae13983495ed7acd6c7bda4e5",
+      "size_bytes": 19443
     },
     {
       "kind": "file",

@@ -15,7 +15,9 @@ loading Python, so the same fixture can be used by both test suites.
 
 中文:生成供 C# 迁移测试使用的确定性夹具。
 
-中文:迁移期间,Python 连接器仍是行为参考实现。此工具会有意调用公开的基线映射函数,并将结果记录为可审阅的 JSON。C# 测试直接使用检入仓库的输出,不加载 Python,因此两个测试套件可以共用同一份夹具。
+中文：迁移期间,Python 连接器仍是行为参考实现。此工具会有意调用公开的基线映射函数,
+并将结果记录为可审阅的 JSON。C# 测试直接使用检入仓库的输出,不加载 Python,
+因此两个测试套件可以共用同一份夹具。
 """
 
 from __future__ import annotations

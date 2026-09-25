@@ -120,7 +120,8 @@ def response_chunks(
 
         中文:排列一个非流式提供方响应的数据块顺序。
 
-        中文:``structured`` 选择 chat v2:v1 编解码器无法承载角色、工具调用或已报告的总量,因此只有在协商启用 v2 时才会设置这些字段。
+        中文：``structured`` 选择 chat v2:v1 编解码器无法承载角色、工具调用或已报告的总量,
+        因此只有在协商启用 v2 时才会设置这些字段。
     """
 
     choices = body.get("choices")
@@ -253,7 +254,8 @@ def _usage_chunk(raw: Any, *, structured: bool = False) -> ChatCompletionChunk |
 
         中文:仅返回提供方报告的用量;绝不虚构总量。
 
-        中文:v1 编解码器无法承载已报告的总量,因此除非协商启用 v2,否则会丢弃该总量;提示词和生成内容的计数仍保持准确。
+        中文：v1 编解码器无法承载已报告的总量,因此除非协商启用 v2,否则会丢弃该总量;
+        提示词和生成内容的计数仍保持准确。
     """
 
     if not isinstance(raw, Mapping):

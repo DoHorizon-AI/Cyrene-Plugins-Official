@@ -16,7 +16,10 @@ It owns the protocol connection and never selects another configured binding.
 The external OneBot process is the peer; Product/session policy remains above
 the ``message.connector.v1`` boundary.
 
-中文:不依赖额外库的 OneBot v11 forward-WebSocket 传输。该传输明确限定于一个 `OneBotInstanceConfig`。它拥有协议连接,绝不会选择其他已配置 binding。外部 OneBot 进程是连接对端;Product/session 策略仍位于 `message.connector.v1` 边界之上。
+中文：不依赖额外库的 OneBot v11 forward-WebSocket 传输。
+该传输明确限定于一个 `OneBotInstanceConfig`。它拥有协议连接,
+绝不会选择其他已配置 binding。外部 OneBot 进程是连接对端;
+Product/session 策略仍位于 `message.connector.v1` 边界之上。
 """
 
 from __future__ import annotations
@@ -60,7 +63,11 @@ class OneBotWebSocketTransport:
     retried with bounded exponential backoff; no action is replayed
     implicitly, because replay could duplicate a side effect.
 
-        中文:供一个已配置 binding 使用的 OneBot v11 forward-WebSocket 客户端。每个传输实例使用一个 daemon reader 线程。它会将入站事件分发给 connector 回调,并根据 OneBot 的 `echo` 字段关联 action 响应。连接损坏时会使进行中的 action 失败,并按有界指数退避重试;绝不会隐式重放 action,因为重放可能重复产生副作用。
+        中文：供一个已配置 binding 使用的 OneBot v11 forward-WebSocket 客户端。
+        每个传输实例使用一个 daemon reader 线程。它会将入站事件分发给 connector 回调,
+        并根据 OneBot 的 `echo` 字段关联 action 响应。
+        连接损坏时会使进行中的 action 失败,并按有界指数退避重试;绝不会隐式重放 action,
+        因为重放可能重复产生副作用。
     """
 
     def __init__(

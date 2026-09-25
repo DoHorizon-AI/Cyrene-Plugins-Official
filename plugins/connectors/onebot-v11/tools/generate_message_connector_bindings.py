@@ -17,7 +17,8 @@ normal generation never checks out or reads Cyrene-Platform.
 
 中文:根据 Plugins 持有的规范 proto 生成 OneBot 绑定。
 
-中文:能力架构和生成后的消费者位于同一仓库,因此常规生成流程不会检出或读取 Cyrene-Platform。
+中文：能力架构和生成后的消费者位于同一仓库,因此常规生成流程不会检出或读取
+Cyrene-Platform。
 """
 
 from __future__ import annotations

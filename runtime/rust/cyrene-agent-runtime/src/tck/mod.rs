@@ -36,7 +36,7 @@ use crate::adapter::tool_provider::ToolProvider;
 use crate::engine::cancel::CancellationToken;
 
 // ── Mock Providers for TCK ─────────────────────────────────────────────
-    // 中文：// 中文：TCK 使用的 Mock Provider。
+// 中文：TCK 使用的 Mock Provider。
 
 pub struct MockModelProvider {
     pub call_count: AtomicUsize,
@@ -208,7 +208,7 @@ fn mock_descriptor(binding_id: &str, provider_tool_id: &str) -> ToolDescriptor {
 }
 
 // ── TCK Test Runner ───────────────────────────────────────────────────
-    // 中文：// 中文：TCK 测试运行器。
+// 中文：TCK 测试运行器。
 
 pub struct AgentTckSuite;
 
@@ -316,21 +316,21 @@ impl AgentTckSuite {
 
         assert!(!events.is_empty(), "Must receive streaming events");
         // Verify strictly monotonic sequence numbers starting at 1
-    // 中文：        // 中文：验证序列号从 1 开始且严格单调递增。
+        // 中文：验证序列号从 1 开始且严格单调递增。
         for (idx, evt) in events.iter().enumerate() {
             assert_eq!(evt.sequence_number, (idx + 1) as i64);
             assert!(evt.timestamp_ms > 0);
         }
 
         // Verify first event is RunStarted
-    // 中文：        // 中文：验证第一个事件是 RunStarted。
+        // 中文：验证第一个事件是 RunStarted。
         assert!(matches!(
             events.first().unwrap().event.as_ref().unwrap(),
             agent_stream_event::Event::RunStarted(_)
         ));
 
         // Verify last event is RunCompleted terminal event
-    // 中文：        // 中文：验证最后一个事件是终态事件 RunCompleted。
+        // 中文：验证最后一个事件是终态事件 RunCompleted。
         assert!(matches!(
             events.last().unwrap().event.as_ref().unwrap(),
             agent_stream_event::Event::RunCompleted(_)
@@ -342,7 +342,7 @@ impl AgentTckSuite {
     /// 中文：Test Vector 4：强制执行最大轮数限制（T59、T64）。
     pub async fn run_tck_max_turns_limit(driver: &(dyn AgentDriver + 'static)) {
         // Model always requests tools (infinite loop without bound)
-    // 中文：        // 中文：模型始终请求工具；如果没有上限就会无限循环。
+        // 中文：模型始终请求工具；没有上限时会无限循环。
         let model = MockModelProvider::with_tool_turns(100);
         let tools = MockToolProvider::new();
 
@@ -448,7 +448,7 @@ impl AgentTckSuite {
         assert_eq!(calls[0].catalog_version.as_deref(), Some("catalog-v1"));
 
         // A flat name outside the snapshot fails closed before any call.
-    // 中文：        // 中文：快照之外的扁平名称会失败关闭，且不会发起任何调用。
+        // 中文：快照之外的扁平名称会失败关闭，且不会发起调用。
         let other_source = Arc::new(MockToolCatalogSource::new(
             vec![mock_descriptor("mcp.other", "different_tool")],
             "catalog-v2",

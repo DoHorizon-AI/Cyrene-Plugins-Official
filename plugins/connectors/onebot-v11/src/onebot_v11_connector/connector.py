@@ -23,9 +23,16 @@ A host can load ``OneBotV11Connector`` through the generic Python worker and cal
 profiles are selected from the configured binding; the OneBot protocol parser
 remains independent of Product session policy.
 
-中文:提供通用 OneBot v11 `message.connector.v1` 实现。一次 Host activation 只接收一个已配置 binding,因此此 package 绝不会按 adapter 类型或解析顺序选择实例。Platform 可以解析并授权 Endpoint,随后 Product 直接调用本 package。binding 身份来自配置;Worker/Runtime 代次则是由 Host 管理的独立生命周期观测值。
+中文：提供通用 OneBot v11 `message.connector.v1` 实现。
+一次 Host activation 只接收一个已配置 binding,
+因此此 package 绝不会按 adapter 类型或解析顺序选择实例。
+Platform 可以解析并授权 Endpoint,随后 Product 直接调用本 package。binding 身份来自配置;
+Worker/Runtime 代次则是由 Host 管理的独立生命周期观测值。
 
-connector 使用打包的 Cyrene direct runtime 获取 activation 设置。Host 可以通过通用 Python Worker 加载 `OneBotV11Connector`,并调用 `send_message` 或 `on_subscribe`。HTTP 与 forward-WebSocket 传输 profile 根据已配置 binding 选择;OneBot 协议解析器独立于 Product session 策略。
+connector 使用打包的 Cyrene direct runtime 获取 activation 设置。
+Host 可以通过通用 Python Worker 加载 `OneBotV11Connector`,
+并调用 `send_message` 或 `on_subscribe`。HTTP 与 forward-WebSocket 传输 profile
+根据已配置 binding 选择;OneBot 协议解析器独立于 Product session 策略。
 """
 
 from __future__ import annotations
@@ -115,7 +122,9 @@ class OneBotTransport(Protocol):
     connector uses those hooks without making them part of the required legacy
     transport surface.
 
-        中文:用于 OneBot action 的传输抽象。传输实例属于单个已配置 binding。实现可以提供可选的 `start` 和 `set_event_handler` hook 来接收入站事件;connector 会使用这些 hook,但不会将其设为旧版传输接口的必需成员。
+        中文：用于 OneBot action 的传输抽象。传输实例属于单个已配置 binding。
+        实现可以提供可选的 `start` 和 `set_event_handler` hook 来接收入站事件;
+        connector 会使用这些 hook,但不会将其设为旧版传输接口的必需成员。
     """
 
     def call(
@@ -151,7 +160,10 @@ class OneBotInstanceConfig:
     not regenerated when a worker restarts. ``runtime_profile`` is only an
     external transport label; it does not change connector identity.
 
-        中文:由 Host 提供、用于单个 capability binding 的配置。`binding_id` 是由 Product 选择或通过控制平面解析得到的稳定身份。它不是账户或供应商身份,Worker 重启时也不会重新生成。`runtime_profile` 只是外部传输标签,不会改变 connector 身份。
+        中文：由 Host 提供、用于单个 capability binding 的配置。
+        `binding_id` 是由 Product 选择或通过控制平面解析得到的稳定身份。
+        它不是账户或供应商身份,Worker 重启时也不会重新生成。
+        `runtime_profile` 只是外部传输标签,不会改变 connector 身份。
     """
 
     binding_id: str
@@ -643,7 +655,11 @@ class OneBotV11Connector:
         to ``set_group_add_request`` with ``sub_type=invite``.  The connector
         never derives a target from Product conversation state.
 
-            中文:批准或拒绝经过规范化的 OneBot 好友／群组请求。Product 会将不透明的 OneBot `flag` 作为 `request_id` 传入。`friend` 映射为 `set_friend_add_request`;`group_invite` 则映射为带有 `sub_type=invite` 的 `set_group_add_request`。connector 绝不会根据 Product 会话状态推导目标对象。
+            中文：批准或拒绝经过规范化的 OneBot 好友／群组请求。
+            Product 会将不透明的 OneBot `flag` 作为 `request_id` 传入。
+            `friend` 映射为 `set_friend_add_request`;
+            `group_invite` 则映射为带有 `sub_type=invite` 的 `set_group_add_request`。
+            connector 绝不会根据 Product 会话状态推导目标对象。
         """
 
         config = self._require_configured()
@@ -799,7 +815,7 @@ class OneBotV11Connector:
         except ConnectorError as exc:
             return False, _direct_error(exc)
         except Exception as exc:  # Keep errors inside the worker protocol.
-        # 中文:// 中文:将错误保留在 Worker 协议内。
+        # 中文：将错误保留在 Worker 协议内。
             return False, _direct_error(
                 ConnectorError("EXECUTION_FAILED", f"OneBot invocation failed: {exc}")
             )
