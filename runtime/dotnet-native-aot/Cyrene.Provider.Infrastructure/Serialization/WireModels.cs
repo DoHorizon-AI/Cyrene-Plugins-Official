@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.Infrastructure.Serialization            │
 // │  Role: Wire JSON models and Native AOT JsonSerializerContext.       │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：WireModels.cs
+// 中文：命名空间：Cyrene.Provider.Infrastructure.Serialization
+// 中文：职责：定义 wire JSON 模型与 Native AOT JsonSerializerContext。
 
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -10,6 +13,7 @@ using System.Text.Json.Serialization;
 namespace Cyrene.Provider.Infrastructure.Serialization;
 
 // ── OpenAI Wire Models ────────────────────────────────────────────────
+// 中文：OpenAI wire 模型。
 
 public sealed record OpenAiWireMessage(
     [property: JsonPropertyName("role")] string Role,
@@ -122,9 +126,11 @@ public sealed record OpenAiEmbeddingResponse(
 );
 
 // ── Anthropic Wire Models ──────────────────────────────────────────────
+// 中文：Anthropic wire 模型。
 
 // One Anthropic content block. Text, tool_use, and tool_result shapes share the
 // record; unused members stay null and are omitted on the wire.
+// 中文：Anthropic 的单个 content block。文本、tool_use 和 tool_result 形状共用该记录；未使用的成员保持 null，并会从 wire 输出中省略。
 public sealed record AnthropicContentBlock(
     [property: JsonPropertyName("type")] string Type,
     [property: JsonPropertyName("text")] string? Text = null,
@@ -177,6 +183,7 @@ public sealed record AnthropicMessagesResponse(
 );
 
 // Anthropic streaming event models (SSE data frames carry the event type inline).
+// 中文：Anthropic 流式事件模型（SSE data 帧会内联携带事件类型）。
 
 public sealed record AnthropicStreamError(
     [property: JsonPropertyName("type")] string? Type = null,
@@ -207,6 +214,7 @@ public sealed record AnthropicStreamEvent(
 );
 
 // ── Gemini Wire Models ────────────────────────────────────────────────
+// 中文：Gemini wire 模型。
 
 public sealed record GeminiFunctionCall(
     [property: JsonPropertyName("name")] string Name,

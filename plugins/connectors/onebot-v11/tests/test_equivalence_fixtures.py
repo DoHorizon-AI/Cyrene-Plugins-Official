@@ -29,7 +29,9 @@ FIXTURE_PATH = Path(__file__).parent / "fixtures/native-equivalence.json"
 
 
 def test_checked_in_fixture_matches_python_baseline() -> None:
-    """Detect semantic drift before the native runtime becomes formal."""
+    """Detect semantic drift before the native runtime becomes formal.
+
+        中文：在原生运行时正式启用前检测语义偏移。"""
 
     checked_in = json.loads(FIXTURE_PATH.read_text(encoding="utf-8"))
     assert checked_in == build_fixture()

@@ -34,3 +34,27 @@ checkout.
 
 `contracts/capabilities.yaml` 标明 owner 与 TCK。共享契约随本仓库发布；Product 使用同一契约发布的
 版本化制品或生成源码，不读取可变的 Platform checkout，Plugins 的普通构建也不依赖 Platform checkout。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# 能力契约版本规则
+
+## 兼容变更
+
+- 保留 protobuf package 名称、消息名称、字段编号、字段类型、枚举数值以及已发布的 type URL。
+- 新增字段时使用新编号，并采用 optional 或 repeated 的存在语义。
+- 必须保证旧 reader 继续工作；未知字段必须可以忽略。
+- 发布前运行 owner 对应的 TCK 和生成检查。
+
+## 破坏性变更
+
+- 创建新的 protobuf package 版本和 capability interface 版本。
+- 删除字段时，将字段编号和字段名称都标记为 reserved；两者都不能重新使用。
+- 迁移消费者前，先发布明确的兼容和删除策略。
+
+## 所有权与发布
+
+contracts/capabilities.yaml 会列出 owner 所属的 Plugin 区域和 TCK。共享契约从本仓库发布。Product 使用同一契约版本发布的制品或生成源码；它们不读取可变的 Platform checkout。Plugins 的常规构建也不需要 Platform checkout。

@@ -1,4 +1,6 @@
-"""Tests for the isolated Native AOT migration package candidate."""
+"""Tests for the isolated Native AOT migration package candidate.
+
+中文：隔离 Native AOT 迁移候选包的测试。"""
 
 from __future__ import annotations
 
@@ -28,7 +30,9 @@ REPOSITORY_ROOT = Path(__file__).parents[4]
 
 
 def _executable(tmp_path: Path) -> Path:
-    """Use the current interpreter as an executable-only build fixture."""
+    """Use the current interpreter as an executable-only build fixture.
+
+        中文：使用当前解释器作为仅供执行的构建夹具。"""
 
     binary = tmp_path / "cyrene-onebot-v11"
     binary.write_bytes(Path(sys.executable).read_bytes())
@@ -37,7 +41,9 @@ def _executable(tmp_path: Path) -> Path:
 
 
 def test_source_metadata_is_formal_native_with_explicit_python_rollback() -> None:
-    """The source projection is Native AOT while Python metadata is archived."""
+    """The source projection is Native AOT while Python metadata is archived.
+
+        中文：源代码投影为 Native AOT，而 Python 元数据会归档保留。"""
 
     manifest = json.loads(
         (

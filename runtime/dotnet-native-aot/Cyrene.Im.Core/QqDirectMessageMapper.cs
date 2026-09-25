@@ -15,6 +15,7 @@ using Google.Protobuf;
 namespace Cyrene.Im.Core;
 
 /// <summary>Canonical constants used by the QQ message connector projection.</summary>
+/// <remarks>中文：QQ 消息连接器投影使用的规范常量。</remarks>
 public static class QqDirectMessageMapper
 {
     public const string CapabilityId = "message.connector.v1";
@@ -49,6 +50,7 @@ public static class QqDirectMessageMapper
     private const int MaxMediaReferenceBytes = 4 * 1_024;
 
     /// <summary>Maps a canonical send request to fixed native QQ parameters.</summary>
+/// <remarks>中文：将规范发送请求映射为固定的原生 QQ 参数。</remarks>
     public static JsonElement BuildSendParameters(
         SendMessageRequest request,
         QqDirectProfile profile)
@@ -123,6 +125,7 @@ public static class QqDirectMessageMapper
     }
 
     /// <summary>Reads a native send result into the canonical delivery payload.</summary>
+/// <remarks>中文：将原生发送结果读取并转换为规范投递负载。</remarks>
     public static DeliveryResult BuildDeliveryResult(JsonElement result)
     {
         if (result.ValueKind != JsonValueKind.Object)
@@ -163,6 +166,7 @@ public static class QqDirectMessageMapper
     }
 
     /// <summary>Maps the canonical JSON approval request to one fixed QQ operation.</summary>
+/// <remarks>中文：将规范 JSON 审批请求映射为一个固定的 QQ 操作。</remarks>
     public static QqRespondOperation BuildRespondOperation(
         string json,
         QqDirectProfile profile)
@@ -238,6 +242,7 @@ public static class QqDirectMessageMapper
     }
 
     /// <summary>Normalizes one current-generation native message event.</summary>
+/// <remarks>中文：规范化当前代次的单个原生消息事件。</remarks>
     public static QqDirectNormalizedEvent NormalizeMessage(
         JsonElement payload,
         QqDirectProfile profile,
@@ -400,6 +405,7 @@ public static class QqDirectMessageMapper
     }
 
     /// <summary>Normalizes one current-generation native friend/group request.</summary>
+/// <remarks>中文：规范化当前代次的单个原生好友／群组请求。</remarks>
     public static QqDirectNormalizedEvent NormalizeRequest(
         JsonElement payload,
         QqDirectProfile profile)
@@ -443,6 +449,7 @@ public static class QqDirectMessageMapper
     }
 
     /// <summary>Normalizes one correlated native completion callback.</summary>
+/// <remarks>中文：规范化与请求相关联的单个原生完成回调。</remarks>
     public static QqDirectNormalizedEvent NormalizeCallback(
         string operation,
         string requestId,
@@ -943,6 +950,7 @@ public static class QqDirectMessageMapper
 }
 
 /// <summary>Mapping failure safe to expose at the direct runtime boundary.</summary>
+/// <remarks>中文：可在 Direct runtime 边界安全公开的映射失败。</remarks>
 public sealed class QqDirectMappingException : Exception
 {
     public QqDirectMappingException(string domainCode, string message)
@@ -955,6 +963,7 @@ public sealed class QqDirectMappingException : Exception
 }
 
 /// <summary>Fixed operation and result for canonical request approval.</summary>
+/// <remarks>中文：规范请求审批操作及其固定结果。</remarks>
 public sealed record QqRespondOperation(
     string Operation,
     JsonElement Parameters,

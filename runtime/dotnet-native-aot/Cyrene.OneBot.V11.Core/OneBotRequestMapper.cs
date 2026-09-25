@@ -11,6 +11,7 @@ using System.Text.Json;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>Validated OneBot request-approval action.</summary>
+/// <remarks>中文：经过校验的 OneBot 请求审批操作。</remarks>
 public sealed record OneBotRequestOperation(
     string Action,
     OneBotActionRequest Request,
@@ -19,6 +20,7 @@ public sealed record OneBotRequestOperation(
     string Decision);
 
 /// <summary>Maps the existing message.connector.v1 request approval contract.</summary>
+/// <remarks>中文：映射现有的 message.connector.v1 请求审批契约。</remarks>
 public static class OneBotRequestMapper
 {
     public const string RespondRequestMethod = "respond_request";
@@ -194,6 +196,7 @@ public static class OneBotRequestMapper
 }
 
 /// <summary>Request approval JSON mapping failure.</summary>
+/// <remarks>中文：请求审批 JSON 映射失败。</remarks>
 public sealed class OneBotRequestMappingException : Exception
 {
     public OneBotRequestMappingException(string message)

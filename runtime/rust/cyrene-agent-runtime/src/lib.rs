@@ -19,9 +19,11 @@ pub mod limits;
 pub mod tck;
 
 // Re-export canonical Protobuf types
+// 重新导出规范 Protobuf 类型。
 pub use cyrene_plugin_contracts::agent_runtime_v1;
 
 // Re-export runtime core components
+// 重新导出 runtime 核心组件。
 pub use adapter::{
     snapshot_tool_catalog, InjectedMemoryProvider, ModelProvider, RigAgentAdapter,
     SnapshotToolProvider, ToolCatalogSnapshot, ToolCatalogSource, ToolProvider, ToolRoute,

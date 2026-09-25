@@ -43,7 +43,9 @@ DELIVERY_RESULT_TYPE_URL = (
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse the packaged binary and evidence destination."""
+    """Parse the packaged binary and evidence destination.
+
+        中文：解析已打包的二进制文件和证据输出位置。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
@@ -53,7 +55,9 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _read_ready(process: subprocess.Popen[str]) -> dict[str, Any]:
-    """Read the bounded Native AOT readiness announcement."""
+    """Read the bounded Native AOT readiness announcement.
+
+        中文：读取长度受限的 Native AOT 就绪公告。"""
 
     if process.stdout is None:
         raise RuntimeError("Native AOT stdout is not captured")
@@ -105,7 +109,9 @@ def _qq_request(
     payload: dict[str, Any],
     request_id: str,
 ) -> Any:
-    """Build one fixed qq.client.v1 request envelope."""
+    """Build one fixed qq.client.v1 request envelope.
+
+        中文：构造一个固定的 qq.client.v1 请求封装。"""
 
     return runtime_wire.DirectInvocationRequest(
         capability=QQ_CAPABILITY,
@@ -118,7 +124,9 @@ def _qq_request(
 
 
 def _subscription_request(runtime_wire: Any, request_id: str) -> Any:
-    """Build one canonical message event subscription request."""
+    """Build one canonical message event subscription request.
+
+        中文：构造一个规范消息事件订阅请求。"""
 
     return runtime_wire.DirectInvocationRequest(
         capability=CAPABILITY,
@@ -132,7 +140,9 @@ def _subscription_request(runtime_wire: Any, request_id: str) -> Any:
 
 
 def _canonical_send_request(message_wire: Any) -> Any:
-    """Build one canonical QQ group message."""
+    """Build one canonical QQ group message.
+
+        中文：构造一条规范 QQ 群消息。"""
 
     return message_wire.SendMessageRequest(
         conversation=message_wire.ConversationScope(
@@ -150,7 +160,9 @@ def _canonical_send_request(message_wire: Any) -> Any:
 
 
 def _copy_fake_host(runtime_root: Path) -> Path:
-    """Copy the fixture Host into disposable runtime state."""
+    """Copy the fixture Host into disposable runtime state.
+
+        中文：将夹具 Host 复制到临时运行时状态目录。"""
 
     fake_host = runtime_root / "fake_qq_host.py"
     shutil.copyfile(
@@ -161,7 +173,9 @@ def _copy_fake_host(runtime_root: Path) -> Path:
 
 
 def _exercise(binary: Path, rid: str) -> dict[str, Any]:
-    """Exercise one packaged qqnt-direct process and its external Host."""
+    """Exercise one packaged qqnt-direct process and its external Host.
+
+        中文：运行一个已打包的 qqnt-direct 进程及其外部 Host。"""
 
     sys.path.insert(0, str(REPOSITORY_ROOT / "sdk/python/cyrene_plugin_runtime/src"))
     sys.path.insert(0, str(REPOSITORY_ROOT / "plugins/connectors/im/src"))
@@ -382,7 +396,9 @@ def _exercise(binary: Path, rid: str) -> dict[str, Any]:
 
 
 def main() -> int:
-    """Run the packaged qqnt-direct acceptance and write bounded evidence."""
+    """Run the packaged qqnt-direct acceptance and write bounded evidence.
+
+        中文：运行已打包 qqnt-direct 的验收流程并写入有界证据。"""
 
     args = _parse_args()
     binary = args.binary.resolve(strict=True)

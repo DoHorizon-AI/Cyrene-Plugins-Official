@@ -46,6 +46,7 @@ use computer_runtime_v1::{
 };
 
 /// Unified high-level service facade for Computer Runtime v1.
+/// Computer Runtime v1 的统一高层 service facade。
 pub struct ComputerRuntimeService {
     shell: ShellProcessRunner,
     fs: FilesystemService,
@@ -86,6 +87,7 @@ impl ComputerRuntimeService {
     }
 
     // ── Shell Commands ─────────────────────────────────────────────────
+    // ── Shell 命令
     pub async fn execute_command(
         &self,
         request: CommandExecutionRequest,
@@ -106,6 +108,7 @@ impl ComputerRuntimeService {
     }
 
     // ── Filesystem ─────────────────────────────────────────────────────
+    // ── 文件系统
     pub fn read_file(&self, req: ReadFileRequest) -> ReadFileResponse {
         self.fs.read_file(req)
     }
@@ -118,7 +121,8 @@ impl ComputerRuntimeService {
         self.fs.list_dir(req)
     }
 
-    // ── Artifacts ──────────────────────────────────────────────────────
+    // ── 制品s ──────────────────────────────────────────────────────
+    // ── 制品
     pub fn create_artifact(&self, req: CreateArtifactRequest) -> CreateArtifactResponse {
         self.artifacts.create_artifact(req)
     }
@@ -131,7 +135,8 @@ impl ComputerRuntimeService {
         self.artifacts.get_artifact_path(artifact_id)
     }
 
-    // ── Browser ────────────────────────────────────────────────────────
+    // ── 浏览器 ────────────────────────────────────────────────────────
+    // ── 浏览器
     pub async fn browser_navigate(&self, url: &str) -> Result<String, ComputerError> {
         self.browser.navigate(url).await
     }

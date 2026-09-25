@@ -69,6 +69,7 @@ class SampleApplicationExitGateTest {
     @BeforeEach
     void setUp() throws Exception {
         // Build service implementation
+// 中文：构造服务实现。
         DirectPluginRuntimeGrpc.DirectPluginRuntimeImplBase serviceImpl =
             new DirectPluginRuntimeGrpc.DirectPluginRuntimeImplBase() {
                 @Override
@@ -129,6 +130,7 @@ class SampleApplicationExitGateTest {
             };
 
         // Server 1 (generation 1)
+// 中文：服务器 1（代次 1）。
         server1 = NettyServerBuilder.forAddress(new InetSocketAddress("127.0.0.1", 0))
             .addService(serviceImpl)
             .build()
@@ -136,6 +138,7 @@ class SampleApplicationExitGateTest {
         port1 = server1.getPort();
 
         // Server 2 (generation 2)
+// 中文：服务器 2（代次 2）。
         server2 = NettyServerBuilder.forAddress(new InetSocketAddress("127.0.0.1", 0))
             .addService(serviceImpl)
             .build()
@@ -143,6 +146,7 @@ class SampleApplicationExitGateTest {
         port2 = server2.getPort();
 
         // Register initial binding with Server 1 and gen-001
+// 中文：使用服务器 1 和 gen-001 注册初始 binding。
         bindingResolver.register("sample-agent-binding", "direct://127.0.0.1:" + port1, "gen-001");
         bindingResolver.register("sample-memory-binding", "direct://127.0.0.1:" + port1, "gen-001");
     }
@@ -162,6 +166,7 @@ class SampleApplicationExitGateTest {
     @Test
     void testM4ExitGate_CleanSampleEndToEnd() throws Exception {
         // ── 1. Resolves stable binding and obtains current endpoint ──────────
+// 中文：1. 解析稳定 binding 并获取当前 Endpoint。
         BindingResolution resolution1 = bindingResolver.resolve("sample-agent-binding");
         assertThat(resolution1.getBindingId()).isEqualTo("sample-agent-binding");
         assertThat(resolution1.getConnectionRef().getHost()).isEqualTo("127.0.0.1");
@@ -169,6 +174,7 @@ class SampleApplicationExitGateTest {
         assertThat(resolution1.getGeneration()).isEqualTo(RuntimeGeneration.of("gen-001"));
 
         // ── 2. Calls typed capabilities without handcrafted URLs ─────────────
+// 中文：2. 调用强类型 capability，不手工拼接 URL。
         String agentResult = capabilityService.executeAgentRun("sample-agent-binding", "Hello Agent");
         assertThat(agentResult).isEqualTo("Processed: Run");
 
@@ -179,21 +185,27 @@ class SampleApplicationExitGateTest {
         assertThat(memoryId).isEqualTo("mem-spring-exit-gate");
 
         // Verify channel for gen-001 is active in channel manager
+// 中文：验证 channel manager 中 gen-001 的 channel 处于活动状态。
         assertThat(channelManager.hasActiveChannel("sample-agent-binding", RuntimeGeneration.of("gen-001"))).isTrue();
 
         // ── 3. Survives endpoint generation change (closes stale channel) ────
         // Simulate endpoint migration / upgrade / failover to Server 2 with gen-002
+// 中文：3. 在 Endpoint 代次变化后仍可继续工作（关闭过期 channel）。
+// 中文：模拟 Endpoint 迁移／升级／故障切换到使用 gen-002 的服务器 2。
         bindingResolver.register("sample-agent-binding", "direct://127.0.0.1:" + port2, "gen-002");
 
         // Execute call on new generation
+// 中文：在新代次上执行调用。
         String migratedAgentResult = capabilityService.executeAgentRun("sample-agent-binding", "Call after upgrade");
         assertThat(migratedAgentResult).isEqualTo("Processed: Run");
 
         // Old channel for gen-001 must be purged and closed; new channel for gen-002 active
+// 中文：必须清理并关闭 gen-001 的旧 channel，同时保持 gen-002 的新 channel 处于活动状态。
         assertThat(channelManager.hasActiveChannel("sample-agent-binding", RuntimeGeneration.of("gen-001"))).isFalse();
         assertThat(channelManager.hasActiveChannel("sample-agent-binding", RuntimeGeneration.of("gen-002"))).isTrue();
 
         // ── 4. Strict architectural purity: never imports Exchange or Platform packages ──
+// 中文：4. 严格遵循架构边界：绝不导入 Exchange 或 Platform package。
         Path sampleSrcDir = Path.of("src/main/java");
         try (Stream<Path> stream = Files.walk(sampleSrcDir)) {
             List<Path> javaFiles = stream.filter(p -> p.toString().endsWith(".java")).toList();

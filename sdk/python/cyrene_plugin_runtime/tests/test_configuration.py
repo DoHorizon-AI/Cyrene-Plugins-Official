@@ -1,4 +1,6 @@
-"""Tests for the mechanism-neutral Plugin activation configuration seam."""
+"""Tests for the mechanism-neutral Plugin activation configuration seam.
+
+中文：与具体机制无关的 Plugin 激活配置接口测试。"""
 
 from __future__ import annotations
 

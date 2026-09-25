@@ -88,15 +88,18 @@ pub struct DirectPluginRuntimeServiceImpl {
 }
 
 /// Host-side `ToolCatalogSource` over the configured MCP tool provider.
+/// 基于已配置 MCP 工具提供方的主机侧 `ToolCatalogSource`。
 ///
 /// This is the agent-runtime host path: the package assembles the runtime
 /// with a provider that actually speaks `tool.provider.v1`.
+/// 这是 agent-runtime 的主机路径：软件包会使用真正实现 `tool.provider.v1` 的提供方组装运行时。
 pub struct McpCatalogSource {
     provider: Arc<McpToolProvider>,
 }
 
 impl McpCatalogSource {
     /// Wrap one configured MCP tool provider.
+    /// 包装一个已配置的 MCP 工具提供方。
     pub fn new(provider: Arc<McpToolProvider>) -> Self {
         Self { provider }
     }
@@ -131,6 +134,8 @@ impl DirectPluginRuntimeServiceImpl {
     /// Agent and Memory calls fail closed until the package launcher injects real
     /// capability bindings and a production memory backend. Computer operations
     /// remain available because they have no simulated upstream dependency.
+    /// 在软件包启动器注入真实能力绑定和生产级记忆后端之前，Agent 和 Memory 调用会失败关闭。
+    /// Computer 操作没有模拟上游依赖，因此仍可使用。
     pub fn new() -> Self {
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
         let computer = Arc::new(ComputerRuntimeService::new(vec![current_dir]));
@@ -146,6 +151,8 @@ impl DirectPluginRuntimeServiceImpl {
     /// Builds a host that serves `tool.provider.v1` over the configured MCP
     /// server bindings. The package launcher is expected to call this once
     /// bindings are resolved; without it, tool calls fail closed.
+    /// 构建通过已配置 MCP server 绑定提供 `tool.provider.v1` 的主机。
+    /// 软件包启动器应在解析绑定后调用此方法；否则工具调用会失败关闭。
     pub fn with_mcp_servers(servers: Vec<McpServerConfig>) -> Self {
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
         let computer = Arc::new(ComputerRuntimeService::new(vec![current_dir]));
@@ -159,6 +166,7 @@ impl DirectPluginRuntimeServiceImpl {
     }
 
     /// Builds a deterministic in-memory service exclusively for contract tests.
+    /// 构建仅供契约测试使用的确定性内存服务。
     pub fn with_simulated_dependencies_for_tests() -> Self {
         let mem_backend = Arc::new(SqliteMemoryBackend::new_in_memory().expect("sqlite in-memory"));
         let mem_embed = Arc::new(ContractModelEmbeddingClient::new(4));
@@ -238,6 +246,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
         let req = request.into_inner();
 
         // 1. Fail-closed on interface version mismatch (R09)
+        // 1. 接口版本不匹配时失败关闭（R09）
         if req.interface_version != "1" {
             return Ok(Response::new(Self::fail_closed_error(
                 Code::InvalidRequest,
@@ -251,6 +260,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
 
         // 2. Dispatch by capability; method ids are normalized to their
         //    canonical contract spelling first.
+        // 2. 按能力分发；先将方法 ID 规范化为契约中的标准拼写。
         let method = canonical_method(req.capability.as_str(), req.method.as_str());
         match req.capability.as_str() {
             "agent.runtime.v1" => match method {

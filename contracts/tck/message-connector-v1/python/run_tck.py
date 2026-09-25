@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Validate generated Python bindings for the direct connector payload."""
+"""Validate generated Python bindings for the direct connector payload.
+
+中文：验证直连连接器载荷的生成 Python 绑定。"""
 
 from __future__ import annotations
 

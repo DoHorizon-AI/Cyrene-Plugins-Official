@@ -50,7 +50,9 @@ from qq_connector.qqnt_direct_operations import (
 
 
 class RecordingEmitter:
-    """Small direct-runtime emitter that records typed events."""
+    """Small direct-runtime emitter that records typed events.
+
+        中文：记录有类型事件的轻量直连运行时发射器。"""
 
     def __init__(self) -> None:
         self.events: list[tuple[str, bytes, str]] = []
@@ -66,7 +68,9 @@ class CancelledToken:
 
 
 def test_manifest_exposes_operation_specific_output_contracts() -> None:
-    """Keep executable QQ mappings and public response references in lockstep."""
+    """Keep executable QQ mappings and public response references in lockstep.
+
+        中文：确保可执行 QQ 映射与公开响应引用保持同步。"""
 
     package_root = Path(__file__).parents[1]
     manifest = json.loads(
@@ -352,7 +356,9 @@ def test_direct_extension_rejects_cross_family_parameter_names(tmp_path: Path) -
 def test_direct_extension_rejects_invalid_typed_parameters_before_host_start(
     tmp_path: Path, operation: str, params: dict[str, Any]
 ) -> None:
-    """Reject schema-invalid scalar values without starting a native process."""
+    """Reject schema-invalid scalar values without starting a native process.
+
+        中文：在不启动原生进程的情况下拒绝不符合架构的标量值。"""
 
     connector = QQNTDirectConnector(_config(tmp_path, "qq-typed-params"))
     try:
@@ -366,7 +372,9 @@ def test_direct_extension_rejects_invalid_typed_parameters_before_host_start(
 def test_direct_extension_rejects_deep_nested_json_before_host_start(
     tmp_path: Path,
 ) -> None:
-    """Keep nested vendor envelopes bounded even when their field names are valid."""
+    """Keep nested vendor envelopes bounded even when their field names are valid.
+
+        中文：即使嵌套厂商封装的字段名称有效，也要限制其范围。"""
 
     nested: dict[str, Any] = {}
     current = nested
@@ -821,7 +829,9 @@ def test_every_registered_qq_operation_has_a_fixed_fake_host_dispatch(
 def test_semantic_fake_host_preserves_planned_mapping_shapes(
     tmp_path: Path,
 ) -> None:
-    """Exercise representative P1/P2 result shapes and both chat kinds."""
+    """Exercise representative P1/P2 result shapes and both chat kinds.
+
+        中文：测试有代表性的 P1/P2 结果结构和两种聊天类型。"""
 
     connector = QQNTDirectConnector(
         _config(tmp_path, "qq-semantic-mapping", mode="semantic_mapping")
@@ -1187,7 +1197,9 @@ def test_send_completion_callback_is_typed_and_request_correlated(
 def test_direct_event_boundary_rejects_unknown_and_cross_generation_events(
     tmp_path: Path,
 ) -> None:
-    """Only named, current-generation events may enter the application seam."""
+    """Only named, current-generation events may enter the application seam.
+
+        中文：只有具名且属于当前代次的事件才能进入应用接口。"""
 
     connector = QQNTDirectConnector(_config(tmp_path, "qq-event-boundary"))
     emitter = RecordingEmitter()

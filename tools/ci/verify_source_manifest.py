@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
-"""Verify an exported source tree without consulting Git history."""
+"""Verify an exported source tree without consulting Git history.
+
+中文：校验导出的源码树，不查询 Git 历史。
+"""
 
 from __future__ import annotations
 
@@ -22,11 +25,17 @@ SYMLINK_MODE = "120000"
 
 
 class ManifestVerificationError(ValueError):
-    """Raised when an exported tree does not match its source manifest."""
+    """Raised when an exported tree does not match its source manifest.
+
+        中文：导出树与其 source manifest 不匹配时抛出的错误。
+    """
 
 
 def _safe_relative(value: Any, field: str) -> str:
-    """Validate a manifest path and reject traversal or platform separators."""
+    """Validate a manifest path and reject traversal or platform separators.
+
+        中文：校验 manifest 路径，并拒绝路径遍历或平台特有分隔符。
+    """
 
     if not isinstance(value, str) or not value or "\\" in value or "\x00" in value:
         raise ManifestVerificationError(f"{field} must be a non-empty POSIX path")
@@ -37,13 +46,19 @@ def _safe_relative(value: Any, field: str) -> str:
 
 
 def _digest(content: bytes) -> str:
-    """Hash one manifest payload value."""
+    """Hash one manifest payload value.
+
+        中文：计算一个 manifest 负载值的哈希。
+    """
 
     return hashlib.sha256(content).hexdigest()
 
 
 def _read_manifest(path: Path) -> dict[str, Any]:
-    """Read one regular JSON manifest."""
+    """Read one regular JSON manifest.
+
+        中文：读取一份常规 JSON manifest 文件。
+    """
 
     if path.is_symlink() or not path.is_file():
         raise ManifestVerificationError(f"Manifest is not a regular file: {path}")
@@ -57,7 +72,10 @@ def _read_manifest(path: Path) -> dict[str, Any]:
 
 
 def _verify_hex(value: Any, length: int, field: str) -> str:
-    """Validate a lowercase hexadecimal digest or commit."""
+    """Validate a lowercase hexadecimal digest or commit.
+
+        中文：校验小写十六进制摘要或 commit 标识。
+    """
 
     if not isinstance(value, str) or len(value) != length:
         raise ManifestVerificationError(f"{field} must be {length} hexadecimal characters")
@@ -69,7 +87,10 @@ def _verify_hex(value: Any, length: int, field: str) -> str:
 
 
 def _ignored_untracked(root: Path) -> set[str]:
-    """Return untracked paths excluded by the repository's ignore rules."""
+    """Return untracked paths excluded by the repository's ignore rules.
+
+        中文：返回被仓库忽略规则排除的未跟踪路径。
+    """
 
     try:
         result = subprocess.run(
@@ -98,7 +119,10 @@ def _ignored_untracked(root: Path) -> set[str]:
 
 
 def _is_ignored(relative: str, ignored: set[str]) -> bool:
-    """Return whether a path is inside an ignored untracked subtree."""
+    """Return whether a path is inside an ignored untracked subtree.
+
+        中文：返回某个路径是否位于被忽略的未跟踪子树中。
+    """
 
     return any(relative == item or relative.startswith(item + "/") for item in ignored)
 
@@ -109,7 +133,10 @@ def _walk_payload(
     *,
     allow_git_metadata: bool,
 ) -> set[str]:
-    """List regular payload files and symlinks, rejecting Git metadata."""
+    """List regular payload files and symlinks, rejecting Git metadata.
+
+        中文：列出普通负载文件与符号链接，并拒绝 Git 元数据。
+    """
 
     observed: set[str] = set()
     ignored = _ignored_untracked(root)
@@ -152,7 +179,10 @@ def _walk_payload(
 
 
 def _entry_content(path: Path, entry: dict[str, Any]) -> bytes:
-    """Read one declared file or symlink in its manifest representation."""
+    """Read one declared file or symlink in its manifest representation.
+
+        中文：按 manifest 表示形式读取一个已声明文件或符号链接。
+    """
 
     kind = entry.get("kind")
     if kind == "file":
@@ -183,7 +213,10 @@ def verify_manifest(
     *,
     allow_git_metadata: bool = False,
 ) -> dict[str, Any]:
-    """Verify every declared payload entry and reject unexpected payload files."""
+    """Verify every declared payload entry and reject unexpected payload files.
+
+        中文：校验每个已声明的负载条目，并拒绝未预期的负载文件。
+    """
 
     root = root.resolve()
     if not root.is_dir():
@@ -193,6 +226,7 @@ def verify_manifest(
     elif not manifest_path.is_absolute():
         manifest_path = root / manifest_path
     # Preserve a caller-provided symlink so _read_manifest can reject it.
+    # 中文：# 中文：保留调用方提供的符号链接，以便 `_read_manifest` 能拒绝它。
     manifest_path = Path(os.path.abspath(manifest_path))
     try:
         manifest_path.relative_to(root)
@@ -294,7 +328,10 @@ def verify_manifest(
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run source-manifest verification from the command line."""
+    """Run source-manifest verification from the command line.
+
+        中文：从命令行执行 source-manifest 校验。
+    """
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())

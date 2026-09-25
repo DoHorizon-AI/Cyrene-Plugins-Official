@@ -65,6 +65,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
         var toolCalls = ExtractToolCalls(candidate);
         return new ChatCompletionResult(
             // Gemini native responses carry no message id; the field stays empty.
+            // 中文：Gemini 原生响应不携带消息 ID；该字段会保持为空。
             Id: string.Empty,
             Model: parameters.Model,
             Content: ExtractText(candidate),
@@ -107,12 +108,14 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
             catch (JsonException)
             {
                 // Ignore malformed keep-alive or vendor comment frames.
+                // 中文：忽略格式错误的 keep-alive 或供应商注释帧。
                 continue;
             }
 
             if (parsed?.Candidates is not { Count: > 0 })
             {
                 // Usage-only frames close the stream without candidate content.
+                // 中文：只有 usage 的帧会在没有 candidate 内容的情况下结束流。
                 if (parsed?.UsageMetadata is { } usage)
                 {
                     yield return new ChatCompletionChunk(
@@ -188,6 +191,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
     }
 
     // ── request construction ───────────────────────────────────────────
+    // 中文：构造请求。
 
     private static GeminiGenerateContentRequest BuildRequest(ChatCompletionParameters parameters)
     {
@@ -225,6 +229,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
                 // tool responses and emit it in the order of the assistant tool
                 // calls so parallel calls stay unambiguous even when the runtime
                 // reports its tool messages out of order.
+                // 中文：Gemini 根据函数名称关联工具响应；如果同一轮中名称重复，还会按位置关联。这里会收集连续的工具响应，并按 assistant 工具调用的顺序发出，从而确保即使运行时以乱序报告工具消息，并行调用仍可明确区分。
                 var run = new List<(int Order, GeminiContent Content)>();
                 while (index < remaining.Count && remaining[index].Role == "tool")
                 {
@@ -320,6 +325,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
     }
 
     // ── response extraction ────────────────────────────────────────────
+    // 中文：提取响应。
 
     private static string ExtractText(GeminiCandidate candidate)
     {
@@ -354,6 +360,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
             calls.Add(new ChatToolCall(
                 // Gemini carries no call id; a deterministic local id keeps
                 // tool_call history correlatable inside the capability model.
+                // 中文：Gemini 不提供调用 ID；使用确定性本地 ID，确保工具调用历史在 capability 模型中仍可关联。
                 Id: $"gemini-call-{calls.Count}",
                 Type: "function",
                 Function: new ChatToolCallFunction(
@@ -395,6 +402,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
     /// name of the assistant tool call that the tool_call_id belongs to; the
     /// call order keeps parallel calls with the same name positional.
     /// </summary>
+/// <remarks>中文：将一条工具消息解析为 Gemini functionResponse。Gemini 不携带调用 ID，因此需要通过该工具消息的 tool_call_id 所属 assistant 工具调用的函数名称完成关联；保持调用顺序，即可区分函数名称相同的并行调用。</remarks>
     private static (int Order, GeminiContent Content) ResolveToolResponse(
         ChatMessage message,
         Dictionary<string, (string Name, int Order)> toolTargetsById
@@ -425,6 +433,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
     }
 
     // ── helpers ────────────────────────────────────────────────────────
+    // 中文：辅助函数。
 
     private HttpRequestMessage NewRequest(string relativePath, string json)
     {
@@ -488,6 +497,7 @@ public sealed class GeminiVendorAdapter : IModelCapability, IEmbeddingCapability
             catch (JsonException)
             {
                 // Fall through to the deterministic wrapper below.
+                // 中文：继续执行下方的确定性包装逻辑。
             }
         }
         var encoded = JsonEncodedText.Encode(content ?? string.Empty);

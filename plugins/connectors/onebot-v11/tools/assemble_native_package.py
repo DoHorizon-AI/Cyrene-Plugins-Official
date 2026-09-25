@@ -39,11 +39,15 @@ PACKAGE_FILES = (
 
 
 class NativePackageAssemblyError(ValueError):
-    """Raised when a Native AOT candidate cannot be assembled safely."""
+    """Raised when a Native AOT candidate cannot be assembled safely.
+
+        中文：当无法安全组装 Native AOT 候选包时引发。"""
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    """Read one JSON object used as package metadata."""
+    """Read one JSON object used as package metadata.
+
+        中文：读取一个用作软件包元数据的 JSON 对象。"""
 
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -57,7 +61,9 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
-    """Write stable UTF-8 JSON metadata."""
+    """Write stable UTF-8 JSON metadata.
+
+        中文：以稳定格式写入 UTF-8 JSON 元数据。"""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -67,7 +73,9 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def _rewrite_manifest(manifest: dict[str, Any], rid: str) -> dict[str, Any]:
-    """Project the source manifest into one Native AOT candidate manifest."""
+    """Project the source manifest into one Native AOT candidate manifest.
+
+        中文：将源清单转换为一份 Native AOT 候选清单。"""
 
     projected = json.loads(json.dumps(manifest))
     projected["version"] = PACKAGE_VERSION
@@ -95,7 +103,9 @@ def _rewrite_manifest(manifest: dict[str, Any], rid: str) -> dict[str, Any]:
 
 
 def _rewrite_descriptor(descriptor: dict[str, Any], rid: str) -> dict[str, Any]:
-    """Project the source descriptor into one Native AOT candidate descriptor."""
+    """Project the source descriptor into one Native AOT candidate descriptor.
+
+        中文：将源描述文件转换为一个 Native AOT 候选描述文件。"""
 
     projected = json.loads(json.dumps(descriptor))
     package = projected["package"]
@@ -129,7 +139,9 @@ def _rewrite_descriptor(descriptor: dict[str, Any], rid: str) -> dict[str, Any]:
 
 
 def _copy_required(source: Path, destination: Path) -> None:
-    """Copy one regular package input and reject symlink indirection."""
+    """Copy one regular package input and reject symlink indirection.
+
+        中文：复制一个常规软件包输入文件，并拒绝符号链接间接引用。"""
 
     if source.is_symlink() or not source.is_file():
         raise NativePackageAssemblyError(
@@ -145,7 +157,9 @@ def assemble_native_package(
     output_root: Path,
     rid: str,
 ) -> Path:
-    """Assemble one unpacked Native AOT candidate package."""
+    """Assemble one unpacked Native AOT candidate package.
+
+        中文：组装一个未压缩的 Native AOT 候选软件包。"""
 
     if rid not in SUPPORTED_RIDS:
         raise NativePackageAssemblyError(
@@ -214,7 +228,9 @@ def build_native_package_archive(
     output_path: Path,
     rid: str,
 ) -> Path:
-    """Build a deterministic ZIP archive for one Native AOT RID."""
+    """Build a deterministic ZIP archive for one Native AOT RID.
+
+        中文：为一个 Native AOT RID 构建确定性的 ZIP 归档。"""
 
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -245,7 +261,9 @@ def build_native_package_archive(
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse one candidate assembly request."""
+    """Parse one candidate assembly request.
+
+        中文：解析一项候选包组装请求。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository-root", type=Path, required=True)
@@ -257,7 +275,9 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Assemble one Native AOT candidate without publishing it."""
+    """Assemble one Native AOT candidate without publishing it.
+
+        中文：组装一个 Native AOT 候选包，但不发布它。"""
 
     args = _parse_args()
     if args.directory:

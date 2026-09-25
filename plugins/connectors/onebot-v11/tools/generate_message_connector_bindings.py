@@ -14,6 +14,10 @@
 
 The capability schema and generated consumer live in the same repository, so
 normal generation never checks out or reads Cyrene-Platform.
+
+中文：根据 Plugins 持有的规范 proto 生成 OneBot 绑定。
+
+中文：能力架构和生成后的消费者位于同一仓库，因此常规生成流程不会检出或读取 Cyrene-Platform。
 """
 
 from __future__ import annotations
@@ -32,7 +36,9 @@ OUTPUT_PATH = (
 
 
 def main() -> int:
-    """Generate the checked-in Python projection from the canonical proto."""
+    """Generate the checked-in Python projection from the canonical proto.
+
+        中文：根据规范 proto 生成并检入 Python 投影。"""
 
     parser = argparse.ArgumentParser()
     parser.add_argument(

@@ -15,6 +15,7 @@ using Google.Protobuf;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>Dispatches the implemented OneBot V1 action through the direct runtime.</summary>
+/// <remarks>中文：通过 direct runtime 分派已实现的 OneBot V1 action。</remarks>
 public sealed class OneBotInvocationDispatcher : IDirectInvocationDispatcher
 {
     public const int MaxPayloadBytes = 8 * 1024 * 1024;

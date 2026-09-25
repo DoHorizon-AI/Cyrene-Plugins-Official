@@ -130,6 +130,7 @@ public sealed class OpenAiVendorAdapter : IModelCapability, IEmbeddingCapability
             catch
             {
                 // Ignore malformed chunk lines or comments
+                // 中文：忽略格式错误的 chunk 行或注释行。
                 continue;
             }
 
@@ -162,6 +163,7 @@ public sealed class OpenAiVendorAdapter : IModelCapability, IEmbeddingCapability
             if (chunk.Usage != null)
             {
                 // Final usage-only frame requested through stream_options.include_usage.
+                // 中文：通过 `stream_options.include_usage` 请求的最终 usage-only 帧。
                 yield return new ChatCompletionChunk(
                     Id: chunk.Id,
                     Delta: string.Empty,

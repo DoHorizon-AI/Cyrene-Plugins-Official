@@ -33,6 +33,7 @@ public static class Program
             {
                 // DirectPluginRuntime uses h2c on the loopback endpoint.  The
                 // endpoint must therefore be HTTP/2-only, not HTTP/1.1 fallback.
+                // 中文：DirectPluginRuntime 在 loopback Endpoint 上使用 h2c，因此该 Endpoint 必须只允许 HTTP/2，不能回退到 HTTP/1.1。
                 options.ConfigureEndpointDefaults(endpoint =>
                     endpoint.Protocols = HttpProtocols.Http2);
             });

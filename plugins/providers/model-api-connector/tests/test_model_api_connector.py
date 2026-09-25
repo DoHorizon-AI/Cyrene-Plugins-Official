@@ -1,4 +1,6 @@
-"""Invocation tests for the model API connector: unary, streamed and cancelled."""
+"""Invocation tests for the model API connector: unary, streamed and cancelled.
+
+中文：模型 API 连接器的调用测试：一元调用、流式调用和取消调用。"""
 
 from __future__ import annotations
 
@@ -30,7 +32,9 @@ from model_api_connector import ModelApiConnector, ProviderSettings
 
 
 class _Upstream(BaseHTTPRequestHandler):
-    """Minimal OpenAI-compatible peer with a cancellable slow stream."""
+    """Minimal OpenAI-compatible peer with a cancellable slow stream.
+
+        中文：支持取消慢速流的最小 OpenAI 兼容对端。"""
 
     server_version = "connector-test/1"
 
@@ -174,6 +178,7 @@ def test_unary_completion_round_trips_the_typed_answer(upstream_server) -> None:
     response = decode_chat_completion_response(payload.value)
     assert [chunk.delta for chunk in response.chunks] == ["real path", ""]
     # chat v1 carries no role field; the closing chunk holds reason and usage.
+    # 中文：chat v1 不携带角色字段；结束数据块包含结束原因和用量。
     assert response.chunks[0].role is None
     assert response.chunks[-1].finish_reason == "stop"
     assert response.chunks[-1].prompt_tokens == 1
@@ -201,6 +206,7 @@ def test_streamed_completion_yields_one_chunk_per_event(upstream_server) -> None
     chunks = [decode_chat_completion_chunk(item.value) for item in stream.items]
     # v1 has no role field, so the role-only preamble is not a frame of its own;
     # the remaining events map one-to-one.
+    # 中文：v1 没有角色字段，因此仅包含角色的前导信息不会单独成为一个帧；其余事件一一映射。
     assert [chunk.delta for chunk in chunks] == ["real ", "path", ""]
     assert chunks[1].finish_reason == "stop"
     assert (chunks[2].prompt_tokens, chunks[2].completion_tokens) == (3, 2)
@@ -221,7 +227,9 @@ def test_stream_items_carry_the_chunk_type_url(upstream_server) -> None:
 
 
 def test_v2_stream_keeps_role_and_reported_total(upstream_server) -> None:
-    """The structured method carries the role preamble and a reported total."""
+    """The structured method carries the role preamble and a reported total.
+
+        中文：结构化方法会承载角色前导信息和已报告的总量。"""
 
     connector = _connector(upstream_server, "success")
     request = ChatCompletionRequest(
@@ -318,7 +326,9 @@ def test_missing_configuration_fails_closed() -> None:
 
 
 def test_cancellation_aborts_the_upstream_request(upstream_server) -> None:
-    """A cancel must close the upstream socket, not just stop waiting."""
+    """A cancel must close the upstream socket, not just stop waiting.
+
+        中文：取消操作必须关闭上游套接字，而不能只停止等待。"""
 
     connector = _connector(upstream_server, "slow")
     request = ChatCompletionRequest(
@@ -350,6 +360,7 @@ def test_cancellation_aborts_the_upstream_request(upstream_server) -> None:
     assert not worker.is_alive()
     assert time.monotonic() - started < 4
     # A cancelled stream reports no chunks and never reports usage.
+    # 中文：已取消的流不会返回数据块，也不会报告用量。
     assert received == []
 
 

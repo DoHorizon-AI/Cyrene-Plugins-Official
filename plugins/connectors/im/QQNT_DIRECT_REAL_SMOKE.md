@@ -188,3 +188,134 @@ rows from `QQ_SIDE_INTERFACES.md`.
 
 真实运行成功后，才可以在矩阵中按 exact `main` SHA、workflow run、授权 QQ build/ABI 和
 实际结果更新对应行；`QQ_SIDE_INTERFACES.md` 中未进入计划的额外接口仍保持后续范围。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# QQNT Direct 真实环境烟测
+
+本文描述 qqnt-direct profile 在受保护环境中的 smoke 门禁。该门禁是通过现有 public-ci workflow 由 operator 触发的 job。它与 fake Host TCK 分离，绝不能将 fake Host 或本地模拟报告为通过。
+
+## 门禁形态
+
+public-ci workflow 暴露受保护的 repository_dispatch event；smoke job 只会从 main 运行：
+
+- GitHub Environment：qq-real-smoke，并配置 required reviewer。
+- Runner label：self-hosted、linux、x64、qq-real。
+- 每个 main ref 使用独立 concurrency group，因为 QQ session/data directory 归 binding 所有。
+- runner 必须预先安装一个获授权的准确 QQ Linux x86_64 build、一个通过继承 stdio 实现 cyrene.qq.host.v1 的 Host 可执行文件，以及一个专用测试账号/session。
+- 准确的客户端 build 和 Host ABI 放在受保护 Environment variables 中；runner script 强制要求二者完全匹配，缺失任一项时返回 NOT_RUN。
+- 现有 workflow 已处理 push 和 pull-request event；smoke job 会明确拒绝所有非 repository_dispatch event。
+- 场景 JSON 留在受保护 runner 上，不提交到公共仓库。
+
+Environment variables：
+
+| 变量 | 含义 |
+| --- | --- |
+| QQNT_HOST_EXECUTABLE | 获授权 QQ Host 的绝对可执行文件路径。 |
+| QQNT_HOST_ARGS_JSON | 不含 secret 的 Host 参数 JSON array，默认值为 []。 |
+| QQNT_DATA_DIR | 已存在的、由 binding 私有持有的 QQ session/data directory。 |
+| QQNT_ACCOUNT_ID | 专用 smoke 账号身份。 |
+| QQNT_SMOKE_SCENARIO_PATH | 受保护场景 JSON 的绝对路径。 |
+| QQNT_REAL_SMOKE_APPROVED | 必须严格为 yes，且只能在受保护 Environment 中设置。 |
+| QQNT_REQUIRED_CLIENT_VERSION | Host 握手应匹配的、获授权 QQ 客户端准确 build。 |
+| QQNT_REQUIRED_HOST_ABI | 握手应匹配的、获授权 Host 准确 ABI。 |
+
+握手必须返回与受保护 QQNT_REQUIRED_CLIENT_VERSION 和 QQNT_REQUIRED_HOST_ABI 完全相同的值。不接受密码；自动门禁开始前，账号必须已有授权 session，或由 operator 手动完成二维码登录。
+
+授权 operator 可以通过 GitHub CLI 从仓库默认 main branch 触发门禁：
+
+```bash
+gh api repos/DoHorizon-AI/Cyrene-Plugins-Official/dispatches -f event_type=qq-real-smoke
+```
+
+qq-real-smoke Environment 的 reviewer 仍是最终审批边界。
+
+## 受保护环境预检
+
+触发前，operator 必须确认 runner 使用专用 QQ 账号和 data directory，Host 可执行文件是获授权的 Linux x86_64 build，并且两个受保护版本/ABI 变量描述同一安装。账号必须已获授权，或准备好由 operator 控制二维码登录；不能把凭据写入仓库、场景 JSON、event payload 或证据制品。
+
+## 场景契约
+
+场景必须包含两个专用目标、两条入站断言、有界 marker prefix 和明确的固定操作参数：
+
+```json
+{
+  "marker_prefix": "cyrene-qq-smoke",
+  "private_conversation": {
+    "conversation_id": "<private-peer-id>",
+    "peer_uid": "<private-peer-uid>"
+  },
+  "group_conversation": {
+    "conversation_id": "<group-code>",
+    "peer_uid": "<group-peer-uid>"
+  },
+  "expected_inbound": [
+    {
+      "conversation_kind": "private",
+      "conversation_id": "<private-peer-id>",
+      "text_contains": "-private"
+    },
+    {
+      "conversation_kind": "group",
+      "conversation_id": "<group-code>",
+      "text_contains": "-group"
+    }
+  ],
+  "operations": {
+    "qq.message.history_include_self": {
+      "account_id": "$ACCOUNT_ID",
+      "peer": {"kind": "private", "peer_uid": "$PRIVATE_PEER_UID"},
+      "offset": 0,
+      "count": 20
+    },
+    "qq.message.by_id": {
+      "account_id": "$ACCOUNT_ID",
+      "message_id": "$PRIVATE_MESSAGE_ID"
+    },
+    "qq.group.list": {"account_id": "$ACCOUNT_ID"},
+    "qq.friend.list": {"account_id": "$ACCOUNT_ID"},
+    "qq.media.download": {
+      "account_id": "$ACCOUNT_ID",
+      "media_id": "<dedicated-media-id>"
+    },
+    "qq.file.list": {
+      "account_id": "$ACCOUNT_ID",
+      "group_id": "<dedicated-group-code>"
+    },
+    "qq.group.modify_remark": {
+      "account_id": "$ACCOUNT_ID",
+      "group_id": "<dedicated-group-code>",
+      "remark": "cyrene-qq-smoke"
+    },
+    "qq.search.contact": {
+      "account_id": "$ACCOUNT_ID",
+      "query": "<dedicated-contact-query>"
+    },
+    "qq.profile.long_nick": {
+      "account_id": "$ACCOUNT_ID",
+      "long_nick": "cyrene-qq-smoke"
+    },
+    "qq.online.devices": {"account_id": "$ACCOUNT_ID"}
+  }
+}
+```
+
+每项操作都必须存在于固定的 qq.client.v1 allow-list 中。runner script 会拒绝未知操作、仅用于 callback 的操作、原始 service/method 透传、密码、token 和未解析的 placeholder。场景必须使用专用账号；P2 修改操作必须可恢复。
+
+## 证据
+
+tools/ci/im_real_smoke.py 只记录：
+
+- 精确平台、客户端 build、Host ABI 和 binding identity。
+- 已接受的固定操作名称、优先级和已登记的 Service/method。
+- 私聊/群聊发送是否被接受，以及是否存在原生 message ID。
+- 规范化入站 event 数量。
+- 正常接受 qq.login.offline 且状态转换到 LOGIN_REQUIRED 的证据。
+- 正常关闭，以及重启后的 binding/账号身份检查结果。
+
+它绝不会将原始 QQ 响应、消息正文、session 文件、密码、token 或场景参数写入证据制品。运行成功时输出 QQ_REAL_SMOKE: PASS；缺少受保护配置时输出 NOT_RUN 并以 exit 2 退出，API matrix 中也必须继续标记为 NOT_RUN。
+
+真实运行成功后，应在 QQNT_DIRECT_API_MATRIX.md 对应条目中记录精确的 main SHA、workflow run、获授权 QQ build/ABI 和观测结果。不要修改 QQ_SIDE_INTERFACES.md 中与本计划无关的行。

@@ -45,3 +45,40 @@ CUDA inference, and GPU release remain unverified and are RC acceptance work.
 
 本地测试用真实本地制品 CAS 覆盖模型导入，用替身加速器进程覆盖执行生命周期。真实 vLLM
 启动、CUDA 推理和 GPU 回收仍未验证，属于 RC 验收工作。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# 来源记录
+
+本 package 是 Cyrene 自有代码。vLLM 是由 operator 安装并以独立进程运行的外部 engine；本仓库没有 vendor 任何 vLLM 源码。
+
+## Package 信息
+
+| 字段 | 值 |
+| --- | --- |
+| Package | cyrene-vllm-runtime |
+| Capability | execution.engine.v1 |
+| License | Apache-2.0（仓库 LICENSE） |
+| 来源 | Cyrene-Plugins-Official/plugins/serving/vllm-runtime |
+
+## 上游 Engine
+
+| 字段 | 值 |
+| --- | --- |
+| 项目 | vllm-project/vllm |
+| Package | vllm |
+| 固定版本 | release-lock.json 中 engines."execution.engine.v1".acceptedVersion |
+| License | Apache-2.0 |
+| 已解析依赖 | torch==2.11.0、transformers>=5.5.3（来自固定版本的 vLLM metadata） |
+| 调用方式 | --vllm-command "vllm serve"（由 operator 安装的 launcher） |
+
+## 模型来源
+
+import_model 接受固定的 Hugging Face revision 或绝对本地目录。在将 model artifact 发布到 Platform artifact plane 前，它会验证权重、config.json、tokenizer、chat template、许可证和 manifest digest。此路径始终禁用 trust_remote_code。
+
+## 验证状态
+
+本地测试使用真实的本地 artifact CAS 测试模型导入，并使用加速器替身进程测试 execution 生命周期。真实 vLLM 启动、CUDA 推理和 GPU 释放仍未经验证，属于 RC 验收工作。

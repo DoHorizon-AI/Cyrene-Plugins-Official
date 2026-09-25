@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.Anthropic                               │
 // │  Role: Strict Anthropic Messages API wire translation (T83, T85).  │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：AnthropicVendorAdapter.cs
+// 中文：命名空间：Cyrene.Provider.Anthropic
+// 中文：职责：严格按 Anthropic Messages API wire 格式进行转换（T83、T85）。
 
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -104,6 +107,7 @@ public sealed class AnthropicVendorAdapter : IModelCapability
             catch (JsonException)
             {
                 // Ignore malformed or vendor comment frames, matching the OpenAI stream path.
+                // 中文：忽略格式错误的帧或供应商注释帧，与 OpenAI 流式路径保持一致。
                 continue;
             }
 
@@ -166,6 +170,7 @@ public sealed class AnthropicVendorAdapter : IModelCapability
 
                 default:
                     // message_stop, content_block_start/stop, and ping carry no delta.
+                    // 中文：message_stop、content_block_start／stop 和 ping 都不携带 delta。
                     break;
             }
         }
@@ -175,6 +180,7 @@ public sealed class AnthropicVendorAdapter : IModelCapability
     {
         // Anthropic carries system prompts as a top-level field, never as a
         // message role; tool results arrive as user-role tool_result blocks.
+        // 中文：Anthropic 将 system prompt 放在顶层字段中，而不是作为 message role；工具结果则以 user role 的 tool_result block 传入。
         var systemParts = parameters.Messages
             .Where(message => message.Role == "system")
             .Select(message => message.Content)
@@ -255,6 +261,7 @@ public sealed class AnthropicVendorAdapter : IModelCapability
             "required" => new AnthropicWireToolChoice("any"),
             "auto" => new AnthropicWireToolChoice("auto"),
             // Anthropic has no explicit disable mode; omit the field.
+            // 中文：Anthropic 没有显式禁用模式，因此省略该字段。
             _ => null,
         };
     }

@@ -67,3 +67,49 @@ mvn --batch-mode --no-transfer-progress clean verify -f sdk/java/pom.xml
 - [Security policy / 安全策略](SECURITY.md)
 - [Contribution guide / 贡献指南](CONTRIBUTING.md)
 - [Repository policy / 仓库策略](repository-policy.yaml)
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# Cyrene 插件
+
+本仓库从经过审查、没有历史记录的源码导出中，发布 Cyrene 自有的能力契约、多语言 SDK、原生运行时和连接器包。source-manifest.json 记录精确的私有审计提交，以及每个发布文件的 SHA-256。
+
+## 发布状态
+
+本仓库面向无需凭据的公开 CI。构建或测试通过，不会让尚未配置的 runtime 自动达到生产就绪状态。在 operator 提供有效 binding 和 endpoint 之前，原生 provider 与可选 capability 会继续失败关闭。
+
+## 发布范围
+
+- contracts/：版本化 Protobuf、JSON、C ABI、TCK 和生成的契约投影。
+- sdk/：Java/Spring 和 Python 客户端及 runtime SDK。
+- runtime/：Rust runtime 以及 .NET Native AOT host/provider。
+- plugins/：涵盖 connector、评估、模型、策略和工具的官方 capability Plugin，也包括由本仓库维护的 OneBot v11 connector。
+- contracts/capabilities.yaml：生成的 capability 索引，涵盖契约、实现、TCK 覆盖和 maturity。
+- docs/plans/：经过审查的实现计划及其证据。
+- 受保护的 QQ 侧接口研究文档；本仓库不包含 QQ runtime。
+- manifests/：规范 Plugin manifest schema。
+
+本仓库不拥有 Product 语义或 Platform 生命周期权威。Product 通过 Platform 获取经授权的不透明 connection reference，然后通过版本化契约直接调用选定的 Plugin。
+
+## 验证
+
+权威门禁定义见 .github/workflows/public-ci.yml。它覆盖 source-manifest 验证、secret 扫描、SPDX/CycloneDX SBOM、Python、Buf、Rust、纯 C ABI、.NET Native AOT、Java 17/Spring Boot 3 和 4，以及不可变的 release handoff。
+
+本地验证入口包括：
+
+```bash
+python3 tools/ci/verify_source_manifest.py --root . --allow-git-metadata
+cargo test --manifest-path contracts/rust/cyrene-plugin-contracts/Cargo.toml
+dotnet test runtime/dotnet-native-aot/Cyrene.Provider.Tests/Cyrene.Provider.Tests.csproj --configuration Release
+mvn --batch-mode --no-transfer-progress clean verify -f sdk/java/pom.xml
+```
+
+## 策略
+
+- 授权映射见 LICENSING.md。
+- 安全策略见 SECURITY.md。
+- 贡献指南见 CONTRIBUTING.md。
+- 仓库策略见 repository-policy.yaml。

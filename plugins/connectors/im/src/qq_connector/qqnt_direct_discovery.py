@@ -26,7 +26,9 @@ MAX_MANIFEST_BYTES = 64 * 1024
 
 
 class QQInstallationError(RuntimeError):
-    """Structured error raised when an installation cannot be selected safely."""
+    """Structured error raised when an installation cannot be selected safely.
+
+        中文：当无法安全选择安装项时引发的结构化错误。"""
 
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
@@ -70,6 +72,13 @@ def discover_explicit(
     Raises:
         QQInstallationError: If the host, platform, data path, or build is not
             an exact supported selection.
+
+        中文：验证一个明确选定的安装项，不对其进行修改。
+
+        中文：首个受支持的目标是 Linux x86_64。可执行文件必须是单个常规可执行文件；绑定数据目录可以不存在，以便调用方以仅绑定可访问的权限创建它。此路径不会扫描目录，也不会采用启发式回退。
+
+        引发：
+            QQInstallationError：当主机、平台、数据路径或构建不符合精确的支持条件时。
     """
 
     if expected_platform != SUPPORTED_PLATFORM:
@@ -102,6 +111,10 @@ def discover_manifest(
     The manifest is a path and metadata declaration, not a session or secret
     store.  Unknown fields are rejected so an unreviewed installation layout
     cannot silently become supported.
+
+        中文：以确定性方式加载一份由操作者编写的安装清单。
+
+        中文：清单用于声明路径和元数据，不是会话或密钥存储。未知字段会被拒绝，避免未经审核的安装布局悄然变成受支持布局。
     """
 
     manifest_path = _canonical_manifest_path(path)
@@ -173,7 +186,9 @@ def discover_manifest(
 def discover_manifests(
     paths: Sequence[str | Path], *, required_client_version: str
 ) -> QQInstallation:
-    """Select exactly one manifest and reject zero or multiple candidates."""
+    """Select exactly one manifest and reject zero or multiple candidates.
+
+        中文：必须恰好选中一份清单，并拒绝零个或多个候选项。"""
 
     if isinstance(paths, (str, bytes)):
         raise QQInstallationError(
@@ -195,7 +210,9 @@ def discover_manifests(
 
 
 def _require_runtime_platform() -> None:
-    """Reject execution outside the first approved Linux x86_64 target."""
+    """Reject execution outside the first approved Linux x86_64 target.
+
+        中文：拒绝在首个获批目标 Linux x86_64 之外执行。"""
 
     architecture = _normalize_architecture(host_platform.machine())
     if sys.platform != "linux" or architecture != "x86_64":
@@ -206,7 +223,9 @@ def _require_runtime_platform() -> None:
 
 
 def _canonical_executable(value: Any) -> Path:
-    """Resolve one regular executable path and reject zero candidates."""
+    """Resolve one regular executable path and reject zero candidates.
+
+        中文：解析一个常规可执行文件路径，并拒绝零个候选项。"""
 
     path = _required_absolute_path(value, "host_executable")
     try:
@@ -224,7 +243,9 @@ def _canonical_executable(value: Any) -> Path:
 
 
 def _canonical_data_dir(value: Any) -> Path:
-    """Canonicalize a binding data path while allowing first-use creation."""
+    """Canonicalize a binding data path while allowing first-use creation.
+
+        中文：规范化绑定数据路径，同时允许首次使用时创建该路径。"""
 
     path = _required_absolute_path(value, "data_dir")
     if path.is_symlink():
@@ -240,7 +261,9 @@ def _canonical_data_dir(value: Any) -> Path:
 
 
 def _canonical_manifest_path(value: Any) -> Path:
-    """Resolve one regular manifest path without following ambiguous roots."""
+    """Resolve one regular manifest path without following ambiguous roots.
+
+        中文：解析一个常规清单路径，不跟随含义不明确的根路径。"""
 
     path = _required_absolute_path(value, "installation_manifest")
     try:
@@ -258,7 +281,9 @@ def _canonical_manifest_path(value: Any) -> Path:
 
 
 def _required_absolute_path(value: Any, field: str) -> Path:
-    """Validate an absolute path value before canonicalization."""
+    """Validate an absolute path value before canonicalization.
+
+        中文：在规范化之前验证路径值是否为绝对路径。"""
 
     if not isinstance(value, (str, Path)) or not str(value).strip():
         raise QQInstallationError("INVALID_REQUEST", f"{field} must be a path")
@@ -269,7 +294,9 @@ def _required_absolute_path(value: Any, field: str) -> Path:
 
 
 def _required_text(value: Any, field: str) -> str:
-    """Validate one bounded manifest text field."""
+    """Validate one bounded manifest text field.
+
+        中文：验证一个长度受限的清单文本字段。"""
 
     if not isinstance(value, str) or not value.strip() or len(value) > 512:
         raise QQInstallationError("INVALID_REQUEST", f"{field} must be bounded text")
@@ -277,7 +304,9 @@ def _required_text(value: Any, field: str) -> str:
 
 
 def _normalize_architecture(value: Any) -> str:
-    """Normalize the only accepted architecture aliases."""
+    """Normalize the only accepted architecture aliases.
+
+        中文：规范化唯一获准的架构别名。"""
 
     if not isinstance(value, str):
         return ""

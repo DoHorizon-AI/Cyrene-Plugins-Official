@@ -13,6 +13,7 @@ using System.Text.Json.Serialization.Metadata;
 namespace Cyrene.Im.Core;
 
 /// <summary>Cyrene-owned QQ Host stdio protocol constants.</summary>
+/// <remarks>中文：Cyrene 定义的 QQ Host 标准输入输出协议常量。</remarks>
 public static class QqHostProtocol
 {
     public const string Protocol = "cyrene.qq.host.v1";
@@ -145,6 +146,7 @@ public static class QqHostProtocol
 }
 
 /// <summary>Malformed or oversized QQ Host protocol data.</summary>
+/// <remarks>中文：格式错误或超出大小限制的 QQ Host 协议数据。</remarks>
 public sealed class QqHostProtocolException : Exception
 {
     public QqHostProtocolException(string message)

@@ -13,6 +13,7 @@ using System.Text.Json;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>Binding-local transport for OneBot action calls.</summary>
+/// <remarks>中文：binding 本地的 OneBot action 调用传输。</remarks>
 public interface IOneBotActionTransport
 {
     Task<OneBotActionResponse> CallAsync(
@@ -28,6 +29,7 @@ public interface IOneBotActionTransport
 }
 
 /// <summary>Safe transport failure classification for the direct runtime.</summary>
+/// <remarks>中文：供 direct runtime 安全公开的传输故障分类。</remarks>
 public sealed class OneBotTransportException : Exception
 {
     public OneBotTransportException(string domainCode, string message)
@@ -254,6 +256,7 @@ public sealed class OneBotHttpTransport : IOneBotActionTransport, IDisposable
 }
 
 /// <summary>Explicit registry that maps profile names to transport implementations.</summary>
+/// <remarks>中文：将 profile 名称映射到传输实现的显式注册表。</remarks>
 public static class OneBotTransportFactory
 {
     public static IOneBotActionTransport Create(

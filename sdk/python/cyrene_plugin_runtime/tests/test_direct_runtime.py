@@ -1,4 +1,6 @@
-"""Direct data-plane TCK for one Plugin process."""
+"""Direct data-plane TCK for one Plugin process.
+
+中文：针对单个 Plugin 进程的直连数据平面 TCK。"""
 
 from __future__ import annotations
 
@@ -84,7 +86,9 @@ class EchoPlugin:
 
 
 class MultiCapabilityPlugin:
-    """Minimal plugin fixture for a shared direct endpoint."""
+    """Minimal plugin fixture for a shared direct endpoint.
+
+        中文：供共享直连端点使用的最小 Plugin 夹具。"""
 
     plugin_id = "test.direct.multi"
     version = "1.0.0"
@@ -366,6 +370,10 @@ def test_running_the_bootstrap_by_path_does_not_shadow_stdlib_modules() -> None:
     it, ``cyrene_plugin_runtime/logging.py`` shadows ``logging`` and importing the
     server fails with ``AttributeError: module 'logging' has no attribute
     'getLogger'``.
+
+        中文：供应商打包的模块不得遮蔽标准库模块。
+
+        中文：打包启动器按路径执行 ``src/cyrene_plugin_runtime/bootstrap.py``，因此软件包目录会成为 ``sys.path[0]``；若不对其进行规范化，``cyrene_plugin_runtime/logging.py`` 就会遮蔽标准库的 ``logging`` 模块，导致服务器导入失败并出现 ``AttributeError: module 'logging' has no attribute 'getLogger'``。
     """
 
     bootstrap = (

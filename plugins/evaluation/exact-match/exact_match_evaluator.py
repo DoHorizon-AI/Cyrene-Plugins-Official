@@ -22,14 +22,18 @@ EVALUATOR_ID = "exact_match.v1"
 
 @dataclass(frozen=True, slots=True)
 class TypedPayload:
-    """Typed response consumed by DirectPluginRuntime."""
+    """Typed response consumed by DirectPluginRuntime.
+
+        中文：由 DirectPluginRuntime 使用的有类型响应。"""
 
     value: bytes
     type_url: str
 
 
 def _coerce_text(value: Any) -> str | None:
-    """Project one JSON value to text without inventing a missing value."""
+    """Project one JSON value to text without inventing a missing value.
+
+        中文：将一个 JSON 值映射为文本，不虚构缺失值。"""
 
     if value is None:
         return None
@@ -39,7 +43,9 @@ def _coerce_text(value: Any) -> str | None:
 
 
 def _non_negative_integer(value: Any) -> int | None:
-    """Return one provider-supplied counter when it is valid."""
+    """Return one provider-supplied counter when it is valid.
+
+        中文：在提供方给出的计数器有效时返回该计数值。"""
 
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         return None
@@ -47,7 +53,9 @@ def _non_negative_integer(value: Any) -> int | None:
 
 
 def _usage(record: dict[str, Any]) -> dict[str, Any] | None:
-    """Project provider usage facts and never estimate missing counters."""
+    """Project provider usage facts and never estimate missing counters.
+
+        中文：映射提供方报告的用量事实，绝不估算缺失的计数值。"""
 
     value = record.get("usage")
     if not isinstance(value, dict):
@@ -67,7 +75,9 @@ def _usage(record: dict[str, Any]) -> dict[str, Any] | None:
 
 
 class ExactMatchEvaluationRunner:
-    """Evaluate JSON records with strict field equality and return measurements."""
+    """Evaluate JSON records with strict field equality and return measurements.
+
+        中文：使用严格字段相等规则评估 JSON 记录并返回测量结果。"""
 
     plugin_id = "cyrene.evaluation.exact-match"
     version = "0.1.0"
@@ -83,7 +93,9 @@ class ExactMatchEvaluationRunner:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, TypedPayload | str]:
-        """Dispatch one typed JSON evaluation request."""
+        """Dispatch one typed JSON evaluation request.
+
+            中文：分发一个有类型的 JSON 评估请求。"""
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -127,7 +139,9 @@ class ExactMatchEvaluationRunner:
         expected_field: str,
         actual_field: str,
     ) -> dict[str, Any]:
-        """Return exact-match measurements for all supplied records."""
+        """Return exact-match measurements for all supplied records.
+
+            中文：返回所有已提供记录的精确匹配测量结果。"""
 
         if evaluator != EVALUATOR_ID:
             raise ValueError(f"evaluator must be {EVALUATOR_ID}")

@@ -21,6 +21,8 @@ namespace Cyrene.Im.Core;
 /// and credential-bearing results from crossing the stable IPC boundary.
 /// </para>
 /// </summary>
+/// <remarks>中文：校验公共 `qq.client.v1` operation 投影使用的封闭 JSON 边界。</remarks>
+/// <remarks>中文：原生 Host 负责各版本特有的重载细节。此校验器会阻止无关字段、不安全的基本类型值、无界结构以及包含凭据的结果穿过稳定 IPC 边界。</remarks>
 public static class QqHostOperationValidator
 {
     public const int MaxParameterFields = 128;

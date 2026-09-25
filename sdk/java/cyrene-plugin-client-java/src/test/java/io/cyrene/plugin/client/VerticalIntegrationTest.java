@@ -190,6 +190,7 @@ class VerticalIntegrationTest {
         assertThat(output).contains("model.provider.v1");
 
         // Version mismatch detection: querying an unsupported interface version
+// 中文：版本不匹配检测：查询不受支持的接口版本。
         assertThat(output).doesNotContain("agent.runtime.v999");
         assertThat(output).doesNotContain("unsupported.capability");
     }
@@ -203,6 +204,7 @@ class VerticalIntegrationTest {
         assertThat(rustLibrary.length()).isGreaterThan(1000);
 
         // Verify exported symbols from Rust C ABI library using nm
+// 中文：使用 nm 验证 Rust C ABI 库导出的符号。
         ProcessBuilder pb = new ProcessBuilder("nm", "-D", "--defined-only", rustLibrary.getAbsolutePath());
         Process proc = pb.start();
         String nmOutput = new String(proc.getInputStream().readAllBytes(), StandardCharsets.UTF_8);
@@ -247,12 +249,14 @@ class VerticalIntegrationTest {
 
         try {
             // 1. Health check
+// 中文：1. Health check。
             HealthResponse health = client.health("rust-server", io.cyrene.plugin.runtime.v1.HealthRequest.getDefaultInstance());
             assertThat(health.getStatus()).isEqualTo(HealthResponse.Status.STATUS_SERVING);
             assertThat(health.getPluginId()).isEqualTo("cyrene.plugin.rust.server");
             assertThat(health.getCapabilitiesList()).containsExactly("computer.runtime.v1");
 
             // Production startup has no implicit SQLite or synthetic embedding backend.
+// 中文：生产启动时不会隐式启用 SQLite 或合成 embedding 后端。
             io.cyrene.proto.memory.provider.v1.StoreMemoryRequest storeReq =
                 io.cyrene.proto.memory.provider.v1.StoreMemoryRequest.newBuilder()
                     .setTenantId("tenant-vtest")
@@ -318,6 +322,7 @@ class VerticalIntegrationTest {
 
         try {
             // Fail-closed test: invoke unknown capability
+// 中文：失败关闭测试：调用未知 capability。
             DirectInvocationRequest req = DirectInvocationRequest.newBuilder()
                 .setInterfaceVersion("1")
                 .setCapability("unknown.malicious.capability")

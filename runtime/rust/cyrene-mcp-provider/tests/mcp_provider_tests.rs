@@ -151,6 +151,8 @@ async fn call_tool_without_a_snapshot_still_dispatches_and_validates_arguments()
 }
 
 /// Adapter wrapper that counts how many sessions the provider opens.
+///
+/// 中文：统计 Provider 打开了多少个会话的适配器包装器。
 struct CountingAdapter {
     inner: StdioProcessAdapter,
     opens: AtomicUsize,
@@ -178,6 +180,8 @@ impl McpSessionAdapter for CountingAdapter {
 }
 
 /// First opened session fails the transport once; later sessions answer.
+///
+/// 中文：第一个打开的会话会遇到一次传输失败；后续会话可以正常响应。
 struct FlakyAdapter {
     opens: AtomicUsize,
 }
@@ -267,6 +271,7 @@ async fn timeout_is_typed_and_the_session_survives_until_shutdown() {
     let directory = tempfile::tempdir().unwrap();
     // The client deadline is shorter than the tool's own runtime so the
     // timeout fires while the session is still healthy.
+    // 中文：客户端截止时间短于工具自身的运行时间，因此会在会话仍然正常时触发超时。
     let (config, pid_path) = server_with_pid_file(directory.path(), Duration::from_millis(300));
     let provider = McpToolProvider::new(vec![config]);
 
@@ -279,6 +284,7 @@ async fn timeout_is_typed_and_the_session_survives_until_shutdown() {
 
     // Let the in-flight tool finish; its stale response is skipped by request
     // id matching, and the logical session keeps working.
+    // 中文：等待正在执行的工具完成；通过请求 ID 匹配会跳过它的过期响应，而逻辑会话仍可继续工作。
     tokio::time::sleep(Duration::from_millis(900)).await;
     let echo = provider
         .call_tool(&call_request("echo", r#"{"text":"after timeout"}"#))
@@ -297,6 +303,7 @@ async fn timeout_is_typed_and_the_session_survives_until_shutdown() {
     }
 
     // Explicit shutdown closes the session and releases the child process.
+    // 中文：显式关闭会结束会话并释放子进程。
     let pid = wait_for_pid_file(&pid_path);
     provider.shutdown().await;
     assert!(

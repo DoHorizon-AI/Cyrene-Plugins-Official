@@ -13,6 +13,7 @@ namespace Cyrene.Im.Core;
 internal sealed record QqHostInstallation(string HostExecutable, string DataDirectory);
 
 /// <summary>Resolves exactly one binding-local QQ Host installation.</summary>
+/// <remarks>中文：解析且只解析一个 binding 本地的 QQ Host 安装项。</remarks>
 internal static class QqHostInstallationResolver
 {
     private const string ManifestSchema = "cyrene.qq.installation.v1";

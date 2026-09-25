@@ -66,3 +66,41 @@ JSON payloads; their vendor request identity is intentionally opaque to the
 Product policy layer.
 
 协议迁移不得改变 protobuf package 或 type URL。Platform 中的兼容副本只读，并在消费者切换后删除。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# 插件能力契约
+
+本目录是 Cyrene 官方 Plugin 及其 Product 消费方共享能力载荷契约的规范来源。这里负责定义消息结构、稳定的 capability 和 method 标识、生成的语言投影，以及按 owner 划分的一致性测试。
+
+## 边界
+
+- Product 通过选定 Plugin 的 endpoint 直接交换 capability payload。Platform 不代理、解析、转换或持久化这些字节。
+- Platform 拥有通用安装、解析、接入、生命周期、健康、权限、租约/fence 和 endpoint 描述符契约。
+- Product 生命周期和状态契约保留在各自的 Product 仓库。
+- 只有在存在明确 owner 和消费者时，才在此添加契约。只供单个实现使用的私有协议应留在该实现内部。
+
+## 目录结构
+
+| 路径 | 职责 |
+| --- | --- |
+| capabilities.yaml | 机器可读的契约 owner 和版本索引，由 tools/ci/capability_catalog.py 生成 |
+| runtime-implementations.json | 未通过已发布 Plugin manifest 暴露能力的 runtime package |
+| capability-verification.json | 每个（capability、implementation）的作者提供验证证据：等级、执行模式和观测记录 |
+| legacy-spi-disposition.yaml | 已退役 Platform 具名 SPI 的一次性映射或删除证据 |
+| proto/ | 规范 protobuf payload schema |
+| json/ | 为携带有界不透明厂商事实的 capability method 定义的规范 JSON payload schema |
+| rust/ | 生成的 Rust 投影和稳定标识 |
+| tck/ | 跨语言契约一致性测试 |
+| VERSIONING.md | 兼容性和发布规则 |
+
+cyrene.plugin.runtime.v1.DirectPluginRuntime 是单个已配置 Plugin 进程的标准直连传输，由本目录和 Plugin SDK 共同维护。它不是 Platform proxy：Product 打开返回的 endpoint，直接与该 Plugin 进程交换不透明的类型化字节。
+
+owner 范围的 JSON Schema 契约与实现放在一起维护，并在本目录建立索引。legacy-spi-disposition.yaml 记录每个旧 Platform 具名 SPI 被真实 owner 契约替代，或不复制而直接删除的原因。
+
+authority 迁移不会改变 protobuf package 或 type URL。Platform 兼容副本只是只读迁移产物；消费者改用本目录中的来源后，必须删除这些副本。
+
+JSON capability method 使用同一种确定性 type URL 格式：type.cyrene.io/{capability_id}.{method}.{request|response}。message connector 的 respond_request 和 inbound_request schema 是首批共享 JSON payload；Product policy 层有意将其中的厂商 request identity 保持为不透明值。

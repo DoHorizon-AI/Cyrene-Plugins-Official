@@ -11,6 +11,7 @@ namespace Cyrene.Plugin.Core;
 /// <summary>
 /// Status codes representing execution outcomes across the C ABI boundary.
 /// </summary>
+/// <remarks>中文：表示跨越 C ABI 边界的执行结果状态码。</remarks>
 public enum StatusCode : int
 {
     Ok = 0,

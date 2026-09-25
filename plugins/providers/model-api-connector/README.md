@@ -57,3 +57,50 @@ python -m cyrene_plugin_runtime.server \
 `tests/` exercises the connector against a local OpenAI-compatible peer,
 including streamed tool fragments and cancellation; the cross-repository
 acceptance lane lives in `Cyrene-Exchange/tests/test_platform_integration.py`.
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# 官方 Model API Connector
+
+这是 model.provider.v1 的实现，会将类型化 Cyrene chat contract 适配到一个由 operator 配置、兼容 OpenAI API 的 endpoint。
+
+## 所属职责
+
+本 connector 只负责类型化传输。它解码 ChatCompletionRequest，调用 POST <base_url>/v1/chat/completions，并将响应重新编码为契约定义的 chunk：
+
+- chat_completion（interface 1）：兼容文本的方法。v1 codec 无法承载 role、tool call 或上报的总数，因此此版本不会声称提供这些信息。
+- chat_completion_v2（interface 2）：增加 assistant role 前导内容、带索引的流式 tool-call 片段，以及 provider 上报的总数。
+
+路由、凭据、配额、重试和资源生命周期仍由解析 binding 的 Product 负责。
+
+## 明确不负责的事项
+
+- 不提供厂商兼容层，不包含 AstrBot/legacy adapter 树，也不加载本地模型。
+- 不编造 usage：只有 provider 上报 token count 时才会返回。
+- 不会静默重新编号：缺少 index 的流式 tool fragment 会被视为错误，因为 gateway 无法正确合并。
+
+## 取消
+
+connector 拥有上游 socket。on_cancel 会关闭该 socket，因此停止等待的客户端不会让 provider 继续生成。流被取消时不返回 chunk 和 usage。
+
+## 配置
+
+| 变量 | 含义 |
+| --- | --- |
+| CYRENE_CHAT_BASE_URL | 上游 base URL，可包含路径前缀，必填。 |
+| CYRENE_CHAT_API_KEY | 设置后，会作为 Bearer credential 发送给上游。 |
+| CYRENE_CHAT_TIMEOUT | 单请求超时时间（秒），默认 30。 |
+| CYRENE_EMBEDDINGS_SUPPORTED | 预留配置：尚未实现 embeddings，因此对应 method 会以 METHOD_NOT_SUPPORTED 失败关闭。 |
+
+## 运行
+
+runtime 会在 Plugin 旁物化 src/cyrene_plugin_runtime/bootstrap.py，并启动 manifest 指定的入口：
+
+```bash
+python -m cyrene_plugin_runtime.server --entrypoint model_api_connector:ModelApiConnector --capability model.provider.v1 --interface-version 1 --interface-version 2 --listen 127.0.0.1:0
+```
+
+tests/ 会使用本地 OpenAI-compatible peer 测试 connector，包括流式 tool fragment 和取消。跨仓验收路径位于 Cyrene-Exchange/tests/test_platform_integration.py。

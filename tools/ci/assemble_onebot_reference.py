@@ -32,11 +32,17 @@ REFERENCE_RUNNER = "tools/ci/onebot_reference_parity.py"
 
 
 class ReferenceAssemblyError(ValueError):
-    """Raised when a Python reference artifact cannot be assembled safely."""
+    """Raised when a Python reference artifact cannot be assembled safely.
+
+        中文：无法安全组装 Python reference 制品时抛出的错误。
+    """
 
 
 def _load_package_builder(repository_root: Path) -> Any:
-    """Load the existing package copier without importing repository packages."""
+    """Load the existing package copier without importing repository packages.
+
+        中文：加载已有的 package 复制器，但不导入仓库 package。
+    """
 
     builder_path = repository_root / PACKAGE_BUILDER
     spec = importlib.util.spec_from_file_location(
@@ -50,7 +56,10 @@ def _load_package_builder(repository_root: Path) -> Any:
 
 
 def _sha256(path: Path) -> str:
-    """Return the SHA-256 digest of one regular file."""
+    """Return the SHA-256 digest of one regular file.
+
+        中文：返回一个普通文件的 SHA-256 摘要。
+    """
 
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -60,7 +69,10 @@ def _sha256(path: Path) -> str:
 
 
 def _source_revision(repository_root: Path) -> str:
-    """Read the exact Git revision used to build the reference artifact."""
+    """Read the exact Git revision used to build the reference artifact.
+
+        中文：读取用于构建 reference 制品的精确 Git revision。
+    """
 
     try:
         result = subprocess.run(
@@ -80,7 +92,10 @@ def _source_revision(repository_root: Path) -> str:
 
 
 def _source_date_epoch() -> int:
-    """Resolve a reproducible timestamp from SOURCE_DATE_EPOCH."""
+    """Resolve a reproducible timestamp from SOURCE_DATE_EPOCH.
+
+        中文：根据 `SOURCE_DATE_EPOCH` 解析可重现时间戳。
+    """
 
     raw = os.environ.get("SOURCE_DATE_EPOCH", "0")
     try:
@@ -93,7 +108,10 @@ def _source_date_epoch() -> int:
 
 
 def _entries(root: Path) -> list[dict[str, object]]:
-    """Describe every staged reference file in stable lexical order."""
+    """Describe every staged reference file in stable lexical order.
+
+        中文：按稳定的字典序记录每个已暂存 reference 文件。
+    """
 
     entries: list[dict[str, object]] = []
     for path in sorted(root.rglob("*")):
@@ -114,7 +132,10 @@ def _entries(root: Path) -> list[dict[str, object]]:
 
 
 def _write_manifest(root: Path, repository_root: Path) -> None:
-    """Write provenance metadata after the Python payload has been staged."""
+    """Write provenance metadata after the Python payload has been staged.
+
+        中文：Python 负载暂存完成后写入来源信息元数据。
+    """
 
     epoch = _source_date_epoch()
     manifest = {
@@ -136,7 +157,10 @@ def _write_manifest(root: Path, repository_root: Path) -> None:
 
 
 def _write_build_metadata(root: Path, repository_root: Path) -> None:
-    """Write deterministic SBOM and build-proof records into the artifact."""
+    """Write deterministic SBOM and build-proof records into the artifact.
+
+        中文：在制品中写入确定性的 SBOM 和构建证明记录。
+    """
 
     source_revision = _source_revision(repository_root)
     builder_path = repository_root / PACKAGE_BUILDER
@@ -185,7 +209,10 @@ def _write_build_metadata(root: Path, repository_root: Path) -> None:
 
 
 def _zip_timestamp(epoch: int) -> tuple[int, int, int, int, int, int]:
-    """Convert one epoch to ZIP's minimum-safe timestamp representation."""
+    """Convert one epoch to ZIP's minimum-safe timestamp representation.
+
+        中文：将 epoch 转换为 ZIP 可安全表示的最小时间戳。
+    """
 
     import datetime as dt
 
@@ -201,7 +228,10 @@ def _zip_timestamp(epoch: int) -> tuple[int, int, int, int, int, int]:
 
 
 def _write_archive(root: Path, output: Path, epoch: int) -> None:
-    """Write a deterministic ZIP archive without symlink indirection."""
+    """Write a deterministic ZIP archive without symlink indirection.
+
+        中文：写入确定性的 ZIP archive，不使用符号链接转向。
+    """
 
     output.parent.mkdir(parents=True, exist_ok=True)
     timestamp = _zip_timestamp(epoch)
@@ -228,6 +258,8 @@ def build_reference_archive(repository_root: Path, output: Path) -> Path:
 
     Raises:
         ReferenceAssemblyError: If the source or destination is unsafe.
+
+        中文：构建一个自包含的 Python reference archive。参数 `repository_root` 指包含 Python reference 的 Plugins 仓库；`output` 是仓库 checkout 之外的 ZIP 目标路径。返回解析后的 archive 路径。如果源或目标路径不安全，则抛出 `ReferenceAssemblyError`。
     """
 
     repository_root = repository_root.resolve(strict=True)
@@ -249,7 +281,10 @@ def build_reference_archive(repository_root: Path, output: Path) -> Path:
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse repository and immutable output paths."""
+    """Parse repository and immutable output paths.
+
+        中文：解析仓库路径和不可变输出路径。
+    """
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository-root", type=Path, required=True)
@@ -258,7 +293,10 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Build one external reference artifact without modifying the checkout."""
+    """Build one external reference artifact without modifying the checkout.
+
+        中文：构建一份位于仓库之外的 reference 制品，不修改 checkout。
+    """
 
     args = _parse_args()
     archive = build_reference_archive(args.repository_root, args.output)

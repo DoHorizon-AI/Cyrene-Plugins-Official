@@ -2,6 +2,7 @@
 // Module: src/App.tsx
 // Role: Session gate, shell navigation, and page composition for Navigator UI.
 // -----------------------------------------------------------------------------
+// 中文：// 中文：模块职责：管理会话入口、外壳导航，并组合 Navigator UI 页面。
 
 import { useEffect, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
@@ -21,7 +22,10 @@ import {
 } from "./pages";
 import { pushRoute, routeForPath, ROUTES, type RouteId } from "./router";
 
-/** Own the browser session gate and mount only authenticated Product surfaces. */
+/**
+ * Own the browser session gate and mount only authenticated Product surfaces.
+ * 拥有浏览器会话入口，并且只挂载已经认证的 Product 页面。
+ */
 export function App() {
   const [api] = useState(() => new NavigatorApi());
   const [session, setSession] = useState<SessionPayload | null>(null);
@@ -116,7 +120,10 @@ interface LoginViewProps {
   onAuthenticated: (session: SessionPayload) => void;
 }
 
-/** Pair with the launcher-delivered one-time code without persisting it. */
+/**
+ * Pair with the launcher-delivered one-time code without persisting it.
+ * 使用启动器交付的一次性代码完成配对，且不持久化保存该代码。
+ */
 function LoginView({ api, onAuthenticated }: LoginViewProps) {
   const [pairingCode, setPairingCode] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -180,7 +187,10 @@ interface AppShellProps {
   onSessionChange: (session: SessionPayload) => void;
 }
 
-/** Desktop rail plus responsive page frame for the seven route surfaces. */
+/**
+ * Desktop rail plus responsive page frame for the seven route surfaces.
+ * 为七个路由页面提供桌面侧栏和响应式页面框架。
+ */
 function AppShell({ api, session, onSessionChange }: AppShellProps) {
   const [route, setRoute] = useState<RouteId>(() => routeForPath(window.location.pathname));
 

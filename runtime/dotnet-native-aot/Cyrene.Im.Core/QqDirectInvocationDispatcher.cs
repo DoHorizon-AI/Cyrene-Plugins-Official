@@ -16,6 +16,7 @@ using Google.Protobuf;
 namespace Cyrene.Im.Core;
 
 /// <summary>Dispatches fixed QQ extension operations through one Host client.</summary>
+/// <remarks>中文：通过一个 Host 客户端分派固定的 QQ 扩展操作。</remarks>
 public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, IDisposable
 {
     public const string CapabilityId = "qq.client.v1";
@@ -339,6 +340,7 @@ public sealed class QqDirectInvocationDispatcher : IDirectInvocationDispatcher, 
         catch (QqDirectMappingException)
         {
             // Malformed native data is dropped at the binding boundary.
+            // 中文：格式错误的原生数据会在 binding 边界处丢弃。
         }
     }
 

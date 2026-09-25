@@ -2,6 +2,7 @@
 // Module: src/components.tsx
 // Role: Shared presentation primitives for the Navigator operations console.
 // -----------------------------------------------------------------------------
+// 中文：// 中文：模块职责：为 Navigator 运维控制台提供共享展示组件。
 
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
@@ -12,7 +13,10 @@ export interface PageHeaderProps {
   action?: ReactNode;
 }
 
-/** Page-level title block with a single clear action slot. */
+/**
+ * Page-level title block with a single clear action slot.
+ * 提供页面级标题区，并预留一个明确的操作按钮位置。
+ */
 export function PageHeader({ eyebrow, title, description, action }: PageHeaderProps) {
   return (
     <header className="page-header">
@@ -33,7 +37,10 @@ export interface PanelProps {
   className?: string;
 }
 
-/** Bordered work surface used to keep related API data together. */
+/**
+ * Bordered work surface used to keep related API data together.
+ * 使用带边框的工作区将相关 API 数据归在一起。
+ */
 export function Panel({ title, meta, children, className = "" }: PanelProps) {
   return (
     <section className={`panel ${className}`.trim()}>
@@ -50,7 +57,10 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   tone?: "primary" | "quiet" | "danger";
 }
 
-/** Consistent keyboard-focusable button surface. */
+/**
+ * Consistent keyboard-focusable button surface.
+ * 提供统一且可通过键盘聚焦的按钮外观。
+ */
 export function Button({ tone = "quiet", className = "", children, ...props }: ButtonProps) {
   return (
     <button className={`button button--${tone} ${className}`.trim()} {...props}>
@@ -59,7 +69,10 @@ export function Button({ tone = "quiet", className = "", children, ...props }: B
   );
 }
 
-/** Small state marker that uses domain wording rather than color alone. */
+/**
+ * Small state marker that uses domain wording rather than color alone.
+ * 使用领域术语呈现小型状态标记，不单靠颜色表达状态。
+ */
 export function StatusPill({ value }: { value: string | undefined }) {
   const label = value || "UNKNOWN";
   const normalized = label.toLowerCase();
@@ -88,7 +101,10 @@ export interface MetricCardProps {
   accent?: "lime" | "orange" | "blue" | "gray";
 }
 
-/** Compact metric with an editorial label/detail hierarchy. */
+/**
+ * Compact metric with an editorial label/detail hierarchy.
+ * 采用清晰的标题与详情层级展示紧凑指标。
+ */
 export function MetricCard({ label, value, detail, accent = "lime" }: MetricCardProps) {
   return (
     <article className={`metric-card metric-card--${accent}`}>
@@ -106,7 +122,10 @@ export interface StateBlockProps {
   action?: ReactNode;
 }
 
-/** Honest loading, failure, and empty states shared by every resource page. */
+/**
+ * Honest loading, failure, and empty states shared by every resource page.
+ * 为所有资源页面提供一致的加载、失败和空状态。
+ */
 export function StateBlock({ kind, title, detail, action }: StateBlockProps) {
   return (
     <div className={`state-block state-block--${kind}`} role={kind === "error" ? "alert" : undefined}>
@@ -135,7 +154,10 @@ export interface ResourceTableProps<T> {
   caption: string;
 }
 
-/** Accessible horizontal table with a mobile scroll boundary. */
+/**
+ * Accessible horizontal table with a mobile scroll boundary.
+ * 提供可访问的水平表格，并在移动端设置滚动边界。
+ */
 export function ResourceTable<T>({ rows, columns, rowKey, caption }: ResourceTableProps<T>) {
   return (
     <div className="table-scroll">
@@ -166,7 +188,10 @@ export function ResourceTable<T>({ rows, columns, rowKey, caption }: ResourceTab
   );
 }
 
-/** Form label wrapper that keeps the control name adjacent to its input. */
+/**
+ * Form label wrapper that keeps the control name adjacent to its input.
+ * 提供表单标签包装组件，使控件名称紧邻对应输入框。
+ */
 export function Field({
   label,
   hint,
@@ -185,7 +210,10 @@ export function Field({
   );
 }
 
-/** Format an optional API timestamp for the operator's local timezone. */
+/**
+ * Format an optional API timestamp for the operator's local timezone.
+ * 按操作人员本地时区格式化可选的 API 时间戳。
+ */
 export function formatDate(value: unknown): string {
   if (typeof value !== "string" || !value) {
     return "No timestamp";
@@ -196,7 +224,10 @@ export function formatDate(value: unknown): string {
     : new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-/** Narrow an unknown Product field to a render-safe string. */
+/**
+ * Narrow an unknown Product field to a render-safe string.
+ * 将未知 Product 字段收窄为可安全渲染的字符串。
+ */
 export function text(value: unknown, fallback = "Not reported"): string {
   if (typeof value === "string" && value.trim()) {
     return value;
@@ -207,7 +238,10 @@ export function text(value: unknown, fallback = "Not reported"): string {
   return fallback;
 }
 
-/** Format a count without hiding the unavailable state behind zero. */
+/**
+ * Format a count without hiding the unavailable state behind zero.
+ * 格式化计数，同时不把不可用状态伪装成零。
+ */
 export function count(value: number | null): string {
   return value === null ? "--" : new Intl.NumberFormat().format(value);
 }

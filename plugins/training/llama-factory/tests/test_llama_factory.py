@@ -1,4 +1,6 @@
-"""Contract and behavior tests for training.llama-factory.v1."""
+"""Contract and behavior tests for training.llama-factory.v1.
+
+中文：training.llama-factory.v1 的契约和行为测试。"""
 
 from __future__ import annotations
 

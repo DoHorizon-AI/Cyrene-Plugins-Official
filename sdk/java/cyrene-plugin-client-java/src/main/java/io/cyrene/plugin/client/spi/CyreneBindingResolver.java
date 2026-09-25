@@ -25,6 +25,7 @@ public interface CyreneBindingResolver {
      *
      * @param bindingId Stable logical identifier (e.g., "binding://cyrene-agent-service").
      * @return {@link BindingResolution} containing connection reference and generation.
+     * <p>中文：将稳定 binding ID 解析为当前物理 Endpoint 与 Runtime 代次。参数 bindingId 是稳定逻辑标识（例如 `binding://cyrene-agent-service`）；返回的 {@link BindingResolution} 包含连接引用和代次。</p>
      */
     BindingResolution resolve(String bindingId);
 }

@@ -79,6 +79,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
     }
 
     /// <summary>Returns the latest binding-local connection failure category.</summary>
+    /// <remarks>中文：返回最新的 binding 本地连接故障类别。</remarks>
     public string? LastErrorDomainCode
     {
         get
@@ -492,6 +493,7 @@ public sealed class OneBotWebSocketTransport : IOneBotActionTransport, IDisposab
             catch (Exception)
             {
                 // Event normalization is isolated from the transport reader.
+                // 中文：事件规范化与传输读取器隔离执行。
             }
         }
     }

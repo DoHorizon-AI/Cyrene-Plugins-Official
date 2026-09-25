@@ -76,6 +76,7 @@ public class DirectPluginRuntimeClient implements AutoCloseable {
     }
 
     // ── 1. Blocking Invocations ──────────────────────────────────────────
+// 中文：1. 阻塞式调用。
 
     public DirectInvocationResponse invoke(
         String bindingId,
@@ -114,6 +115,7 @@ public class DirectPluginRuntimeClient implements AutoCloseable {
     }
 
     // ── 2. Future Invocations ────────────────────────────────────────────
+// 中文：2. Future 调用。
 
     public CompletableFuture<DirectInvocationResponse> invokeFuture(
         String bindingId,
@@ -148,6 +150,7 @@ public class DirectPluginRuntimeClient implements AutoCloseable {
     }
 
     // ── 3. Async Invocations ─────────────────────────────────────────────
+// 中文：3. 异步调用。
 
     public void invokeAsync(
         String bindingId,
@@ -188,6 +191,7 @@ public class DirectPluginRuntimeClient implements AutoCloseable {
     }
 
     // ── 4. Idempotent Health Check (T50) ─────────────────────────────────
+// 中文：4. 幂等 health check（T50）。
 
     public HealthResponse health(String bindingId, HealthRequest request) {
         try {

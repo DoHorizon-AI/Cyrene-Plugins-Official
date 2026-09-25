@@ -6,8 +6,8 @@
 // │  模块职责：严格限制输出字节数，防止输出炸弹造成内存耗尽                 │
 // └─────────────────────────────────────────────────────────────────────┘
 
-pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 512 * 1024; // 512 KB
-pub const ABSOLUTE_MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024; // 4 MB
+pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 512 * 1024; // 512 KB | 中文：默认输出上限为 512 KB
+pub const ABSOLUTE_MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024; // 4 MB | 中文：输出绝对上限为 4 MB
 
 pub struct OutputCollector {
     max_bytes: usize,
@@ -32,6 +32,7 @@ impl OutputCollector {
     }
 
     /// Appends data chunk; truncates once limit is reached.
+    /// 追加数据块；达到上限后截断。
     pub fn append(&mut self, chunk: &[u8]) {
         self.total_bytes_seen += chunk.len();
 

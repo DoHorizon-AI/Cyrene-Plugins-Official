@@ -11,6 +11,9 @@
 //! broken transport. The provider is not a process supervisor — production
 //! hosts inject an adapter backed by managed execution (capability expansion
 //! plan, decision C).
+//! 基于 MCP stdio server 实现 tool.provider.v1。
+//! v1 只暴露 tools/list 和 tools/call（不支持 resources 或 prompts）。工具 identity 为 (binding_id, provider_tool_id) 组合；display_name 只是展示信息。list_tools 会为每个 binding 记录快照，并由 call_tool 执行快照校验；这使 Agent Runtime 能在每次 run 开始时取得一个工具目录快照。
+//! Session 生命周期：一个 binding 拥有一个逻辑 session；首次使用时通过注入的 McpSessionAdapter 延迟打开，传输中断后重新打开。provider 不是进程监管器；生产 host 注入基于托管执行的 adapter（能力扩展计划，决策 C）。
 
 pub mod client;
 
@@ -34,11 +37,14 @@ use cyrene_plugin_contracts::tool_provider_v1::{
 };
 
 /// Capability identifier owned by this implementation.
+/// 此实现拥有的 capability 标识符。
 pub const CAPABILITY_ID: &str = "tool.provider.v1";
 /// Interface version owned by this implementation.
+/// 此实现拥有的 interface 版本。
 pub const INTERFACE_VERSION: &str = "1";
 
 /// One binding's logical session slot; `None` means the session must be opened.
+/// 一个 binding 的逻辑 session 槽位；None 表示必须打开 session。
 type SessionSlot = Arc<Mutex<Option<Box<dyn McpSession>>>>;
 
 /// MCP stdio tool provider implementing `tool.provider.v1`.
@@ -48,6 +54,8 @@ type SessionSlot = Arc<Mutex<Option<Box<dyn McpSession>>>>;
 /// catalog snapshot and the calls planned against it stay on one server-side
 /// session. Sessions are opened through the injected [`McpSessionAdapter`];
 /// the provider never supervises processes.
+/// 实现 tool.provider.v1 的 MCP stdio tool provider。
+/// 一个 binding 拥有一个逻辑 session：该 binding 的 tools/list 和后续所有 tools/call 共用同一个已初始化的 MCP session，因此目录快照和基于它规划的调用会在同一个 server-side session 上执行。session 通过注入的 McpSessionAdapter 打开；provider 自身不会监管进程。
 pub struct McpToolProvider {
     adapter: Arc<dyn McpSessionAdapter>,
     servers: Vec<McpServerConfig>,
@@ -67,11 +75,13 @@ impl std::fmt::Debug for McpToolProvider {
 impl McpToolProvider {
     /// Build a provider over the configured server bindings using the default
     /// stdio process adapter.
+    /// 使用默认 stdio process adapter，根据已配置的 server binding 构建 provider。
     pub fn new(servers: Vec<McpServerConfig>) -> Self {
         Self::with_adapter(Arc::new(StdioProcessAdapter), servers)
     }
 
     /// Build a provider whose session lifecycle is owned by the given adapter.
+    /// 构建 provider，并由指定 adapter 持有 session 生命周期。
     pub fn with_adapter(
         adapter: Arc<dyn McpSessionAdapter>,
         servers: Vec<McpServerConfig>,
@@ -87,6 +97,7 @@ impl McpToolProvider {
     /// Close every open logical session. Hosts call this when a package unloads;
     /// dropping the provider also releases the sessions (the default adapter's
     /// children die with their session).
+    /// 关闭所有已打开的逻辑 session。package unload 时由 host 调用；丢弃 provider 也会释放 session（默认 adapter 的子进程会随 session 退出）。
     pub async fn shutdown(&self) {
         let slots: Vec<SessionSlot> = {
             let mut sessions = self.sessions.lock().await;
@@ -101,11 +112,13 @@ impl McpToolProvider {
     }
 
     /// True when at least one server binding is configured.
+    /// 至少配置一个 server binding 时返回 true。
     pub fn is_configured(&self) -> bool {
         !self.servers.is_empty()
     }
 
     /// Binding identifiers in configuration order.
+    /// 按配置顺序返回 binding 标识符。
     pub fn bindings(&self) -> Vec<String> {
         self.servers
             .iter()
@@ -114,6 +127,7 @@ impl McpToolProvider {
     }
 
     /// Return one catalog snapshot for the selected bindings and record it.
+    /// 为选定的 binding 返回一份目录快照，并记录该快照。
     pub async fn list_tools(&self, binding_id: Option<&str>) -> ListToolsResponse {
         let selected: Vec<&McpServerConfig> = match binding_id {
             Some(selected_id) => self
@@ -178,6 +192,7 @@ impl McpToolProvider {
     }
 
     /// Execute one tool call against the configured binding.
+    /// 针对已配置的 binding 执行一次工具调用。
     pub async fn call_tool(&self, request: &CallToolRequest) -> CallToolResponse {
         let Some(server) = self
             .servers
@@ -243,6 +258,7 @@ impl McpToolProvider {
     }
 
     /// Ensure the binding has an open logical session and return its slot.
+    /// 确保该 binding 拥有已打开的逻辑 session，并返回其槽位。
     async fn ensure_session(
         &self,
         server: &McpServerConfig,
@@ -257,6 +273,7 @@ impl McpToolProvider {
     }
 
     /// Drop a session whose transport broke so the next operation re-opens one.
+    /// 丢弃传输已中断的 session，使下一次操作重新打开 session。
     async fn reset_broken_session(&self, slot: &SessionSlot) {
         let mut guard = slot.lock().await;
         *guard = None;
@@ -368,6 +385,7 @@ fn map_tool_outcome(result: &Value) -> ToolCallOutcome {
                 });
             } else {
                 // Images, audio, and embedded resources stay opaque JSON in v1.
+                // v1 会将图片、音频和嵌入式资源作为不透明 JSON 保留。
                 content.push(ToolContentPart {
                     content: Some(tool_content_part::Content::Json(ToolJsonContent {
                         json: item.to_string(),

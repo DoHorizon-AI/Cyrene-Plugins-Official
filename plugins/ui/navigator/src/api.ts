@@ -2,11 +2,18 @@
 // Module: src/api.ts
 // Role: Typed same-origin client for the Navigator Web Host and Product proxies.
 // -----------------------------------------------------------------------------
+// 中文：模块职责：为 Navigator Web Host 与 Product 代理提供同源类型化客户端。
 
-/** A JSON object received from a Product API after boundary validation. */
+/**
+ * A JSON object received from a Product API after boundary validation.
+ * 中文：经过边界校验后，从 Product API 接收的 JSON 对象。
+ */
 export type JsonRecord = Record<string, unknown>;
 
-/** The browser-visible session projection returned by Navigator Web Host. */
+/**
+ * The browser-visible session projection returned by Navigator Web Host.
+ * 中文：由 Navigator Web Host 返回、可供浏览器访问的会话投影。
+ */
 export interface SessionPayload {
   authenticated: boolean;
   state: "AUTHENTICATED" | "ANONYMOUS";
@@ -88,7 +95,10 @@ export interface DeploymentEventsResponse {
   events: DeploymentEvent[];
 }
 
-/** Safe host status; it intentionally contains no credential material. */
+/**
+ * Safe host status; it intentionally contains no credential material.
+ * 中文：安全的 Host 状态；其中有意不包含任何凭据材料。
+ */
 export interface SystemStatus {
   service: string;
   status: string;
@@ -109,12 +119,16 @@ export interface SystemStatus {
    * Host. Optional so an older Web Host keeps working; consumers must fall back
    * to their previous behaviour when it is absent. The port differs between the
    * dev stack and packaged deployments, so it must never be hardcoded.
+      * 中文：由 Web Host 发布的 Exchange OpenAI 兼容网关基础 URL。此字段为可选项，以便兼容较旧的 Web Host；缺失时，调用方必须回退到此前行为。开发环境与打包部署使用的端口不同，因此绝不能硬编码。
    */
   gatewayBaseUrl?: string;
   observedAt: string;
 }
 
-/** Write-only credential metadata returned by the Web Host. */
+/**
+ * Write-only credential metadata returned by the Web Host.
+ * 中文：Web Host 返回的只写凭据元数据。
+ */
 export interface CredentialMetadata {
   id: string;
   name: string;
@@ -126,7 +140,10 @@ export interface CredentialMetadata {
   updatedAt: string;
 }
 
-/** Gateway API key metadata returned by Exchange. */
+/**
+ * Gateway API key metadata returned by Exchange.
+ * 中文：Exchange 返回的网关 API key 元数据。
+ */
 export interface ApiKeyMetadata {
   id: string;
   name: string;
@@ -145,7 +162,10 @@ export interface CreateApiKeyInput {
   modelScope?: string[];
 }
 
-/** Model import command accepted by the Reactor Product API. */
+/**
+ * Model import command accepted by the Reactor Product API.
+ * 中文：Reactor Product API 接受的模型导入命令。
+ */
 export interface CreateModelImportInput {
   name: string;
   servingBindingId: string;
@@ -159,7 +179,10 @@ export interface CreateModelImportInput {
   trustRemoteCode: false;
 }
 
-/** Dataset creation command accepted by Catalyst. */
+/**
+ * Dataset creation command accepted by Catalyst.
+ * 中文：Catalyst 接受的数据集创建命令。
+ */
 export interface CreateDatasetInput {
   name: string;
   description: string;
@@ -171,6 +194,9 @@ export interface CreateDatasetInput {
  * Property names are camelCase because Yield's ContractModel generates aliases
  * with `to_camel`. The model is declared with `extra="forbid"`, so a typo here
  * is rejected with 422 rather than quietly ignored.
+  * 中文：Yield 的 `TrainingParameters` 模型接受的超参数。
+ *
+ * 中文：属性名称采用 camelCase，因为 Yield 的 ContractModel 会通过 `to_camel` 生成别名。该模型声明了 `extra="forbid"`，因此字段拼写错误会返回 422，而不会被悄然忽略。
  */
 export interface TrainingParametersInput {
   epochs: number;
@@ -188,13 +214,19 @@ export interface TrainingParametersInput {
  *
  * `baseModel` is required by Yield, so it is echoed back from the draft's
  * existing configuration rather than being re-selected on every launch.
+  * 中文：`PATCH /api/v1/training-drafts/{id}` 的请求正文（Yield 的“Prepare Draft”操作）。
+ *
+ * 中文：Yield 要求提供 `baseModel`，因此这里会从草稿的现有配置中回传该值，而不是每次启动时重新选择。
  */
 export interface TrainingDraftSpecInput {
   baseModel: JsonRecord;
   parameters: TrainingParametersInput;
 }
 
-/** A stable set of same-origin proxy prefixes exposed by Navigator. */
+/**
+ * A stable set of same-origin proxy prefixes exposed by Navigator.
+ * 中文：Navigator 暴露的一组稳定同源代理前缀。
+ */
 export const NAVIGATOR_PROXY_PATHS = {
   catalyst: "/api/v1/catalyst",
   exchange: "/api/v1/exchange",
@@ -208,7 +240,10 @@ const AUTH_REFRESH_PATH = "/api/v1/auth/session/refresh";
 const AUTH_PAIR_PATH = "/api/v1/auth/pair";
 const AUTH_LOGOUT_PATH = "/api/v1/auth/session";
 
-/** An RFC 9457 or Web Host error raised before a page can render a result. */
+/**
+ * An RFC 9457 or Web Host error raised before a page can render a result.
+ * 中文：页面渲染结果之前发生的 RFC 9457 或 Web Host 错误。
+ */
 export class NavigatorHttpError extends Error {
   readonly status: number;
   readonly code: string;
@@ -230,7 +265,10 @@ export class NavigatorHttpError extends Error {
   }
 }
 
-/** Raised when a response does not satisfy the small client-side wire contract. */
+/**
+ * Raised when a response does not satisfy the small client-side wire contract.
+ * 中文：响应不符合精简客户端 wire contract 时抛出的错误。
+ */
 export class NavigatorContractError extends Error {
   constructor(detail: string) {
     super(detail);
@@ -245,6 +283,7 @@ type Fetcher = (input: RequestInfo | URL, init?: RequestInit) => Promise<Respons
  * Own browser session material in memory and route every Product request through
  * Navigator's configured same-origin prefixes. No API origin is accepted from
  * page code and no session token is written to browser storage.
+  * 中文：在内存中管理浏览器会话材料，并通过 Navigator 配置的同源前缀路由所有 Product 请求。页面代码不能指定 API origin，也不会将会话令牌写入浏览器存储。
  */
 export class NavigatorApi {
   private csrfToken: string | null = null;
@@ -253,12 +292,18 @@ export class NavigatorApi {
 
   constructor(private readonly fetcher: Fetcher = globalThis.fetch.bind(globalThis)) {}
 
-  /** Register the App-level response for an exhausted Web Host session. */
+  /**
+   * Register the App-level response for an exhausted Web Host session.
+   * 中文：为会话耗尽的 Web Host 响应注册 App 级处理函数。
+   */
   setSessionExpiredHandler(handler: (() => void) | null): void {
     this.sessionExpiredHandler = handler;
   }
 
-  /** Read current session state and rotate it when only refresh state remains. */
+  /**
+   * Read current session state and rotate it when only refresh state remains.
+   * 中文：读取当前会话状态；如果只剩刷新凭据，则轮换会话。
+   */
   async restoreSession(): Promise<SessionPayload> {
     const session = await this.getSession();
     if (!session.authenticated && session.refreshable) {
@@ -274,7 +319,10 @@ export class NavigatorApi {
     return session;
   }
 
-  /** Pair the browser with the one-time code printed by the Web Host launcher. */
+  /**
+   * Pair the browser with the one-time code printed by the Web Host launcher.
+   * 中文：使用 Web Host 启动器打印的一次性代码关联当前浏览器会话。
+   */
   async pair(pairingCode: string): Promise<SessionPayload> {
     const value = pairingCode.trim();
     if (!value) {
@@ -288,12 +336,18 @@ export class NavigatorApi {
     );
   }
 
-  /** Return session state without converting anonymous access into an error. */
+  /**
+   * Return session state without converting anonymous access into an error.
+   * 中文：读取会话状态，不会将匿名访问转换为错误。
+   */
   async getSession(): Promise<SessionPayload> {
     return this.requestJson(AUTH_SESSION_PATH, { method: "GET" }, parseSession, false);
   }
 
-  /** Rotate the refresh cookie and its CSRF token, coalescing concurrent calls. */
+  /**
+   * Rotate the refresh cookie and its CSRF token, coalescing concurrent calls.
+   * 中文：轮换刷新 cookie 和 CSRF token，并合并并发调用。
+   */
   async refreshSession(): Promise<SessionPayload> {
     if (this.refreshInFlight) {
       return this.refreshInFlight;
@@ -312,7 +366,10 @@ export class NavigatorApi {
     }
   }
 
-  /** Revoke the browser session and clear the in-memory CSRF token. */
+  /**
+   * Revoke the browser session and clear the in-memory CSRF token.
+   * 中文：撤销浏览器会话并清除内存中的 CSRF token。
+   */
   async logout(): Promise<void> {
     await this.requestJson<void>(
       AUTH_LOGOUT_PATH,
@@ -323,7 +380,10 @@ export class NavigatorApi {
     this.csrfToken = null;
   }
 
-  /** Read non-secret Web Host readiness and credential lifecycle counts. */
+  /**
+   * Read non-secret Web Host readiness and credential lifecycle counts.
+   * 中文：读取不含密钥的 Web Host 就绪状态和凭据生命周期计数。
+   */
   async getSystemStatus(): Promise<SystemStatus> {
     return this.requestJson(
       "/api/v1/system/status",
@@ -332,7 +392,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read write-only credential metadata. */
+  /**
+   * Read write-only credential metadata.
+   * 中文：读取只写凭据元数据。
+   */
   async getCredentials(): Promise<CredentialMetadata[]> {
     return this.requestJson(
       "/api/v1/credentials",
@@ -341,7 +404,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Create a credential without ever echoing its secret in the UI response. */
+  /**
+   * Create a credential without ever echoing its secret in the UI response.
+   * 中文：创建凭据，且绝不在 UI 响应中回传密钥。
+   */
   async createCredential(input: {
     name: string;
     provider: string;
@@ -355,7 +421,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Revoke one Web Host credential by metadata identifier. */
+  /**
+   * Revoke one Web Host credential by metadata identifier.
+   * 中文：按元数据标识撤销一个 Web Host 凭据。
+   */
   async revokeCredential(id: string): Promise<CredentialMetadata> {
     return this.requestJson(
       `/api/v1/credentials/${encodeURIComponent(id)}`,
@@ -364,7 +433,10 @@ export class NavigatorApi {
     );
   }
 
-  /** List Reactor-owned model imports through the Navigator proxy. */
+  /**
+   * List Reactor-owned model imports through the Navigator proxy.
+   * 中文：通过 Navigator 代理列出 Reactor 管理的模型导入项。
+   */
   async getModelImports(): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.reactor}/model-imports`,
@@ -373,7 +445,10 @@ export class NavigatorApi {
     );
   }
 
-  /** List serving bindings available to the current Reactor installation. */
+  /**
+   * List serving bindings available to the current Reactor installation.
+   * 中文：列出当前 Reactor 安装可用的 serving binding。
+   */
   async getServingBindings(): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.reactor}/serving-bindings`,
@@ -382,7 +457,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Start a model import with a stable mutation key. */
+  /**
+   * Start a model import with a stable mutation key.
+   * 中文：使用稳定的 mutation key 启动模型导入。
+   */
   async createModelImport(input: CreateModelImportInput): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.reactor}/model-imports`,
@@ -391,7 +469,10 @@ export class NavigatorApi {
     );
   }
 
-  /** List Catalyst-owned dataset containers through the Navigator proxy. */
+  /**
+   * List Catalyst-owned dataset containers through the Navigator proxy.
+   * 中文：通过 Navigator 代理列出 Catalyst 管理的数据集容器。
+   */
   async getDatasets(): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.catalyst}/datasets`,
@@ -400,7 +481,10 @@ export class NavigatorApi {
     );
   }
 
-  /** List Preparations of one Catalyst dataset in insertion order. */
+  /**
+   * List Preparations of one Catalyst dataset in insertion order.
+   * 中文：按插入顺序列出一个 Catalyst 数据集的 Preparations。
+   */
   async getPreparations(datasetId: string): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.catalyst}/datasets/${encodeURIComponent(datasetId)}/preparations`,
@@ -414,6 +498,9 @@ export class NavigatorApi {
    *
    * Catalyst reads the raw request body (not multipart) and takes the display
    * name and original filename from the query string.
+      * 中文：将源文件上传为新的 Preparation。
+   *
+   * 中文：Catalyst 读取原始请求正文（不是 multipart），并从 query string 获取显示名称和原始文件名。
    */
   async createPreparation(
     datasetId: string,
@@ -434,7 +521,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Declare how imported fields map onto the SFT training shape. */
+  /**
+   * Declare how imported fields map onto the SFT training shape.
+   * 中文：声明导入字段如何映射到 SFT 训练数据结构。
+   */
   async configurePreparationMapping(
     preparationId: string,
     command: Record<string, unknown>,
@@ -446,7 +536,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Run preparation (validate + deduplicate) on a mapped Preparation. */
+  /**
+   * Run preparation (validate + deduplicate) on a mapped Preparation.
+   * 中文：对已映射的 Preparation 执行预处理（校验并去重）。
+   */
   async confirmPreparation(preparationId: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.catalyst}/preparations/${encodeURIComponent(preparationId)}/confirm`,
@@ -455,7 +548,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Publish a confirmed Preparation into an immutable DatasetVersion. */
+  /**
+   * Publish a confirmed Preparation into an immutable DatasetVersion.
+   * 中文：将已确认的 Preparation 发布为不可变 DatasetVersion。
+   */
   async publishPreparation(preparationId: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.catalyst}/preparations/${encodeURIComponent(preparationId)}/publish`,
@@ -464,7 +560,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Hand the published version to Yield as a training draft. */
+  /**
+   * Hand the published version to Yield as a training draft.
+   * 中文：将已发布的数据集版本交给 Yield，作为训练草稿使用。
+   */
   async sendPreparationToYield(preparationId: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.catalyst}/preparations/${encodeURIComponent(preparationId)}/yield-draft`,
@@ -477,6 +576,9 @@ export class NavigatorApi {
    * List the DatasetVersions of one Catalyst dataset, newest first.
    *
    * Lets the console offer a picker instead of making the user paste a UUID.
+      * 中文：按从新到旧的顺序列出一个 Catalyst 数据集的 DatasetVersions。
+   *
+   * 这样控制台可以提供选择器，而不必让用户手动粘贴 UUID。
    */
   async getDatasetVersions(datasetId: string): Promise<JsonRecord[]> {
     return this.requestJson(
@@ -486,7 +588,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Create a dataset container; file preparation remains Catalyst-owned. */
+  /**
+   * Create a dataset container; file preparation remains Catalyst-owned.
+   * 中文：创建数据集容器；文件预处理仍由 Catalyst 管理。
+   */
   async createDataset(input: CreateDatasetInput): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.catalyst}/datasets`,
@@ -495,7 +600,10 @@ export class NavigatorApi {
     );
   }
 
-  /** List Yield-owned training drafts through the Navigator proxy. */
+  /**
+   * List Yield-owned training drafts through the Navigator proxy.
+   * 中文：通过 Navigator 代理列出 Yield 管理的训练草稿。
+   */
   async getTrainingDrafts(): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.yield}/training-drafts`,
@@ -509,6 +617,9 @@ export class NavigatorApi {
    *
    * Yield owns these values; without this call the training run starts with
    * whatever the draft already carried and any UI edits are silently lost.
+      * 中文：在启动前，将草稿的基础模型和超参数持久化保存到 Yield。
+   *
+   * 中文：这些值由 Yield 管理；如果不调用此接口，训练会使用草稿当前已有的值，UI 中的修改会被静默丢弃。
    */
   async updateTrainingDraft(id: string, spec: TrainingDraftSpecInput): Promise<JsonRecord> {
     return this.requestJson(
@@ -518,7 +629,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Start one prepared training draft. */
+  /**
+   * Start one prepared training draft.
+   * 中文：启动一个已准备好的训练草稿。
+   */
   async startTrainingDraft(id: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.yield}/training-drafts/${encodeURIComponent(id)}/actions/start`,
@@ -527,7 +641,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read a Yield training run by its owning Product identifier. */
+  /**
+   * Read a Yield training run by its owning Product identifier.
+   * 中文：按其所属 Product 标识读取一项 Yield 训练运行。
+   */
   async getTrainingRun(id: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.yield}/training-runs/${encodeURIComponent(id)}`,
@@ -541,6 +658,9 @@ export class NavigatorApi {
    *
    * Yield requires an explicit checkpoint, so the caller passes the name
    * observed in the event stream rather than relying on an implicit "latest".
+      * 中文：从完整检查点恢复一项已停止的运行。
+   *
+   * 中文：Yield 要求显式指定检查点，因此调用方应传入从事件流中观察到的名称，而不能依赖隐式的“最新”检查点。
    */
   async resumeTrainingRun(
     runId: string,
@@ -554,7 +674,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Hand a completed training result to Reactor for deployment. */
+  /**
+   * Hand a completed training result to Reactor for deployment.
+   * 中文：将已完成的训练结果交给 Reactor 部署。
+   */
   async sendResultToReactor(resultId: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.yield}/training-results/${encodeURIComponent(resultId)}/actions/send-to-reactor`,
@@ -563,7 +686,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read public attempt diagnostics for one training run. */
+  /**
+   * Read public attempt diagnostics for one training run.
+   * 中文：读取某次训练运行公开的尝试诊断信息。
+   */
   async getTrainingRunAttempts(id: string): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.yield}/training-runs/${encodeURIComponent(id)}/attempts`,
@@ -572,7 +698,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Request cancellation without pretending that cancellation is synchronous. */
+  /**
+   * Request cancellation without pretending that cancellation is synchronous.
+   * 中文：请求取消操作；不会假装取消是同步完成的。
+   */
   async cancelTrainingRun(id: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.yield}/training-runs/${encodeURIComponent(id)}/actions/cancel`,
@@ -581,7 +710,10 @@ export class NavigatorApi {
     );
   }
 
-  /** List Reactor deployment intent and observed lifecycle projections. */
+  /**
+   * List Reactor deployment intent and observed lifecycle projections.
+   * 中文：列出 Reactor 的部署意图和观测到的生命周期投影。
+   */
   async getDeployments(): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.reactor}/deployments`,
@@ -590,7 +722,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Stop one deployment through Reactor's explicit lifecycle action. */
+  /**
+   * Stop one deployment through Reactor's explicit lifecycle action.
+   * 中文：通过 Reactor 的显式生命周期操作停止一项部署。
+   */
   async stopDeployment(id: string): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.reactor}/deployments/${encodeURIComponent(id)}/actions/stop`,
@@ -599,7 +734,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read Gateway routes configured on Exchange. */
+  /**
+   * Read Gateway routes configured on Exchange.
+   * 中文：读取 Exchange 配置的网关路由。
+   */
   async getGatewayRoutes(): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/gateway-routes`,
@@ -608,7 +746,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read Gateway endpoints configured on Exchange. */
+  /**
+   * Read Gateway endpoints configured on Exchange.
+   * 中文：读取 Exchange 配置的网关 Endpoint。
+   */
   async getGatewayEndpoints(): Promise<JsonRecord[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/gateway-endpoints`,
@@ -617,7 +758,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Confirm and publish a draft gateway route. */
+  /**
+   * Confirm and publish a draft gateway route.
+   * 中文：确认并发布一条草稿网关路由。
+   */
   async confirmGatewayRoute(routeId: string, resourceVersion: number): Promise<JsonRecord> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/gateway-route-drafts/${encodeURIComponent(routeId)}/actions/confirm`,
@@ -626,7 +770,10 @@ export class NavigatorApi {
     );
   }
 
-  /** List Exchange gateway API keys. */
+  /**
+   * List Exchange gateway API keys.
+   * 中文：列出 Exchange 网关 API key。
+   */
   async listApiKeys(): Promise<ApiKeyMetadata[]> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/api-keys`,
@@ -635,7 +782,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Create an Exchange gateway API key; secret is returned exactly once. */
+  /**
+   * Create an Exchange gateway API key; secret is returned exactly once.
+   * 中文：创建 Exchange 网关 API key；密钥只会返回一次。
+   */
   async createApiKey(
     routeId: string,
     input: CreateApiKeyInput | JsonRecord,
@@ -648,7 +798,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Revoke an Exchange gateway API key. */
+  /**
+   * Revoke an Exchange gateway API key.
+   * 中文：撤销一个 Exchange 网关 API key。
+   */
   async revokeApiKey(id: string): Promise<ApiKeyMetadata> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.exchange}/api/v1/api-keys/${encodeURIComponent(id)}/actions/revoke`,
@@ -657,7 +810,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read dataset version sample preview through Catalyst proxy. */
+  /**
+   * Read dataset version sample preview through Catalyst proxy.
+   * 中文：通过 Catalyst 代理读取数据集版本的样本预览。
+   */
   async getDatasetVersionPreview(
     versionId: string,
     limit: number = 10,
@@ -670,7 +826,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read deployment loading phase events through Reactor proxy. */
+  /**
+   * Read deployment loading phase events through Reactor proxy.
+   * 中文：通过 Reactor 代理读取部署加载阶段事件。
+   */
   async getDeploymentEvents(deploymentId: string): Promise<DeploymentEventsResponse> {
     return this.requestJson(
       `${NAVIGATOR_PROXY_PATHS.reactor}/deployments/${encodeURIComponent(deploymentId)}/events`,
@@ -679,7 +838,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Read active gateway route from Navigator Web Host session. */
+  /**
+   * Read active gateway route from Navigator Web Host session.
+   * 中文：从 Navigator Web Host 会话读取当前网关路由。
+   */
   async getActiveRoute(): Promise<ActiveRoutePayload> {
     return this.requestJson(
       "/api/v1/navigator/active-route",
@@ -688,7 +850,10 @@ export class NavigatorApi {
     );
   }
 
-  /** Store active gateway route into Navigator Web Host session. */
+  /**
+   * Store active gateway route into Navigator Web Host session.
+   * 中文：将当前网关路由写入 Navigator Web Host 会话。
+   */
   async setActiveRoute(payload: ActiveRoutePayload): Promise<ActiveRoutePayload> {
     return this.requestJson(
       "/api/v1/navigator/active-route",
@@ -712,6 +877,7 @@ export class NavigatorApi {
         }
       } catch {
         // The original response contains the useful Product/Web Host problem.
+                // 中文：原始响应包含有用的 Product/Web Host 错误信息。
       }
       this.sessionExpiredHandler?.();
       this.csrfToken = null;
@@ -750,7 +916,10 @@ export class NavigatorApi {
   }
 }
 
-/** Create a JSON request and an idempotency key for a Product mutation. */
+/**
+ * Create a JSON request and an idempotency key for a Product mutation.
+ * 中文：为 Product mutation 创建 JSON 请求和幂等键。
+ */
 function jsonRequest(method: string, body: unknown, idempotent = false): RequestInit {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   if (idempotent) {

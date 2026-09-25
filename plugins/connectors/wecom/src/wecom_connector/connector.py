@@ -58,7 +58,10 @@ _TARGET_KEYS = {"private": "touser", "group": "toparty"}
 
 
 class ConnectorError(RuntimeError):
-    """Typed connector failure carried to DirectPluginRuntime."""
+    """Typed connector failure carried to DirectPluginRuntime.
+
+        中文：通过 DirectPluginRuntime 传递的类型化 connector 故障。
+    """
 
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
@@ -67,13 +70,19 @@ class ConnectorError(RuntimeError):
 
 
 class CancellationToken(Protocol):
-    """Minimal cooperative cancellation surface."""
+    """Minimal cooperative cancellation surface.
+
+        中文：精简的协作式取消接口。
+    """
 
     def is_cancelled(self) -> bool: ...
 
 
 class WeComTransport(Protocol):
-    """Injectable transport for token, upload, and message REST calls."""
+    """Injectable transport for token, upload, and message REST calls.
+
+        中文：可注入的 REST 传输，用于 token、文件上传和消息发送请求。
+    """
 
     def get_token(
         self,
@@ -106,7 +115,10 @@ class WeComTransport(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class WeComInstanceConfig:
-    """One configured WeCom application binding."""
+    """One configured WeCom application binding.
+
+        中文：一个已配置的 WeCom 应用 binding。
+    """
 
     binding_id: str
     corp_id: str
@@ -118,7 +130,10 @@ class WeComInstanceConfig:
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> WeComInstanceConfig:
-        """Validate one configuration mapping."""
+        """Validate one configuration mapping.
+
+            中文：校验一份配置映射。
+        """
 
         binding_id = _required_text(value.get("binding_id"), "binding_id")
         corp_id = _required_text(value.get("corp_id"), "corp_id")
@@ -140,6 +155,7 @@ class WeComInstanceConfig:
             "localhost",
         ):
             # Plain HTTP is tolerated only for loopback test endpoints.
+            # 中文：# 中文：仅容忍 loopback 测试 Endpoint 使用普通 HTTP。
             pass
         else:
             raise ConnectorError(
@@ -176,7 +192,10 @@ class WeComInstanceConfig:
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, str]) -> WeComInstanceConfig:
-        """Build configuration from the standard plugin activation environment."""
+        """Build configuration from the standard plugin activation environment.
+
+            中文：根据标准 Plugin activation 环境构造配置。
+        """
 
         encoded = settings.get("config") or "{}"
         try:
@@ -195,7 +214,10 @@ class WeComInstanceConfig:
 
 
 class UrllibWeComTransport:
-    """Small urllib transport; the only network surface this connector owns."""
+    """Small urllib transport; the only network surface this connector owns.
+
+        中文：精简的 urllib 传输；这是此 connector 唯一拥有的网络接口。
+    """
 
     def get_token(
         self,
@@ -239,7 +261,10 @@ class UrllibWeComTransport:
         *,
         cancellation: CancellationToken | None = None,
     ) -> Mapping[str, Any]:
-        """Fetch one canonical remote attachment and upload it as temporary media."""
+        """Fetch one canonical remote attachment and upload it as temporary media.
+
+            中文：获取一个规范的远程附件，并将其上传为临时媒体文件。
+        """
 
         content, resolved_name, resolved_mime = self._download_media(
             remote_uri,
@@ -372,7 +397,10 @@ class UrllibWeComTransport:
 
 
 class WeComConnector:
-    """WeCom application-message connector for one configured binding."""
+    """WeCom application-message connector for one configured binding.
+
+        中文：供单个已配置 binding 使用的 WeCom 应用消息 connector。
+    """
 
     plugin_id = "cyrene.connectors.wecom"
     version = "0.1.0"
@@ -396,10 +424,14 @@ class WeComConnector:
                 self.configure(WeComInstanceConfig.from_settings(settings))
 
     # ── configuration ──────────────────────────────────────────────────
+    # 中文：# 中文：配置。
 
     @property
     def configured_binding_id(self) -> str | None:
-        """Return the configured binding identity."""
+        """Return the configured binding identity.
+
+            中文：返回已配置的 binding 身份。
+        """
 
         return self._config.binding_id if self._config is not None else None
 
@@ -409,7 +441,10 @@ class WeComConnector:
         *,
         transport: WeComTransport | None = None,
     ) -> None:
-        """Bind one configuration; an explicit transport is used when given."""
+        """Bind one configuration; an explicit transport is used when given.
+
+            中文：绑定一份配置；如果显式提供了 transport，则使用该实例。
+        """
 
         self._config = config
         self._transport = transport
@@ -417,6 +452,7 @@ class WeComConnector:
         self._token_expires_at = 0.0
 
     # ── canonical method ───────────────────────────────────────────────
+    # 中文：# 中文：规范方法。
 
     def send_message(
         self,
@@ -424,7 +460,10 @@ class WeComConnector:
         *,
         cancellation: CancellationToken | None = None,
     ) -> dict[str, Any]:
-        """Invoke canonical ``message.connector.v1/send_message``."""
+        """Invoke canonical ``message.connector.v1/send_message``.
+
+            中文：调用规范的 `message.connector.v1/send_message`。
+        """
 
         config = self._require_configured()
         if not isinstance(request, Mapping):
@@ -463,6 +502,7 @@ class WeComConnector:
         return _delivery_result(response, conversation.get("reply_message_id"))
 
     # ── DirectPluginRuntime adapter ────────────────────────────────────
+    # 中文：# 中文：DirectPluginRuntime 适配器。
 
     def on_invoke(
         self,
@@ -474,7 +514,10 @@ class WeComConnector:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, Any]:
-        """Adapt the direct Plugin runtime call to the typed connector contract."""
+        """Adapt the direct Plugin runtime call to the typed connector contract.
+
+            中文：将 direct Plugin runtime 调用适配为类型化 connector contract。
+        """
 
         try:
             if capability != CAPABILITY_ID:
@@ -518,6 +561,7 @@ class WeComConnector:
             return False, f"{exc.code}: {exc.message}"
 
     # ── internals ──────────────────────────────────────────────────────
+    # 中文：# 中文：内部辅助逻辑。
 
     def _require_configured(self) -> WeComInstanceConfig:
         if self._config is None:
@@ -683,7 +727,10 @@ class _TypedPayload:
 
 
 def _environment_settings() -> dict[str, str] | None:
-    """Read one binding through the standard plugin activation environment."""
+    """Read one binding through the standard plugin activation environment.
+
+        中文：通过标准 Plugin activation 环境读取一个 binding。
+    """
 
     from cyrene_plugin_runtime.configuration import read_environment_settings
 
@@ -913,6 +960,7 @@ def _delivery_result(
 
 
 # ── proto mapping ──────────────────────────────────────────────────────
+# 中文：# 中文：protobuf 映射。
 
 
 def _send_request_to_mapping(request: Any) -> dict[str, Any]:

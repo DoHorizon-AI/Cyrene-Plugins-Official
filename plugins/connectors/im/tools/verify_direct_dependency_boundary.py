@@ -5,6 +5,10 @@ clearance.  The direct profile may use the shared Plugin runtime and its
 locked protobuf/grpc dependencies, but it must not acquire a NapCat/AstrBot
 runtime, a connector-owned network transport, or a copied third-party
 runtime through its executable surface.
+
+中文：验证 QQNT 直连运行时的依赖边界。
+
+中文：这是高置信度的仓库门禁，不构成法律或来源许可审查。直连配置可以使用共享 Plugin 运行时及其锁定的 protobuf/grpc 依赖，但不得通过可执行接口引入 NapCat/AstrBot 运行时、连接器自有网络传输，或复制的第三方运行时。
 """
 
 from __future__ import annotations
@@ -47,20 +51,26 @@ ALLOWED_LOCK_DEPENDENCIES = {"grpcio", "protobuf"}
 
 
 def _relative(path: Path, root: Path) -> str:
-    """Return a stable repository-relative path for diagnostics."""
+    """Return a stable repository-relative path for diagnostics.
+
+        中文：返回稳定的仓库相对路径，供诊断信息使用。"""
 
     return path.relative_to(root).as_posix()
 
 
 def _dependency_name(requirement: str) -> str:
-    """Extract a normalized package name from a PEP 508 requirement."""
+    """Extract a normalized package name from a PEP 508 requirement.
+
+        中文：从 PEP 508 依赖声明中提取规范化的软件包名称。"""
 
     match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*)", requirement)
     return match.group(1).lower().replace("_", "-") if match else ""
 
 
 def _project_dependencies(path: Path) -> list[str]:
-    """Read runtime and build dependencies from the connector project file."""
+    """Read runtime and build dependencies from the connector project file.
+
+        中文：从连接器项目文件中读取运行时和构建依赖。"""
 
     with path.open("rb") as stream:
         project = tomllib.load(stream)
@@ -79,7 +89,9 @@ def _project_dependencies(path: Path) -> list[str]:
 
 
 def _scan_python(path: Path, root: Path) -> list[str]:
-    """Reject forbidden imports and network listener calls in direct sources."""
+    """Reject forbidden imports and network listener calls in direct sources.
+
+        中文：拒绝直连源代码中的禁止导入和网络监听调用。"""
 
     relative = _relative(path, root)
     try:
@@ -115,7 +127,9 @@ def _scan_python(path: Path, root: Path) -> list[str]:
 
 
 def scan_root(root: Path) -> list[str]:
-    """Return dependency-boundary violations for one repository root."""
+    """Return dependency-boundary violations for one repository root.
+
+        中文：返回一个仓库根目录下的依赖边界违规项。"""
 
     root = root.resolve(strict=True)
     connector_root = root / CONNECTOR_RELATIVE
@@ -187,7 +201,9 @@ def scan_root(root: Path) -> list[str]:
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse the repository root argument."""
+    """Parse the repository root argument.
+
+        中文：解析仓库根目录参数。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())
@@ -195,7 +211,9 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Run the direct dependency-boundary gate."""
+    """Run the direct dependency-boundary gate.
+
+        中文：运行直连依赖边界门禁。"""
 
     args = _parse_args()
     failures = scan_root(args.root)

@@ -1,4 +1,6 @@
-"""Activation settings for one ``model.provider.v1`` binding."""
+"""Activation settings for one ``model.provider.v1`` binding.
+
+中文：一个 ``model.provider.v1`` 绑定的激活设置。"""
 
 from __future__ import annotations
 
@@ -16,7 +18,9 @@ DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
 class ConfigurationError(ValueError):
-    """The binding is unusable; the Plugin must fail closed, not guess."""
+    """The binding is unusable; the Plugin must fail closed, not guess.
+
+        中文：此绑定不可用；Plugin 必须按失败即拒绝处理，不得猜测。"""
 
 
 def _positive_float(raw: str | None, *, field: str, default: float) -> float:
@@ -39,7 +43,9 @@ def _boolean(raw: str | None, *, default: bool) -> bool:
 
 @dataclass(frozen=True, slots=True)
 class ProviderSettings:
-    """The upstream endpoint a single binding is allowed to reach."""
+    """The upstream endpoint a single binding is allowed to reach.
+
+        中文：单个绑定获准访问的上游端点。"""
 
     base_url: str
     api_key: str | None = None
@@ -54,13 +60,17 @@ class ProviderSettings:
 
     @property
     def chat_completions_url(self) -> str:
-        """Full upstream URL; the binding may carry a path prefix."""
+        """Full upstream URL; the binding may carry a path prefix.
+
+            中文：完整上游 URL；绑定可以包含路径前缀。"""
 
         return self.base_url.rstrip("/") + CHAT_COMPLETIONS_PATH
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> ProviderSettings:
-        """Read the operator-provided activation environment."""
+        """Read the operator-provided activation environment.
+
+            中文：读取操作者提供的激活环境。"""
 
         source = os.environ if environ is None else environ
         raw_base = (source.get(BASE_URL_ENV) or "").strip()

@@ -34,6 +34,7 @@ async fn test_t66_and_t70_full_crud_and_idempotent_store() {
     let (service, _backend) = create_test_service();
 
     // 1. Store
+    // 中文：1. 存储。
     let mut meta = HashMap::new();
     meta.insert("tag".into(), "unit_test".into());
 
@@ -60,6 +61,7 @@ async fn test_t66_and_t70_full_crud_and_idempotent_store() {
     }
 
     // 2. Idempotent Store (Update with same ID) (Task T70)
+    // 中文：2. 幂等存储（使用相同 ID 更新）（任务 T70）。
     let update_req = StoreMemoryRequest {
         tenant_id: "tenant_alpha".into(),
         item: Some(MemoryItem {
@@ -67,7 +69,7 @@ async fn test_t66_and_t70_full_crud_and_idempotent_store() {
             tenant_id: "tenant_alpha".into(),
             scope: "session_chat".into(),
             subject: "user_preference".into(),
-            content: "User prefers concise markdown summaries".into(), // updated content
+            content: "User prefers concise markdown summaries".into(), // updated content | 中文：已更新的内容
             embedding: vec![0.1, 0.2, 0.3, 0.4],
             metadata: meta,
             created_at_ms: 1000,
@@ -82,6 +84,7 @@ async fn test_t66_and_t70_full_crud_and_idempotent_store() {
     }
 
     // 3. Get
+    // 中文：3. 获取。
     let get_resp = service
         .get(GetMemoryRequest {
             tenant_id: "tenant_alpha".into(),
@@ -97,6 +100,7 @@ async fn test_t66_and_t70_full_crud_and_idempotent_store() {
     }
 
     // 4. Exact Delete (Task T70)
+    // 中文：4. 精确删除（任务 T70）。
     let del_resp = service
         .delete(DeleteMemoryRequest {
             tenant_id: "tenant_alpha".into(),
@@ -109,6 +113,7 @@ async fn test_t66_and_t70_full_crud_and_idempotent_store() {
     }
 
     // Verify deleted
+    // 中文：验证该记忆已删除。
     let get_after_del = service
         .get(GetMemoryRequest {
             tenant_id: "tenant_alpha".into(),
@@ -126,6 +131,7 @@ async fn test_t66_and_t70_full_crud_and_idempotent_store() {
 #[tokio::test]
 async fn test_t67_backend_pgvector_and_sqlite_separation() {
     // 1. Verify PostgreSQL/pgvector production DDL and query builders (Task T67)
+    // 中文：1. 验证 PostgreSQL/pgvector 的生产 DDL 和查询构造器（任务 T67）。
     let ddl_hnsw = PgVectorSchemaBuilder::build_ddl(1536, PgVectorIndexType::Hnsw);
     assert!(ddl_hnsw.contains("CREATE EXTENSION IF NOT EXISTS vector;"));
     assert!(ddl_hnsw.contains("embedding vector(1536) NOT NULL"));
@@ -139,6 +145,7 @@ async fn test_t67_backend_pgvector_and_sqlite_separation() {
     assert!(recall_sql.contains("1.0 - (embedding <=> $1::vector) AS score"));
 
     // 2. Verify SQLite dev backend executes in-memory with transactional guarantees
+    // 中文：2. 验证 SQLite 开发后端在内存中执行并提供事务保证。
     let sqlite_backend = SqliteMemoryBackend::new_in_memory().expect("in memory sqlite");
     let record = MemoryRecord {
         item_id: "dev_test_1".into(),
@@ -217,6 +224,7 @@ async fn test_t68_explicit_modeling_and_invariants() {
 #[tokio::test]
 async fn test_t69_embedding_via_model_provider_only() {
     // When no embedding is provided, service calls ModelEmbeddingClient (model.provider.v1)
+    // 中文：未提供 embedding 时，服务会调用 ModelEmbeddingClient（model.provider.v1）。
     let (service, _backend) = create_test_service();
 
     let store_req = StoreMemoryRequest {
@@ -227,7 +235,7 @@ async fn test_t69_embedding_via_model_provider_only() {
             scope: "auto".into(),
             subject: "text".into(),
             content: "Generate embedding via contract client".into(),
-            embedding: vec![], // empty embedding triggers model.provider.v1 integration
+            embedding: vec![], // empty embedding triggers model.provider.v1 integration | 中文：空 embedding 会触发 model.provider.v1 集成
             metadata: HashMap::new(),
             created_at_ms: 1000,
             expires_at_ms: None,
@@ -261,6 +269,7 @@ async fn test_t70_recall_filtered_and_prune() {
     let (service, _backend) = create_test_service();
 
     // Store items with varying embeddings and scopes
+    // 中文：存储具有不同 embedding 和作用域的条目。
     service
         .store(StoreMemoryRequest {
             tenant_id: "tenant_recall".into(),
@@ -298,6 +307,7 @@ async fn test_t70_recall_filtered_and_prune() {
         .await;
 
     // Recall with query matching target_1
+    // 中文：使用与 target_1 匹配的查询检索记忆。
     let recall_resp = service
         .recall(RecallMemoryRequest {
             tenant_id: "tenant_recall".into(),
@@ -322,6 +332,7 @@ async fn test_t70_recall_filtered_and_prune() {
     }
 
     // Test Prune (Task T70)
+    // 中文：测试 Prune（任务 T70）。
     let prune_resp = service
         .prune(PruneMemoryRequest {
             tenant_id: "tenant_recall".into(),
@@ -338,6 +349,8 @@ async fn test_t70_recall_filtered_and_prune() {
 async fn test_t71_pure_capability_boundary_no_dream_or_inference() {
     // Assert that the memory service exposes pure storage & recall capability only.
     // Proactive states, dream audits, and profile inference are strictly prohibited.
+    // 中文：断言记忆服务只暴露纯存储与检索能力。
+    // 主动状态、梦境审计和用户画像推断都严格禁止。
     let (service, _backend) = create_test_service();
 
     let store_req = StoreMemoryRequest {
@@ -367,6 +380,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
     let (service, _backend) = create_test_service();
 
     // 1. Strict Tenant Isolation
+    // 中文：1. 严格执行租户隔离。
     service
         .store(StoreMemoryRequest {
             tenant_id: "tenant_A".into(),
@@ -386,6 +400,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
         .await;
 
     // Tenant B cannot GET Tenant A's item
+    // 中文：租户 B 无法读取（GET）租户 A 的条目。
     let cross_get = service
         .get(GetMemoryRequest {
             tenant_id: "tenant_B".into(),
@@ -400,6 +415,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
     }
 
     // Tenant B cannot RECALL Tenant A's item
+    // 中文：租户 B 无法检索（RECALL）租户 A 的条目。
     let cross_recall = service
         .recall(RecallMemoryRequest {
             tenant_id: "tenant_B".into(),
@@ -418,6 +434,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
     }
 
     // 2. Vector Dimension Mismatch
+    // 中文：2. 向量维度不匹配。
     let bad_dim_store = service
         .store(StoreMemoryRequest {
             tenant_id: "tenant_A".into(),
@@ -427,7 +444,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
                 scope: "test".into(),
                 subject: "test".into(),
                 content: "Wrong vector dimension".into(),
-                embedding: vec![1.0, 2.0], // 2 dimensions instead of expected 4
+                embedding: vec![1.0, 2.0], // 2 dimensions instead of expected 4 | 中文：实际为 2 维，预期为 4 维
                 metadata: HashMap::new(),
                 created_at_ms: 1000,
                 expires_at_ms: None,
@@ -445,6 +462,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
     }
 
     // 3. TTL Expiry
+    // 中文：3. TTL 过期。
     service
         .store(StoreMemoryRequest {
             tenant_id: "tenant_A".into(),
@@ -457,7 +475,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
                 embedding: vec![0.5, 0.5, 0.5, 0.5],
                 metadata: HashMap::new(),
                 created_at_ms: 100,
-                expires_at_ms: Some(200), // explicitly in the past
+                expires_at_ms: Some(200), // explicitly in the past | 中文：过期时间明确设在过去
                 ttl_seconds: None,
             }),
         })
@@ -477,6 +495,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
     }
 
     // 4. Import Atomic Rollback on Error
+    // 中文：4. 出错时原子回滚导入操作。
     let import_batch = vec![
         MemoryItem {
             item_id: "import_valid_1".into(),
@@ -492,7 +511,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
         },
         MemoryItem {
             item_id: "import_invalid_tenant".into(),
-            tenant_id: "tenant_ATTACKER".into(), // Tenant mismatch forces transaction rollback!
+            tenant_id: "tenant_ATTACKER".into(), // Tenant mismatch forces transaction rollback! | 中文：租户不匹配会触发事务回滚！
             scope: "injected".into(),
             subject: "test".into(),
             content: "Injected item".into(),
@@ -522,6 +541,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
     }
 
     // Verify atomic rollback: import_valid_1 must NOT exist in the database
+    // 中文：验证原子回滚：`import_valid_1` 绝不能出现在数据库中。
     let rollback_check = service
         .get(GetMemoryRequest {
             tenant_id: "tenant_A".into(),
@@ -536,6 +556,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
     }
 
     // 5. Successful Import and Export with pagination
+    // 中文：5. 成功执行带分页的导入和导出。
     let valid_batch = vec![
         MemoryItem {
             item_id: "batch_1".into(),

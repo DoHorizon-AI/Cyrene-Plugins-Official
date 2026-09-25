@@ -12,6 +12,7 @@ using System.Text.Json.Serialization;
 namespace Cyrene.Im.Core;
 
 /// <summary>JSON projection of one qqnt-direct activation configuration.</summary>
+/// <remarks>中文：JSON 形式的 qqnt-direct 激活配置投影。</remarks>
 public sealed class QqDirectProfileDocument
 {
     [JsonPropertyName("runtime_profile")]
@@ -82,6 +83,7 @@ public sealed class QqDirectProfileDocument
 }
 
 /// <summary>One request sent to the configured QQ Host child.</summary>
+/// <remarks>中文：发送给已配置 QQ Host 子进程的单个请求。</remarks>
 public sealed class QqHostHelloParams
 {
     [JsonPropertyName("protocol")]
@@ -101,6 +103,7 @@ public sealed class QqHostHelloParams
 }
 
 /// <summary>One request sent to the configured QQ Host child.</summary>
+/// <remarks>中文：发送给已配置 QQ Host 子进程的单个请求。</remarks>
 public sealed class QqHostRequest
 {
     [JsonPropertyName("type")]
@@ -123,6 +126,7 @@ public sealed class QqHostRequest
 }
 
 /// <summary>One response returned by the configured QQ Host child.</summary>
+/// <remarks>中文：由已配置 QQ Host 子进程返回的单个响应。</remarks>
 public sealed class QqHostResponse
 {
     [JsonPropertyName("type")]
@@ -148,6 +152,7 @@ public sealed class QqHostResponse
 }
 
 /// <summary>One event emitted by the configured QQ Host child.</summary>
+/// <remarks>中文：由已配置 QQ Host 子进程发出的单个事件。</remarks>
 public sealed class QqHostEvent
 {
     [JsonPropertyName("type")]
@@ -173,6 +178,7 @@ public sealed class QqHostEvent
 }
 
 /// <summary>Control message used to request a bounded Host shutdown.</summary>
+/// <remarks>中文：用于请求 Host 在有界时间内关闭的控制消息。</remarks>
 public sealed class QqHostShutdown
 {
     [JsonPropertyName("type")]
@@ -186,6 +192,7 @@ public sealed class QqHostShutdown
 }
 
 /// <summary>Bounded error record crossing the QQ Host boundary.</summary>
+/// <remarks>中文：穿过 QQ Host 边界的有界错误记录。</remarks>
 public sealed class QqHostErrorDocument
 {
     [JsonPropertyName("code")]
@@ -196,6 +203,7 @@ public sealed class QqHostErrorDocument
 }
 
 /// <summary>Public qq.client.v1 request envelope.</summary>
+/// <remarks>中文：公共 qq.client.v1 请求封套。</remarks>
 public sealed class QqClientRequest
 {
     [JsonPropertyName("params")]
@@ -203,6 +211,7 @@ public sealed class QqClientRequest
 }
 
 /// <summary>Public operation-to-native-method projection.</summary>
+/// <remarks>中文：公共的 operation 到 native method 投影。</remarks>
 public sealed class QqOperationMapping
 {
     [JsonPropertyName("service")]
@@ -213,6 +222,7 @@ public sealed class QqOperationMapping
 }
 
 /// <summary>Public qq.client.v1 response envelope.</summary>
+/// <remarks>中文：公共 qq.client.v1 响应封套。</remarks>
 public sealed class QqClientResponse
 {
     [JsonPropertyName("operation")]
@@ -232,6 +242,7 @@ public sealed class QqClientResponse
 }
 
 /// <summary>Native QQ peer identity used by canonical message sends.</summary>
+/// <remarks>中文：规范消息发送操作使用的原生 QQ 对端身份。</remarks>
 public sealed class QqNativePeer
 {
     [JsonPropertyName("kind")]
@@ -257,6 +268,7 @@ public sealed class QqNativePeer
 }
 
 /// <summary>Remote or binding-owned media reference for a native element.</summary>
+/// <remarks>中文：原生消息元素的远程媒体引用或 binding 所有的媒体引用。</remarks>
 public sealed class QqNativeReference
 {
     [JsonPropertyName("remote_uri")]
@@ -273,6 +285,7 @@ public sealed class QqNativeReference
 }
 
 /// <summary>One canonical content part mapped to a native QQ message element.</summary>
+/// <remarks>中文：映射到原生 QQ 消息元素的单个规范内容部分。</remarks>
 public sealed class QqNativeElement
 {
     [JsonPropertyName("type")]
@@ -295,6 +308,7 @@ public sealed class QqNativeElement
 }
 
 /// <summary>Canonical reply mapped to the native QQ send operation.</summary>
+/// <remarks>中文：映射到原生 QQ 发送操作的规范回复。</remarks>
 public sealed class QqNativeReply
 {
     [JsonPropertyName("message_id")]
@@ -302,6 +316,7 @@ public sealed class QqNativeReply
 }
 
 /// <summary>Fixed parameter shape for the native QQ message send operation.</summary>
+/// <remarks>中文：原生 QQ 消息发送操作的固定参数结构。</remarks>
 public sealed class QqNativeMessageParameters
 {
     [JsonPropertyName("peer")]
@@ -315,6 +330,7 @@ public sealed class QqNativeMessageParameters
 }
 
 /// <summary>Fixed native listener subscription parameter shape.</summary>
+/// <remarks>中文：原生 listener 订阅的固定参数结构。</remarks>
 public sealed class QqSubscribeParameters
 {
     [JsonPropertyName("events")]
@@ -322,6 +338,7 @@ public sealed class QqSubscribeParameters
 }
 
 /// <summary>JSON request shape for canonical friend/group approval.</summary>
+/// <remarks>中文：规范好友／群组审批的 JSON 请求结构。</remarks>
 public sealed class QqRespondRequestDocument
 {
     [JsonPropertyName("request_id")]
@@ -344,6 +361,7 @@ public sealed class QqRespondRequestDocument
 }
 
 /// <summary>Fixed native parameters for a QQ friend or group approval.</summary>
+/// <remarks>中文：QQ 好友或群组审批操作的固定原生参数。</remarks>
 public sealed class QqRespondParameters
 {
     [JsonPropertyName("request_id")]
@@ -360,6 +378,7 @@ public sealed class QqRespondParameters
 }
 
 /// <summary>Canonical approval result returned to the Product caller.</summary>
+/// <remarks>中文：返回给 Product 调用方的规范审批结果。</remarks>
 public sealed class QqRespondResult
 {
     [JsonPropertyName("status")]
@@ -382,6 +401,7 @@ public sealed class QqRespondResult
 }
 
 /// <summary>Canonical friend/group request event JSON shape.</summary>
+/// <remarks>中文：规范好友／群组请求事件的 JSON 结构。</remarks>
 public sealed class QqInboundRequestPayload
 {
     [JsonPropertyName("account_id")]
@@ -401,6 +421,7 @@ public sealed class QqInboundRequestPayload
 }
 
 /// <summary>Typed callback error facts emitted by a correlated native event.</summary>
+/// <remarks>中文：由关联的原生事件发出的类型化回调错误事实。</remarks>
 public sealed class QqCallbackError
 {
     [JsonPropertyName("code")]
@@ -411,6 +432,7 @@ public sealed class QqCallbackError
 }
 
 /// <summary>Bounded callback payload correlated to one originating operation.</summary>
+/// <remarks>中文：与一个发起操作关联的有界回调负载。</remarks>
 public sealed class QqCallbackPayload
 {
     [JsonPropertyName("operation")]

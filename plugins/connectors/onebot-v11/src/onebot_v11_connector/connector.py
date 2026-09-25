@@ -22,6 +22,10 @@ A host can load ``OneBotV11Connector`` through the generic Python worker and cal
 ``send_message`` or ``on_subscribe``.  HTTP and forward-WebSocket transport
 profiles are selected from the configured binding; the OneBot protocol parser
 remains independent of Product session policy.
+
+中文：提供通用 OneBot v11 `message.connector.v1` 实现。一次 Host activation 只接收一个已配置 binding，因此此 package 绝不会按 adapter 类型或解析顺序选择实例。Platform 可以解析并授权 Endpoint，随后 Product 直接调用本 package。binding 身份来自配置；Worker/Runtime 代次则是由 Host 管理的独立生命周期观测值。
+
+connector 使用打包的 Cyrene direct runtime 获取 activation 设置。Host 可以通过通用 Python Worker 加载 `OneBotV11Connector`，并调用 `send_message` 或 `on_subscribe`。HTTP 与 forward-WebSocket 传输 profile 根据已配置 binding 选择；OneBot 协议解析器独立于 Product session 策略。
 """
 
 from __future__ import annotations
@@ -62,7 +66,10 @@ MAX_VENDOR_FACT_TOTAL_BYTES = 8_192
 
 
 class ConnectorError(RuntimeError):
-    """Structured failure returned at the generic capability boundary."""
+    """Structured failure returned at the generic capability boundary.
+
+        中文：在通用 capability 边界返回的结构化失败。
+    """
 
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
@@ -71,19 +78,31 @@ class ConnectorError(RuntimeError):
 
 
 class CancellationToken(Protocol):
-    """Minimal cancellation seam provided by the generic worker."""
+    """Minimal cancellation seam provided by the generic worker.
+
+        中文：由通用 Worker 提供的精简取消接口。
+    """
 
     def is_cancelled(self) -> bool:
-        """Return whether the current direct invocation has been cancelled."""
+        """Return whether the current direct invocation has been cancelled.
+
+            中文：返回当前 direct invocation 是否已取消。
+        """
 
         ...
 
 
 class ApplicationEventEmitter(Protocol):
-    """Worker-owned bounded emitter for one application-event subscription."""
+    """Worker-owned bounded emitter for one application-event subscription.
+
+        中文：由 Worker 拥有、用于单个 application-event 订阅的有界 emitter。
+    """
 
     def emit(self, event_type: str, payload: bytes, type_url: str = "") -> bool:
-        """Deliver one typed event and report whether the subscriber accepted it."""
+        """Deliver one typed event and report whether the subscriber accepted it.
+
+            中文：投递一个类型化事件，并报告订阅者是否接受。
+        """
 
         ...
 
@@ -95,6 +114,8 @@ class OneBotTransport(Protocol):
     an optional ``start`` and ``set_event_handler`` hook for inbound events; the
     connector uses those hooks without making them part of the required legacy
     transport surface.
+
+        中文：用于 OneBot action 的传输抽象。传输实例属于单个已配置 binding。实现可以提供可选的 `start` 和 `set_event_handler` hook 来接收入站事件；connector 会使用这些 hook，但不会将其设为旧版传输接口的必需成员。
     """
 
     def call(
@@ -105,12 +126,18 @@ class OneBotTransport(Protocol):
         timeout_seconds: float,
         cancellation: CancellationToken | None,
     ) -> Mapping[str, Any]:
-        """Execute one binding-scoped OneBot action and return its result object."""
+        """Execute one binding-scoped OneBot action and return its result object.
+
+            中文：执行一个作用域限定在单个 binding 的 OneBot action，并返回其结果对象。
+        """
 
         ...
 
     def close(self) -> None:
-        """Close the transport and release all binding-local resources."""
+        """Close the transport and release all binding-local resources.
+
+            中文：关闭传输并释放该 binding 的全部本地资源。
+        """
 
         ...
 
@@ -123,6 +150,8 @@ class OneBotInstanceConfig:
     through the control plane. It is not an account or vendor identity and is
     not regenerated when a worker restarts. ``runtime_profile`` is only an
     external transport label; it does not change connector identity.
+
+        中文：由 Host 提供、用于单个 capability binding 的配置。`binding_id` 是由 Product 选择或通过控制平面解析得到的稳定身份。它不是账户或供应商身份，Worker 重启时也不会重新生成。`runtime_profile` 只是外部传输标签，不会改变 connector 身份。
     """
 
     binding_id: str
@@ -138,7 +167,10 @@ class OneBotInstanceConfig:
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> OneBotInstanceConfig:
-        """Validate a host-provided configured binding mapping."""
+        """Validate a host-provided configured binding mapping.
+
+            中文：校验由 Host 提供的已配置 binding 映射。
+        """
 
         binding_id = _required_identifier(value.get("binding_id"), "binding_id")
         raw_base_url = value.get("http_base_url")
@@ -271,7 +303,10 @@ class OneBotInstanceConfig:
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, str]) -> OneBotInstanceConfig:
-        """Build configuration from the generic worker Configure mapping."""
+        """Build configuration from the generic worker Configure mapping.
+
+            中文：根据通用 Worker 的 Configure 映射构造配置。
+        """
 
         config: dict[str, Any] = {}
         encoded = settings.get("config")
@@ -310,7 +345,10 @@ class OneBotInstanceConfig:
 
 
 class UrllibOneBotTransport:
-    """Small dependency-free OneBot v11 HTTP action transport."""
+    """Small dependency-free OneBot v11 HTTP action transport.
+
+        中文：依赖精简、无需额外依赖的 OneBot v11 HTTP action 传输。
+    """
 
     def __init__(self, config: OneBotInstanceConfig) -> None:
         if config.http_base_url is None:
@@ -329,7 +367,10 @@ class UrllibOneBotTransport:
         timeout_seconds: float,
         cancellation: CancellationToken | None,
     ) -> Mapping[str, Any]:
-        """POST one action to the configured OneBot HTTP endpoint."""
+        """POST one action to the configured OneBot HTTP endpoint.
+
+            中文：向已配置的 OneBot HTTP Endpoint 发送一个 action。
+        """
 
         _raise_if_cancelled(cancellation)
         request = urllib.request.Request(
@@ -392,7 +433,10 @@ class UrllibOneBotTransport:
         return headers
 
     def close(self) -> None:
-        """There is no persistent resource in the stdlib transport."""
+        """There is no persistent resource in the stdlib transport.
+
+            中文：标准库传输中没有持久化资源需要清理。
+        """
 
 
 @dataclass(slots=True)
@@ -408,7 +452,10 @@ class _DirectTypedPayload:
 
 
 class OneBotV11Connector:
-    """Official generic OneBot v11 connector for one configured binding."""
+    """Official generic OneBot v11 connector for one configured binding.
+
+        中文：供单个已配置 binding 使用的官方通用 OneBot v11 connector。
+    """
 
     plugin_id = "cyrene.connectors.onebot-v11"
     version = "0.1.0"
@@ -436,19 +483,28 @@ class OneBotV11Connector:
 
     @property
     def configured_binding_id(self) -> str | None:
-        """Return stable configured identity, never a runtime generation."""
+        """Return stable configured identity, never a runtime generation.
+
+            中文：返回稳定的已配置身份，不返回 Runtime 代次。
+        """
 
         return self._config.binding_id if self._config is not None else None
 
     @property
     def runtime_profile(self) -> str | None:
-        """Return the external transport profile label, if configured."""
+        """Return the external transport profile label, if configured.
+
+            中文：如果已配置，则返回外部传输 profile 标签。
+        """
 
         return self._config.runtime_profile if self._config is not None else None
 
     @property
     def reverse_listen_address(self) -> tuple[str, int] | None:
-        """Return the bound reverse-WebSocket address, when that profile is used."""
+        """Return the bound reverse-WebSocket address, when that profile is used.
+
+            中文：使用该 profile 时，返回绑定的反向 WebSocket 地址。
+        """
 
         if self._transport_server is None:
             return None
@@ -460,7 +516,10 @@ class OneBotV11Connector:
         *,
         transport: OneBotTransport | None = None,
     ) -> None:
-        """Configure one worker activation with one stable binding identity."""
+        """Configure one worker activation with one stable binding identity.
+
+            中文：使用一个稳定 binding 身份配置一次 Worker activation。
+        """
 
         parsed = (
             config
@@ -502,7 +561,10 @@ class OneBotV11Connector:
             event_handler_setter(self.publish_inbound_event)
 
     def on_configure(self, settings: Mapping[str, str]) -> str | None:
-        """Generic worker lifecycle hook; ``None`` means configured."""
+        """Generic worker lifecycle hook; ``None`` means configured.
+
+            中文：通用 Worker 生命周期 hook；返回 `None` 表示配置成功。
+        """
 
         try:
             self.configure(OneBotInstanceConfig.from_settings(settings))
@@ -524,7 +586,10 @@ class OneBotV11Connector:
         *,
         cancellation: CancellationToken | None = None,
     ) -> dict[str, Any]:
-        """Invoke canonical ``message.connector.v1/send_message``."""
+        """Invoke canonical ``message.connector.v1/send_message``.
+
+            中文：调用规范的 `message.connector.v1/send_message`。
+        """
 
         config = self._require_configured()
         transport = self._require_transport()
@@ -577,6 +642,8 @@ class OneBotV11Connector:
         ``friend`` maps to ``set_friend_add_request`` and ``group_invite`` maps
         to ``set_group_add_request`` with ``sub_type=invite``.  The connector
         never derives a target from Product conversation state.
+
+            中文：批准或拒绝经过规范化的 OneBot 好友／群组请求。Product 会将不透明的 OneBot `flag` 作为 `request_id` 传入。`friend` 映射为 `set_friend_add_request`；`group_invite` 则映射为带有 `sub_type=invite` 的 `set_group_add_request`。connector 绝不会根据 Product 会话状态推导目标对象。
         """
 
         config = self._require_configured()
@@ -663,7 +730,10 @@ class OneBotV11Connector:
         cancellation: CancellationToken | None = None,
         request_type_url: str | None = None,
     ) -> tuple[bool, Any]:
-        """Adapt the direct Plugin runtime call to the typed connector contract."""
+        """Adapt the direct Plugin runtime call to the typed connector contract.
+
+            中文：将 direct Plugin runtime 调用适配为类型化 connector contract。
+        """
 
         try:
             if capability != CAPABILITY_ID:
@@ -729,6 +799,7 @@ class OneBotV11Connector:
         except ConnectorError as exc:
             return False, _direct_error(exc)
         except Exception as exc:  # Keep errors inside the worker protocol.
+        # 中文：// 中文：将错误保留在 Worker 协议内。
             return False, _direct_error(
                 ConnectorError("EXECUTION_FAILED", f"OneBot invocation failed: {exc}")
             )
@@ -748,7 +819,10 @@ class OneBotV11Connector:
         filter_payload: bytes,
         emitter: ApplicationEventEmitter | None = None,
     ) -> str | None:
-        """Attach one event stream to this activation's configured binding."""
+        """Attach one event stream to this activation's configured binding.
+
+            中文：为此 activation 附加一个属于已配置 binding 的事件流。
+        """
 
         self._require_configured()
         if capability != CAPABILITY_ID:
@@ -768,13 +842,19 @@ class OneBotV11Connector:
         return None
 
     def on_unsubscribe(self, subscription_id: str, reason: str) -> None:
-        """Detach one binding-local subscription without affecting the transport."""
+        """Detach one binding-local subscription without affecting the transport.
+
+            中文：分离一个 binding 本地订阅，不影响传输。
+        """
 
         del reason
         self._subscriptions.pop(subscription_id, None)
 
     def publish_inbound_event(self, event: Mapping[str, Any]) -> int:
-        """Normalize one OneBot message event and emit it to this binding only."""
+        """Normalize one OneBot message event and emit it to this binding only.
+
+            中文：规范化一条 OneBot 消息事件，并且只发给此 binding。
+        """
 
         config = self._require_configured()
         if event.get("post_type") == "request":
@@ -830,7 +910,10 @@ class OneBotV11Connector:
         return delivered
 
     def close(self) -> None:
-        """Close the configured transport and detach application streams."""
+        """Close the configured transport and detach application streams.
+
+            中文：关闭已配置的传输并分离 application event 流。
+        """
 
         self._subscriptions.clear()
         if self._transport_server is not None:
@@ -840,7 +923,10 @@ class OneBotV11Connector:
             self._transport.close()
 
     def on_shutdown(self, grace_period_ms: int) -> None:
-        """Stop the configured transport within the worker shutdown callback."""
+        """Stop the configured transport within the worker shutdown callback.
+
+            中文：在 Worker 关闭回调的时限内停止已配置的传输。
+        """
 
         del grace_period_ms
         self.close()
@@ -1152,13 +1238,19 @@ def _vendor_extension_to_proto(
 
 
 def _direct_typed_payload(value: bytes, type_url: str) -> Any:
-    """Return one direct-runtime structural payload."""
+    """Return one direct-runtime structural payload.
+
+        中文：返回一个 direct-runtime 结构化负载。
+    """
 
     return _DirectTypedPayload(value, type_url)
 
 
 def _direct_error(error: ConnectorError) -> str:
-    """Return one direct-runtime structured error prefix and message."""
+    """Return one direct-runtime structured error prefix and message.
+
+        中文：返回一个 direct-runtime 结构化错误前缀和消息。
+    """
 
     return f"{error.code}: {error.message}"
 
@@ -1173,7 +1265,10 @@ def _direct_error(error: ConnectorError) -> str:
 #   也不把 reply 元数据当作普通内容。
 # ════════════════════════════════════════════════════════════════════════
 def build_onebot_segments(request: Mapping[str, Any]) -> list[dict[str, Any]]:
-    """Map canonical ordered content parts to ordered OneBot v11 segments."""
+    """Map canonical ordered content parts to ordered OneBot v11 segments.
+
+        中文：将规范的有序内容部分映射为有序的 OneBot v11 segment。
+    """
 
     content = request.get("content")
     if not isinstance(content, Sequence) or isinstance(content, (str, bytes)):
@@ -1242,7 +1337,10 @@ def build_onebot_segments(request: Mapping[str, Any]) -> list[dict[str, Any]]:
 #   将 OneBot 入站消息事件转换为 connector 的规范事件形态，并保留内容与元数据的区别。
 # ════════════════════════════════════════════════════════════════════════
 def normalize_inbound_event(event: Mapping[str, Any]) -> dict[str, Any]:
-    """Map a OneBot v11 message event to canonical connector JSON semantics."""
+    """Map a OneBot v11 message event to canonical connector JSON semantics.
+
+        中文：将 OneBot v11 消息事件映射为规范 connector JSON 语义。
+    """
 
     if not isinstance(event, Mapping) or event.get("post_type") != "message":
         raise ConnectorError("INVALID_REQUEST", "event is not a OneBot message event")
@@ -1335,7 +1433,10 @@ def normalize_inbound_event(event: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def normalize_request_event(event: Mapping[str, Any]) -> dict[str, Any]:
-    """Normalize a OneBot friend or group request for Product auto-approval."""
+    """Normalize a OneBot friend or group request for Product auto-approval.
+
+        中文：规范化 OneBot 好友或群组请求，供 Product 自动审批。
+    """
 
     if not isinstance(event, Mapping) or event.get("post_type") != "request":
         raise ConnectorError("INVALID_REQUEST", "event is not a OneBot request event")
@@ -1523,7 +1624,10 @@ def _collect_vendor_facts(
     segment_type: str,
     data: Mapping[str, Any],
 ) -> None:
-    """Keep unknown segments bounded without forwarding raw vendor payloads."""
+    """Keep unknown segments bounded without forwarding raw vendor payloads.
+
+        中文：对未知 segment 进行有界保留，不转发原始供应商负载。
+    """
 
     values: list[tuple[str, Any]] = [("type", segment_type)]
     values.extend(
@@ -1589,6 +1693,9 @@ def _numeric_identifier(value: Any, field: str) -> int:
 
 
 def _environment_config() -> dict[str, str] | None:
-    """Read one binding through the standard Plugin activation environment."""
+    """Read one binding through the standard Plugin activation environment.
+
+        中文：通过标准 Plugin activation 环境读取一个 binding。
+    """
 
     return read_environment_settings()

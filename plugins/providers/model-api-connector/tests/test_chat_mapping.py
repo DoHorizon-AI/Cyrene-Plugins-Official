@@ -1,4 +1,6 @@
-"""Contract-mapping tests for the model API connector."""
+"""Contract-mapping tests for the model API connector.
+
+中文：模型 API 连接器的契约映射测试。"""
 
 from __future__ import annotations
 
@@ -82,6 +84,7 @@ def test_request_projects_messages_tools_and_usage_options() -> None:
         }
     ]
     # A tool-only assistant turn sends a null content, not an empty string.
+    # 中文：仅调用工具的助手轮次会发送 null 内容，而不是空字符串。
     assert body["messages"][1]["content"] is None
     assert body["messages"][1]["tool_calls"][0]["function"]["name"] == "weather"
     assert body["messages"][2]["tool_call_id"] == "call-1"
@@ -107,11 +110,14 @@ def test_unary_answer_becomes_ordered_chunks() -> None:
     assert closing.finish_reason == "stop"
     assert (closing.prompt_tokens, closing.completion_tokens) == (1, 2)
     # The provider never reported a total, so none is invented.
+    # 中文：提供方从未报告总量，因此不会虚构该值。
     assert closing.total_tokens is None
 
 
 def test_v1_answer_omits_structured_only_fields() -> None:
-    """chat v1 cannot carry a role or a reported total, so neither is claimed."""
+    """chat v1 cannot carry a role or a reported total, so neither is claimed.
+
+        中文：chat v1 无法承载角色或已报告的总量，因此两者都不会被声明。"""
 
     body = {
         "choices": [
@@ -253,17 +259,21 @@ def test_malformed_answers_fail_closed() -> None:
     with pytest.raises(ProviderMappingError):
         response_chunks({"choices": []})
     # A choice without a message is unrepresentable rather than empty.
+    # 中文：没有消息的选项无法表示，而不是表示为空。
     with pytest.raises(ProviderMappingError):
         response_chunks({"choices": [{"finish_reason": "stop"}]})
     # A streamed fragment without an index cannot be merged by the gateway.
+    # 中文：没有索引的流式片段无法由网关合并。
     with pytest.raises(ProviderMappingError):
         chunk_from_event(
             {"choices": [{"delta": {"tool_calls": [{"id": "x", "function": {}}]}}]},
             structured=True,
         )
     # Usage is only reported when the provider actually reports numbers.
+    # 中文：只有提供方确实报告数值时才会返回用量。
     assert chunk_from_event({"choices": [], "usage": {"prompt_tokens": "many"}}) is None
     # A version that cannot carry tool calls refuses rather than dropping them.
+    # 中文：无法承载工具调用的协议版本会拒绝请求，而不是丢弃工具调用。
     with pytest.raises(ProviderMappingError):
         chunk_from_event(
             {
@@ -295,3 +305,4 @@ def test_request_body_has_no_invented_fields() -> None:
         "stream": False,
     }
     assert json.dumps(body)  # JSON-serialisable for the upstream call
+                             # 中文：此值可序列化为 JSON，以便用于上游调用。

@@ -13,3 +13,19 @@ dotnet run --project contracts/tck/model-provider-v1/dotnet/ModelProviderContrac
 bash contracts/tck/model-provider-v1/generate-bindings.sh
 bash contracts/tck/model-provider-v1/run-jvm-tck.sh
 ```
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# model.provider.v1 TCK
+
+本 TCK 独立验证 Plugins 所有的 payload schema，不依赖 Platform。它检查生成的 Rust、C#、Java、Kotlin、Python 投影，以及真实 model-api-connector codec 和 provider 测试。
+
+```bash
+cargo test --manifest-path contracts/rust/cyrene-plugin-contracts/Cargo.toml
+dotnet run --project contracts/tck/model-provider-v1/dotnet/ModelProviderContractTck.csproj
+bash contracts/tck/model-provider-v1/generate-bindings.sh
+bash contracts/tck/model-provider-v1/run-jvm-tck.sh
+```

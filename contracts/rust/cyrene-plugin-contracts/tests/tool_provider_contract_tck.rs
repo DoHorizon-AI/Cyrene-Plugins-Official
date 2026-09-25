@@ -3,6 +3,9 @@
 // ║ Module: CYRENE Plugins Official                                     ║
 // ║ Role: Direct tool.provider.v1 capability conformance & TCK.         ║
 // ╚══════════════════════════════════════════════════════════════════════╝
+// 中文：文件：tool_provider_contract_tck.rs
+// 中文：模块：CYRENE Plugins Official
+// 中文：职责：对直接使用 tool.provider.v1 capability 的实现执行一致性验证与 TCK。
 
 use cyrene_plugin_contracts::tool_provider::{
     CALL_TOOL_REQUEST_TYPE_URL, CALL_TOOL_RESPONSE_TYPE_URL, CAPABILITY_ID, INTERFACE_VERSION,
@@ -68,6 +71,7 @@ fn tool_catalog_round_trip_preserves_identity_and_schema_facts() {
     });
     // Identity is the (binding_id, provider_tool_id) pair; a second tool may
     // share the display name without colliding.
+    // 中文：身份由 `(binding_id, provider_tool_id)` 组成；不同工具即使共享展示名称，也不会发生冲突。
     catalog.tools.push(ToolDescriptor {
         binding_id: "mcp.remote".to_string(),
         provider_tool_id: "weather.get_forecast".to_string(),

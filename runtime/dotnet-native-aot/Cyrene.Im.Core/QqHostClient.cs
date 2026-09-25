@@ -14,6 +14,7 @@ using System.Text.Json;
 namespace Cyrene.Im.Core;
 
 /// <summary>Immutable launch inputs for one binding-local QQ Host process.</summary>
+/// <remarks>中文：一个 binding 本地 QQ Host 进程的不可变启动输入。</remarks>
 public sealed record QqHostLaunchConfiguration(
     string BindingId,
     string HostExecutable,
@@ -33,6 +34,7 @@ public sealed record QqHostLaunchConfiguration(
     string? InstallationManifest = null);
 
 /// <summary>Negotiated QQ Host compatibility facts safe for diagnostics.</summary>
+/// <remarks>中文：协商得到的 QQ Host 兼容性事实，可安全用于诊断。</remarks>
 public sealed record QqHostCompatibility(
     string Protocol,
     string ProtocolVersion,
@@ -43,6 +45,7 @@ public sealed record QqHostCompatibility(
     string HostAbi);
 
 /// <summary>Bounded restart and crash-circuit state safe for diagnostics.</summary>
+/// <remarks>中文：可安全用于诊断的、有界重启与崩溃熔断状态。</remarks>
 public sealed record QqHostSupervision(
     string State,
     string? FailureCode,
@@ -51,6 +54,7 @@ public sealed record QqHostSupervision(
     bool CircuitOpen);
 
 /// <summary>Structured error from the QQ Host process boundary.</summary>
+/// <remarks>中文：来自 QQ Host 进程边界的结构化错误。</remarks>
 public sealed class QqHostException : Exception
 {
     public QqHostException(string code, string message)
@@ -63,6 +67,7 @@ public sealed class QqHostException : Exception
 }
 
 /// <summary>Supervises one authorized QQ Host child over inherited stdio.</summary>
+/// <remarks>中文：通过继承的标准输入输出监督一个已授权的 QQ Host 子进程。</remarks>
 public sealed class QqHostClient : IAsyncDisposable
 {
     private sealed class PendingRequest
@@ -103,6 +108,7 @@ public sealed class QqHostClient : IAsyncDisposable
     }
 
     /// <summary>Receives only validated, current-generation Host events.</summary>
+/// <remarks>中文：只接收经过校验且属于当前代次的 Host 事件。</remarks>
     public Action<QqHostEvent>? EventHandler { get; set; }
 
     public string BindingId => _configuration.BindingId;
@@ -175,6 +181,7 @@ public sealed class QqHostClient : IAsyncDisposable
     }
 
     /// <summary>Returns bounded restart state without process arguments or secrets.</summary>
+/// <remarks>中文：返回有界重启状态，不包含进程参数或密钥。</remarks>
     public QqHostSupervision Supervision
     {
         get
@@ -193,6 +200,7 @@ public sealed class QqHostClient : IAsyncDisposable
     }
 
     /// <summary>Returns bounded stderr and supervision diagnostics after redaction.</summary>
+/// <remarks>中文：经过脱敏后，返回有界 stderr 内容和监督诊断信息。</remarks>
     public IReadOnlyList<string> Diagnostics
     {
         get
@@ -559,6 +567,7 @@ public sealed class QqHostClient : IAsyncDisposable
         catch (Exception)
         {
             // Cancellation is best effort once the caller has already received a terminal error.
+            // 中文：调用方已经收到终态错误后，取消操作只能尽力执行。
         }
     }
 
@@ -722,6 +731,7 @@ public sealed class QqHostClient : IAsyncDisposable
         catch (Exception)
         {
             // A malformed vendor event must not terminate the protocol reader.
+            // 中文：格式错误的供应商事件不得终止协议读取器。
         }
     }
 

@@ -218,3 +218,98 @@ forwarded as an untyped generic event.
 
 只有命名的 `message.received`、`request.received` 和固定完成回调可以跨越应用边界。其他
 QQ Service 事件在拥有明确契约和矩阵条目之前会被丢弃，不会作为无类型通用事件转发。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# QQNT Direct Host 协议
+
+这是 Cyrene 自有的协议，用于 Python connector worker 和一个已配置、获授权的 QQ Host 子进程之间通信。它不是 OneBot，也不是 Product 公共 API。外层数据平面仍使用通用 Cyrene direct runtime。
+
+## 传输
+
+子进程通过继承的二进制 stdin/stdout 启动。每一帧由以下内容组成：
+
+```text
+uint32 big-endian payload length
+UTF-8 JSON object
+```
+
+单个 payload 最大为 8 MiB。connector 不会创建 TCP listener、Unix socket、WebSocket endpoint 或 OneBot endpoint。worker 还会探测 Linux x86_64 Host 进程树；如果发现 IPv4 或 IPv6 TCP socket 处于 LISTEN 状态，就会失败关闭。QQ 外连连接仍然允许，并且不属于本 connector 的 IPC 边界。
+
+## 安装选择
+
+首个目标平台为 Linux x86_64。worker 接收 operator 提供的绝对 Host 路径和 binding 数据路径，在启动前将其规范化；并拒绝不存在、非普通文件、不可执行、数据路径包含符号链接或平台不是 Linux 的选择。可选的 installation_manifest 用于记录一个精确的 cyrene.qq.installation.v1 安装选择；没有或有多个 manifest 时都会拒绝。manifest 中的 build、平台、架构、Host 路径和数据路径必须与 binding 配置一致。最终观测到的 QQ build/ABI 仍以 Host hello 为准。
+
+## 进程监督
+
+进程或 stdio 意外退出后，只能在 binding 本地有界重启预算、指数退避和崩溃熔断下恢复。恢复会启动新的 generation，并重新初始化 session 和订阅；不会重试触发故障的原操作。协议、版本、账号、登录和配置错误会保持失败关闭，不自动重试。关闭时会排空并回收 binding 本地的进程组。
+
+## 关联
+
+每个请求都携带 binding_id、generation 和请求 ID，请求 ID 格式为 <binding_id>:<generation>:<counter>。父进程拒绝来自其他 binding 或 generation 的响应与事件。请求超时或取消时，会先移除该请求，再发送 cancel 帧；迟到响应会被忽略。
+
+## 消息格式
+
+握手请求：
+
+```json
+{
+  "type": "request",
+  "operation": "hello",
+  "request_id": "qq-main:1:1",
+  "binding_id": "qq-main",
+  "generation": 1,
+  "params": {
+    "protocol": "cyrene.qq.host.v1",
+    "protocol_version": "1",
+    "platform": "linux-x86_64",
+    "required_client_version": "<exact-approved-build>",
+    "required_host_abi": "<exact-approved-host-abi>"
+  }
+}
+```
+
+响应必须返回相同的 protocol、version、binding、generation、platform、operator 配置的准确 client_version 和准确 abi。任一字段不匹配或缺少 ABI 都必须失败关闭。
+
+普通 request/response 使用 type=request|response、operation、params、ok，以及 result 或有界的 {code,message} 错误数据。关闭使用 type=shutdown 控制消息；取消使用 type=cancel 消息，并携带原始 request identity。
+
+worker 会在成功 Host result 暴露给 connector 或扩展调用方之前验证结果。结果必须是有界 JSON object，不能包含 token、secret、ticket、cookie 等凭据字段；qq.message.send 必须返回原生 message_id。媒体和文件结果只允许暴露有界 HTTP(S) remote_uri，或 binding 私有的 qq://、staging:// 本地引用。任何违规都会返回 PROTOCOL_MISMATCH；如果该请求此前登记了 callback，则会先移除登记，再向上报告失败。
+
+事件使用 type=event、稳定的 event_id、binding 和 generation、事件名称以及类型化 payload。message.received 会直接规范化为 message.connector.v1，不会先序列化成中间 OneBot JSON envelope。
+
+完成 callback 使用发起它的 request ID，并且只接受 operation matrix 中声明的两个固定 callback record：message.send_completion 和 media.download_complete。
+
+```json
+{
+  "type": "event",
+  "event": "message.send_completion",
+  "event_id": "qq-main:1:9-completion",
+  "request_id": "qq-main:1:9",
+  "binding_id": "qq-main",
+  "generation": 1,
+  "payload": {
+    "message_id": "<native-message-id>",
+    "sequence": 7,
+    "random": 11,
+    "peer_uid": "<native-peer-uid>",
+    "status": "completed"
+  }
+}
+```
+
+media.download_complete 遵循相同的关联规则，只能携带有界的 media/file/element identity、进度、本地结果引用、经过验证的 HTTP(S) URI、状态和结构化错误字段。request ID 缺失、generation 不匹配或 request ID 不匹配时会丢弃事件，不会把它暴露为通用 QQ event。callback record 以类型化的 type.cyrene.io/qq.client.v1.Callback 数据发布，不能作为 request 调用。
+
+完成 record 是终态：第一个有效 callback 消费发起请求的 identity 后，同一请求的后续 callback 都会被丢弃，即使 event ID 不同也如此。callback identity 字段 peer_uid、peer_uin、group_code、user_uid 和 user_uin 始终相互独立，不会互相推断。
+
+三个 qq.session.* 操作都是显式生命周期动作。调用其中一个不会隐式执行另外两个；普通消息或扩展操作会在每个 Host generation 内按顺序补齐缺少的启动阶段，并且每个阶段只执行一次。
+
+## Host 职责
+
+已配置的 Host adapter 拥有按 QQ 版本区分的官方集成，并将每项固定 qq.* 操作映射到 QQNT_DIRECT_API_MATRIX.md 中登记的授权类型化 Service method。它不得接受任意 service/method 或原始 request 透传。凭据、ticket、session 文件和消息正文不得写入 connector diagnostics。
+
+仓库中提交的 fake Host 只是独立编写的协议 fixture。测试通过只能证明 framing、生命周期和映射机制，不能证明官方 QQ 兼容性。只有在精确授权 QQ build 上实际运行后，真实 API 行才能不再标记为 NOT_RUN。
+
+只有命名的 message.received、request.received 和固定完成 event 能跨越应用边界。来自其他 QQ Service 的 event 在获得明确 contract 和 matrix 条目之前都会被丢弃，不会作为无类型的通用 event 转发。

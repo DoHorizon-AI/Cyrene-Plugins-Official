@@ -2,6 +2,7 @@
 // Module: src/api.test.ts
 // Role: Session rotation and same-origin Product proxy client tests.
 // -----------------------------------------------------------------------------
+// 中文：// 中文：模块职责：测试会话轮换与同源 Product 代理客户端。
 
 import { NavigatorApi } from "./api";
 import { describe, expect, it } from "vitest";

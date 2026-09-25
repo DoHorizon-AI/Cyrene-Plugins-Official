@@ -54,6 +54,7 @@ public final class CyreneChannelManager implements AutoCloseable {
      *
      * @param resolution The resolved binding metadata.
      * @return An active gRPC ManagedChannel.
+     * <p>中文：根据给定的 binding resolution 获取或创建 ManagedChannel。参数 resolution 是已解析的 binding 元数据；返回值是可用的 gRPC ManagedChannel。</p>
      */
     public ManagedChannel getOrCreateChannel(BindingResolution resolution) {
         if (closed) {
@@ -65,6 +66,7 @@ public final class CyreneChannelManager implements AutoCloseable {
         ChannelKey key = new ChannelKey(bindingId, newGeneration);
 
         // ── T48: Detect generation change and close stale channels ────────────
+// 中文：T48：检测代次变化并关闭过期 channel。
         RuntimeGeneration previousGeneration = latestGenerations.put(bindingId, newGeneration);
         if (previousGeneration != null && !previousGeneration.equals(newGeneration)) {
             log.info("Runtime generation change detected for [{}]: {} -> {}. Closing stale channel.",
@@ -73,6 +75,7 @@ public final class CyreneChannelManager implements AutoCloseable {
         }
 
         // ── T47: Cache by binding_id + runtime generation ─────────────────────
+// 中文：T47：按 binding_id 和 Runtime 代次缓存。
         return channelCache.computeIfAbsent(key, k -> buildChannel(resolution));
     }
 
@@ -86,12 +89,14 @@ public final class CyreneChannelManager implements AutoCloseable {
         NettyChannelBuilder builder = NettyChannelBuilder.forAddress(host, port);
 
         // ── T49: Validate loopback vs TLS enforcement ─────────────────────────
+// 中文：T49：校验 loopback 与 TLS 强制策略。
         if (conn.isLoopbackOrLocal()) {
             builder.usePlaintext();
             log.debug("Verified loopback or local socket for [{}], plaintext allowed (T49).", resolution.getBindingId());
         } else {
             // Remote endpoints MUST use TLS
-            conn.validateTransportSecurity(false); // throws SecurityException if invalid
+// 中文：远程 Endpoint 必须使用 TLS。
+            conn.validateTransportSecurity(false); // throws SecurityException if invalid | 中文：校验失败时抛出 SecurityException
             builder.useTransportSecurity();
             log.debug("Remote endpoint for [{}], TLS transport security enforced (T49).", resolution.getBindingId());
         }

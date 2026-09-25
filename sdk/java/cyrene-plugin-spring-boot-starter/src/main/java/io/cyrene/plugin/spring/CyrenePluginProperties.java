@@ -17,6 +17,7 @@ import java.util.Map;
  * ════════════════════════════════════════════════════════════════════════
  * Configuration properties for Cyrene Plugin integration (T52).
  * ════════════════════════════════════════════════════════════════════════
+ * <p>中文：用于集成 Cyrene Plugin 的配置属性（T52）。</p>
  */
 @ConfigurationProperties(prefix = "cyrene.plugin")
 public class CyrenePluginProperties {

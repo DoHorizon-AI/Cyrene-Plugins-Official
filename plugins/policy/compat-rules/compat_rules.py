@@ -22,7 +22,10 @@ TYPE_PREFIX = f"type.cyrene.io/{CAPABILITY_ID}"
 
 @dataclass(frozen=True, slots=True)
 class TypedPayload:
-    """Typed result consumed by the standard direct runtime."""
+    """Typed result consumed by the standard direct runtime.
+
+        中文：标准 direct runtime 使用的类型化结果。
+    """
 
     value: bytes
     type_url: str
@@ -30,7 +33,10 @@ class TypedPayload:
 
 @dataclass
 class RuleDecision:
-    """One Product-neutral compatibility decision."""
+    """One Product-neutral compatibility decision.
+
+        中文：一项不包含 Product 语义的兼容性决策。
+    """
 
     subject: str
     verdict: str
@@ -38,7 +44,10 @@ class RuleDecision:
     evidence: list[str] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the JSON contract representation."""
+        """Return the JSON contract representation.
+
+            中文：返回 JSON contract 表示。
+        """
 
         return {
             "subject": self.subject,
@@ -50,7 +59,10 @@ class RuleDecision:
 
 @dataclass
 class EvaluationReport:
-    """Consolidated compatibility report with stable issue evidence."""
+    """Consolidated compatibility report with stable issue evidence.
+
+        中文：包含稳定 issue 证据的汇总兼容性报告。
+    """
 
     compatible: bool
     summary: str
@@ -59,7 +71,10 @@ class EvaluationReport:
     evidence: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        """Return the JSON contract representation."""
+        """Return the JSON contract representation.
+
+            中文：返回 JSON contract 表示。
+        """
 
         return {
             "compatible": self.compatible,
@@ -71,7 +86,10 @@ class EvaluationReport:
 
 
 def _version(value: str) -> tuple[int, int, int]:
-    """Normalize a driver or runtime version for ordered comparison."""
+    """Normalize a driver or runtime version for ordered comparison.
+
+        中文：规范化驱动程序或 Runtime 版本，以便进行有序比较。
+    """
 
     values = re.findall(r"\d+", value)
     return tuple(int(values[index]) if index < len(values) else 0 for index in range(3))
@@ -86,7 +104,10 @@ def _issue(
     evidence: list[str] | None = None,
     remediation: str | None = None,
 ) -> dict[str, Any]:
-    """Build one stable Product-neutral preflight issue."""
+    """Build one stable Product-neutral preflight issue.
+
+        中文：构造一个稳定且不包含 Product 语义的 preflight issue。
+    """
 
     return {
         "code": code,
@@ -99,7 +120,10 @@ def _issue(
 
 
 class CompatibilityRuleEvaluator:
-    """Evaluate hardware, model, environment, and workload compatibility."""
+    """Evaluate hardware, model, environment, and workload compatibility.
+
+        中文：评估硬件、模型、环境和工作负载的兼容性。
+    """
 
     plugin_id = "cyrene.policy.compat-rules"
     version = "0.2.0"
@@ -115,7 +139,10 @@ class CompatibilityRuleEvaluator:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, TypedPayload | str]:
-        """Dispatch a typed evaluate request through DirectPluginRuntime."""
+        """Dispatch a typed evaluate request through DirectPluginRuntime.
+
+            中文：通过 DirectPluginRuntime 分派类型化 evaluate 请求。
+        """
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -166,7 +193,10 @@ class CompatibilityRuleEvaluator:
         model_spec: dict[str, Any],
         workload: dict[str, Any],
     ) -> EvaluationReport:
-        """Evaluate either the canonical inventory shape or the legacy GPU projection."""
+        """Evaluate either the canonical inventory shape or the legacy GPU projection.
+
+            中文：评估规范清单结构或旧版 GPU 投影。
+        """
 
         if (
             hardware_facts is None
@@ -183,7 +213,10 @@ class CompatibilityRuleEvaluator:
         model: dict[str, Any],
         workload: dict[str, Any],
     ) -> EvaluationReport:
-        """Evaluate the canonical Node resource inventory projection."""
+        """Evaluate the canonical Node resource inventory projection.
+
+            中文：评估规范 Node 资源清单投影。
+        """
 
         issues: list[dict[str, Any]] = []
         decisions: list[RuleDecision] = []
@@ -398,7 +431,10 @@ class CompatibilityRuleEvaluator:
         model_spec: dict[str, Any],
         workload: dict[str, Any],
     ) -> EvaluationReport:
-        """Preserve the previously published flat GPU request behavior."""
+        """Preserve the previously published flat GPU request behavior.
+
+            中文：保留先前发布的扁平 GPU 请求行为。
+        """
 
         decisions: list[RuleDecision] = []
         gpus = hardware_facts.get("gpus", [])
@@ -511,7 +547,10 @@ class CompatibilityRuleEvaluator:
         decisions: list[RuleDecision],
         evidence: dict[str, Any],
     ) -> EvaluationReport:
-        """Finalize one canonical inventory report."""
+        """Finalize one canonical inventory report.
+
+            中文：完成一份规范资源清单报告。
+        """
 
         compatible = not any(issue["severity"] == "blocked" for issue in issues)
         summary = (

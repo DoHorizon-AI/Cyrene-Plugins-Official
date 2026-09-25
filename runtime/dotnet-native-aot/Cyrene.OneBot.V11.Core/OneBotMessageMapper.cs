@@ -12,6 +12,7 @@ using Cyrene.Message.Connector.V1;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>Canonical message mapping failure.</summary>
+/// <remarks>中文：规范消息映射失败。</remarks>
 public sealed class OneBotMappingException : Exception
 {
     public OneBotMappingException(string message)
@@ -21,6 +22,7 @@ public sealed class OneBotMappingException : Exception
 }
 
 /// <summary>One validated OneBot action and its binding-local parameters.</summary>
+/// <remarks>中文：经过校验的一个 OneBot action 及其 binding 本地参数。</remarks>
 public sealed record OneBotSendOperation(
     string Action,
     OneBotActionRequest Request);

@@ -2,6 +2,7 @@
 // Module: src/router.test.ts
 // Role: Route resolution tests for the Navigator console navigation rail.
 // -----------------------------------------------------------------------------
+// 中文：// 中文：模块职责：测试 Navigator 控制台导航栏的路由解析。
 
 import { pathForRoute, routeForPath } from "./router";
 import { describe, expect, it } from "vitest";

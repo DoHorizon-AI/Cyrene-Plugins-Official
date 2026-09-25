@@ -2,8 +2,12 @@
 // Module: src/router.ts
 // Role: Minimal history router for the seven Navigator console surfaces.
 // -----------------------------------------------------------------------------
+// 中文：// 中文：模块职责：为 Navigator 的七个控制台页面提供轻量级 history 路由。
 
-/** The pages intentionally exposed by the Navigator WebUI navigation rail. */
+/**
+ * The pages intentionally exposed by the Navigator WebUI navigation rail.
+ * Navigator WebUI 导航栏有意公开的页面集合。
+ */
 export type RouteId =
   | "overview"
   | "models"
@@ -15,7 +19,10 @@ export type RouteId =
   | "settings"
   | "chat";
 
-/** Navigation metadata used by both the shell and the route resolver. */
+/**
+ * Navigation metadata used by both the shell and the route resolver.
+ * 供外壳与路由解析器共同使用的导航元数据。
+ */
 export interface RouteDefinition {
   id: RouteId;
   label: string;
@@ -80,7 +87,10 @@ export const ROUTES: readonly RouteDefinition[] = [
   },
 ];
 
-/** Resolve a browser path without introducing a second routing dependency. */
+/**
+ * Resolve a browser path without introducing a second routing dependency.
+ * 在不引入第二套路由依赖的前提下解析浏览器路径。
+ */
 export function routeForPath(pathname: string): RouteId {
   const normalized = normalizePath(pathname);
   const match = ROUTES.find((route) => route.path === normalized);
@@ -93,12 +103,18 @@ export function routeForPath(pathname: string): RouteId {
   return "overview";
 }
 
-/** Return the canonical path for a route identifier. */
+/**
+ * Return the canonical path for a route identifier.
+ * 返回路由标识对应的规范路径。
+ */
 export function pathForRoute(route: RouteId): string {
   return ROUTES.find((definition) => definition.id === route)?.path ?? "/";
 }
 
-/** Push a route without reloading the WebUI bundle. */
+/**
+ * Push a route without reloading the WebUI bundle.
+ * 切换到指定路由，但不重新加载 WebUI bundle。
+ */
 export function pushRoute(route: RouteId): void {
   window.history.pushState({}, "", pathForRoute(route));
   window.dispatchEvent(new PopStateEvent("popstate"));

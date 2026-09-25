@@ -82,6 +82,7 @@ public final class ConnectionRef {
 
     /**
      * Checks whether the target endpoint is verified loopback or local socket (T49).
+     * <p>中文：检查目标 Endpoint 是否为已核验的 loopback 或本地套接字（T49）。</p>
      */
     public boolean isLoopbackOrLocal() {
         return loopbackOrLocal;
@@ -92,6 +93,7 @@ public final class ConnectionRef {
      *
      * @param useInsecure whether the caller requested insecure / plaintext transport.
      * @throws SecurityException if insecure transport is requested for a remote endpoint.
+     * <p>中文：校验传输安全不变量（T49）。参数 useInsecure 表示调用方是否请求不安全／明文传输；如果远程 Endpoint 使用不安全传输，则抛出 SecurityException。</p>
      */
     public void validateTransportSecurity(boolean useInsecure) {
         if (useInsecure && !isLoopbackOrLocal()) {

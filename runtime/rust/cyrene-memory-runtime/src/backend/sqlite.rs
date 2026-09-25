@@ -3,6 +3,8 @@
 //!
 //! Provides transactional storage, tenant-isolated vector recall, TTL pruning,
 //! and atomic import rollback for local development and testing.
+//! SQLite 开发存储后端（任务 T67、T70、T72）。
+//! 为本地开发和测试提供事务化存储、tenant 隔离的向量 recall、TTL 清理以及导入失败时的原子回滚。
 
 use crate::backend::{cosine_similarity, MemoryStorageBackend};
 use crate::model::MemoryRecord;
@@ -20,6 +22,7 @@ pub struct SqliteMemoryBackend {
 
 impl SqliteMemoryBackend {
     /// Initialize in-memory SQLite database.
+    /// 初始化内存 SQLite 数据库。
     pub fn new_in_memory() -> Result<Self, rusqlite::Error> {
         let conn = Connection::open_in_memory()?;
         Self::init_schema(&conn)?;
@@ -29,6 +32,7 @@ impl SqliteMemoryBackend {
     }
 
     /// Initialize SQLite database at the specified file path.
+    /// 在指定文件路径初始化 SQLite 数据库。
     pub fn new_file(path: &str) -> Result<Self, rusqlite::Error> {
         let conn = Connection::open(path)?;
         Self::init_schema(&conn)?;
@@ -291,6 +295,7 @@ impl MemoryStorageBackend for SqliteMemoryBackend {
             })?;
 
             // Apply optional scope and subject filters
+            // 应用可选的 scope 和 subject 过滤条件。
             if let Some(s) = scope {
                 if item.scope != s {
                     continue;
@@ -312,6 +317,7 @@ impl MemoryStorageBackend for SqliteMemoryBackend {
         }
 
         // Sort descending by score
+        // 按评分从高到低排序。
         scored_matches.sort_by(|a, b| {
             b.score
                 .partial_cmp(&a.score)
@@ -503,6 +509,7 @@ impl MemoryStorageBackend for SqliteMemoryBackend {
     ) -> Result<i32, MemoryError> {
         let mut conn = self.conn.lock().await;
         // Atomic transaction with rollback on error (Task T72)
+        // 使用原子事务；发生错误时回滚（任务 T72）。
         let tx = conn.transaction().map_err(|e| MemoryError {
             code: MemoryErrorCode::StorageFailed as i32,
             message: format!("Failed to open SQLite transaction: {}", e),
@@ -604,7 +611,7 @@ impl MemoryStorageBackend for SqliteMemoryBackend {
                         retryable: false,
                     })?;
                 if res == 0 {
-                    continue; // skipped duplicate
+                    continue; // skipped duplicate; 已跳过重复项
                 }
             }
             imported += 1;

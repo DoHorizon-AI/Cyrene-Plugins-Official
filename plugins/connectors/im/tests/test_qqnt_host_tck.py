@@ -36,7 +36,9 @@ def _launch_config(
     timeout_seconds: float = 1.0,
     operation_log: Path | None = None,
 ) -> QQHostLaunchConfig:
-    """Build one fixture-backed launch configuration for the TCK."""
+    """Build one fixture-backed launch configuration for the TCK.
+
+        中文：为 TCK 构建一个由夹具支持的启动配置。"""
 
     fake_host = Path(__file__).parent / "fixtures" / "fake_qq_host.py"
     command = [sys.executable, "-B", str(fake_host), f"--mode={mode}"]
@@ -56,7 +58,9 @@ def _launch_config(
 
 
 def _request_params(operation: str) -> dict[str, Any]:
-    """Return the smallest declared payload that exercises one operation."""
+    """Return the smallest declared payload that exercises one operation.
+
+        中文：返回能够执行一项操作的最小已声明载荷。"""
 
     if operation == "qq.message.send":
         return {
@@ -70,7 +74,9 @@ def _request_params(operation: str) -> dict[str, Any]:
 def test_qq_host_tck_negotiates_exact_hello_and_dispatches_all_fixed_operations(
     tmp_path: Path,
 ) -> None:
-    """Verify exact compatibility negotiation and the complete allow-list."""
+    """Verify exact compatibility negotiation and the complete allow-list.
+
+        中文：验证兼容性协商完全匹配且允许列表完整。"""
 
     binding_id = "qq-host-tck-all-operations"
     operation_log = tmp_path / "operations.log"
@@ -109,7 +115,9 @@ def test_qq_host_tck_negotiates_exact_hello_and_dispatches_all_fixed_operations(
 def test_qq_host_tck_rejects_passthrough_and_callback_only_requests(
     tmp_path: Path,
 ) -> None:
-    """Verify that only registered operation names cross the Host boundary."""
+    """Verify that only registered operation names cross the Host boundary.
+
+        中文：验证只有已注册的操作名称能够跨越 Host 边界。"""
 
     client = QQHostClient(_launch_config(tmp_path, "qq-host-tck-boundary"))
     try:
@@ -143,7 +151,9 @@ def test_qq_host_tck_rejects_passthrough_and_callback_only_requests(
 def test_qq_host_tck_correlates_callbacks_to_the_current_request(
     tmp_path: Path,
 ) -> None:
-    """Verify typed callback delivery retains binding and generation identity."""
+    """Verify typed callback delivery retains binding and generation identity.
+
+        中文：验证有类型的回调投递会保留绑定标识和代次标识。"""
 
     events: list[Mapping[str, Any]] = []
     event_received = threading.Event()
@@ -181,7 +191,9 @@ def test_qq_host_tck_correlates_callbacks_to_the_current_request(
 def test_qq_host_tck_cancellation_ignores_late_response(
     tmp_path: Path,
 ) -> None:
-    """Verify cancellation remains local and a deliberately late response is ignored."""
+    """Verify cancellation remains local and a deliberately late response is ignored.
+
+        中文：验证取消仅在本地生效，并且刻意延迟的响应会被忽略。"""
 
     client = QQHostClient(
         _launch_config(
@@ -231,7 +243,9 @@ def test_qq_host_tck_fails_closed_on_incompatible_host_hello(
     mode: str,
     expected_code: str,
 ) -> None:
-    """Verify mismatched QQ build or protocol identity never becomes ready."""
+    """Verify mismatched QQ build or protocol identity never becomes ready.
+
+        中文：验证 QQ 构建版本或协议标识不匹配时始终不会进入就绪状态。"""
 
     client = QQHostClient(_launch_config(tmp_path, f"qq-host-tck-{mode}", mode=mode))
     try:
@@ -244,7 +258,9 @@ def test_qq_host_tck_fails_closed_on_incompatible_host_hello(
 
 
 def test_qq_host_tck_assigns_a_new_generation_after_restart(tmp_path: Path) -> None:
-    """Verify restart changes generation while preserving the binding identity."""
+    """Verify restart changes generation while preserving the binding identity.
+
+        中文：验证重启会改变代次，同时保留绑定标识。"""
 
     binding_id = "qq-host-tck-generation"
     client = QQHostClient(_launch_config(tmp_path, binding_id))
@@ -261,7 +277,9 @@ def test_qq_host_tck_assigns_a_new_generation_after_restart(tmp_path: Path) -> N
 
 
 def test_qq_host_tck_rejects_a_child_tcp_listener(tmp_path: Path) -> None:
-    """The inherited-stdio Host boundary must remain portless at runtime."""
+    """The inherited-stdio Host boundary must remain portless at runtime.
+
+        中文：继承标准输入输出的 Host 边界在运行时必须保持无端口。"""
 
     client = QQHostClient(
         _launch_config(tmp_path, "qq-host-tck-portless", mode="tcp_listener")
@@ -277,7 +295,9 @@ def test_qq_host_tck_rejects_a_child_tcp_listener(tmp_path: Path) -> None:
 
 
 def test_qq_host_tck_stops_a_listener_opened_after_startup(tmp_path: Path) -> None:
-    """The watchdog continues enforcing portless operation after hello."""
+    """The watchdog continues enforcing portless operation after hello.
+
+        中文：收到 hello 后，监视器仍会持续强制执行无端口运行。"""
 
     client = QQHostClient(
         _launch_config(tmp_path, "qq-host-tck-late-portless", mode="late_tcp_listener")

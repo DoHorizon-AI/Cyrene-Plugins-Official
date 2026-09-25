@@ -40,6 +40,7 @@ public interface IPluginInstance : IDisposable
 /// <summary>
 /// Core implementation of the plugin capability provider.
 /// </summary>
+/// <remarks>中文：插件 capability Provider 的核心实现。</remarks>
 public class PluginCoreInstance : IPluginInstance
 {
     private readonly string? _configJson;
@@ -75,6 +76,7 @@ public class PluginCoreInstance : IPluginInstance
 
             case "model.provider.v1/chat_completion":
             // Compatibility alias for interface version 1 (W6-3).
+// 中文：接口版本 1 的兼容别名（W6-3）。
             case "model.provider.v1/Chat":
                 return new InvokeResult(
                     StatusCode.Unavailable,

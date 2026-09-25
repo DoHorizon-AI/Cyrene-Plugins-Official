@@ -1,4 +1,6 @@
-"""Tests for the isolated IM Native AOT package candidate."""
+"""Tests for the isolated IM Native AOT package candidate.
+
+中文：隔离 IM Native AOT 候选包的测试。"""
 
 from __future__ import annotations
 
@@ -21,7 +23,9 @@ REPOSITORY_ROOT = Path(__file__).parents[4]
 
 
 def _executable(tmp_path: Path) -> Path:
-    """Use the current interpreter as an executable-only build fixture."""
+    """Use the current interpreter as an executable-only build fixture.
+
+        中文：使用当前解释器作为仅供执行的构建夹具。"""
 
     binary = tmp_path / "cyrene-im"
     binary.write_bytes(Path(sys.executable).read_bytes())
@@ -32,7 +36,9 @@ def _executable(tmp_path: Path) -> Path:
 def test_im_native_candidate_contains_only_native_runtime_and_resolvable_refs(
     tmp_path: Path,
 ) -> None:
-    """The IM package is native-only and contains both capability contracts."""
+    """The IM package is native-only and contains both capability contracts.
+
+        中文：IM 软件包仅包含原生组件，并包含两份能力契约。"""
 
     package_root = assemble_native_package(
         REPOSITORY_ROOT, _executable(tmp_path), tmp_path / "package", "linux-x64"

@@ -52,3 +52,46 @@ returned as rejected delivery results instead of guessing a target.
 python3 -m pytest plugins/connectors/wecom/tests
 python3 plugins/connectors/wecom/tools/generate_message_connector_bindings.py
 ```
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# 企业微信应用连接器
+
+这是 WeCom（企业微信）应用消息的 message.connector.v1 实现。v1 只发布出站路径，并且 manifest 只声明 send_message；要求其他 method 的 Product binding 会失败关闭。
+
+| Method | 状态 |
+| --- | --- |
+| send_message | 已实现（text / markdown / image / file、touser / toparty、mentions） |
+| inbound_message | v1 不支持：WeCom callback 需要由 owner 持有的 HTTP callback surface、URL 验证和 AES 解密；本实现不臆造该入口，此需求记录为后续工作。 |
+| inbound_request / respond_request | v1 不支持：WeCom 审批流程需要单独的映射，以及厂商 request identity 处理。 |
+
+## 配置
+
+配置由 CYRENE_CAPABILITY_BINDING_ID 和 CYRENE_CAPABILITY_CONFIGURATION_JSON 提供：
+
+```json
+{
+  "corp_id": "ww...",
+  "corp_secret": "<secret>",
+  "agent_id": 1000002,
+  "base_url": "https://qyapi.weixin.qq.com"
+}
+```
+
+binding_id 来自 activation environment；base_url 和 timeout 为可选项。conversation.vendor 必须是 wecom.app；kind: private 时目标字段为 touser，kind: group 时目标字段为 toparty（department ID）。其他 kind 会被作为拒绝的 delivery result 返回，不会猜测目标。
+
+## 交付语义
+
+- Access token 缓存在内存中，并预留 expiry skew；WeCom 返回 40001、40014 或 42001 时只刷新一次。
+- 厂商 errcode 按确定性规则映射：0 -> accepted，45009/45047 -> rate_limited，其他错误 -> rejected，并在 reason 中附上 errcode/errmsg。
+- 传输失败会抛出 UNAVAILABLE，而不会虚报交付结果。reply reference 会作为厂商事实 reply_reference_ignored 返回，因为 WeCom 应用消息不支持 thread。
+- image 和 file part 可以使用由 binding 持有的 vendor_media reference，或绝对 HTTP(S) remote_uri。远程字节会在 binding timeout 内下载，大小限制为 WeCom image 2 MiB、file 20 MiB；随后上传至 /cgi-bin/media/upload，再使用返回的临时 media_id 发送。
+- 每条出站应用消息最多包含一个 media part。来自其他厂商或 agent binding 的 media reference、混合 text/media payload、过小或过大的文件，以及非 JPEG/PNG image 都会失败关闭。
+
+```bash
+python3 -m pytest plugins/connectors/wecom/tests
+python3 plugins/connectors/wecom/tools/generate_message_connector_bindings.py
+```

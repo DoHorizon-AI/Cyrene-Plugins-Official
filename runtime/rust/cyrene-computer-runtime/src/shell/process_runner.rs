@@ -57,6 +57,7 @@ impl ShellProcessRunner {
     }
 
     /// Unary blocking managed execution (T74, T75, T76, T78).
+    /// 一元阻塞式托管执行（T74、T75、T76、T78）。
     pub async fn execute_command(
         &self,
         request: CommandExecutionRequest,
@@ -65,6 +66,7 @@ impl ShellProcessRunner {
         let start_time = Instant::now();
 
         // 1. Validate working directory (T75)
+        // 1. 校验工作目录（T75）。
         let cwd = match self.path_validator.validate_cwd(request.cwd.as_deref()) {
             Ok(p) => p,
             Err(err) => {
@@ -75,18 +77,20 @@ impl ShellProcessRunner {
         };
 
         // 2. Sanitize environment variables (T75, T80)
+        // 2. 净化环境变量（T75、T80）。
         let sanitized_env = self.env_filter.sanitize_environment(&request.env);
 
         // 3. Configure command execution with process group (T80 descendant cleanup)
+        // 3. 配置命令执行时使用进程组（T80 后代清理）。
         let mut cmd = Command::new("bash");
         cmd.arg("-c")
             .arg(&request.command)
             .current_dir(cwd)
-            .env_clear() // Strict isolation: clear host environment to prevent token/secret leakage (R02, T75)
+            .env_clear() // Strict isolation: clear host environment to prevent token/secret leakage (R02, T75); 严格隔离：清除主机环境变量，防止令牌/密钥泄漏（R02、T75）
             .envs(sanitized_env)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
-            .process_group(0); // Sets new process group
+            .process_group(0); // Sets new process group; 创建新的进程组
 
         let mut child = match cmd.spawn() {
             Ok(c) => c,
@@ -104,7 +108,7 @@ impl ShellProcessRunner {
         let child_pid = child.id().unwrap_or(0);
         let timeout_duration = match request.timeout_ms {
             Some(ms) if ms > 0 => Duration::from_millis(ms as u64),
-            _ => Duration::from_secs(30), // Default 30s timeout
+            _ => Duration::from_secs(30), // Default 30s timeout; 默认超时为 30 秒
         };
 
         let mut stdout_collector = OutputCollector::new(request.max_output_bytes);
@@ -114,6 +118,7 @@ impl ShellProcessRunner {
         let mut child_stderr = child.stderr.take().unwrap();
 
         // Read stdout and stderr concurrently with cancellation & timeout checks
+        // 并发读取 stdout 和 stderr，同时检查取消状态与超时。
         let run_fut = async {
             let mut stdout_buf = [0u8; 4096];
             let mut stderr_buf = [0u8; 4096];
@@ -134,6 +139,7 @@ impl ShellProcessRunner {
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_millis(30)) => {
                         // Periodic wakeup to test cancel_flag even if process is silent
+                        // 定期唤醒，以便在进程无输出时仍检查 cancel_flag。
                     }
                     res = child_stdout.read(&mut stdout_buf), if !stdout_done => {
                         match res {
@@ -197,6 +203,7 @@ impl ShellProcessRunner {
         let (stderr_str, stderr_truncated) = stderr_collector.into_string_lossy();
 
         // Calculate SHA-256 evidence hash of output (T76)
+        // 计算输出的 SHA-256 证据哈希（T76）。
         let mut hasher = Sha256::new();
         hasher.update(stdout_str.as_bytes());
         hasher.update(b"|");
@@ -224,6 +231,7 @@ impl ShellProcessRunner {
     }
 
     /// Streaming managed execution (T74, T80).
+    /// 流式托管执行（T74、T80）。
     pub async fn execute_command_stream(
         &self,
         request: CommandExecutionRequest,
@@ -240,7 +248,7 @@ impl ShellProcessRunner {
         cmd.arg("-c")
             .arg(&request.command)
             .current_dir(cwd)
-            .env_clear() // Strict isolation: clear host environment to prevent token/secret leakage (R02, T75)
+            .env_clear() // Strict isolation: clear host environment to prevent token/secret leakage (R02, T75); 严格隔离：清除主机环境变量，防止令牌/密钥泄漏（R02、T75）
             .envs(sanitized_env)
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
@@ -284,6 +292,7 @@ impl ShellProcessRunner {
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_millis(30)) => {
                         // Periodic wakeup to test cancel_flag
+                        // 定期唤醒，以便在进程无输出时仍检查 cancel_flag。
                     }
                     res = child_stdout.read(&mut stdout_buf), if !stdout_done => {
                         match res {

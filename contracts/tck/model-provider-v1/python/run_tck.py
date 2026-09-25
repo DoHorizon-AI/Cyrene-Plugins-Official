@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Validate generated Python bindings for the direct model-provider payload."""
+"""Validate generated Python bindings for the direct model-provider payload.
+
+中文：验证直连模型提供方载荷的生成 Python 绑定。"""
 
 from __future__ import annotations
 
@@ -60,6 +62,7 @@ assert unpacked_chat.include_usage is True
 
 # Structured chat v2: index, identity, type, function facts, usage, and
 # finish_reason must survive the projection byte-for-byte.
+# 中文：结构化 chat v2 的 index、identity、type、function 事实、用量和 finish_reason 必须在投影中逐字节保持不变。
 tool_chat = model_provider_pb2.ChatCompletionRequest(
     messages=[
         model_provider_pb2.ChatMessage(
