@@ -192,7 +192,7 @@ def test_import_refuses_remote_code_and_incomplete_models(tmp_path: Path) -> Non
 def test_operator_binding_fails_closed_with_typed_errors(tmp_path: Path) -> None:
     """Probe an operator binding when explicitly configured; never silently skip.
 
-        中文：仅在显式配置时探测操作者绑定；绝不静默跳过。"""
+        中文:仅在显式配置时探测操作者绑定;绝不静默跳过。"""
 
     base_url = os.environ.get("CYRENE_ENGINE_TCK_BASE_URL", "").rstrip("/")
     token_file = os.environ.get("CYRENE_ENGINE_TCK_TOKEN", "")

@@ -34,7 +34,7 @@ SOURCE_FORMATS = {"JSONL", "JSON", "TEXT", "CSV", "PARQUET"}
 class TypedPayload:
     """Typed response consumed by DirectPluginRuntime.
 
-        中文：DirectPluginRuntime 使用的类型化响应。
+        中文:DirectPluginRuntime 使用的类型化响应。
     """
 
     value: bytes
@@ -45,7 +45,7 @@ class TypedPayload:
 class PreparedSample:
     """One unique normalized sample.
 
-        中文：一个唯一且已规范化的样本。
+        中文:一个唯一且已规范化的样本。
     """
 
     index: int
@@ -57,7 +57,7 @@ class PreparedSample:
 class DatasetPreparationPlugin:
     """Run stateless deterministic dataset preparation over staged paths.
 
-        中文：在 staging 路径上执行无状态、确定性的数据集预处理。
+        中文:在 staging 路径上执行无状态、确定性的数据集预处理。
     """
 
     plugin_id = "cyrene.tools.dataset-preparation"
@@ -76,7 +76,7 @@ class DatasetPreparationPlugin:
     ) -> tuple[bool, TypedPayload | str]:
         """Dispatch one typed preparation request.
 
-            中文：分派一个类型化预处理请求。
+            中文:分派一个类型化预处理请求。
         """
 
         if capability != CAPABILITY_ID:
@@ -144,7 +144,7 @@ class DatasetPreparationPlugin:
     ) -> dict[str, Any]:
         """Parse a staged source and persist its generic row projection.
 
-            中文：解析 staging 源文件，并持久化通用行投影。
+            中文:解析 staging 源文件,并持久化通用行投影。
         """
 
         _validate_source(source_path)
@@ -175,7 +175,7 @@ class DatasetPreparationPlugin:
     ) -> dict[str, Any]:
         """Normalize and split rows, persisting bounded-path result artifacts.
 
-            中文：规范化并拆分行数据，同时持久化有界路径下的结果制品。
+            中文:规范化并拆分行数据,同时持久化有界路径下的结果制品。
         """
 
         source_path = _path(source_path, "source_path")
@@ -223,7 +223,7 @@ class DatasetPreparationPlugin:
     ) -> dict[str, Any]:
         """Convert a supported structured source to compressed Parquet.
 
-            中文：将受支持的结构化源数据转换为压缩 Parquet。
+            中文:将受支持的结构化源数据转换为压缩 Parquet。
         """
 
         _validate_source(source_path)
@@ -253,7 +253,7 @@ class DatasetPreparationPlugin:
 def detect_format(data: bytes) -> str:
     """Detect supported text formats from content rather than a filename.
 
-        中文：根据内容检测受支持的文本格式，而不是依赖文件名。
+        中文:根据内容检测受支持的文本格式,而不是依赖文件名。
     """
 
     if not data.strip():
@@ -302,7 +302,7 @@ def _json_native(value: Any) -> Any:
 def parse_rows(source: Path, source_format: str) -> list[dict[str, Any]]:
     """Parse supported structured formats with DuckDB or plain-text lines.
 
-        中文：使用 DuckDB 或纯文本行解析受支持的结构化格式。
+        中文:使用 DuckDB 或纯文本行解析受支持的结构化格式。
     """
 
     if source_format == "TEXT":
@@ -333,7 +333,7 @@ def _structured_relation(
 ) -> duckdb.DuckDBPyRelation:
     """Open one supported structured source through its typed DuckDB reader.
 
-        中文：通过类型化的 DuckDB reader 打开一种受支持的结构化源数据。
+        中文:通过类型化的 DuckDB reader 打开一种受支持的结构化源数据。
     """
 
     if source_format == "CSV":
@@ -352,7 +352,7 @@ def _structured_relation(
 def _validate_csv_source(source: Path) -> None:
     """Reject blank, duplicate, or ragged CSV columns before typed parsing.
 
-        中文：在执行类型化解析前，拒绝空白、重复或字段数不齐的 CSV 列名。
+        中文:在执行类型化解析前,拒绝空白、重复或字段数不齐的 CSV 列名。
     """
 
     try:
@@ -381,7 +381,7 @@ def run_pipeline(
 ) -> tuple[list[PreparedSample], list[dict[str, Any]], list[dict[str, Any]]]:
     """Map, normalize, quality-check, and deduplicate rows deterministically.
 
-        中文：以确定性方式映射、规范化、质量检查并去重行数据。
+        中文:以确定性方式映射、规范化、质量检查并去重行数据。
     """
 
     mode = _enum_text(
@@ -538,7 +538,7 @@ def assign_split(
 ) -> tuple[dict[int, str], dict[str, Any] | None]:
     """Assign whole groups to train or validation using a stable hash.
 
-        中文：使用稳定哈希将整组数据分配到训练集或验证集。
+        中文:使用稳定哈希将整组数据分配到训练集或验证集。
     """
 
     if split is None:

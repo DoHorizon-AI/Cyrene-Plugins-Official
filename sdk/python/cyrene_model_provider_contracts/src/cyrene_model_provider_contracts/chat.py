@@ -16,9 +16,9 @@ The schema authority is ``contracts/proto/cyrene/model/provider/v1`` in this
 repository. The provider keeps using the zero-dependency wire helpers instead
 of introducing a second message protocol.
 
-中文：为 Plugins 所有的类型化 chat contract 提供手工 protobuf 编解码。
+中文:为 Plugins 所有的类型化 chat contract 提供手工 protobuf 编解码。
 
-本仓库中的 schema 规范来源位于 ``contracts/proto/cyrene/model/provider/v1``。Provider 继续使用零依赖的 wire 辅助函数，而不会引入第二套消息协议。
+本仓库中的 schema 规范来源位于 ``contracts/proto/cyrene/model/provider/v1``。Provider 继续使用零依赖的 wire 辅助函数,而不会引入第二套消息协议。
 """
 
 from __future__ import annotations
@@ -92,14 +92,14 @@ _UINT32_MAX = (1 << 32) - 1
 class ChatCodecError(ValueError):
     """A typed chat payload is malformed or violates its wire contract.
 
-        中文：类型化 chat 负载格式错误，或违反其 wire contract。
+        中文:类型化 chat 负载格式错误,或违反其 wire contract。
     """
 
 
 class ChatRole(IntEnum):
     """Stable values from ``ChatMessage.Role`` in the canonical proto.
 
-        中文：规范 proto 中 ``ChatMessage.Role`` 的稳定取值。
+        中文:规范 proto 中 ``ChatMessage.Role`` 的稳定取值。
     """
 
     ROLE_UNSPECIFIED = 0
@@ -110,7 +110,7 @@ class ChatRole(IntEnum):
 
     # Short aliases keep direct Python callers readable without changing the
     # canonical enum names or their wire values.
-    # 中文：短别名让直接调用 Python 的调用方更容易阅读，同时不会改变规范枚举名称或其 wire 值。
+    # 中文:短别名让直接调用 Python 的调用方更容易阅读,同时不会改变规范枚举名称或其 wire 值。
     UNSPECIFIED = ROLE_UNSPECIFIED
     SYSTEM = ROLE_SYSTEM
     USER = ROLE_USER
@@ -125,7 +125,7 @@ ChatMessageRole = ChatRole
 class ChatMessage:
     """One canonical chat message in request order.
 
-        中文：请求顺序中的一条规范 chat 消息。
+        中文:请求顺序中的一条规范 chat 消息。
     """
 
     role: ChatRole | int = ChatRole.ROLE_UNSPECIFIED
@@ -139,7 +139,7 @@ class ChatMessage:
 class ChatFunction:
     """One provider function definition carried by structured chat v2.
 
-        中文：structured chat v2 携带的一份 Provider 函数定义。
+        中文:structured chat v2 携带的一份 Provider 函数定义。
     """
 
     name: str
@@ -152,7 +152,7 @@ class ChatFunction:
 class ChatTool:
     """One function tool offered to the provider.
 
-        中文：提供给 Provider 的一个 function tool。
+        中文:提供给 Provider 的一个 function tool。
     """
 
     type: str
@@ -163,7 +163,7 @@ class ChatTool:
 class ChatToolChoice:
     """Normalized tool-choice mode, optionally naming one function.
 
-        中文：经过规范化的 tool-choice 模式，也可指定一个函数名称。
+        中文:经过规范化的 tool-choice 模式,也可指定一个函数名称。
     """
 
     mode: str
@@ -174,7 +174,7 @@ class ChatToolChoice:
 class ChatToolCallFunction:
     """Completed function identity and JSON argument text.
 
-        中文：已完成函数的标识和 JSON 参数文本。
+        中文:已完成函数的标识和 JSON 参数文本。
     """
 
     name: str
@@ -185,7 +185,7 @@ class ChatToolCallFunction:
 class ChatToolCall:
     """A completed assistant tool call in request history.
 
-        中文：请求历史中的一条已完成 assistant tool call。
+        中文:请求历史中的一条已完成 assistant tool call。
     """
 
     id: str
@@ -197,7 +197,7 @@ class ChatToolCall:
 class ChatToolCallDelta:
     """One indexed, possibly partial streamed tool-call fragment.
 
-        中文：一个带索引、可能尚未完整的流式 tool-call 片段。
+        中文:一个带索引、可能尚未完整的流式 tool-call 片段。
     """
 
     index: int
@@ -211,7 +211,7 @@ class ChatToolCallDelta:
 class ChatCompletionRequest:
     """Decoded or encodable ``ChatCompletionRequest``.
 
-        中文：已解码或可编码的 ``ChatCompletionRequest``。
+        中文:已解码或可编码的 ``ChatCompletionRequest``。
     """
 
     messages: tuple[ChatMessage, ...] = ()
@@ -229,7 +229,7 @@ class ChatCompletionRequest:
 class ChatCompletionChunk:
     """One ordered provider response chunk.
 
-        中文：一段有序的 Provider 响应 chunk。
+        中文:一段有序的 Provider 响应 chunk。
     """
 
     delta: str = ""
@@ -245,7 +245,7 @@ class ChatCompletionChunk:
 class ChatCompletionResponse:
     """Ordered chunks shared by unary and streamed provider responses.
 
-        中文：供 unary 和流式 Provider 响应共用的有序 chunk 列表。
+        中文:供 unary 和流式 Provider 响应共用的有序 chunk 列表。
     """
 
     chunks: tuple[ChatCompletionChunk, ...] = ()
@@ -254,7 +254,7 @@ class ChatCompletionResponse:
 def encode_chat_message(message: ChatMessage) -> bytes:
     """Encode one canonical ``ChatMessage`` body.
 
-        中文：编码一条规范 ``ChatMessage`` 正文。
+        中文:编码一条规范 ``ChatMessage`` 正文。
     """
 
     return _encode_chat_message(message, structured=False)
@@ -263,7 +263,7 @@ def encode_chat_message(message: ChatMessage) -> bytes:
 def encode_chat_message_v2(message: ChatMessage) -> bytes:
     """Encode a ``ChatMessage`` including structured tool-call history.
 
-        中文：编码一条包含结构化 tool-call 历史的 ``ChatMessage``。
+        中文:编码一条包含结构化 tool-call 历史的 ``ChatMessage``。
     """
 
     return _encode_chat_message(message, structured=True)
@@ -272,7 +272,7 @@ def encode_chat_message_v2(message: ChatMessage) -> bytes:
 def _encode_chat_message(message: ChatMessage, *, structured: bool) -> bytes:
     """Encode one message for the selected chat contract version.
 
-        中文：根据所选 chat contract 版本编码一条消息。
+        中文:根据所选 chat contract 版本编码一条消息。
     """
 
     if not isinstance(message, ChatMessage):
@@ -304,7 +304,7 @@ def _encode_chat_message(message: ChatMessage, *, structured: bool) -> bytes:
 def decode_chat_message(payload: bytes) -> ChatMessage:
     """Decode one canonical ``ChatMessage`` body.
 
-        中文：解码一条规范 ``ChatMessage`` 正文。
+        中文:解码一条规范 ``ChatMessage`` 正文。
     """
 
     payload = _payload_bytes(payload, "ChatMessage")
@@ -348,7 +348,7 @@ def decode_chat_message(payload: bytes) -> ChatMessage:
 def encode_chat_completion_request(request: ChatCompletionRequest) -> bytes:
     """Encode the v1 text-only ``ChatCompletionRequest`` message.
 
-        中文：编码 v1 仅含文本的 ``ChatCompletionRequest`` 消息。
+        中文:编码 v1 仅含文本的 ``ChatCompletionRequest`` 消息。
     """
 
     return _encode_chat_completion_request(request, structured=False)
@@ -357,7 +357,7 @@ def encode_chat_completion_request(request: ChatCompletionRequest) -> bytes:
 def encode_chat_completion_request_v2(request: ChatCompletionRequest) -> bytes:
     """Encode a structured ``ChatCompletionRequest`` for chat v2.
 
-        中文：为 chat v2 编码结构化 ``ChatCompletionRequest``。
+        中文:为 chat v2 编码结构化 ``ChatCompletionRequest``。
     """
 
     return _encode_chat_completion_request(request, structured=True)
@@ -368,7 +368,7 @@ def _encode_chat_completion_request(
 ) -> bytes:
     """Encode a request for the selected chat contract version.
 
-        中文：根据所选 chat contract 版本编码请求。
+        中文:根据所选 chat contract 版本编码请求。
     """
 
     if not isinstance(request, ChatCompletionRequest):
@@ -399,7 +399,7 @@ def _encode_chat_completion_request(
 
     # A repeated message has presence even when its body is empty.  Therefore
     # this uses encode_len_delimited rather than encode_bytes_field.
-    # 中文：重复消息即使正文为空也仍具有 presence。因此这里使用 encode_len_delimited，而不是 encode_bytes_field。
+    # 中文:重复消息即使正文为空也仍具有 presence。因此这里使用 encode_len_delimited,而不是 encode_bytes_field。
     body = b"".join(
         _wire.encode_len_delimited(
             _REQUEST_MESSAGES,
@@ -441,7 +441,7 @@ def _encode_chat_completion_request(
 def decode_chat_completion_request(payload: bytes) -> ChatCompletionRequest:
     """Decode the canonical ``ChatCompletionRequest`` message.
 
-        中文：解码规范的 ``ChatCompletionRequest`` 消息。
+        中文:解码规范的 ``ChatCompletionRequest`` 消息。
     """
 
     payload = _payload_bytes(payload, "ChatCompletionRequest")
@@ -536,7 +536,7 @@ def decode_chat_completion_request(payload: bytes) -> ChatCompletionRequest:
 def decode_chat_completion_request_v2(payload: bytes) -> ChatCompletionRequest:
     """Decode a structured chat request using the additive protobuf fields.
 
-        中文：使用新增的 protobuf 字段解码结构化 chat 请求。
+        中文:使用新增的 protobuf 字段解码结构化 chat 请求。
     """
 
     return decode_chat_completion_request(payload)
@@ -545,7 +545,7 @@ def decode_chat_completion_request_v2(payload: bytes) -> ChatCompletionRequest:
 def encode_chat_completion_chunk(chunk: ChatCompletionChunk) -> bytes:
     """Encode one v1 text-only ``ChatCompletionChunk`` body.
 
-        中文：编码一个 v1 仅含文本的 ``ChatCompletionChunk`` 正文。
+        中文:编码一个 v1 仅含文本的 ``ChatCompletionChunk`` 正文。
     """
 
     return _encode_chat_completion_chunk(chunk, structured=False)
@@ -554,7 +554,7 @@ def encode_chat_completion_chunk(chunk: ChatCompletionChunk) -> bytes:
 def encode_chat_completion_chunk_v2(chunk: ChatCompletionChunk) -> bytes:
     """Encode one structured ``ChatCompletionChunk`` body for chat v2.
 
-        中文：为 chat v2 编码一个结构化 ``ChatCompletionChunk`` 正文。
+        中文:为 chat v2 编码一个结构化 ``ChatCompletionChunk`` 正文。
     """
 
     return _encode_chat_completion_chunk(chunk, structured=True)
@@ -565,7 +565,7 @@ def _encode_chat_completion_chunk(
 ) -> bytes:
     """Encode one response chunk for the selected chat contract version.
 
-        中文：根据所选 chat contract 版本编码一个响应 chunk。
+        中文:根据所选 chat contract 版本编码一个响应 chunk。
     """
 
     if not isinstance(chunk, ChatCompletionChunk):
@@ -613,7 +613,7 @@ def _encode_chat_completion_chunk(
 def decode_chat_completion_chunk(payload: bytes) -> ChatCompletionChunk:
     """Decode one canonical ``ChatCompletionChunk`` body.
 
-        中文：解码一条规范 ``ChatCompletionChunk`` 正文。
+        中文:解码一条规范 ``ChatCompletionChunk`` 正文。
     """
 
     payload = _payload_bytes(payload, "ChatCompletionChunk")
@@ -690,7 +690,7 @@ def decode_chat_completion_chunk(payload: bytes) -> ChatCompletionChunk:
 def decode_chat_completion_chunk_v2(payload: bytes) -> ChatCompletionChunk:
     """Decode one structured response chunk using additive fields.
 
-        中文：使用新增字段解码一个结构化响应 chunk。
+        中文:使用新增字段解码一个结构化响应 chunk。
     """
 
     return decode_chat_completion_chunk(payload)
@@ -699,7 +699,7 @@ def decode_chat_completion_chunk_v2(payload: bytes) -> ChatCompletionChunk:
 def encode_chat_completion_response(response: ChatCompletionResponse) -> bytes:
     """Encode one v1 text-only ``ChatCompletionResponse`` message.
 
-        中文：编码一条 v1 仅含文本的 ``ChatCompletionResponse`` 消息。
+        中文:编码一条 v1 仅含文本的 ``ChatCompletionResponse`` 消息。
     """
 
     return _encode_chat_completion_response(response, structured=False)
@@ -708,7 +708,7 @@ def encode_chat_completion_response(response: ChatCompletionResponse) -> bytes:
 def encode_chat_completion_response_v2(response: ChatCompletionResponse) -> bytes:
     """Encode one structured ``ChatCompletionResponse`` for chat v2.
 
-        中文：为 chat v2 编码一个结构化 ``ChatCompletionResponse``。
+        中文:为 chat v2 编码一个结构化 ``ChatCompletionResponse``。
     """
 
     return _encode_chat_completion_response(response, structured=True)
@@ -719,7 +719,7 @@ def _encode_chat_completion_response(
 ) -> bytes:
     """Encode one response for the selected chat contract version.
 
-        中文：根据所选 chat contract 版本编码一个响应。
+        中文:根据所选 chat contract 版本编码一个响应。
     """
 
     if not isinstance(response, ChatCompletionResponse):
@@ -727,7 +727,7 @@ def _encode_chat_completion_response(
     if not isinstance(response.chunks, (list, tuple)):
         raise ChatCodecError("ChatCompletionResponse.chunks must be a sequence")
     # A repeated message has presence even when its body is empty.
-    # 中文：重复消息即使正文为空也仍具有 presence。
+    # 中文:重复消息即使正文为空也仍具有 presence。
     return b"".join(
         _wire.encode_len_delimited(
             _RESPONSE_CHUNKS,
@@ -740,7 +740,7 @@ def _encode_chat_completion_response(
 def decode_chat_completion_response(payload: bytes) -> ChatCompletionResponse:
     """Decode the canonical ``ChatCompletionResponse`` message.
 
-        中文：解码规范的 ``ChatCompletionResponse`` 消息。
+        中文:解码规范的 ``ChatCompletionResponse`` 消息。
     """
 
     payload = _payload_bytes(payload, "ChatCompletionResponse")
@@ -762,7 +762,7 @@ def decode_chat_completion_response(payload: bytes) -> ChatCompletionResponse:
 def decode_chat_completion_response_v2(payload: bytes) -> ChatCompletionResponse:
     """Decode one structured response using additive protobuf fields.
 
-        中文：使用新增的 protobuf 字段解码一个结构化响应。
+        中文:使用新增的 protobuf 字段解码一个结构化响应。
     """
 
     return decode_chat_completion_response(payload)
@@ -1042,7 +1042,7 @@ def _require_wire_type(
 ) -> None:
     """Reject a known field encoded with a different protobuf wire type.
 
-        中文：拒绝使用错误 protobuf wire type 编码的已知字段。
+        中文:拒绝使用错误 protobuf wire type 编码的已知字段。
     """
 
     if actual != expected:
@@ -1111,7 +1111,7 @@ def _optional_string_field(field_number: int, value: Any, field_name: str) -> by
     if value is None:
         return b""
     # optional strings preserve explicit empty-string presence.
-    # 中文：可选字符串会保留显式设置为空字符串的 presence。
+    # 中文:可选字符串会保留显式设置为空字符串的 presence。
     return _wire.encode_len_delimited(field_number, value.encode("utf-8"))
 
 
@@ -1135,7 +1135,7 @@ def _require_optional_uint32(value: Any, field_name: str) -> None:
 
 def _optional_uint32_field(field_number: int, value: int) -> bytes:
     # optional uint32 preserves explicit zero presence.
-    # 中文：可选 uint32 会保留显式设置为零的 presence。
+    # 中文:可选 uint32 会保留显式设置为零的 presence。
     return _wire.encode_tag(field_number, _wire.WIRE_VARINT) + _wire.encode_varint(
         value
     )

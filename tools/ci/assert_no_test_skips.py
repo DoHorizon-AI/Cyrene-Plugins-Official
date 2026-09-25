@@ -20,7 +20,7 @@ from pathlib import Path
 def _parse_args() -> argparse.Namespace:
     """Parse the Maven/Surefire report root supplied by the CI job.
 
-        中文：解析 CI 作业提供的 Maven/Surefire 报告根目录。"""
+        中文:解析 CI 作业提供的 Maven/Surefire 报告根目录。"""
 
     parser = argparse.ArgumentParser(
         description="Fail when any JUnit/Surefire report contains skipped cases."
@@ -36,7 +36,7 @@ def _parse_args() -> argparse.Namespace:
 def _skipped_cases(report_path: Path) -> list[str]:
     """Return fully qualified test names marked as skipped in one XML report.
 
-        中文：返回一个 XML 报告中标记为跳过的完整测试名称。"""
+        中文:返回一个 XML 报告中标记为跳过的完整测试名称。"""
 
     root = ET.parse(report_path).getroot()
     suite_name = root.attrib.get("name", report_path.stem)
@@ -53,7 +53,7 @@ def _skipped_cases(report_path: Path) -> list[str]:
 def main() -> int:
     """Inspect every Surefire report and fail closed on skipped cases.
 
-        中文：检查每份 Surefire 报告，并在存在跳过用例时按失败即拒绝处理。"""
+        中文:检查每份 Surefire 报告,并在存在跳过用例时按失败即拒绝处理。"""
 
     args = _parse_args()
     report_root = args.report_root.resolve()

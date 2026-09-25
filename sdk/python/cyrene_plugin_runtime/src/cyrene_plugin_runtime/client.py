@@ -27,7 +27,7 @@ from ._generated import direct_plugin_runtime_pb2_grpc as wire_grpc
 class DirectPayload:
     """One capability-owned typed payload.
 
-        中文：由单个 capability 拥有的类型化负载。
+        中文:由单个 capability 拥有的类型化负载。
     """
 
     type_url: str
@@ -38,21 +38,21 @@ class DirectPayload:
 class DirectPluginError(RuntimeError):
     """Base error for a direct Plugin invocation.
 
-        中文：direct Plugin invocation 的基础错误。
+        中文:direct Plugin invocation 的基础错误。
     """
 
 
 class DirectPluginProtocolError(DirectPluginError):
     """The endpoint violated the direct runtime protocol.
 
-        中文：Endpoint 违反 direct runtime 协议。
+        中文:Endpoint 违反 direct runtime 协议。
     """
 
 
 class DirectPluginFailure(DirectPluginError):
     """The Plugin endpoint returned a typed invocation failure.
 
-        中文：Plugin Endpoint 返回了一项类型化调用失败。
+        中文:Plugin Endpoint 返回了一项类型化调用失败。
     """
 
     def __init__(
@@ -73,7 +73,7 @@ class DirectPluginFailure(DirectPluginError):
     def is_cancelled(self) -> bool:
         """Whether the endpoint classified the outcome as cancellation.
 
-            中文：Endpoint 是否将结果分类为取消。
+            中文:Endpoint 是否将结果分类为取消。
         """
 
         return self.code == wire.DirectInvocationError.CODE_CANCELLED
@@ -82,7 +82,7 @@ class DirectPluginFailure(DirectPluginError):
 class DirectPluginTransportError(DirectPluginError):
     """gRPC failed before the Plugin endpoint returned a typed result.
 
-        中文：gRPC 在 Plugin Endpoint 返回类型化结果之前就失败。
+        中文:gRPC 在 Plugin Endpoint 返回类型化结果之前就失败。
     """
 
     def __init__(self, status: grpc.StatusCode, message: str) -> None:
@@ -94,21 +94,21 @@ class DirectPluginTransportError(DirectPluginError):
 class DirectPluginInvocationCancelled(DirectPluginTransportError):
     """The Product cancelled the direct invocation.
 
-        中文：Product 取消了 direct invocation。
+        中文:Product 取消了 direct invocation。
     """
 
 
 class DirectPluginDeadlineExceeded(DirectPluginTransportError):
     """The direct invocation exceeded its native gRPC deadline.
 
-        中文：direct invocation 超出原生 gRPC deadline。
+        中文:direct invocation 超出原生 gRPC deadline。
     """
 
 
 class DirectPluginClient:
     """Call one resolved Plugin endpoint without a Platform data-plane hop.
 
-        中文：调用一个已解析的 Plugin Endpoint，不经过 Platform 数据平面中转。
+        中文:调用一个已解析的 Plugin Endpoint,不经过 Platform 数据平面中转。
     """
 
     def __init__(self, channel: grpc.Channel, *, owns_channel: bool = False) -> None:
@@ -120,7 +120,7 @@ class DirectPluginClient:
     def for_local_connection_ref(cls, connection_ref: str) -> DirectPluginClient:
         """Create an insecure client for a loopback or Unix connection ref.
 
-            中文：为 loopback 或 Unix connection ref 创建不安全客户端。
+            中文:为 loopback 或 Unix connection ref 创建不安全客户端。
         """
 
         target = connection_ref.removeprefix("grpc://")
@@ -133,7 +133,7 @@ class DirectPluginClient:
     def close(self) -> None:
         """Close a channel created by :meth:`for_local_connection_ref`.
 
-            中文：关闭由 `for_local_connection_ref` 创建的 channel。
+            中文:关闭由 `for_local_connection_ref` 创建的 channel。
         """
 
         if self._owns_channel:
@@ -152,7 +152,7 @@ class DirectPluginClient:
     ) -> DirectPayload:
         """Invoke one method and return its typed response.
 
-            中文：调用一个方法并返回其类型化响应。
+            中文:调用一个方法并返回其类型化响应。
         """
 
         invocation = _invocation(
@@ -201,7 +201,7 @@ class DirectPluginClient:
     ) -> Iterator[DirectPayload]:
         """Yield ordered typed results until the endpoint sends its end marker.
 
-            中文：以有序方式产生类型化结果，直到 Endpoint 发出结束标记。
+            中文:以有序方式产生类型化结果,直到 Endpoint 发出结束标记。
         """
 
         invocation = _invocation(

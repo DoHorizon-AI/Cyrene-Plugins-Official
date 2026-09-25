@@ -24,7 +24,7 @@ MAX_FRAME_BYTES = 8 * 1024 * 1024
 def _mode() -> str:
     """Read a fixture-only mode from command-line arguments.
 
-        中文：从命令行参数读取仅供 fixture 使用的模式。
+        中文:从命令行参数读取仅供 fixture 使用的模式。
     """
 
     for argument in sys.argv[1:]:
@@ -36,7 +36,7 @@ def _mode() -> str:
 def _operation_log() -> str | None:
     """Read an optional fixture-only operation log path.
 
-        中文：读取可选的 fixture 专用 operation 日志路径。
+        中文:读取可选的 fixture 专用 operation 日志路径。
     """
 
     for argument in sys.argv[1:]:
@@ -48,7 +48,7 @@ def _operation_log() -> str | None:
 def _request_log() -> str | None:
     """Read an optional fixture-only full request log path.
 
-        中文：读取可选的 fixture 专用完整请求日志路径。
+        中文:读取可选的 fixture 专用完整请求日志路径。
     """
 
     for argument in sys.argv[1:]:
@@ -60,7 +60,7 @@ def _request_log() -> str | None:
 def _control_log() -> str | None:
     """Read an optional fixture-only control-frame log path.
 
-        中文：读取可选的 fixture 专用控制帧日志路径。
+        中文:读取可选的 fixture 专用控制帧日志路径。
     """
 
     for argument in sys.argv[1:]:
@@ -72,7 +72,7 @@ def _control_log() -> str | None:
 def _read_frame() -> dict[str, Any] | None:
     """Read one bounded frame using only inherited stdin.
 
-        中文：仅读取继承的 stdin，获取一帧有界数据。
+        中文:仅读取继承的 stdin,获取一帧有界数据。
     """
 
     header = sys.stdin.buffer.read(4)
@@ -95,7 +95,7 @@ def _read_frame() -> dict[str, Any] | None:
 def _write_frame(value: dict[str, Any]) -> None:
     """Write one complete JSON frame to inherited stdout.
 
-        中文：向继承的 stdout 写入一帧完整 JSON 数据。
+        中文:向继承的 stdout 写入一帧完整 JSON 数据。
     """
 
     payload = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode(
@@ -116,7 +116,7 @@ def _response(
 ) -> dict[str, Any]:
     """Build a deterministic response for one fixed operation.
 
-        中文：为一个固定 operation 构造确定性响应。
+        中文:为一个固定 operation 构造确定性响应。
     """
 
     operation = request.get("operation")
@@ -216,7 +216,7 @@ def _semantic_result(operation: Any, params: Any) -> dict[str, Any]:
     facts.  It does not claim that these values or native overloads match an
     official QQ build; that remains the protected real-smoke boundary.
 
-        中文：返回供计划中映射类别使用的类型化 fixture 数据。该 fixture 有意只模拟稳定的身份和结果结构事实，并不声称这些值或原生重载与任何官方 QQ build 相符；该差异仍由受保护的真实烟测边界验证。
+        中文:返回供计划中映射类别使用的类型化 fixture 数据。该 fixture 有意只模拟稳定的身份和结果结构事实,并不声称这些值或原生重载与任何官方 QQ build 相符;该差异仍由受保护的真实烟测边界验证。
     """
 
     values = params if isinstance(params, dict) else {}
@@ -343,7 +343,7 @@ def _semantic_result(operation: Any, params: Any) -> dict[str, Any]:
 def _message_event(binding_id: str, generation: int, event_id: str) -> dict[str, Any]:
     """Return one message event with distinct QQ identity values.
 
-        中文：返回一个包含不同 QQ 身份值的消息事件。
+        中文:返回一个包含不同 QQ 身份值的消息事件。
     """
 
     return {
@@ -378,7 +378,7 @@ def _private_message_event(
 ) -> dict[str, Any]:
     """Return a private message event for the semantic mapping fixture.
 
-        中文：为语义映射 fixture 返回一条私聊消息事件。
+        中文:为语义映射 fixture 返回一条私聊消息事件。
     """
 
     event = _message_event(binding_id, generation, event_id)
@@ -401,7 +401,7 @@ def _private_message_event(
 def _spawn_child() -> None:
     """Spawn a harmless long-lived helper to test process-group cleanup.
 
-        中文：派生一个无害的长生命周期辅助进程，用于测试进程组清理。
+        中文:派生一个无害的长生命周期辅助进程,用于测试进程组清理。
     """
 
     child = subprocess.Popen(["sleep", "60"])
@@ -415,7 +415,7 @@ def _spawn_child() -> None:
 def main() -> int:
     """Serve one fixture Host session until shutdown or a deliberate fault.
 
-        中文：为单次 fixture Host session 提供服务，直到收到关闭请求或触发指定故障。
+        中文:为单次 fixture Host session 提供服务,直到收到关闭请求或触发指定故障。
     """
 
     mode = _mode()
@@ -510,7 +510,7 @@ def main() -> int:
             if mode in {"timeout", "cancel"}:
                 # Deliberately late response: the parent must have removed the
                 # request before sending cancel and ignore this frame.
-                # 中文：故意延迟响应：发送 cancel 时，父进程必须已经移除该请求，并忽略随后到达的此帧。
+                # 中文:故意延迟响应:发送 cancel 时,父进程必须已经移除该请求,并忽略随后到达的此帧。
                 _write_frame(_response(message, binding_id, generation, mode=mode))
             continue
         if message_type != "request":

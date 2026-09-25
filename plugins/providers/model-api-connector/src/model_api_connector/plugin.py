@@ -1,6 +1,6 @@
 """Direct-invocation adapter for the OpenAI-compatible model provider connector.
 
-中文：面向 OpenAI 兼容模型提供方连接器的直接调用适配器。"""
+中文:面向 OpenAI 兼容模型提供方连接器的直接调用适配器。"""
 
 from __future__ import annotations
 
@@ -51,7 +51,7 @@ _METHOD_NOT_FOUND = "METHOD_NOT_FOUND"
 class TypedPayload:
     """One typed contract payload returned to the runtime.
 
-        中文：返回给运行时的一个有类型契约载荷。"""
+        中文:返回给运行时的一个有类型契约载荷。"""
 
     value: bytes
     type_url: str
@@ -63,9 +63,9 @@ class ChunkStream:
     The gateway forwards each chunk as it arrives, so the first tool-call
     fragment must reach it while the provider is still generating.
 
-        中文：为一次流式调用惰性生成契约数据块。
+        中文:为一次流式调用惰性生成契约数据块。
 
-        中文：网关会在每个数据块到达时立即转发，因此第一个工具调用片段必须在提供方仍在生成内容时送达网关。
+        中文:网关会在每个数据块到达时立即转发,因此第一个工具调用片段必须在提供方仍在生成内容时送达网关。
     """
 
     def __init__(self, items: Iterator[TypedPayload]) -> None:
@@ -75,7 +75,7 @@ class ChunkStream:
 class ModelApiConnector:
     """Adapt the typed chat contract onto one configured upstream endpoint.
 
-        中文：将有类型的聊天契约适配到一个已配置的上游端点。"""
+        中文:将有类型的聊天契约适配到一个已配置的上游端点。"""
 
     capabilities = (CAPABILITY_ID,)
     plugin_id = PLUGIN_ID
@@ -93,7 +93,7 @@ class ModelApiConnector:
         self._lock = threading.Lock()
 
     # ── runtime surface ───────────────────────────────────────────────────
-    # 中文：── 运行时接口 ───────────────────────────────────────────────────
+    # 中文:── 运行时接口 ───────────────────────────────────────────────────
 
     def on_invoke(
         self,
@@ -108,7 +108,7 @@ class ModelApiConnector:
     ) -> tuple[bool, Any]:
         """Dispatch one direct invocation without leaking vendor detail.
 
-            中文：分发一次直接调用，不泄露厂商细节。"""
+            中文:分发一次直接调用,不泄露厂商细节。"""
 
         try:
             if capability != CAPABILITY_ID:
@@ -171,7 +171,7 @@ class ModelApiConnector:
     def on_cancel(self, request_id: str, reason: str) -> None:
         """Abort the upstream request the runtime is no longer waiting for.
 
-            中文：中止运行时已不再等待的上游请求。"""
+            中文:中止运行时已不再等待的上游请求。"""
 
         with self._lock:
             call = self._calls.get(request_id)
@@ -179,7 +179,7 @@ class ModelApiConnector:
             call.close()
 
     # ── internals ─────────────────────────────────────────────────────────
-    # 中文：── 内部实现 ─────────────────────────────────────────────────────
+    # 中文:── 内部实现 ─────────────────────────────────────────────────────
 
     def _require_settings(self) -> ProviderSettings:
         if self._settings is None:
@@ -216,7 +216,7 @@ class ModelApiConnector:
     ) -> Iterator[TypedPayload]:
         """Yield one contract chunk per upstream event, without materialising.
 
-            中文：每收到一个上游事件就产出一个契约数据块，不先将其全部载入内存。"""
+            中文:每收到一个上游事件就产出一个契约数据块,不先将其全部载入内存。"""
         encoder = encode_chat_completion_chunk_v2 if structured else encode_chat_completion_chunk
         try:
             for event in upstream.events(body, call, cancellation=cancellation):
@@ -227,7 +227,7 @@ class ModelApiConnector:
         except ProviderCancelled:
             # A cancelled invocation has no result to report: stop cleanly and
             # let the runtime observe the cancellation it already knows about.
-            # 中文：已取消的调用没有结果可报告：应正常停止，并让运行时观察到它已知的取消状态。
+            # 中文:已取消的调用没有结果可报告:应正常停止,并让运行时观察到它已知的取消状态。
             return
         finally:
             self._forget(request_id)

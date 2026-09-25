@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Verify the IM Python-to-C# behavior evidence matrix.
 
-中文：验证 IM 从 Python 到 C# 的行为证据矩阵。"""
+中文:验证 IM 从 Python 到 C# 的行为证据矩阵。"""
 
 from __future__ import annotations
 
@@ -67,7 +67,7 @@ FILE_DEFAULT_EVIDENCE = {
 def discover_python_tests() -> list[str]:
     """Return every top-level pytest function in the IM reference suite.
 
-        中文：返回 IM 参考套件中的所有顶层 pytest 函数。"""
+        中文:返回 IM 参考套件中的所有顶层 pytest 函数。"""
 
     discovered: list[str] = []
     for path in sorted(PYTHON_TEST_ROOT.glob("test_*.py")):
@@ -83,7 +83,7 @@ def discover_python_tests() -> list[str]:
 def csharp_test_methods() -> set[str]:
     """Collect concrete public test method references from the IM C# suite.
 
-        中文：从 IM C# 套件中收集具体的公开测试方法引用。"""
+        中文:从 IM C# 套件中收集具体的公开测试方法引用。"""
 
     methods: set[str] = set()
     pattern = re.compile(r"public\s+(?:async\s+)?(?:Task|void)\s+(\w+)")
@@ -103,7 +103,7 @@ def csharp_test_methods() -> set[str]:
 def build_matrix() -> dict[str, Any]:
     """Build the deterministic IM behavior matrix.
 
-        中文：构建确定性的 IM 行为矩阵。"""
+        中文:构建确定性的 IM 行为矩阵。"""
 
     tests = discover_python_tests()
     rows = [
@@ -135,7 +135,7 @@ def build_matrix() -> dict[str, Any]:
 def validate(matrix: dict[str, Any]) -> None:
     """Fail if inventory, evidence references, or generated values drift.
 
-        中文：如果清单、证据引用或生成值发生偏移，则判定失败。"""
+        中文:如果清单、证据引用或生成值发生偏移,则判定失败。"""
 
     expected = build_matrix()
     if matrix != expected:
@@ -158,7 +158,7 @@ def validate(matrix: dict[str, Any]) -> None:
 def main() -> int:
     """Write or verify the checked-in matrix.
 
-        中文：写入或验证已检入仓库的矩阵。"""
+        中文:写入或验证已检入仓库的矩阵。"""
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--write", action="store_true")

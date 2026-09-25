@@ -177,8 +177,8 @@ fn verify_unknown_fields_forward_compatibility() {
     // Tag 99, wire type 0 (varint): (99 << 3) | 0 = 792 = 0x318 -> varint [0x98, 0x06]
     // Value: 42 -> 0x2a
     // 中文：构造包含未知字段标记的字节数组（例如 tag 99：varint 42）。
-        // 中文：tag 99、wire type 0（varint）：(99 << 3) | 0 = 792 = 0x318 → varint [0x98, 0x06]。
-        // 中文：值 42 对应 0x2a。
+    // 中文：tag 99、wire type 0（varint）：(99 << 3) | 0 = 792 = 0x318 → varint [0x98, 0x06]。
+    // 中文：值 42 对应 0x2a。
     let base_req = CommandExecutionRequest {
         command: "ls -la".to_string(),
         cwd: None,

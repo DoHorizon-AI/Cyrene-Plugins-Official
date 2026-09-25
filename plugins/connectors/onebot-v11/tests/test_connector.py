@@ -41,7 +41,7 @@ from onebot_v11_connector._generated import (
 class MemoryTransport:
     """Deterministic transport fake that records the configured worker target.
 
-        中文：记录已配置工作进程目标的确定性模拟传输。"""
+        中文:记录已配置工作进程目标的确定性模拟传输。"""
 
     def __init__(self, label: str) -> None:
         self.label = label
@@ -95,7 +95,7 @@ class CancelledToken:
 class BoundCapabilityHarness:
     """Test-only CES seam; Platform remains the production binding authority.
 
-        中文：仅供测试使用的 CES 接口；Platform 仍是生产环境中的绑定权威。"""
+        中文:仅供测试使用的 CES 接口;Platform 仍是生产环境中的绑定权威。"""
 
     def __init__(self, workers: dict[str, OneBotV11Connector]) -> None:
         self.workers = workers

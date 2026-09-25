@@ -77,7 +77,7 @@ PLUGIN_RUNTIME_ERROR_MAPPINGS: dict[str, dict[str, str]] = {
 def map_plugin_error(code_or_name: str, *, default_family: str = "RUNTIME") -> dict[str, str]:
     """Map a plugin error code or raw string to canonical PLUGIN.<FAMILY>.<REASON>.
 
-        中文：将 Plugin 错误码或原始字符串映射为规范的 PLUGIN.<FAMILY>.<REASON>。"""
+        中文:将 Plugin 错误码或原始字符串映射为规范的 PLUGIN.<FAMILY>.<REASON>。"""
     raw = code_or_name.strip()
     if raw in PLUGIN_RUNTIME_ERROR_MAPPINGS:
         return PLUGIN_RUNTIME_ERROR_MAPPINGS[raw]

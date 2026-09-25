@@ -6,7 +6,7 @@
 ###############################################################################
 """Collect repeatable, non-gating performance samples for a Native AOT package.
 
-中文：为 Native AOT package 收集可重复但不作为门禁的性能样本。
+中文:为 Native AOT package 收集可重复但不作为门禁的性能样本。
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ SAMPLES = 10
 def _parse_args() -> argparse.Namespace:
     """Parse the installed binary and evidence destination.
 
-        中文：解析已安装的二进制文件和证据输出位置。
+        中文:解析已安装的二进制文件和证据输出位置。
     """
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -53,7 +53,7 @@ def _parse_args() -> argparse.Namespace:
 class _OneBotHandler(BaseHTTPRequestHandler):
     """Return one deterministic successful OneBot response.
 
-        中文：返回一份确定性成功的 OneBot 响应。
+        中文:返回一份确定性成功的 OneBot 响应。
     """
 
     request_count: ClassVar[int] = 0
@@ -76,7 +76,7 @@ class _OneBotHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         """Keep the local benchmark peer quiet.
 
-            中文：保持本地 benchmark 对端静默。
+            中文:保持本地 benchmark 对端静默。
         """
 
         del format, args
@@ -85,7 +85,7 @@ class _OneBotHandler(BaseHTTPRequestHandler):
 def _read_ready(process: subprocess.Popen[str]) -> dict[str, Any]:
     """Read the bounded readiness announcement from the Native AOT process.
 
-        中文：读取 Native AOT 进程发出的有界 readiness 通告。
+        中文:读取 Native AOT 进程发出的有界 readiness 通告。
     """
 
     if process.stdout is None:
@@ -134,7 +134,7 @@ def _read_ready(process: subprocess.Popen[str]) -> dict[str, Any]:
 def _rss_bytes(pid: int) -> int | None:
     """Return one sampled Linux resident-set size.
 
-        中文：返回一个 Linux 常驻集大小采样值。
+        中文:返回一个 Linux 常驻集大小采样值。
     """
 
     status = Path(f"/proc/{pid}/status")
@@ -151,7 +151,7 @@ def _rss_bytes(pid: int) -> int | None:
 def _canonical_request(message_wire: Any) -> Any:
     """Build one canonical local group message.
 
-        中文：构造一条规范的本地群组消息。
+        中文:构造一条规范的本地群组消息。
     """
 
     return message_wire.SendMessageRequest(
@@ -172,7 +172,7 @@ def _canonical_request(message_wire: Any) -> Any:
 def _percentile(values: list[float], percentile: float) -> float:
     """Return an inclusive percentile in milliseconds.
 
-        中文：返回以毫秒为单位的包含边界百分位数。
+        中文:返回以毫秒为单位的包含边界百分位数。
     """
 
     if len(values) == 1:
@@ -183,7 +183,7 @@ def _percentile(values: list[float], percentile: float) -> float:
 def _sha256(path: Path) -> str:
     """Return a file's SHA-256 digest without loading it all into memory.
 
-        中文：计算一个文件的 SHA-256 摘要，不将整个文件一次性读入内存。
+        中文:计算一个文件的 SHA-256 摘要,不将整个文件一次性读入内存。
     """
 
     digest = hashlib.sha256()
@@ -196,7 +196,7 @@ def _sha256(path: Path) -> str:
 def collect(binary: Path, package: Path, rid: str) -> dict[str, Any]:
     """Launch an installed package and collect descriptive latency samples.
 
-        中文：启动一个已安装的 package，并收集描述性延迟样本。
+        中文:启动一个已安装的 package,并收集描述性延迟样本。
     """
 
     if sys.platform != "linux":
@@ -275,7 +275,7 @@ def _collect_process_evidence(
 ) -> dict[str, Any]:
     """Collect protocol samples and always close the child and fake peer.
 
-        中文：采集协议性能样本，并确保始终关闭子进程与 fake peer。
+        中文:采集协议性能样本,并确保始终关闭子进程与 fake peer。
     """
 
     channel = None
@@ -395,7 +395,7 @@ def _collect_process_evidence(
 def main() -> int:
     """Collect and write one benchmark record.
 
-        中文：采集并写入一条 benchmark 记录。
+        中文:采集并写入一条 benchmark 记录。
     """
 
     args = _parse_args()

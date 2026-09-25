@@ -2,7 +2,7 @@
 Tests for plugin runtime W3C trace correlation, secret redaction, structured logging,
 and canonical PLUGIN.<DOMAIN>.<REASON> error mappings.
 
-中文：测试 Plugin 运行时的 W3C 轨迹关联、机密信息脱敏、结构化日志，以及规范的 PLUGIN.<DOMAIN>.<REASON> 错误映射。
+中文:测试 Plugin 运行时的 W3C 轨迹关联、机密信息脱敏、结构化日志,以及规范的 PLUGIN.<DOMAIN>.<REASON> 错误映射。
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ def test_secret_redaction_and_token_preservation() -> None:
     assert is_sensitive_key("secret")
 
     # Tokens and counts must be preserved
-    # 中文：必须保留令牌和计数。
+    # 中文:必须保留令牌和计数。
     assert not is_sensitive_key("tokens")
     assert not is_sensitive_key("prompt_tokens")
     assert not is_sensitive_key("token_count")
@@ -110,11 +110,11 @@ def test_emit_diagnostic_error_strictly_to_stderr() -> None:
         sys.stderr = old_stderr
 
     # stdout MUST be completely empty (preserving machine protocols)
-    # 中文：stdout 必须完全为空（以保留机器协议）。
+    # 中文:stdout 必须完全为空(以保留机器协议)。
     assert stdout_buf.getvalue() == ""
 
     # stderr MUST contain the structured NDJSON record
-    # 中文：stderr 必须包含结构化 NDJSON 记录。
+    # 中文:stderr 必须包含结构化 NDJSON 记录。
     stderr_output = stderr_buf.getvalue()
     assert stderr_output.endswith("\n")
     record = json.loads(stderr_output.strip())
@@ -132,7 +132,7 @@ def test_plugin_error_mappings() -> None:
         assert mapped["recovery_action"] == expected["recovery_action"]
 
     # Custom plugin domain mappings
-    # 中文：自定义 Plugin 域映射。
+    # 中文:自定义 Plugin 域映射。
     m1 = map_plugin_error("ONEBOT.CONNECTION_LOST")
     assert m1["code"] == "PLUGIN.ONEBOT.CONNECTION_LOST"
     assert m1["recovery_action"] == "query_state_first"
@@ -158,11 +158,11 @@ def test_server_wire_error_emits_to_stderr() -> None:
         sys.stderr = old_stderr
 
     # stdout empty
-    # 中文：stdout 为空。
+    # 中文:stdout 为空。
     assert stdout_buf.getvalue() == ""
 
     # stderr has diagnostic error
-    # 中文：stderr 包含诊断错误。
+    # 中文:stderr 包含诊断错误。
     record = json.loads(stderr_buf.getvalue().strip())
     assert record["attributes"]["error.code"] == "PLUGIN.RUNTIME.INVALID_INPUT"
     assert record["attributes"]["request_id"] == "req-999"

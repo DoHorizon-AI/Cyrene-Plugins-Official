@@ -46,7 +46,7 @@ DELIVERY_RESULT_TYPE_URL = (
 def _parse_args() -> argparse.Namespace:
     """Parse one RID and its disposable output directory.
 
-        中文：解析一个 RID 及其临时输出目录。"""
+        中文:解析一个 RID 及其临时输出目录。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rid", choices=sorted(SUPPORTED_RIDS), required=True)
@@ -57,7 +57,7 @@ def _parse_args() -> argparse.Namespace:
 def _run(command: list[str], *, cwd: Path = REPOSITORY_ROOT) -> None:
     """Run one required command and retain its output in the CI log.
 
-        中文：运行一条必需命令，并将其输出保留在 CI 日志中。"""
+        中文:运行一条必需命令,并将其输出保留在 CI 日志中。"""
 
     print("+", " ".join(command))
     subprocess.run(command, cwd=cwd, check=True)
@@ -66,7 +66,7 @@ def _run(command: list[str], *, cwd: Path = REPOSITORY_ROOT) -> None:
 def _publish(rid: str, output_dir: Path) -> Path:
     """Publish the OneBot Host as a self-contained Native AOT executable.
 
-        中文：将 OneBot Host 发布为独立部署的 Native AOT 可执行文件。"""
+        中文:将 OneBot Host 发布为独立部署的 Native AOT 可执行文件。"""
 
     _run(
         [
@@ -98,7 +98,7 @@ def _publish(rid: str, output_dir: Path) -> Path:
 class _OneBotHandler(BaseHTTPRequestHandler):
     """Record one local OneBot action and return a successful fake response.
 
-        中文：记录一条本地 OneBot 动作，并返回成功的模拟响应。"""
+        中文:记录一条本地 OneBot 动作,并返回成功的模拟响应。"""
 
     requests: ClassVar[list[dict[str, Any]]] = []
     request_lock = threading.Lock()
@@ -125,7 +125,7 @@ class _OneBotHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         """Keep the fake transport quiet; failures are reported as evidence.
 
-            中文：让模拟传输保持安静；失败会作为证据报告。"""
+            中文:让模拟传输保持安静;失败会作为证据报告。"""
 
         del format, args
 
@@ -133,7 +133,7 @@ class _OneBotHandler(BaseHTTPRequestHandler):
 def _read_ready_announcement(process: subprocess.Popen[str]) -> dict[str, Any]:
     """Read the bounded JSON launch announcement from the child stdout.
 
-        中文：从子进程标准输出中读取长度受限的 JSON 启动公告。"""
+        中文:从子进程标准输出中读取长度受限的 JSON 启动公告。"""
 
     if process.stdout is None:
         raise RuntimeError("OneBot Native AOT host stdout is not captured")
@@ -181,7 +181,7 @@ def _read_ready_announcement(process: subprocess.Popen[str]) -> dict[str, Any]:
 def _canonical_send_request(message_wire: Any) -> Any:
     """Build one canonical group message for the direct-runtime smoke test.
 
-        中文：为直连运行时冒烟检查构造一条规范群消息。"""
+        中文:为直连运行时冒烟检查构造一条规范群消息。"""
 
     return message_wire.SendMessageRequest(
         conversation=message_wire.ConversationScope(
@@ -201,7 +201,7 @@ def _canonical_send_request(message_wire: Any) -> Any:
 def _exercise_package(binary: Path, rid: str) -> dict[str, Any]:
     """Call Health and send_message through the packaged process endpoint.
 
-        中文：通过打包后的进程端点调用 Health 和 send_message。"""
+        中文:通过打包后的进程端点调用 Health 和 send_message。"""
 
     sys.path.insert(
         0, str(REPOSITORY_ROOT / "sdk/python/cyrene_plugin_runtime/src")
@@ -327,7 +327,7 @@ def _exercise_package(binary: Path, rid: str) -> dict[str, Any]:
 def publish_and_smoke(rid: str, output_dir: Path) -> dict[str, Any]:
     """Publish, package, unpack, and exercise one Linux OneBot candidate.
 
-        中文：发布、打包、解包并执行一个 Linux OneBot 候选构建。"""
+        中文:发布、打包、解包并执行一个 Linux OneBot 候选构建。"""
 
     if rid not in SUPPORTED_RIDS:
         raise ValueError(f"unsupported OneBot Native AOT RID: {rid}")
@@ -379,7 +379,7 @@ def publish_and_smoke(rid: str, output_dir: Path) -> dict[str, Any]:
 def main() -> int:
     """Publish and exercise one RID-specific OneBot Native AOT package.
 
-        中文：发布并执行一个针对指定 RID 的 OneBot Native AOT 包。"""
+        中文:发布并执行一个针对指定 RID 的 OneBot Native AOT 包。"""
 
     args = _parse_args()
     evidence = publish_and_smoke(args.rid, args.output_dir)

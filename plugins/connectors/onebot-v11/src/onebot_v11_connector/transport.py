@@ -16,7 +16,7 @@ It owns the protocol connection and never selects another configured binding.
 The external OneBot process is the peer; Product/session policy remains above
 the ``message.connector.v1`` boundary.
 
-中文：不依赖额外库的 OneBot v11 forward-WebSocket 传输。该传输明确限定于一个 `OneBotInstanceConfig`。它拥有协议连接，绝不会选择其他已配置 binding。外部 OneBot 进程是连接对端；Product/session 策略仍位于 `message.connector.v1` 边界之上。
+中文:不依赖额外库的 OneBot v11 forward-WebSocket 传输。该传输明确限定于一个 `OneBotInstanceConfig`。它拥有协议连接,绝不会选择其他已配置 binding。外部 OneBot 进程是连接对端;Product/session 策略仍位于 `message.connector.v1` 边界之上。
 """
 
 from __future__ import annotations
@@ -60,7 +60,7 @@ class OneBotWebSocketTransport:
     retried with bounded exponential backoff; no action is replayed
     implicitly, because replay could duplicate a side effect.
 
-        中文：供一个已配置 binding 使用的 OneBot v11 forward-WebSocket 客户端。每个传输实例使用一个 daemon reader 线程。它会将入站事件分发给 connector 回调，并根据 OneBot 的 `echo` 字段关联 action 响应。连接损坏时会使进行中的 action 失败，并按有界指数退避重试；绝不会隐式重放 action，因为重放可能重复产生副作用。
+        中文:供一个已配置 binding 使用的 OneBot v11 forward-WebSocket 客户端。每个传输实例使用一个 daemon reader 线程。它会将入站事件分发给 connector 回调,并根据 OneBot 的 `echo` 字段关联 action 响应。连接损坏时会使进行中的 action 失败,并按有界指数退避重试;绝不会隐式重放 action,因为重放可能重复产生副作用。
     """
 
     def __init__(
@@ -106,7 +106,7 @@ class OneBotWebSocketTransport:
     def connected(self) -> bool:
         """Whether the transport currently owns a completed WebSocket session.
 
-            中文：返回此传输当前是否持有已完成握手的 WebSocket session。
+            中文:返回此传输当前是否持有已完成握手的 WebSocket session。
         """
 
         return self._connected.is_set()
@@ -115,7 +115,7 @@ class OneBotWebSocketTransport:
     def reconnect_count(self) -> int:
         """Number of reconnect attempts after an established session failed.
 
-            中文：已建立的 session 失败后，已尝试的重连次数。
+            中文:已建立的 session 失败后,已尝试的重连次数。
         """
 
         with self._state_lock:
@@ -125,7 +125,7 @@ class OneBotWebSocketTransport:
     def heartbeat_count(self) -> int:
         """Number of OneBot heartbeat events observed on this binding.
 
-            中文：在此 binding 上观测到的 OneBot heartbeat 事件数量。
+            中文:在此 binding 上观测到的 OneBot heartbeat 事件数量。
         """
 
         with self._state_lock:
@@ -135,7 +135,7 @@ class OneBotWebSocketTransport:
     def last_error(self) -> ConnectorError | None:
         """Most recent connection/protocol error, for deterministic diagnostics.
 
-            中文：最近一次连接／协议错误，供确定性诊断使用。
+            中文:最近一次连接／协议错误,供确定性诊断使用。
         """
 
         with self._state_lock:
@@ -145,7 +145,7 @@ class OneBotWebSocketTransport:
     def last_event_error(self) -> ConnectorError | None:
         """Most recent rejected inbound event; the connection remains usable.
 
-            中文：最近一次被拒绝的入站事件；连接仍可继续使用。
+            中文:最近一次被拒绝的入站事件;连接仍可继续使用。
         """
 
         with self._state_lock:
@@ -156,7 +156,7 @@ class OneBotWebSocketTransport:
     ) -> None:
         """Attach the connector's binding-local application-event callback.
 
-            中文：附加 connector 在 binding 本地的 application-event 回调。
+            中文:附加 connector 在 binding 本地的 application-event 回调。
         """
 
         with self._state_lock:
@@ -165,7 +165,7 @@ class OneBotWebSocketTransport:
     def start(self) -> None:
         """Start connection management without blocking subscription setup.
 
-            中文：启动连接管理，但不阻塞订阅初始化。
+            中文:启动连接管理,但不阻塞订阅初始化。
         """
 
         if self._url is None:
@@ -185,7 +185,7 @@ class OneBotWebSocketTransport:
     def attach_socket(self, sock: socket.socket, initial_bytes: bytes = b"") -> None:
         """Attach an already-handshaken reverse-WebSocket peer.
 
-            中文：附加一个已完成握手的反向 WebSocket 对端。
+            中文:附加一个已完成握手的反向 WebSocket 对端。
         """
 
         if self._closed.is_set():
@@ -218,7 +218,7 @@ class OneBotWebSocketTransport:
     ) -> Mapping[str, Any]:
         """Send an action and wait for the matching OneBot ``echo`` response.
 
-            中文：发送一个 action，并等待匹配的 OneBot `echo` 响应。
+            中文:发送一个 action,并等待匹配的 OneBot `echo` 响应。
         """
 
         _raise_if_cancelled(cancellation)
@@ -280,7 +280,7 @@ class OneBotWebSocketTransport:
     def close(self) -> None:
         """Stop reconnecting, close the socket, and fail pending actions.
 
-            中文：停止重连、关闭 socket，并将待处理 action 标记为失败。
+            中文:停止重连、关闭 socket,并将待处理 action 标记为失败。
         """
 
         self._closed.set()
@@ -608,7 +608,7 @@ class OneBotWebSocketTransport:
 class OneBotReverseWebSocketServer:
     """Accept OneBot v11 reverse-WebSocket connections for one binding.
 
-        中文：为一个 binding 接收 OneBot v11 反向 WebSocket 连接。
+        中文:为一个 binding 接收 OneBot v11 反向 WebSocket 连接。
     """
 
     def __init__(self, config: Any, transport: OneBotWebSocketTransport) -> None:
@@ -623,7 +623,7 @@ class OneBotReverseWebSocketServer:
     def listen_address(self) -> tuple[str, int] | None:
         """Return the actual bound address, including an ephemeral port.
 
-            中文：返回实际绑定地址，包括临时分配的端口。
+            中文:返回实际绑定地址,包括临时分配的端口。
         """
 
         return self._address
@@ -631,7 +631,7 @@ class OneBotReverseWebSocketServer:
     def start(self) -> None:
         """Bind the reverse endpoint and accept peers in the background.
 
-            中文：绑定反向 Endpoint，并在后台接受对端连接。
+            中文:绑定反向 Endpoint,并在后台接受对端连接。
         """
 
         if self._thread is not None and self._thread.is_alive():
@@ -665,7 +665,7 @@ class OneBotReverseWebSocketServer:
     def close(self) -> None:
         """Stop accepting peers and close the binding-local transport.
 
-            中文：停止接受对端连接，并关闭 binding 本地传输。
+            中文:停止接受对端连接,并关闭 binding 本地传输。
         """
 
         self._stop.set()

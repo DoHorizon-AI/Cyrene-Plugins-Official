@@ -8,7 +8,7 @@
 ###############################################################################
 """Independent QQNT reference implementation for the IM connector.
 
-中文：IM 连接器的独立 QQNT 参考实现。"""
+中文:IM 连接器的独立 QQNT 参考实现。"""
 
 from .plugin import ConnectorPlugin
 from .qqnt_direct import (

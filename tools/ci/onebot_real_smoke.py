@@ -9,7 +9,7 @@ profiles.  It never prints endpoint URLs, access tokens, message contents, or
 process diagnostics.  This is a real-runtime smoke, not the full migration
 approval gate; the independent parity verifier owns that decision.
 
-中文：使用两个已打包 Runtime，对真实 OneBot v11 环境执行受保护烟测。Runner 提供三个由操作人员管理的 OneBot Endpoint。此脚本会通过不可变的 Python reference 和 Native AOT Host 两种 profile 各发送一个有界标记，并要求两个 WebSocket profile 都收到匹配的入站事件。它绝不会打印 Endpoint URL、access token、消息正文或进程诊断信息。这是真实 Runtime 烟测，不是完整的迁移批准门槛；该决策由独立 parity verifier 负责。
+中文:使用两个已打包 Runtime,对真实 OneBot v11 环境执行受保护烟测。Runner 提供三个由操作人员管理的 OneBot Endpoint。此脚本会通过不可变的 Python reference 和 Native AOT Host 两种 profile 各发送一个有界标记,并要求两个 WebSocket profile 都收到匹配的入站事件。它绝不会打印 Endpoint URL、access token、消息正文或进程诊断信息。这是真实 Runtime 烟测,不是完整的迁移批准门槛;该决策由独立 parity verifier 负责。
 """
 
 from __future__ import annotations
@@ -43,14 +43,14 @@ PROFILE_NAMES = ("http_api", "forward_websocket", "reverse_websocket")
 class SmokeConfigurationError(RuntimeError):
     """Raised when the protected OneBot environment is incomplete.
 
-        中文：受保护 OneBot 环境不完整时抛出的错误。
+        中文:受保护 OneBot 环境不完整时抛出的错误。
     """
 
 
 def _required_env(name: str) -> str:
     """Read one required value without exposing its content.
 
-        中文：读取一个必需值，但不暴露其内容。
+        中文:读取一个必需值,但不暴露其内容。
     """
 
     value = os.environ.get(name, "").strip()
@@ -62,7 +62,7 @@ def _required_env(name: str) -> str:
 def _bounded_env(name: str, default: str, maximum: int = 512) -> str:
     """Read one bounded protected value.
 
-        中文：读取一个有界的受保护值。
+        中文:读取一个有界的受保护值。
     """
 
     value = os.environ.get(name, default).strip()
@@ -74,7 +74,7 @@ def _bounded_env(name: str, default: str, maximum: int = 512) -> str:
 def _parse_args() -> argparse.Namespace:
     """Parse packaged runtimes and the redacted evidence destination.
 
-        中文：解析已打包 Runtime 及脱敏证据输出位置。
+        中文:解析已打包 Runtime 及脱敏证据输出位置。
     """
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -87,7 +87,7 @@ def _parse_args() -> argparse.Namespace:
 def _read_ready_announcement(process: subprocess.Popen[bytes]) -> dict[str, Any]:
     """Read the bounded JSON readiness announcement from the child process.
 
-        中文：读取子进程发出的有界 JSON readiness 通告。
+        中文:读取子进程发出的有界 JSON readiness 通告。
     """
 
     if process.stdout is None:
@@ -119,7 +119,7 @@ def _read_ready_announcement(process: subprocess.Popen[bytes]) -> dict[str, Any]
 def _conversation_kind(message_wire: Any, value: str) -> int:
     """Map the protected conversation kind to the canonical enum.
 
-        中文：将受保护会话类型映射到规范枚举。
+        中文:将受保护会话类型映射到规范枚举。
     """
 
     return {
@@ -131,7 +131,7 @@ def _conversation_kind(message_wire: Any, value: str) -> int:
 def _load_configuration() -> dict[str, Any]:
     """Load and validate the operator-owned real smoke configuration.
 
-        中文：加载并校验由操作人员管理的真实烟测配置。
+        中文:加载并校验由操作人员管理的真实烟测配置。
     """
 
     if _required_env("ONEBOT_REAL_SMOKE_APPROVED") != "YES":
@@ -178,7 +178,7 @@ def _load_configuration() -> dict[str, Any]:
 def _canonical_send_request(message_wire: Any, configuration: dict[str, Any], marker: str) -> Any:
     """Build one canonical message request for the dedicated smoke target.
 
-        中文：为专用烟测目标构造一条规范消息请求。
+        中文:为专用烟测目标构造一条规范消息请求。
     """
 
     return message_wire.SendMessageRequest(
@@ -195,7 +195,7 @@ def _canonical_send_request(message_wire: Any, configuration: dict[str, Any], ma
 def _event_contains_marker(message_wire: Any, payload: Any, configuration: dict[str, Any], marker: str) -> bool:
     """Require a normalized inbound event for the same account and target.
 
-        中文：要求收到属于同一账户和目标的规范化入站事件。
+        中文:要求收到属于同一账户和目标的规范化入站事件。
     """
 
     if payload.type_url != MESSAGE_TYPE_URL:
@@ -213,7 +213,7 @@ def _event_contains_marker(message_wire: Any, payload: Any, configuration: dict[
 def _stop(process: subprocess.Popen[bytes]) -> None:
     """Stop one child process without emitting its diagnostics.
 
-        中文：停止一个子进程，但不输出其诊断信息。
+        中文:停止一个子进程,但不输出其诊断信息。
     """
 
     if process.poll() is None:
@@ -239,7 +239,7 @@ def _invoke_profile(
 ) -> dict[str, Any]:
     """Start one runtime binding, verify Health, and send a marker.
 
-        中文：启动一个 Runtime binding、校验 Health，并发送一个标记。
+        中文:启动一个 Runtime binding、校验 Health,并发送一个标记。
     """
 
     if runtime not in {"python-reference", "csharp-native-aot"}:
@@ -411,7 +411,7 @@ def _invoke_profile(
 def main() -> int:
     """Run all three real profiles for both runtimes and write redacted evidence.
 
-        中文：对两个 Runtime 的三种真实 profile 全部执行烟测，并写入脱敏证据。
+        中文:对两个 Runtime 的三种真实 profile 全部执行烟测,并写入脱敏证据。
     """
 
     args = _parse_args()

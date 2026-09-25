@@ -1,6 +1,6 @@
 """Plugin-owned direct endpoint runtime.
 
-中文：Plugin 持有的直连端点运行时。"""
+中文:Plugin 持有的直连端点运行时。"""
 
 from __future__ import annotations
 
@@ -63,7 +63,7 @@ _LOGGING_EXPORTS = frozenset(
 def __getattr__(name: str) -> Any:
     """Load public runtime helpers without importing the CLI module eagerly.
 
-        中文：加载公开的运行时辅助项，但不提前导入 CLI 模块。"""
+        中文:加载公开的运行时辅助项,但不提前导入 CLI 模块。"""
 
     if name in _CLIENT_EXPORTS:
         from . import client

@@ -1,6 +1,6 @@
 """Tests for the isolated Python IM parity reference.
 
-中文：隔离的 Python IM 对等实现参考测试。"""
+中文:隔离的 Python IM 对等实现参考测试。"""
 
 from __future__ import annotations
 
@@ -41,7 +41,7 @@ REPOSITORY_ROOT = Path(__file__).parents[4]
 def _artifact_direct_config(runtime_root: Path, binding_id: str) -> dict[str, Any]:
     """Create one fixture binding whose worker imports only the package artifact.
 
-        中文：创建一个夹具绑定，使其工作进程只导入软件包产物。"""
+        中文:创建一个夹具绑定,使其工作进程只导入软件包产物。"""
 
     runtime_root.mkdir(parents=True, exist_ok=True)
     fake_host = runtime_root / "fake_qq_host.py"
@@ -74,7 +74,7 @@ def _start_artifact_runtime(
 ) -> tuple[subprocess.Popen[str], str]:
     """Start the installed package outside the source checkout and read readiness.
 
-        中文：在源代码检出目录之外启动已安装的软件包并读取就绪状态。"""
+        中文:在源代码检出目录之外启动已安装的软件包并读取就绪状态。"""
 
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(package_root / "src")
@@ -124,7 +124,7 @@ def _start_artifact_runtime(
 def _stop_artifact_runtime(process: subprocess.Popen[str]) -> tuple[int | None, str]:
     """Stop one artifact worker and collect bounded diagnostic output.
 
-        中文：停止一个产物工作进程并收集有界诊断输出。"""
+        中文:停止一个产物工作进程并收集有界诊断输出。"""
 
     if process.poll() is None:
         process.send_signal(signal.SIGTERM)
@@ -140,7 +140,7 @@ def _stop_artifact_runtime(process: subprocess.Popen[str]) -> tuple[int | None, 
 def _qq_extension_request(binding_id: str) -> direct_wire.DirectInvocationRequest:
     """Build one typed QQ extension request for the installed worker.
 
-        中文：为已安装的工作进程构造一个有类型的 QQ 扩展请求。"""
+        中文:为已安装的工作进程构造一个有类型的 QQ 扩展请求。"""
 
     return direct_wire.DirectInvocationRequest(
         capability="qq.client.v1",
@@ -159,7 +159,7 @@ def _message_subscription_request(
 ) -> direct_wire.DirectInvocationRequest:
     """Build one real direct-runtime subscription request for inbound messages.
 
-        中文：为入站消息构造一个真实的直连运行时订阅请求。"""
+        中文:为入站消息构造一个真实的直连运行时订阅请求。"""
 
     return direct_wire.DirectInvocationRequest(
         capability="message.connector.v1",
@@ -177,7 +177,7 @@ def test_assembled_package_contains_runtime_and_resolvable_schema_refs(
 ) -> None:
     """The rollback payload must run without a source checkout.
 
-        中文：回滚载荷必须能在没有源代码检出目录的情况下运行。"""
+        中文:回滚载荷必须能在没有源代码检出目录的情况下运行。"""
 
     package_root = assemble_package(REPOSITORY_ROOT, tmp_path / "package")
     assert (package_root / "src/cyrene_plugin_runtime/bootstrap.py").is_file()
@@ -233,7 +233,7 @@ def test_assembled_package_contains_runtime_and_resolvable_schema_refs(
 def test_package_archive_is_self_contained(tmp_path: Path) -> None:
     """The rollback ZIP must contain the Python runtime and metadata.
 
-        中文：回滚 ZIP 必须包含 Python 运行时和元数据。"""
+        中文:回滚 ZIP 必须包含 Python 运行时和元数据。"""
 
     archive_path = build_package_archive(REPOSITORY_ROOT, tmp_path / "onebot.zip")
     with zipfile.ZipFile(archive_path) as archive:
@@ -263,9 +263,9 @@ def test_installed_artifact_runs_two_direct_bindings_without_source_checkout(
     direct runtime dispatch, fake Host isolation, and cleanup; it is not the
     Workspace P2.5 Product/AstrBot/pgvector harness or official QQ smoke.
 
-        中文：从一个已安装的软件包产物执行直连 gRPC Invoke/Subscribe。
+        中文:从一个已安装的软件包产物执行直连 gRPC Invoke/Subscribe。
 
-        中文：这是产物级的端到端门禁，用于证明软件包自包含、直连运行时分发、模拟 Host 隔离和资源清理；它不等同于 Workspace P2.5 Product/AstrBot/pgvector 测试框架，也不等同于官方 QQ 冒烟检查。
+        中文:这是产物级的端到端门禁,用于证明软件包自包含、直连运行时分发、模拟 Host 隔离和资源清理;它不等同于 Workspace P2.5 Product/AstrBot/pgvector 测试框架,也不等同于官方 QQ 冒烟检查。
     """
 
     archive_path = build_package_archive(REPOSITORY_ROOT, tmp_path / "package.zip")
@@ -364,7 +364,7 @@ def test_installed_artifact_runs_two_direct_bindings_without_source_checkout(
 def test_package_builder_rejects_nonempty_output(tmp_path: Path) -> None:
     """A stale staging directory must never be silently overwritten.
 
-        中文：不得静默覆盖过期的暂存目录。"""
+        中文:不得静默覆盖过期的暂存目录。"""
 
     output = tmp_path / "package"
     output.mkdir()

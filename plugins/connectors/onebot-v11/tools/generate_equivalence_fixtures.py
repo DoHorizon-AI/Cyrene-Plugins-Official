@@ -13,9 +13,9 @@ tool intentionally calls the public baseline mapping functions and records the
 result as reviewable JSON.  C# tests consume the checked-in output without
 loading Python, so the same fixture can be used by both test suites.
 
-中文：生成供 C# 迁移测试使用的确定性夹具。
+中文:生成供 C# 迁移测试使用的确定性夹具。
 
-中文：迁移期间，Python 连接器仍是行为参考实现。此工具会有意调用公开的基线映射函数，并将结果记录为可审阅的 JSON。C# 测试直接使用检入仓库的输出，不加载 Python，因此两个测试套件可以共用同一份夹具。
+中文:迁移期间,Python 连接器仍是行为参考实现。此工具会有意调用公开的基线映射函数,并将结果记录为可审阅的 JSON。C# 测试直接使用检入仓库的输出,不加载 Python,因此两个测试套件可以共用同一份夹具。
 """
 
 from __future__ import annotations
@@ -47,7 +47,7 @@ FIXTURE_PATH = (
 class FixtureTransport:
     """Deterministic transport used only to derive Python expected results.
 
-        中文：仅用于推导 Python 预期结果的确定性传输实现。"""
+        中文:仅用于推导 Python 预期结果的确定性传输实现。"""
 
     def __init__(self, response_id: str = "fixture-message-1") -> None:
         self.response_id = response_id
@@ -74,7 +74,7 @@ class FixtureTransport:
     def close(self) -> None:
         """Satisfy the connector transport protocol.
 
-            中文：满足连接器传输协议。"""
+            中文:满足连接器传输协议。"""
 
 
 def _send_group_rich() -> dict[str, Any]:
@@ -326,7 +326,7 @@ def _respond_case(
 def build_fixture() -> dict[str, Any]:
     """Build the complete checked-in cross-language behavior fixture.
 
-        中文：构建完整且检入仓库的跨语言行为夹具。"""
+        中文:构建完整且检入仓库的跨语言行为夹具。"""
 
     inbound_group = _inbound_group_rich()
     inbound_private = _inbound_private_everyone()
@@ -401,7 +401,7 @@ def build_fixture() -> dict[str, Any]:
 def write_fixture(path: Path = FIXTURE_PATH) -> None:
     """Write one stable, human-reviewable JSON fixture file.
 
-        中文：写入一个稳定且便于人工审阅的 JSON 夹具文件。"""
+        中文:写入一个稳定且便于人工审阅的 JSON 夹具文件。"""
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -413,7 +413,7 @@ def write_fixture(path: Path = FIXTURE_PATH) -> None:
 def main() -> int:
     """Run the fixture generator from the repository checkout.
 
-        中文：从仓库检出目录运行夹具生成器。"""
+        中文:从仓库检出目录运行夹具生成器。"""
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--output", type=Path, default=FIXTURE_PATH)

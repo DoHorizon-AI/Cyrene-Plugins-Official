@@ -11,7 +11,7 @@
 ###############################################################################
 """Official generic OneBot v11 connector package.
 
-中文：官方通用 OneBot v11 连接器软件包。"""
+中文:官方通用 OneBot v11 连接器软件包。"""
 
 from .connector import (
     CAPABILITY_ID,

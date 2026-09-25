@@ -54,7 +54,7 @@ TOKENIZER_FILES = (
 # One deployment keeps at most two diagnostic files of 50 MiB: a vLLM log is
 # the only record of why a model failed to load, so it is bounded rather than
 # unbounded, and old terminal deployments are the only ones ever reclaimed.
-# 中文：一个部署最多保留两个诊断文件，每个文件不超过 50 MiB。vLLM 日志是模型加载失败原因的唯一记录，因此需要限制其大小；只有已结束的旧部署才会被回收。
+# 中文:一个部署最多保留两个诊断文件,每个文件不超过 50 MiB。vLLM 日志是模型加载失败原因的唯一记录,因此需要限制其大小;只有已结束的旧部署才会被回收。
 DIAGNOSTICS_FILE_BUDGET_BYTES = 50 * 1024 * 1024
 DIAGNOSTICS_RETAINED_FILES = 2
 DIAGNOSTICS_PAGE_LIMIT = 500
@@ -68,7 +68,7 @@ class ServingDiagnostics:
     Both pipes are drained concurrently: vLLM writes a great deal to stderr, and
     a process that fills one pipe while the reader sits on the other stalls.
 
-        中文：将 serving 进程的两个输出流捕获为带标签的 NDJSON，并发读取两条管道：vLLM 会向 stderr 写入大量内容；如果某条管道写满而读取器仍在等待另一条，进程就会停滞。
+        中文:将 serving 进程的两个输出流捕获为带标签的 NDJSON,并发读取两条管道:vLLM 会向 stderr 写入大量内容;如果某条管道写满而读取器仍在等待另一条,进程就会停滞。
     """
 
     def __init__(
@@ -101,7 +101,7 @@ class ServingDiagnostics:
     def pump(self, pipe: Any, stream: str) -> None:
         """Forward one pipe into the sink; never let a full pipe stall vLLM.
 
-            中文：将一条管道转发到 sink；即使 sink 已满，也绝不能让 vLLM 停滞。
+            中文:将一条管道转发到 sink;即使 sink 已满,也绝不能让 vLLM 停滞。
         """
 
         try:
@@ -118,7 +118,7 @@ class ServingDiagnostics:
     def page(self, after_sequence: int = 0, limit: int = 200) -> tuple[list[dict[str, Any]], bool]:
         """Return records after one sequence, newest file last, budget applied.
 
-            中文：在指定序号之后返回记录，最新文件排在最后，并应用输出预算。
+            中文:在指定序号之后返回记录,最新文件排在最后,并应用输出预算。
         """
 
         bounded = max(1, min(int(limit), DIAGNOSTICS_PAGE_LIMIT))
@@ -151,7 +151,7 @@ class ServingDiagnostics:
     def _resume_sequence(self) -> int:
         """Continue from the highest sequence already on disk, if it is readable.
 
-            中文：如果磁盘上的最高序号仍可读取，则从该序号继续。
+            中文:如果磁盘上的最高序号仍可读取,则从该序号继续。
         """
 
         highest = 0
@@ -241,7 +241,7 @@ class ServingDiagnostics:
 class ServingRuntimeError(RuntimeError):
     """Fail-closed runtime error carrying a stable code for the Product.
 
-        中文：失败关闭的 Runtime 错误，携带供 Product 使用的稳定错误代码。
+        中文:失败关闭的 Runtime 错误,携带供 Product 使用的稳定错误代码。
     """
 
     def __init__(self, code: str, detail: str, *, status: int = 409, retryable: bool = False) -> None:
@@ -255,7 +255,7 @@ class ServingRuntimeError(RuntimeError):
 def _model_version_artifact(document: dict[str, Any]) -> dict[str, Any]:
     """Return the serving artifact projection of a canonical ModelVersion.
 
-        中文：返回规范 ModelVersion 的 serving artifact 投影。
+        中文:返回规范 ModelVersion 的 serving artifact 投影。
     """
 
     composition = document.get("composition")
@@ -278,7 +278,7 @@ def _model_version_artifact(document: dict[str, Any]) -> dict[str, Any]:
 def _manifest_digest(root: Path, files: list[Path]) -> str:
     """Digest the sorted relative path and size manifest of an import.
 
-        中文：计算导入项中按排序排列的相对路径与文件大小清单摘要。
+        中文:计算导入项中按排序排列的相对路径与文件大小清单摘要。
     """
 
     lines = []
@@ -347,7 +347,7 @@ def _validate_model_directory(root: Path) -> tuple[dict[str, bool], list[str]]:
 class ServingRuntime:
     """Owns one accelerator process per deployment.
 
-        中文：为每个部署拥有一个 accelerator 进程。
+        中文:为每个部署拥有一个 accelerator 进程。
     """
 
     def __init__(
@@ -377,7 +377,7 @@ class ServingRuntime:
         self._lock = threading.RLock()
 
     # ── persistence ─────────────────────────────────────────────────────
-    # 中文：# 中文：持久化。
+    # 中文:# 中文:持久化。
 
     def _record_path(self, deployment_id: UUID) -> Path:
         return self.executions / f"{deployment_id}.json"
@@ -399,7 +399,7 @@ class ServingRuntime:
         pending.replace(path)
 
     # ── model import ────────────────────────────────────────────────────
-    # 中文：# 中文：模型导入。
+    # 中文:# 中文:模型导入。
 
     def _credential(self, credential_ref: str) -> str:
         """Resolve one CredentialRef from the runtime's private store.
@@ -407,7 +407,7 @@ class ServingRuntime:
         The ref itself is never a secret: only its digest names the mode-0600
         file that holds the token, and the token never appears in a response.
 
-            中文：从 Runtime 私有存储解析一个 CredentialRef。引用本身不是密钥：其摘要只用于标识权限设为 0600、存有 token 的文件，token 绝不会出现在任何响应中。
+            中文:从 Runtime 私有存储解析一个 CredentialRef。引用本身不是密钥:其摘要只用于标识权限设为 0600、存有 token 的文件,token 绝不会出现在任何响应中。
         """
 
         marker = self.credentials / hashlib.sha256(credential_ref.encode("utf-8")).hexdigest()
@@ -429,7 +429,7 @@ class ServingRuntime:
     def _download_hugging_face(self, source: dict[str, Any], token: str | None) -> Path:
         """Materialize a pinned Hugging Face revision through huggingface_hub.
 
-            中文：通过 huggingface_hub 获取固定 revision 的模型。
+            中文:通过 huggingface_hub 获取固定 revision 的模型。
         """
 
         try:
@@ -545,12 +545,12 @@ class ServingRuntime:
         }
 
     # ── operations ──────────────────────────────────────────────────────
-    # 中文：# 中文：操作。
+    # 中文:# 中文:操作。
 
     def start(self, deployment_id: UUID, payload: dict[str, Any]) -> dict[str, Any]:
         """Materialize the artifact, launch vLLM, and confirm readiness.
 
-            中文：物化 artifact、启动 vLLM，并确认服务已就绪。
+            中文:物化 artifact、启动 vLLM,并确认服务已就绪。
         """
 
         with self._lock:
@@ -619,7 +619,7 @@ class ServingRuntime:
     def inspect(self, deployment_id: UUID) -> dict[str, Any]:
         """Report the recorded execution and its live process state.
 
-            中文：报告记录的执行信息和当前进程状态。
+            中文:报告记录的执行信息和当前进程状态。
         """
 
         with self._lock:
@@ -631,7 +631,7 @@ class ServingRuntime:
     ) -> dict[str, Any]:
         """Return one bounded page of the serving process's own output.
 
-            中文：返回 serving 进程自身输出中的一个有界页面。
+            中文:返回 serving 进程自身输出中的一个有界页面。
         """
 
         with self._lock:
@@ -651,7 +651,7 @@ class ServingRuntime:
     def stop(self, deployment_id: UUID) -> dict[str, Any]:
         """Terminate the accelerator process and confirm the release.
 
-            中文：终止 accelerator 进程并确认资源已释放。
+            中文:终止 accelerator 进程并确认资源已释放。
         """
 
         with self._lock:
@@ -665,7 +665,7 @@ class ServingRuntime:
             if sink is not None:
                 # Closing drains the tail first, so the reason a stop failed is
                 # not lost behind the process teardown.
-                # 中文：# 中文：关闭时先读取并排空输出尾部，避免进程 teardown 遮住停止失败的原因。
+                # 中文:# 中文:关闭时先读取并排空输出尾部,避免进程 teardown 遮住停止失败的原因。
                 degraded = sink.close()
                 document["diagnosticsDegraded"] = degraded
             document.update(state=TERMINAL_RELEASED, ready=False, released=True)
@@ -674,7 +674,7 @@ class ServingRuntime:
             return self._public(deployment_id, document)
 
     # ── internals ───────────────────────────────────────────────────────
-    # 中文：# 中文：内部辅助逻辑。
+    # 中文:# 中文:内部辅助逻辑。
 
     def _prepare_process(
         self, deployment_id: UUID, payload: dict[str, Any], served_model: str
@@ -745,7 +745,7 @@ class ServingRuntime:
         never be mistaken for a live accelerator; a process recovered from an
         earlier run is probed by identity.
 
-            中文：停止一次执行并确认进程确实已经退出。对于此 Runtime 启动的进程，会调用 `wait` 回收，确保僵尸进程不会被误判为仍在运行的 accelerator；对于从先前运行中恢复的进程，则按身份探测。
+            中文:停止一次执行并确认进程确实已经退出。对于此 Runtime 启动的进程,会调用 `wait` 回收,确保僵尸进程不会被误判为仍在运行的 accelerator;对于从先前运行中恢复的进程,则按身份探测。
         """
 
         process = self._processes.get(deployment_id)
@@ -798,7 +798,7 @@ class ServingRuntime:
 class RuntimeHandler(BaseHTTPRequestHandler):
     """Bearer-protected HTTP surface consumed by the Reactor Product.
 
-        中文：Reactor Product 使用的 Bearer 认证 HTTP 接口。
+        中文:Reactor Product 使用的 Bearer 认证 HTTP 接口。
     """
 
     runtime: ServingRuntime
@@ -907,7 +907,7 @@ class RuntimeHandler(BaseHTTPRequestHandler):
     def _proxy_path(parts: list[str], query: str) -> str:
         """Rebuild the upstream path from the serving prefix, keeping the query.
 
-            中文：从 serving 前缀重建上游路径，并保留 query string。
+            中文:从 serving 前缀重建上游路径,并保留 query string。
         """
 
         path = "/" + "/".join(parts[2:])

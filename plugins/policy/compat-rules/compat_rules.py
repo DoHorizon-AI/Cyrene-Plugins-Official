@@ -24,7 +24,7 @@ TYPE_PREFIX = f"type.cyrene.io/{CAPABILITY_ID}"
 class TypedPayload:
     """Typed result consumed by the standard direct runtime.
 
-        中文：标准 direct runtime 使用的类型化结果。
+        中文:标准 direct runtime 使用的类型化结果。
     """
 
     value: bytes
@@ -35,7 +35,7 @@ class TypedPayload:
 class RuleDecision:
     """One Product-neutral compatibility decision.
 
-        中文：一项不包含 Product 语义的兼容性决策。
+        中文:一项不包含 Product 语义的兼容性决策。
     """
 
     subject: str
@@ -46,7 +46,7 @@ class RuleDecision:
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON contract representation.
 
-            中文：返回 JSON contract 表示。
+            中文:返回 JSON contract 表示。
         """
 
         return {
@@ -61,7 +61,7 @@ class RuleDecision:
 class EvaluationReport:
     """Consolidated compatibility report with stable issue evidence.
 
-        中文：包含稳定 issue 证据的汇总兼容性报告。
+        中文:包含稳定 issue 证据的汇总兼容性报告。
     """
 
     compatible: bool
@@ -73,7 +73,7 @@ class EvaluationReport:
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON contract representation.
 
-            中文：返回 JSON contract 表示。
+            中文:返回 JSON contract 表示。
         """
 
         return {
@@ -88,7 +88,7 @@ class EvaluationReport:
 def _version(value: str) -> tuple[int, int, int]:
     """Normalize a driver or runtime version for ordered comparison.
 
-        中文：规范化驱动程序或 Runtime 版本，以便进行有序比较。
+        中文:规范化驱动程序或 Runtime 版本,以便进行有序比较。
     """
 
     values = re.findall(r"\d+", value)
@@ -106,7 +106,7 @@ def _issue(
 ) -> dict[str, Any]:
     """Build one stable Product-neutral preflight issue.
 
-        中文：构造一个稳定且不包含 Product 语义的 preflight issue。
+        中文:构造一个稳定且不包含 Product 语义的 preflight issue。
     """
 
     return {
@@ -122,7 +122,7 @@ def _issue(
 class CompatibilityRuleEvaluator:
     """Evaluate hardware, model, environment, and workload compatibility.
 
-        中文：评估硬件、模型、环境和工作负载的兼容性。
+        中文:评估硬件、模型、环境和工作负载的兼容性。
     """
 
     plugin_id = "cyrene.policy.compat-rules"
@@ -141,7 +141,7 @@ class CompatibilityRuleEvaluator:
     ) -> tuple[bool, TypedPayload | str]:
         """Dispatch a typed evaluate request through DirectPluginRuntime.
 
-            中文：通过 DirectPluginRuntime 分派类型化 evaluate 请求。
+            中文:通过 DirectPluginRuntime 分派类型化 evaluate 请求。
         """
 
         if capability != CAPABILITY_ID:
@@ -195,7 +195,7 @@ class CompatibilityRuleEvaluator:
     ) -> EvaluationReport:
         """Evaluate either the canonical inventory shape or the legacy GPU projection.
 
-            中文：评估规范清单结构或旧版 GPU 投影。
+            中文:评估规范清单结构或旧版 GPU 投影。
         """
 
         if (
@@ -215,7 +215,7 @@ class CompatibilityRuleEvaluator:
     ) -> EvaluationReport:
         """Evaluate the canonical Node resource inventory projection.
 
-            中文：评估规范 Node 资源清单投影。
+            中文:评估规范 Node 资源清单投影。
         """
 
         issues: list[dict[str, Any]] = []
@@ -433,7 +433,7 @@ class CompatibilityRuleEvaluator:
     ) -> EvaluationReport:
         """Preserve the previously published flat GPU request behavior.
 
-            中文：保留先前发布的扁平 GPU 请求行为。
+            中文:保留先前发布的扁平 GPU 请求行为。
         """
 
         decisions: list[RuleDecision] = []
@@ -549,7 +549,7 @@ class CompatibilityRuleEvaluator:
     ) -> EvaluationReport:
         """Finalize one canonical inventory report.
 
-            中文：完成一份规范资源清单报告。
+            中文:完成一份规范资源清单报告。
         """
 
         compatible = not any(issue["severity"] == "blocked" for issue in issues)

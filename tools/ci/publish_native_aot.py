@@ -36,7 +36,7 @@ EXPECTED_SYMBOLS = (
 class PublishedBinary:
     """Describe one published binary and its role in the release payload.
 
-        中文：描述一个已发布二进制文件及其在发布载荷中的用途。"""
+        中文:描述一个已发布二进制文件及其在发布载荷中的用途。"""
 
     role: str
     path: Path
@@ -45,7 +45,7 @@ class PublishedBinary:
 def _parse_args() -> argparse.Namespace:
     """Parse the target RID and disposable output directory.
 
-        中文：解析目标 RID 和临时输出目录。"""
+        中文:解析目标 RID 和临时输出目录。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--rid", required=True, choices=sorted(SUPPORTED_RIDS))
@@ -56,7 +56,7 @@ def _parse_args() -> argparse.Namespace:
 def _run(command: list[str], *, cwd: Path = REPOSITORY_ROOT) -> subprocess.CompletedProcess[str]:
     """Run a required command while preserving its output for CI evidence.
 
-        中文：运行必需命令，同时保留其输出作为 CI 证据。"""
+        中文:运行必需命令,同时保留其输出作为 CI 证据。"""
 
     print("+", " ".join(command))
     return subprocess.run(command, cwd=cwd, check=True, text=True)
@@ -65,7 +65,7 @@ def _run(command: list[str], *, cwd: Path = REPOSITORY_ROOT) -> subprocess.Compl
 def _publish(project: str, rid: str, output_dir: Path) -> None:
     """Publish one project as a self-contained Native AOT artifact.
 
-        中文：将一个项目发布为独立部署的 Native AOT 产物。"""
+        中文:将一个项目发布为独立部署的 Native AOT 产物。"""
 
     _run(
         [
@@ -88,7 +88,7 @@ def _publish(project: str, rid: str, output_dir: Path) -> None:
 def _find_executable(directory: Path, stem: str) -> Path:
     """Resolve a Native AOT executable on Unix and Windows.
 
-        中文：在 Unix 和 Windows 上解析 Native AOT 可执行文件。"""
+        中文:在 Unix 和 Windows 上解析 Native AOT 可执行文件。"""
 
     candidates = [directory / stem, directory / f"{stem}.exe"]
     for candidate in candidates:
@@ -100,7 +100,7 @@ def _find_executable(directory: Path, stem: str) -> Path:
 def _find_native_library(directory: Path) -> Path:
     """Resolve the NativeLib output without assuming a platform suffix.
 
-        中文：解析 NativeLib 输出，不预设平台后缀。"""
+        中文:解析 NativeLib 输出,不预设平台后缀。"""
 
     candidates = sorted(
         path
@@ -121,7 +121,7 @@ def _run_json_binary(
 ) -> dict[str, object]:
     """Run a health command and parse its JSON response.
 
-        中文：运行健康检查命令并解析其 JSON 响应。"""
+        中文:运行健康检查命令并解析其 JSON 响应。"""
 
     result = subprocess.run(
         [str(binary.path), *arguments],
@@ -149,7 +149,7 @@ def _run_json_binary(
 def _verify_symbols(library: Path, rid: str) -> list[str]:
     """Verify every C ABI export with the native platform symbol tool.
 
-        中文：使用原生平台符号工具验证每个 C ABI 导出项。"""
+        中文:使用原生平台符号工具验证每个 C ABI 导出项。"""
 
     if rid.startswith("linux"):
         tool = shutil.which("nm")
@@ -178,7 +178,7 @@ def _verify_symbols(library: Path, rid: str) -> list[str]:
 def _publish_and_smoke(rid: str, output_dir: Path) -> dict[str, object]:
     """Publish all C# Native AOT components and execute their smoke checks.
 
-        中文：发布所有 C# Native AOT 组件并执行冒烟检查。"""
+        中文:发布所有 C# Native AOT 组件并执行冒烟检查。"""
 
     if output_dir.exists():
         shutil.rmtree(output_dir)
@@ -305,7 +305,7 @@ def _publish_and_smoke(rid: str, output_dir: Path) -> dict[str, object]:
 def main() -> int:
     """Publish, smoke-test, and stage one RID's native artifacts.
 
-        中文：发布、执行冒烟检查并暂存一个 RID 的原生产物。"""
+        中文:发布、执行冒烟检查并暂存一个 RID 的原生产物。"""
 
     args = _parse_args()
     output_dir = args.output_dir.resolve()

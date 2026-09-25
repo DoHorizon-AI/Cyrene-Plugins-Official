@@ -15,13 +15,13 @@ The index merges four artifact sources:
 Run without arguments to rewrite the index; run with --check to fail when the
 committed index drifts from these sources.
 
-中文：生成并校验能力索引 `contracts/capabilities.yaml`。该索引合并四种制品来源：
-- `contracts/proto/cyrene/**/*.proto`：共享负载契约。每个契约文件都包含名为 “Direct plugin invocation identifiers” 的注释块，列出 capability ID、接口版本和方法。
-- `plugins/**/plugin.manifest.json`：已发布的 Plugin 实现。
-- `contracts/runtime-implementations.json`：提供 capability、但没有发布 Plugin manifest package 的 Runtime package。
-- `contracts/tck/*`：按 capability 分目录的 owner-scoped 一致性测试套件（目录名中的连字符会映射为点，例如 message-connector-v1）。
+中文:生成并校验能力索引 `contracts/capabilities.yaml`。该索引合并四种制品来源:
+- `contracts/proto/cyrene/**/*.proto`:共享负载契约。每个契约文件都包含名为 “Direct plugin invocation identifiers” 的注释块,列出 capability ID、接口版本和方法。
+- `plugins/**/plugin.manifest.json`:已发布的 Plugin 实现。
+- `contracts/runtime-implementations.json`:提供 capability、但没有发布 Plugin manifest package 的 Runtime package。
+- `contracts/tck/*`:按 capability 分目录的 owner-scoped 一致性测试套件(目录名中的连字符会映射为点,例如 message-connector-v1)。
 
-不带参数运行会重写索引；加上 `--check` 则在提交的索引与上述来源不一致时失败。
+不带参数运行会重写索引;加上 `--check` 则在提交的索引与上述来源不一致时失败。
 """
 
 from __future__ import annotations
@@ -38,7 +38,7 @@ if str(_SCRIPT_DIR) not in sys.path:
 
 # Keep the exported tree free of __pycache__ payloads; the source manifest
 # inventory walks the filesystem and would otherwise register bytecode.
-# 中文：保留导出树，不让其中出现 `__pycache__` 内容；source manifest 会遍历文件系统清单，否则会把字节码也登记进去。
+# 中文:保留导出树,不让其中出现 `__pycache__` 内容;source manifest 会遍历文件系统清单,否则会把字节码也登记进去。
 sys.dont_write_bytecode = True
 
 import validate_manifests
@@ -73,14 +73,14 @@ REAL_ONLY_LEVELS = {"INTEGRATION_VERIFIED", "LIVE_VERIFIED"}
 class CatalogError(ValueError):
     """Raised when catalog sources cannot be reconciled.
 
-        中文：无法协调 catalog 来源时抛出的错误。
+        中文:无法协调 catalog 来源时抛出的错误。
     """
 
 
 def _read_json(path: Path) -> object:
     """Read one JSON document with a catalog-scoped error.
 
-        中文：读取一份 JSON 文档，并使用 catalog 范围内的错误信息报告失败。
+        中文:读取一份 JSON 文档,并使用 catalog 范围内的错误信息报告失败。
     """
 
     try:
@@ -92,7 +92,7 @@ def _read_json(path: Path) -> object:
 def _parse_identifiers(text: str, path: str) -> dict:
     """Parse the capability ID, interface versions, and methods of one proto.
 
-        中文：解析一个 proto 中的 capability ID、接口版本和方法。
+        中文:解析一个 proto 中的 capability ID、接口版本和方法。
     """
 
     lines = text.splitlines()
@@ -150,7 +150,7 @@ def _parse_identifiers(text: str, path: str) -> dict:
 def _collect_contracts(root: Path) -> dict[str, dict]:
     """Collect proto-backed capability contracts by capability ID.
 
-        中文：按 capability ID 汇总由 proto 支撑的 capability contract。
+        中文:按 capability ID 汇总由 proto 支撑的 capability contract。
     """
 
     contracts: dict[str, dict] = {}
@@ -176,7 +176,7 @@ def _collect_contracts(root: Path) -> dict[str, dict]:
 def _schema_paths(manifest_dir: Path, manifest: dict) -> list[Path]:
     """Return the schema files referenced by one manifest's methods.
 
-        中文：返回某份 manifest 的方法引用的 schema 文件。
+        中文:返回某份 manifest 的方法引用的 schema 文件。
     """
 
     referenced: list[Path] = []
@@ -200,7 +200,7 @@ def _schema_paths(manifest_dir: Path, manifest: dict) -> list[Path]:
 def _collect_manifests(root: Path) -> tuple[list[dict], dict[str, dict]]:
     """Collect published implementations and their contract hints.
 
-        中文：汇总已发布的实现及其 contract 提示。
+        中文:汇总已发布的实现及其 contract 提示。
     """
 
     try:
@@ -283,7 +283,7 @@ def _collect_manifests(root: Path) -> tuple[list[dict], dict[str, dict]]:
                 raise CatalogError(f"{manifest_path}: capability entry is not a string")
             # Several implementations may share one capability; the catalog
             # records each implementation and merges their contract hints.
-            # 中文：多个实现可以共用同一项 capability；catalog 会分别记录每个实现，并合并其 contract 提示。
+            # 中文:多个实现可以共用同一项 capability;catalog 会分别记录每个实现,并合并其 contract 提示。
             hint = contract_hints.setdefault(
                 capability, {"owner_paths": set(), "shared_paths": set()}
             )
@@ -297,7 +297,7 @@ def _collect_registry(
 ) -> tuple[list[dict], dict[str, list[dict]], list[dict]]:
     """Collect runtime implementations, their capabilities, and unbacked declarations.
 
-        中文：汇总 Runtime 实现、它们提供的 capability，以及没有契约支撑的声明。
+        中文:汇总 Runtime 实现、它们提供的 capability,以及没有契约支撑的声明。
     """
 
     registry = _read_json(root / REGISTRY_PATH)
@@ -369,7 +369,7 @@ def _collect_registry(
 def _collect_verification(root: Path) -> dict[tuple[str, str], dict]:
     """Collect authored verification evidence keyed by (capability, implementation).
 
-        中文：以 (capability, implementation) 为键汇总由作者提供的验证证据。
+        中文:以 (capability, implementation) 为键汇总由作者提供的验证证据。
     """
 
     registry = _read_json(root / VERIFICATION_PATH)
@@ -452,9 +452,9 @@ def _collect_tck(root: Path) -> dict[str, list[str]]:
     hyphens with dots. The marker exists for capability IDs that contain a
     hyphen inside a segment, such as ``training.llama-factory.v1``.
 
-        中文：将 TCK 套件目录映射为 capability ID。
+        中文:将 TCK 套件目录映射为 capability ID。
 
-套件目录可以通过 `capability` 文件声明其精确 capability；否则会将目录名中的连字符替换为点。对于 capability ID 的某个字段本身含连字符的情况（例如 `training.llama-factory.v1`），可以使用这个标记文件。
+套件目录可以通过 `capability` 文件声明其精确 capability;否则会将目录名中的连字符替换为点。对于 capability ID 的某个字段本身含连字符的情况(例如 `training.llama-factory.v1`),可以使用这个标记文件。
     """
 
     suites: dict[str, list[str]] = {}
@@ -469,7 +469,7 @@ def _collect_tck(root: Path) -> dict[str, list[str]]:
 def _collect_rust_tck(root: Path, capability_ids: set[str]) -> dict[str, list[str]]:
     """Map Rust contract TCK files to capability IDs by quoted identifiers.
 
-        中文：根据带引号的标识符，将 Rust contract TCK 文件映射为 capability ID。
+        中文:根据带引号的标识符,将 Rust contract TCK 文件映射为 capability ID。
     """
 
     suites: dict[str, list[str]] = {}
@@ -485,7 +485,7 @@ def _collect_rust_tck(root: Path, capability_ids: set[str]) -> dict[str, list[st
 def build_catalog(root: Path) -> dict:
     """Build the capability index document from repository artifacts.
 
-        中文：根据仓库制品构造能力索引文档。
+        中文:根据仓库制品构造能力索引文档。
     """
 
     contracts = _collect_contracts(root)
@@ -625,7 +625,7 @@ def build_catalog(root: Path) -> dict:
 def _yaml_scalar(value: str) -> str:
     """Render one deterministic YAML scalar, quoting when parsing would drift.
 
-        中文：渲染一个确定性的 YAML 标量；如果重新解析会改变值，则加引号。
+        中文:渲染一个确定性的 YAML 标量;如果重新解析会改变值,则加引号。
     """
 
     if (
@@ -641,7 +641,7 @@ def _yaml_scalar(value: str) -> str:
 def _render_yaml(node: object, indent: int = 0) -> list[str]:
     """Render the catalog document as deterministic block-style YAML.
 
-        中文：将 catalog 文档渲染为确定性的 block-style YAML。
+        中文:将 catalog 文档渲染为确定性的 block-style YAML。
     """
 
     lines: list[str] = []
@@ -676,7 +676,7 @@ def _render_yaml(node: object, indent: int = 0) -> list[str]:
 def render_catalog(document: dict) -> str:
     """Render the catalog document with a trailing newline.
 
-        中文：渲染 catalog 文档并在末尾添加换行符。
+        中文:渲染 catalog 文档并在末尾添加换行符。
     """
 
     return "\n".join(_render_yaml(document)) + "\n"
@@ -685,7 +685,7 @@ def render_catalog(document: dict) -> str:
 def main(argv: list[str] | None = None) -> int:
     """Generate the capability index, or check it with --check.
 
-        中文：生成能力索引；如果指定 `--check`，则只执行一致性检查。
+        中文:生成能力索引;如果指定 `--check`,则只执行一致性检查。
     """
 
     parser = argparse.ArgumentParser(description=__doc__)

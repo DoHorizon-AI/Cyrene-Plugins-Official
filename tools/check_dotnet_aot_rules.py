@@ -6,12 +6,12 @@ Enforces:
 - T40: Prohibits blanket warning suppressions for Native AOT / Trim warnings (IL2026, IL3050).
 - T33: Enforces source-generated JsonSerializerContext on JSON paths.
 
-中文：Cyrene .NET Native AOT 规则与策略验证器（里程碑 M3 任务 T32 和 T40）。
+中文:Cyrene .NET Native AOT 规则与策略验证器(里程碑 M3 任务 T32 和 T40)。
 
-强制执行：
-- T32：禁止运行时程序集加载、反射扫描、动态代理和 Emit。
-- T40：禁止对 Native AOT / Trim 警告（IL2026、IL3050）进行一揽子抑制。
-- T33：要求 JSON 路径使用源生成的 JsonSerializerContext。
+强制执行:
+- T32:禁止运行时程序集加载、反射扫描、动态代理和 Emit。
+- T40:禁止对 Native AOT / Trim 警告(IL2026、IL3050)进行一揽子抑制。
+- T33:要求 JSON 路径使用源生成的 JsonSerializerContext。
 """
 
 from __future__ import annotations

@@ -29,14 +29,14 @@ MAX_ERROR_BODY_CHARS = 400
 class _StreamEnd:
     """Sentinel pushed by the reader thread when the upstream stream finishes.
 
-        中文：reader 线程在上游流结束时推送的 sentinel。
+        中文:reader 线程在上游流结束时推送的 sentinel。
     """
 
 
 class UpstreamFailure(RuntimeError):
     """The upstream endpoint failed or answered outside the contract.
 
-        中文：上游 Endpoint 失败，或响应内容违反 contract。
+        中文:上游 Endpoint 失败,或响应内容违反 contract。
     """
 
     def __init__(self, detail: str, *, status: int | None = None) -> None:
@@ -47,14 +47,14 @@ class UpstreamFailure(RuntimeError):
 class ProviderCancelled(RuntimeError):
     """The invocation was cancelled while the upstream request was in flight.
 
-        中文：上游请求仍在执行时，调用被取消。
+        中文:上游请求仍在执行时,调用被取消。
     """
 
 
 class UpstreamCall:
     """A handle another thread can use to abort one in-flight request.
 
-        中文：供另一个线程中止某个进行中请求的句柄。
+        中文:供另一个线程中止某个进行中请求的句柄。
     """
 
     def __init__(self) -> None:
@@ -77,7 +77,7 @@ class UpstreamCall:
         marks its own socket closed while the file object keeps the descriptor
         alive; a duplicated descriptor is the handle that can still send FIN.
 
-            中文：为连接保留一个可独立使用的句柄，以便中止请求。对端可能返回 HTTP/1.0 响应；此后 `http.client` 会将自己的 socket 标记为关闭，但文件对象仍保留该文件描述符。复制后的描述符才是仍可发送 FIN 的句柄。
+            中文:为连接保留一个可独立使用的句柄,以便中止请求。对端可能返回 HTTP/1.0 响应;此后 `http.client` 会将自己的 socket 标记为关闭,但文件对象仍保留该文件描述符。复制后的描述符才是仍可发送 FIN 的句柄。
         """
 
         shim: socket.socket | None = None
@@ -100,7 +100,7 @@ class UpstreamCall:
     def close(self) -> None:
         """Abort the request; safe to call from a cancellation thread.
 
-            中文：中止请求；可从取消处理线程安全调用。
+            中文:中止请求;可从取消处理线程安全调用。
         """
 
         self._closed.set()
@@ -125,7 +125,7 @@ class UpstreamCall:
         # A peer that answers with HTTP/1.0 leaves http.client's connection
         # object without a socket of its own, so the response and the captured
         # socket are the handles that actually shut the upstream down.
-        # 中文：对端若返回 HTTP/1.0，`http.client` 的 connection 对象就不会再持有自己的 socket。因此，response 和捕获到的 socket 才是真正能够关闭上游的句柄。
+        # 中文:对端若返回 HTTP/1.0,`http.client` 的 connection 对象就不会再持有自己的 socket。因此,response 和捕获到的 socket 才是真正能够关闭上游的句柄。
         if sock is not None:
             with contextlib.suppress(OSError):
                 sock.shutdown(socket.SHUT_RDWR)
@@ -142,7 +142,7 @@ class UpstreamCall:
 class OpenAICompatibleUpstream:
     """POST one chat-completions body and hand back JSON or an SSE event stream.
 
-        中文：POST 一份 chat-completions 请求正文，并返回 JSON 或 SSE 事件流。
+        中文:POST 一份 chat-completions 请求正文,并返回 JSON 或 SSE 事件流。
     """
 
     def __init__(self, settings: ProviderSettings) -> None:
@@ -151,7 +151,7 @@ class OpenAICompatibleUpstream:
     def complete(self, body: Mapping[str, Any], call: UpstreamCall) -> dict[str, Any]:
         """Send a non-streamed request and return the decoded JSON body.
 
-            中文：发送非流式请求，并返回解码后的 JSON 正文。
+            中文:发送非流式请求,并返回解码后的 JSON 正文。
         """
 
         connection, response = self._send(body, call)
@@ -222,7 +222,7 @@ class OpenAICompatibleUpstream:
     ) -> Iterator[dict[str, Any]]:
         """Read the upstream SSE stream on the reader thread.
 
-            中文：在 reader 线程上读取上游 SSE 流。
+            中文:在 reader 线程上读取上游 SSE 流。
         """
 
         connection, response = self._send(body, call)
@@ -275,7 +275,7 @@ class OpenAICompatibleUpstream:
             connection.request("POST", target, body=encoded, headers=headers)
             # The socket must be captured before the response is read: a peer
             # answering with HTTP/1.0 makes http.client drop its own reference.
-            # 中文：读取 response 之前必须先捕获 socket：如果对端返回 HTTP/1.0，`http.client` 会丢弃自己对 socket 的引用。
+            # 中文:读取 response 之前必须先捕获 socket:如果对端返回 HTTP/1.0,`http.client` 会丢弃自己对 socket 的引用。
             call.attach_socket(connection.sock)
             response = connection.getresponse()
         except (OSError, ValueError) as error:
@@ -297,7 +297,7 @@ class OpenAICompatibleUpstream:
 def parse_sse_line(line: str) -> dict[str, Any] | str | None:
     """Decode one SSE line into an event, the done marker, or nothing.
 
-        中文：将一行 SSE 解码为事件、结束标记或空结果。
+        中文:将一行 SSE 解码为事件、结束标记或空结果。
     """
 
     stripped = line.strip()

@@ -1,6 +1,6 @@
 """Tests for the fail-closed real OneBot parity verifier.
 
-中文：对真实 OneBot 对等性验证器进行失败即拒绝测试。"""
+中文:对真实 OneBot 对等性验证器进行失败即拒绝测试。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ SPEC.loader.exec_module(VERIFIER)
 def _trace(runtime: str) -> dict:
     """Build one complete semantic trace with deployment IDs.
 
-        中文：构建一份包含部署标识的完整语义轨迹。"""
+        中文:构建一份包含部署标识的完整语义轨迹。"""
 
     profile = {
         "checks": {check: "PASS" for check in VERIFIER.REQUIRED_CHECKS},
@@ -55,7 +55,7 @@ def _trace(runtime: str) -> dict:
 def test_real_trace_comparison_normalizes_deployment_ids() -> None:
     """Runtime-generated IDs do not create false mismatches.
 
-        中文：运行时生成的标识不会造成误报差异。"""
+        中文:运行时生成的标识不会造成误报差异。"""
 
     result = VERIFIER.compare_traces(
         _trace("python-reference"), _trace("csharp-native-aot")
@@ -67,7 +67,7 @@ def test_real_trace_comparison_normalizes_deployment_ids() -> None:
 def test_real_trace_comparison_rejects_incomplete_profile() -> None:
     """A skipped required scenario blocks migration.
 
-        中文：跳过必需场景会阻止迁移。"""
+        中文:跳过必需场景会阻止迁移。"""
 
     python_trace = _trace("python-reference")
     python_trace["profiles"]["http_api"]["checks"]["request_event"] = "NOT_RUN"
@@ -78,7 +78,7 @@ def test_real_trace_comparison_rejects_incomplete_profile() -> None:
 def test_real_trace_comparison_rejects_semantic_difference() -> None:
     """Different action parameters cannot be hidden by normalization.
 
-        中文：不同的动作参数不能通过规范化隐藏。"""
+        中文:不同的动作参数不能通过规范化隐藏。"""
 
     native_trace = _trace("csharp-native-aot")
     native_trace["profiles"]["forward_websocket"]["actions"][0]["params"][

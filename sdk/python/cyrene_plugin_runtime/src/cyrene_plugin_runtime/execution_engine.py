@@ -54,7 +54,7 @@ EXECUTE_INFERENCE_FIELDS = frozenset(
 class DirectTypedPayload:
     """One typed JSON response returned through DirectPluginRuntime.
 
-        中文：通过 DirectPluginRuntime 返回的一项类型化 JSON 响应。
+        中文:通过 DirectPluginRuntime 返回的一项类型化 JSON 响应。
     """
 
     value: bytes
@@ -64,14 +64,14 @@ class DirectTypedPayload:
 class ExecutionEngineRequestError(ValueError):
     """A request failed execution.engine.v1 JSON validation.
 
-        中文：请求未通过 execution.engine.v1 JSON 校验。
+        中文:请求未通过 execution.engine.v1 JSON 校验。
     """
 
 
 def is_cancelled(*signals: Any) -> bool:
     """Return whether any supplied runtime cancellation signal is set.
 
-        中文：返回任意一个已提供 Runtime 取消信号是否处于设置状态。
+        中文:返回任意一个已提供 Runtime 取消信号是否处于设置状态。
     """
 
     for signal in signals:
@@ -89,7 +89,7 @@ def is_cancelled(*signals: Any) -> bool:
 def _positive_int(value: Any, field: str) -> None:
     """Validate one positive integer JSON field without accepting booleans.
 
-        中文：校验一个正整数 JSON 字段，并拒绝布尔值。
+        中文:校验一个正整数 JSON 字段,并拒绝布尔值。
     """
 
     if isinstance(value, bool) or not isinstance(value, int) or value < 1:
@@ -99,7 +99,7 @@ def _positive_int(value: Any, field: str) -> None:
 def _decode_request(payload: bytes, action: str) -> dict[str, Any]:
     """Decode and validate one canonical execution.engine.v1 request.
 
-        中文：解码并校验一条规范的 execution.engine.v1 请求。
+        中文:解码并校验一条规范的 execution.engine.v1 请求。
     """
 
     if len(payload) > MAX_PAYLOAD_BYTES:
@@ -193,7 +193,7 @@ def _decode_request(payload: bytes, action: str) -> dict[str, Any]:
 class ExecutionEngineDirectAdapter:
     """Mixin implementing one canonical execution.engine.v1 direct endpoint.
 
-        中文：实现一个规范 execution.engine.v1 direct Endpoint 的 mixin。
+        中文:实现一个规范 execution.engine.v1 direct Endpoint 的 mixin。
     """
 
     plugin_id = ""
@@ -207,7 +207,7 @@ class ExecutionEngineDirectAdapter:
     def on_cancel(self, request_id: str, reason: str) -> None:
         """Propagate DirectPluginRuntime cancellation to an active request.
 
-            中文：将 DirectPluginRuntime 的取消信号传播给正在处理的请求。
+            中文:将 DirectPluginRuntime 的取消信号传播给正在处理的请求。
         """
 
         del reason
@@ -229,7 +229,7 @@ class ExecutionEngineDirectAdapter:
     ) -> tuple[bool, DirectTypedPayload | str]:
         """Adapt one JSON request to the canonical direct runtime endpoint.
 
-            中文：将 JSON 请求适配到规范 direct runtime Endpoint。
+            中文:将 JSON 请求适配到规范 direct runtime Endpoint。
         """
 
         if capability != CAPABILITY_ID:

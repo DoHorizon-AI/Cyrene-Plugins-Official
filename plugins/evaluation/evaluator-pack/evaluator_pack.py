@@ -44,7 +44,7 @@ _CHECK_LIMIT = 8
 class TypedPayload:
     """Typed response consumed by DirectPluginRuntime.
 
-        中文：由 DirectPluginRuntime 使用的有类型响应。"""
+        中文:由 DirectPluginRuntime 使用的有类型响应。"""
 
     value: bytes
     type_url: str
@@ -53,13 +53,13 @@ class TypedPayload:
 class RequestError(ValueError):
     """Request-level contract violation; the whole evaluation fails closed.
 
-        中文：请求级契约违规；整个评估会按失败即拒绝处理。"""
+        中文:请求级契约违规;整个评估会按失败即拒绝处理。"""
 
 
 class EvaluatorPackPlugin:
     """Deterministic evaluators over Product-supplied JSON records.
 
-        中文：针对 Product 提供的 JSON 记录运行的确定性评估器。"""
+        中文:针对 Product 提供的 JSON 记录运行的确定性评估器。"""
 
     plugin_id = "cyrene.evaluation.evaluator-pack"
     version = "0.1.0"
@@ -77,7 +77,7 @@ class EvaluatorPackPlugin:
     ) -> tuple[bool, TypedPayload | str]:
         """Dispatch one typed evaluation request.
 
-            中文：分发一个有类型的评估请求。"""
+            中文:分发一个有类型的评估请求。"""
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -110,7 +110,7 @@ class EvaluatorPackPlugin:
     def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
         """Evaluate every record and return the typed response payload.
 
-            中文：评估每条记录并返回有类型的响应载荷。"""
+            中文:评估每条记录并返回有类型的响应载荷。"""
 
         evaluator = request.get("evaluator")
         if evaluator not in SUPPORTED_EVALUATORS:
@@ -172,7 +172,7 @@ class EvaluatorPackPlugin:
 
 
 # ── Shared helpers ─────────────────────────────────────────────────────
-# 中文：── 共享辅助函数 ─────────────────────────────────────────────────────
+# 中文:── 共享辅助函数 ─────────────────────────────────────────────────────
 
 def _required_text(value: Any, field: str) -> str:
     if not isinstance(value, str) or not value:
@@ -217,7 +217,7 @@ def _bound(detail: str | None) -> str | None:
 
 
 # ── Evaluators ─────────────────────────────────────────────────────────
-# 中文：── 评估器 ─────────────────────────────────────────────────────────────
+# 中文:── 评估器 ─────────────────────────────────────────────────────────────
 
 def _contains_check(params: dict[str, Any]) -> Callable[[Any, Any], tuple[bool, str | None]]:
     case_sensitive = _optional_bool(params, "case_sensitive", True)
@@ -275,7 +275,7 @@ def _regex_check(params: dict[str, Any]) -> Callable[[Any, Any], tuple[bool, str
 def _as_json_value(value: Any) -> Any:
     """Parse JSON encoded strings once so structural comparison is stable.
 
-        中文：仅解析一次 JSON 编码字符串，以保证结构比较稳定。"""
+        中文:仅解析一次 JSON 编码字符串,以保证结构比较稳定。"""
 
     if isinstance(value, str):
         try:

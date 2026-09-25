@@ -24,14 +24,14 @@ from typing import Any
 class SmokeConfigurationError(RuntimeError):
     """Raised when a protected smoke environment is not fully configured.
 
-        中文：受保护烟测环境配置不完整时抛出的错误。
+        中文:受保护烟测环境配置不完整时抛出的错误。
     """
 
 
 def _repository_root() -> Path:
     """Return the checkout root from this script's stable repository location.
 
-        中文：根据此脚本稳定的仓库内位置返回 checkout 根目录。
+        中文:根据此脚本稳定的仓库内位置返回 checkout 根目录。
     """
 
     return Path(__file__).resolve().parents[2]
@@ -40,7 +40,7 @@ def _repository_root() -> Path:
 def _configure_import_path() -> None:
     """Expose the checked-out runtime and connector without installing the repo.
 
-        中文：无需安装整个仓库，即可暴露当前 checkout 中的 Runtime 和 connector。
+        中文:无需安装整个仓库,即可暴露当前 checkout 中的 Runtime 和 connector。
     """
 
     root = _repository_root()
@@ -93,7 +93,7 @@ _MAX_EVENTS = 128
 class RecordingEmitter:
     """Capture only bounded canonical events for the protected smoke process.
 
-        中文：仅为受保护烟测进程捕获有界的规范事件。
+        中文:仅为受保护烟测进程捕获有界的规范事件。
     """
 
     def __init__(self) -> None:
@@ -102,7 +102,7 @@ class RecordingEmitter:
     def emit(self, event_type: str, payload: bytes, type_url: str = "") -> bool:
         """Record one event and return the worker emitter's accepted result.
 
-            中文：记录一个事件，并返回 Worker emitter 是否接受。
+            中文:记录一个事件,并返回 Worker emitter 是否接受。
         """
 
         if len(self.events) < _MAX_EVENTS:
@@ -113,7 +113,7 @@ class RecordingEmitter:
 def _required_env(name: str) -> str:
     """Read one required protected environment value without logging its content.
 
-        中文：读取一个必需的受保护环境变量，但不记录其内容。
+        中文:读取一个必需的受保护环境变量,但不记录其内容。
     """
 
     value = os.environ.get(name, "").strip()
@@ -125,7 +125,7 @@ def _required_env(name: str) -> str:
 def _absolute_path(name: str, value: str) -> Path:
     """Validate one absolute path and return its canonical path.
 
-        中文：校验一个绝对路径并返回规范路径。
+        中文:校验一个绝对路径并返回规范路径。
     """
 
     path = Path(value)
@@ -137,7 +137,7 @@ def _absolute_path(name: str, value: str) -> Path:
 def _host_args() -> list[str]:
     """Decode bounded Host arguments supplied by the protected environment.
 
-        中文：解码由受保护环境提供的有界 Host 参数。
+        中文:解码由受保护环境提供的有界 Host 参数。
     """
 
     encoded = os.environ.get("QQNT_HOST_ARGS_JSON", "[]")
@@ -159,7 +159,7 @@ def _host_args() -> list[str]:
 def _reject_reserved_keys(value: Any) -> None:
     """Reject credential or passthrough fields anywhere in the scenario tree.
 
-        中文：拒绝场景树中任意位置的凭据字段或透传字段。
+        中文:拒绝场景树中任意位置的凭据字段或透传字段。
     """
 
     if isinstance(value, Mapping):
@@ -175,7 +175,7 @@ def _reject_reserved_keys(value: Any) -> None:
 def _load_scenario() -> dict[str, Any]:
     """Load one operator-authored scenario from outside the checked-out source.
 
-        中文：从 checkout 源码之外加载一份由操作人员编写的场景。
+        中文:从 checkout 源码之外加载一份由操作人员编写的场景。
     """
 
     path = _absolute_path(
@@ -226,7 +226,7 @@ def _load_scenario() -> dict[str, Any]:
 def _required_text(value: Any, field: str, *, maximum: int = 512) -> str:
     """Validate one bounded scenario text field.
 
-        中文：校验一个有界场景文本字段。
+        中文:校验一个有界场景文本字段。
     """
 
     if (
@@ -247,7 +247,7 @@ def _conversation(
 ) -> dict[str, str]:
     """Validate one private or group target while preserving vendor identity.
 
-        中文：校验一个私聊或群组目标，同时保留供应商身份。
+        中文:校验一个私聊或群组目标,同时保留供应商身份。
     """
 
     if not isinstance(value, Mapping):
@@ -268,7 +268,7 @@ def _conversation(
 def _substitute(value: Any, replacements: Mapping[str, str]) -> Any:
     """Substitute only documented smoke identifiers in operation parameters.
 
-        中文：只替换 operation 参数中有文档说明的烟测标识符。
+        中文:只替换 operation 参数中有文档说明的烟测标识符。
     """
 
     if isinstance(value, str):
@@ -294,7 +294,7 @@ def _operation_result(
 ) -> dict[str, Any]:
     """Invoke one fixed operation and return only its bounded result envelope.
 
-        中文：调用一个固定 operation，并且只返回其有界结果封套。
+        中文:调用一个固定 operation,并且只返回其有界结果封套。
     """
 
     result = connector.invoke_extension(operation, params)
@@ -310,7 +310,7 @@ def _send_message(
 ) -> str:
     """Send one canonical text message and return its native vendor message ID.
 
-        中文：发送一条规范文本消息，并返回原生供应商消息 ID。
+        中文:发送一条规范文本消息,并返回原生供应商消息 ID。
     """
 
     result = connector.send_message(
@@ -337,7 +337,7 @@ def _send_message(
 def _inbound_text(payload: bytes) -> tuple[str, str, str, str]:
     """Decode one canonical inbound event into identity and text evidence.
 
-        中文：将一条规范入站事件解码为身份与文本证据。
+        中文:将一条规范入站事件解码为身份与文本证据。
     """
 
     message = message_contract.InboundMessagePayload.FromString(payload)
@@ -368,7 +368,7 @@ def _wait_for_inbound(
 ) -> None:
     """Wait for each configured private/group canonical inbound assertion.
 
-        中文：等待每一项已配置的私聊／群组规范入站断言。
+        中文:等待每一项已配置的私聊／群组规范入站断言。
     """
 
     deadline = time.monotonic() + timeout_seconds
@@ -405,7 +405,7 @@ def _wait_for_inbound(
 def _assert_ready(connector: QQNTDirectConnector, account_id: str) -> Mapping[str, Any]:
     """Verify exact Host compatibility and the configured account identity.
 
-        中文：校验 Host 兼容性精确匹配，并验证已配置的账户身份。
+        中文:校验 Host 兼容性精确匹配,并验证已配置的账户身份。
     """
 
     compatibility = connector.compatibility
@@ -432,7 +432,7 @@ def _assert_ready(connector: QQNTDirectConnector, account_id: str) -> Mapping[st
 def _build_config(scenario: Mapping[str, Any], account_id: str) -> dict[str, Any]:
     """Build the binding configuration from protected inputs and the scenario.
 
-        中文：根据受保护输入和测试场景构造 binding 配置。
+        中文:根据受保护输入和测试场景构造 binding 配置。
     """
 
     binding_id = _required_text(
@@ -465,7 +465,7 @@ def _build_config(scenario: Mapping[str, Any], account_id: str) -> dict[str, Any
 def _run_smoke() -> dict[str, Any]:
     """Execute the protected scenario and return redacted acceptance evidence.
 
-        中文：执行受保护场景，并返回已脱敏的验收证据。
+        中文:执行受保护场景,并返回已脱敏的验收证据。
     """
 
     if sys.platform != "linux" or platform.machine() not in {"x86_64", "amd64"}:
@@ -615,7 +615,7 @@ def _run_smoke() -> dict[str, Any]:
 def main() -> int:
     """Run the protected smoke and write only redacted evidence.
 
-        中文：运行受保护烟测，并且只写入已脱敏的证据。
+        中文:运行受保护烟测,并且只写入已脱敏的证据。
     """
 
     evidence_path_value = os.environ.get("QQNT_SMOKE_EVIDENCE_PATH", "").strip()

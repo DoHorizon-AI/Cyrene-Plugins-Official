@@ -1,6 +1,6 @@
 """Deterministic evaluator pack tests: semantics, fail-closed requests, schema.
 
-中文：确定性评估器包测试：语义、失败即拒绝请求和架构。"""
+中文:确定性评估器包测试:语义、失败即拒绝请求和架构。"""
 
 from __future__ import annotations
 

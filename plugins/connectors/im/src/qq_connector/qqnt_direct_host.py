@@ -47,7 +47,7 @@ _BINDING_OWNER_FILE = ".cyrene-binding-owner.json"
 class QQHostError(RuntimeError):
     """Structured error produced by the QQ Host process boundary.
 
-        中文：QQ Host 进程边界产生的结构化错误。
+        中文:QQ Host 进程边界产生的结构化错误。
     """
 
     def __init__(self, code: str, message: str) -> None:
@@ -60,7 +60,7 @@ class QQHostError(RuntimeError):
 class QQHostLaunchConfig:
     """Immutable launch inputs for exactly one binding and one process tree.
 
-        中文：仅供一个 binding 和一个进程树使用的不可变启动输入。
+        中文:仅供一个 binding 和一个进程树使用的不可变启动输入。
     """
 
     binding_id: str
@@ -84,7 +84,7 @@ class QQHostLaunchConfig:
 class _PendingRequest:
     """One generation-scoped request waiting for a Host response.
 
-        中文：一条按代次关联、正在等待 Host 响应的请求。
+        中文:一条按代次关联、正在等待 Host 响应的请求。
     """
 
     completed: threading.Event
@@ -100,7 +100,7 @@ class QQHostClient:
     binding and current worker generation, so a late callback cannot cross a
     restart or another binding.
 
-        中文：仅通过管道监督一个已授权的 QQ Host 子进程。子进程不会收到任何监听地址，客户端也不会导入或创建网络传输。每个请求标识都包含 binding 和当前 Worker 代次，因此迟到的回调不会跨越进程重启或落入其他 binding。
+        中文:仅通过管道监督一个已授权的 QQ Host 子进程。子进程不会收到任何监听地址,客户端也不会导入或创建网络传输。每个请求标识都包含 binding 和当前 Worker 代次,因此迟到的回调不会跨越进程重启或落入其他 binding。
     """
 
     def __init__(
@@ -135,7 +135,7 @@ class QQHostClient:
     def binding_id(self) -> str:
         """Return the immutable binding identity assigned to this client.
 
-            中文：返回分配给此客户端的不可变 binding 身份。
+            中文:返回分配给此客户端的不可变 binding 身份。
         """
 
         return self._config.binding_id
@@ -144,7 +144,7 @@ class QQHostClient:
     def generation(self) -> int:
         """Return the current process generation, or zero before first start.
 
-            中文：返回当前进程代次；首次启动之前返回 0。
+            中文:返回当前进程代次;首次启动之前返回 0。
         """
 
         with self._state_lock:
@@ -154,7 +154,7 @@ class QQHostClient:
     def state(self) -> str:
         """Return the current lifecycle state.
 
-            中文：返回当前生命周期状态。
+            中文:返回当前生命周期状态。
         """
 
         with self._state_lock:
@@ -164,7 +164,7 @@ class QQHostClient:
     def compatibility(self) -> Mapping[str, Any]:
         """Return the bounded Host hello report without credentials.
 
-            中文：返回不含凭据的有界 Host hello 报告。
+            中文:返回不含凭据的有界 Host hello 报告。
         """
 
         with self._state_lock:
@@ -174,7 +174,7 @@ class QQHostClient:
     def diagnostics(self) -> tuple[str, ...]:
         """Return bounded, redacted diagnostics useful for operator evidence.
 
-            中文：返回有界且已脱敏、可供操作人员留存证据的诊断信息。
+            中文:返回有界且已脱敏、可供操作人员留存证据的诊断信息。
         """
 
         with self._state_lock:
@@ -184,7 +184,7 @@ class QQHostClient:
     def supervision(self) -> Mapping[str, Any]:
         """Return bounded restart and crash-circuit state for diagnostics.
 
-            中文：返回用于诊断的有界重启与崩溃熔断状态。
+            中文:返回用于诊断的有界重启与崩溃熔断状态。
         """
 
         with self._state_lock:
@@ -205,9 +205,9 @@ class QQHostClient:
             QQHostError: If the child cannot start or fails the exact protocol,
                 binding, platform, or QQ client-version checks.
 
-            中文：启动子进程、协商协议兼容性并返回协商报告。
+            中文:启动子进程、协商协议兼容性并返回协商报告。
 
-Raises：如果子进程无法启动，或未通过针对协议、binding、平台或 QQ 客户端版本的精确校验，则抛出 QQHostError。
+Raises:如果子进程无法启动,或未通过针对协议、binding、平台或 QQ 客户端版本的精确校验,则抛出 QQHostError。
         """
 
         with self._state_lock:
@@ -344,7 +344,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
     def restart(self) -> Mapping[str, Any]:
         """Drain the current child and start a new generation for this binding.
 
-            中文：排空当前子进程，并为此 binding 启动一个新的代次。
+            中文:排空当前子进程,并为此 binding 启动一个新的代次。
         """
 
         self.close()
@@ -357,7 +357,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
         that observed the failure is never replayed; the caller may retry a
         later operation after the new generation has initialized its session.
 
-            中文：执行一次有界崩溃恢复，但不重试 QQ 操作。只有意外的进程／标准输入输出退出才允许重启。观察到故障的操作绝不会重放；新代次完成 session 初始化后，调用方可以重试后续操作。
+            中文:执行一次有界崩溃恢复,但不重试 QQ 操作。只有意外的进程／标准输入输出退出才允许重启。观察到故障的操作绝不会重放;新代次完成 session 初始化后,调用方可以重试后续操作。
         """
 
         with self._state_lock:
@@ -405,7 +405,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
     ) -> Any:
         """Send one fixed operation and await its generation-scoped response.
 
-            中文：发送一个固定操作，并等待与当前代次关联的响应。
+            中文:发送一个固定操作,并等待与当前代次关联的响应。
         """
 
         if not isinstance(operation, str) or not operation.strip():
@@ -494,7 +494,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
     def close(self) -> None:
         """Request shutdown, then boundedly reap the entire child process.
 
-            中文：请求关闭，然后在有界时间内回收整个子进程。
+            中文:请求关闭,然后在有界时间内回收整个子进程。
         """
 
         with self._state_lock:
@@ -527,7 +527,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
         # A well-behaved Host exits on shutdown, but it may have spawned
         # binding-local helpers.  Reap that process group even after the
         # leader has already exited.
-        # 中文：正常的 Host 会响应关闭请求并退出，但它可能已经派生了属于当前 binding 的辅助进程。因此，即使 leader 已退出，也要回收整个进程组。
+        # 中文:正常的 Host 会响应关闭请求并退出,但它可能已经派生了属于当前 binding 的辅助进程。因此,即使 leader 已退出,也要回收整个进程组。
         _terminate_process_tree(process, force=True, include_exited=True)
         for stream in (process.stdin, process.stdout, process.stderr):
             if stream is not None:
@@ -709,7 +709,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
     def _listener_watch_loop(self) -> None:
         """Fail closed if the binding-local Host process tree opens TCP LISTEN.
 
-            中文：如果 binding 本地的 Host 进程树打开了 TCP LISTEN listener，则失败关闭。
+            中文:如果 binding 本地的 Host 进程树打开了 TCP LISTEN listener,则失败关闭。
         """
 
         process = self._process
@@ -739,7 +739,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
     ) -> None:
         """Mark one still-current Host generation failed without touching others.
 
-            中文：仅将一个仍为当前代次的 Host 标记为失败，不触碰其他代次。
+            中文:仅将一个仍为当前代次的 Host 标记为失败,不触碰其他代次。
         """
 
         with self._state_lock:
@@ -754,7 +754,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
     def _prune_restart_history(self, now: float) -> None:
         """Discard recovery attempts outside the configured rolling window.
 
-            中文：丢弃落在已配置滚动时间窗之外的恢复尝试。
+            中文:丢弃落在已配置滚动时间窗之外的恢复尝试。
         """
 
         cutoff = now - self._config.restart_window_seconds
@@ -765,7 +765,7 @@ Raises：如果子进程无法启动，或未通过针对协议、binding、平�
     def _release_binding_lock(self) -> None:
         """Unlock and close this binding's active owner-marker handle.
 
-            中文：解锁并关闭此 binding 当前持有的 owner-marker 句柄。
+            中文:解锁并关闭此 binding 当前持有的 owner-marker 句柄。
         """
 
         handle = self._binding_lock_handle
@@ -797,7 +797,7 @@ def _terminate_process_tree(
 ) -> None:
     """Terminate the binding-local process group without touching other bindings.
 
-        中文：终止 binding 本地的进程组，不触碰其他 binding。
+        中文:终止 binding 本地的进程组,不触碰其他 binding。
     """
 
     if process.poll() is not None and not include_exited:
@@ -810,7 +810,7 @@ def _terminate_process_tree(
             return
         except OSError:
             # Fall back to the child handle if the process group disappeared.
-            # 中文：// 中文：如果进程组已消失，则回退使用子进程句柄。
+            # 中文:// 中文:如果进程组已消失,则回退使用子进程句柄。
             pass
     try:
         (process.kill if force else process.terminate)()
@@ -827,7 +827,7 @@ def _assert_no_tcp_listener(process: subprocess.Popen[bytes]) -> None:
     to the kernel's LISTEN tables.  Missing or already-exited /proc entries are
     treated as a race with process shutdown, not as a listener.
 
-        中文：拒绝拥有 IPv4／IPv6 TCP listener 的 Host 进程树。direct profile 可以使用 QQ 的出站网络连接，但 connector 与 Host 之间的 IPC 必须通过继承的标准输入输出进行，并且不能开放端口。这个仅限 Linux 的探测会把子进程及其后代持有的 socket inode 映射到内核 LISTEN 表。缺失或已退出的 `/proc` 条目视为进程关闭期间的竞态，而不是 listener。
+        中文:拒绝拥有 IPv4／IPv6 TCP listener 的 Host 进程树。direct profile 可以使用 QQ 的出站网络连接,但 connector 与 Host 之间的 IPC 必须通过继承的标准输入输出进行,并且不能开放端口。这个仅限 Linux 的探测会把子进程及其后代持有的 socket inode 映射到内核 LISTEN 表。缺失或已退出的 `/proc` 条目视为进程关闭期间的竞态,而不是 listener。
     """
 
     if sys.platform != "linux" or process.poll() is not None:
@@ -859,7 +859,7 @@ def _assert_no_tcp_listener(process: subprocess.Popen[bytes]) -> None:
 def _linux_tcp_listening_inodes() -> set[str]:
     """Return socket inodes in the Linux IPv4/IPv6 TCP LISTEN state.
 
-        中文：返回处于 Linux IPv4／IPv6 TCP LISTEN 状态的 socket inode。
+        中文:返回处于 Linux IPv4／IPv6 TCP LISTEN 状态的 socket inode。
     """
 
     inodes: set[str] = set()
@@ -871,7 +871,7 @@ def _linux_tcp_listening_inodes() -> set[str]:
         for line in lines:
             fields = line.split()
             # /proc/net/tcp: sl local_address rem_address st ... uid timeout inode
-            # 中文：// 中文：`/proc/net/tcp` 字段顺序：sl、local_address、rem_address、st、...、uid、timeout、inode。
+            # 中文:// 中文:`/proc/net/tcp` 字段顺序:sl、local_address、rem_address、st、...、uid、timeout、inode。
             if len(fields) > 9 and fields[3].upper() == "0A":
                 inodes.add(fields[9])
     return inodes
@@ -880,7 +880,7 @@ def _linux_tcp_listening_inodes() -> set[str]:
 def _linux_process_tree(root_pid: int) -> tuple[int, ...]:
     """Return a best-effort snapshot of one process and its descendants.
 
-        中文：尽力返回一个进程及其后代进程的快照。
+        中文:尽力返回一个进程及其后代进程的快照。
     """
 
     parents: dict[int, int] = {}
@@ -897,7 +897,7 @@ def _linux_process_tree(root_pid: int) -> tuple[int, ...]:
             closing = stat_line.rfind(")")
             fields = stat_line[closing + 2 :].split()
             # After the comm field: state, ppid, pgrp, ...
-            # 中文：// 中文：comm 字段之后依次是 state、ppid、pgrp 等字段。
+            # 中文:// 中文:comm 字段之后依次是 state、ppid、pgrp 等字段。
             if len(fields) > 2:
                 parents[int(entry.name)] = int(fields[1])
         except (OSError, ValueError):
@@ -922,7 +922,7 @@ def _claim_binding_data_dir(data_dir: Path, binding_id: str) -> Any:
     has claimed it.  The open marker handle also carries the active lock for
     the lifetime of the worker, so no separate lock file is left behind.
 
-        中文：为单一 binding 身份独占一个数据目录。标记文件有意保持精简，不包含账户密钥或 QQ session 材料。目录中可以保留已有 QQ 数据，但某个 binding 认领根目录后，第二个 binding 不能静默复用它。打开的标记文件句柄会在 Worker 的整个生命周期内持有活动锁，因此无需留下单独的锁文件。
+        中文:为单一 binding 身份独占一个数据目录。标记文件有意保持精简,不包含账户密钥或 QQ session 材料。目录中可以保留已有 QQ 数据,但某个 binding 认领根目录后,第二个 binding 不能静默复用它。打开的标记文件句柄会在 Worker 的整个生命周期内持有活动锁,因此无需留下单独的锁文件。
     """
 
     marker = data_dir / _BINDING_OWNER_FILE

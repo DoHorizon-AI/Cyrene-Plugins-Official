@@ -25,7 +25,7 @@ from pathlib import Path
 def _parse_args() -> argparse.Namespace:
     """Parse the staged CI payload and immutable provenance fields.
 
-        中文：解析已暂存的 CI 载荷和不可变来源字段。"""
+        中文:解析已暂存的 CI 载荷和不可变来源字段。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", required=True, type=Path)
@@ -44,7 +44,7 @@ def _parse_args() -> argparse.Namespace:
 def _sha256(path: Path) -> str:
     """Return the SHA-256 digest of one file.
 
-        中文：返回一个文件的 SHA-256 摘要。"""
+        中文:返回一个文件的 SHA-256 摘要。"""
 
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -56,7 +56,7 @@ def _sha256(path: Path) -> str:
 def _source_epoch() -> int:
     """Resolve a reproducible archive timestamp from SOURCE_DATE_EPOCH.
 
-        中文：根据 SOURCE_DATE_EPOCH 确定可复现的归档时间戳。"""
+        中文:根据 SOURCE_DATE_EPOCH 确定可复现的归档时间戳。"""
 
     return int(os.environ.get("SOURCE_DATE_EPOCH", "0"))
 
@@ -64,7 +64,7 @@ def _source_epoch() -> int:
 def _write_reproducible_tar(source: Path, target: Path) -> None:
     """Write a gzip tar archive with normalized metadata and sorted entries.
 
-        中文：写入元数据已规范化且条目已排序的 gzip tar 归档。"""
+        中文:写入元数据已规范化且条目已排序的 gzip tar 归档。"""
 
     epoch = _source_epoch()
     with (
@@ -91,7 +91,7 @@ def _write_reproducible_tar(source: Path, target: Path) -> None:
 def _payload_entries(source: Path) -> list[dict[str, object]]:
     """Describe every payload file so the manifest is independently reviewable.
 
-        中文：描述载荷中的每个文件，使清单可以独立审核。"""
+        中文:描述载荷中的每个文件,使清单可以独立审核。"""
 
     entries: list[dict[str, object]] = []
     for path in sorted(source.rglob("*")):
@@ -112,7 +112,7 @@ def _payload_entries(source: Path) -> list[dict[str, object]]:
 def _write_checksums(output: Path) -> None:
     """Write checksums for the manifest and payload archive.
 
-        中文：为清单和载荷归档写入校验和。"""
+        中文:为清单和载荷归档写入校验和。"""
 
     lines = [
         f"{_sha256(output / 'payload.tar.gz')}  payload.tar.gz",
@@ -124,7 +124,7 @@ def _write_checksums(output: Path) -> None:
 def main() -> int:
     """Assemble a content-addressed payload and provenance manifest.
 
-        中文：组装内容寻址的载荷和来源清单。"""
+        中文:组装内容寻址的载荷和来源清单。"""
 
     args = _parse_args()
     source = args.input_dir.resolve()

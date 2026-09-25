@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Assemble the Linux x86_64 Native AOT IM connector package.
 
-中文：组装 Linux x86_64 Native AOT IM connector package。
+中文:组装 Linux x86_64 Native AOT IM connector package。
 """
 
 from __future__ import annotations
@@ -39,14 +39,14 @@ PACKAGE_FILES = (
 class NativePackageAssemblyError(ValueError):
     """Raised when an IM Native AOT package cannot be assembled safely.
 
-        中文：无法安全组装 IM Native AOT package 时抛出的错误。
+        中文:无法安全组装 IM Native AOT package 时抛出的错误。
     """
 
 
 def _read_json(path: Path) -> dict[str, Any]:
     """Read one JSON object used as package metadata.
 
-        中文：将用于 package 元数据的一份 JSON 对象读取出来。
+        中文:将用于 package 元数据的一份 JSON 对象读取出来。
     """
 
     try:
@@ -63,7 +63,7 @@ def _read_json(path: Path) -> dict[str, Any]:
 def _write_json(path: Path, value: dict[str, Any]) -> None:
     """Write stable UTF-8 JSON metadata.
 
-        中文：使用稳定的 UTF-8 格式写入 JSON 元数据。
+        中文:使用稳定的 UTF-8 格式写入 JSON 元数据。
     """
 
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -76,7 +76,7 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 def _rewrite_manifest(manifest: dict[str, Any], rid: str) -> dict[str, Any]:
     """Project the source manifest into one RID-specific native package.
 
-        中文：将 source manifest 投影为一个特定 RID 的原生 package。
+        中文:将 source manifest 投影为一个特定 RID 的原生 package。
     """
 
     projected = json.loads(json.dumps(manifest))
@@ -106,7 +106,7 @@ def _rewrite_manifest(manifest: dict[str, Any], rid: str) -> dict[str, Any]:
 def _rewrite_descriptor(descriptor: dict[str, Any], rid: str) -> dict[str, Any]:
     """Project the source descriptor into one RID-specific native package.
 
-        中文：将 source descriptor 投影为一个特定 RID 的原生 package。
+        中文:将 source descriptor 投影为一个特定 RID 的原生 package。
     """
 
     projected = json.loads(json.dumps(descriptor))
@@ -154,7 +154,7 @@ def _rewrite_descriptor(descriptor: dict[str, Any], rid: str) -> dict[str, Any]:
 def _copy_required(source: Path, destination: Path) -> None:
     """Copy one regular package input and reject symlink indirection.
 
-        中文：复制一个普通 package 输入文件，并拒绝符号链接转向。
+        中文:复制一个普通 package 输入文件,并拒绝符号链接转向。
     """
 
     if source.is_symlink() or not source.is_file():
@@ -173,7 +173,7 @@ def assemble_native_package(
 ) -> Path:
     """Assemble one unpacked IM Native AOT package.
 
-        中文：组装一个未打包的 IM Native AOT package。
+        中文:组装一个未打包的 IM Native AOT package。
     """
 
     if rid not in SUPPORTED_RIDS:
@@ -242,7 +242,7 @@ def build_native_package_archive(
 ) -> Path:
     """Build a deterministic ZIP archive for one IM Native AOT package.
 
-        中文：为一个 IM Native AOT package 生成确定性 ZIP archive。
+        中文:为一个 IM Native AOT package 生成确定性 ZIP archive。
     """
 
     output_path = output_path.resolve()
@@ -269,7 +269,7 @@ def build_native_package_archive(
 def _parse_args() -> argparse.Namespace:
     """Parse one candidate assembly request.
 
-        中文：解析一项候选制品组装请求。
+        中文:解析一项候选制品组装请求。
     """
 
     parser = argparse.ArgumentParser(description=__doc__)
@@ -284,7 +284,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> int:
     """Assemble one IM Native AOT candidate without publishing it.
 
-        中文：组装一个 IM Native AOT 候选制品，但不发布它。
+        中文:组装一个 IM Native AOT 候选制品,但不发布它。
     """
 
     args = _parse_args()

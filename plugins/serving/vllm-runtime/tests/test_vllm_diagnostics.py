@@ -1,6 +1,6 @@
 """Diagnostics capture tests for the vLLM serving runtime.
 
-中文：vLLM 服务运行时的诊断捕获测试。"""
+中文:vLLM 服务运行时的诊断捕获测试。"""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ TOKEN = "serving-runtime-token-0123456789abcdef"
 def _chatty_script(tmp_path: Path) -> Path:
     """A stand-in vLLM that writes to both streams before serving.
 
-        中文：一个在提供服务前向两个输出流都写入内容的 vLLM 替身。"""
+        中文:一个在提供服务前向两个输出流都写入内容的 vLLM 替身。"""
 
     script = tmp_path / "chatty_vllm.py"
     script.write_text(
@@ -67,7 +67,7 @@ def test_sink_tags_streams_and_rotates_within_the_budget(tmp_path: Path) -> None
     records = [json.loads(line) for line in (tmp_path / "dep-1.ndjson").read_text().splitlines()]
     assert [record["stream"] for record in records] == ["stdout", "stderr"]
     # Sequence is 1-based so a client can page from 0 without missing record one.
-    # 中文：序列号从 1 开始，因此客户端可以从 0 开始分页且不会漏掉第一条记录。
+    # 中文:序列号从 1 开始,因此客户端可以从 0 开始分页且不会漏掉第一条记录。
     assert [record["sequence"] for record in records] == [1, 2]
     assert records[1]["level"] == "warn"
 
@@ -78,7 +78,7 @@ def test_sink_tags_streams_and_rotates_within_the_budget(tmp_path: Path) -> None
     assert [item["sequence"] for item in after] == [2]
 
     # Exceeding the budget rotates into the second retained file.
-    # 中文：超出预算后会轮换到第二个保留文件。
+    # 中文:超出预算后会轮换到第二个保留文件。
     rotating = ServingDiagnostics(tmp_path, "dep-2", budget_bytes=1)
     rotating.start()
     rotating._pending.put(("stderr", "before rotation"))
@@ -91,7 +91,7 @@ def test_sink_tags_streams_and_rotates_within_the_budget(tmp_path: Path) -> None
     assert [item["message"] for item in rotated] == ["before rotation"]
     assert [item["message"] for item in current] == ["after rotation"]
     # Sequences stay monotonic across the rotation.
-    # 中文：轮换前后序列号保持单调递增。
+    # 中文:轮换前后序列号保持单调递增。
     assert current[0]["sequence"] == rotated[0]["sequence"] + 1
 
 
@@ -154,7 +154,7 @@ def test_diagnostics_route_reports_both_streams(tmp_path: Path) -> None:
 
         # Reading `self.path` with a query must not swallow the query for the
         # upstream call, so the proxy keeps forwarding it verbatim.
-        # 中文：读取带查询参数的 `self.path` 时不得吞掉供上游调用使用的查询参数，因此代理会原样转发。
+        # 中文:读取带查询参数的 `self.path` 时不得吞掉供上游调用使用的查询参数,因此代理会原样转发。
         status, proxied = call("GET", f"/serving/{deployment_id}/v1/models?detailed=true")
         assert status == 200
         assert proxied["path"] == "/v1/models?detailed=true"

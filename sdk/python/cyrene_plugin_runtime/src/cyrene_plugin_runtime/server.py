@@ -1,6 +1,6 @@
 """Serve one configured Plugin instance over its direct data-plane endpoint.
 
-中文：通过直连数据平面端点为一个已配置的 Plugin 实例提供服务。"""
+中文:通过直连数据平面端点为一个已配置的 Plugin 实例提供服务。"""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ _MAX_PAYLOAD_BYTES = 64 * 1024 * 1024
 class _ContextCancellation:
     """Expose gRPC termination as a thread-safe Plugin cancellation signal.
 
-        中文：将 gRPC 终止状态作为线程安全的 Plugin 取消信号提供。"""
+        中文:将 gRPC 终止状态作为线程安全的 Plugin 取消信号提供。"""
 
     def __init__(self, context: grpc.ServicerContext) -> None:
         self._context = context
@@ -67,7 +67,7 @@ class _SubscriptionEmitter:
 class DirectPluginService(wire_grpc.DirectPluginRuntimeServicer):
     """A direct endpoint bound to exactly one Plugin implementation.
 
-        中文：一个只绑定到单个 Plugin 实现的直连端点。"""
+        中文:一个只绑定到单个 Plugin 实现的直连端点。"""
 
     def __init__(
         self,
@@ -292,7 +292,7 @@ def _interface_version_map(
 ) -> dict[str, frozenset[str]]:
     """Normalize single- and multi-capability version declarations.
 
-        中文：规范化单能力和多能力的版本声明。"""
+        中文:规范化单能力和多能力的版本声明。"""
 
     if isinstance(interface_versions, Mapping):
         result: dict[str, frozenset[str]] = {}
@@ -370,7 +370,7 @@ def _wire_error(
     code = mapping.get(code_name, wire.DirectInvocationError.CODE_EXECUTION_FAILED)
 
     # Diagnostic errors strictly to stderr; stdout is reserved for machine protocols
-    # 中文：诊断错误严格写入 stderr；stdout 保留给机器协议使用。
+    # 中文:诊断错误严格写入 stderr;stdout 保留给机器协议使用。
     mapped = map_plugin_error(code_name)
     attrs: dict[str, Any] = {
         "cause_kind": mapped.get("cause_kind"),

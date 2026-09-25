@@ -95,7 +95,7 @@ class QQNTDirectConfig:
     installation is guessed, and no password or session file is accepted as a
     configuration value.
 
-        中文：此配置限定到单个 binding 的 direct QQ runtime。可执行文件与数据目录必须由操作人员显式提供；不会猜测 QQ 安装位置，也不接受密码或会话文件作为配置值。
+        中文:此配置限定到单个 binding 的 direct QQ runtime。可执行文件与数据目录必须由操作人员显式提供;不会猜测 QQ 安装位置,也不接受密码或会话文件作为配置值。
     """
 
     binding_id: str
@@ -122,7 +122,7 @@ class QQNTDirectConfig:
     def from_mapping(cls, value: Mapping[str, Any]) -> QQNTDirectConfig:
         """Validate one direct binding and reject all OneBot endpoint fields.
 
-            中文：校验一个 direct binding，并拒绝所有 OneBot Endpoint 字段。
+            中文:校验一个 direct binding,并拒绝所有 OneBot Endpoint 字段。
         """
 
         if not isinstance(value, Mapping):
@@ -315,7 +315,7 @@ class QQNTDirectConfig:
     def from_settings(cls, settings: Mapping[str, str]) -> QQNTDirectConfig:
         """Build direct configuration from the generic worker environment.
 
-            中文：根据通用 Worker 环境构造 direct 配置。
+            中文:根据通用 Worker 环境构造 direct 配置。
         """
 
         config: dict[str, Any] = {}
@@ -337,7 +337,7 @@ class QQNTDirectConfig:
     def host_launch(self) -> QQHostLaunchConfig:
         """Return the immutable process launch configuration for this binding.
 
-            中文：返回此 binding 不可变的进程启动配置。
+            中文:返回此 binding 不可变的进程启动配置。
         """
 
         return QQHostLaunchConfig(
@@ -363,7 +363,7 @@ class QQNTDirectConfig:
 class _Subscription:
     """One direct event subscription owned by the worker activation.
 
-        中文：由 Worker activation 所拥有的一个 direct 事件订阅。
+        中文:由 Worker activation 所拥有的一个 direct 事件订阅。
     """
 
     emitter: ApplicationEventEmitter
@@ -374,7 +374,7 @@ class _Subscription:
 class _TypedPayload:
     """Typed result wrapper consumed by the generic direct runtime.
 
-        中文：供通用 direct runtime 使用的类型化结果包装器。
+        中文:供通用 direct runtime 使用的类型化结果包装器。
     """
 
     value: bytes
@@ -384,7 +384,7 @@ class _TypedPayload:
 class QQNTDirectConnector:
     """Direct QQ adapter for one binding and one QQ Host generation.
 
-        中文：针对单个 binding 和单个 QQ Host 代次的 direct QQ 适配器。
+        中文:针对单个 binding 和单个 QQ Host 代次的 direct QQ 适配器。
     """
 
     plugin_id = "cyrene.connectors.im"
@@ -419,7 +419,7 @@ class QQNTDirectConnector:
     def configured_binding_id(self) -> str | None:
         """Return stable binding identity, never the worker generation.
 
-            中文：返回稳定的 binding 身份，不包含 Worker 代次。
+            中文:返回稳定的 binding 身份,不包含 Worker 代次。
         """
 
         return self._config.binding_id if self._config is not None else None
@@ -428,7 +428,7 @@ class QQNTDirectConnector:
     def runtime_profile(self) -> str:
         """Return the immutable direct runtime profile.
 
-            中文：返回不可变的 direct runtime profile。
+            中文:返回不可变的 direct runtime profile。
         """
 
         return QQ_RUNTIME_PROFILE
@@ -437,7 +437,7 @@ class QQNTDirectConnector:
     def generation(self) -> int:
         """Return the current Host generation, or zero before startup.
 
-            中文：返回当前 Host 代次；启动前返回 0。
+            中文:返回当前 Host 代次;启动前返回 0。
         """
 
         return self._host.generation if self._host is not None else 0
@@ -446,7 +446,7 @@ class QQNTDirectConnector:
     def state(self) -> str:
         """Return the connector lifecycle state.
 
-            中文：返回 connector 生命周期状态。
+            中文:返回 connector 生命周期状态。
         """
 
         if self._host is not None and self._host.state == "FAILED":
@@ -457,7 +457,7 @@ class QQNTDirectConnector:
     def compatibility(self) -> Mapping[str, Any]:
         """Return the negotiated QQ Host compatibility report.
 
-            中文：返回已协商的 QQ Host 兼容性报告。
+            中文:返回已协商的 QQ Host 兼容性报告。
         """
 
         return self._host.compatibility if self._host is not None else {}
@@ -470,7 +470,7 @@ class QQNTDirectConnector:
     ) -> None:
         """Configure one direct worker activation without selecting another binding.
 
-            中文：配置一次 direct Worker activation，不会另行选择 binding。
+            中文:配置一次 direct Worker activation,不会另行选择 binding。
         """
 
         parsed = (
@@ -493,7 +493,7 @@ class QQNTDirectConnector:
     def on_configure(self, settings: Mapping[str, str]) -> str | None:
         """Apply one standard worker configuration and return a typed failure.
 
-            中文：应用一份标准 Worker 配置，并返回类型化失败结果。
+            中文:应用一份标准 Worker 配置,并返回类型化失败结果。
         """
 
         try:
@@ -510,7 +510,7 @@ class QQNTDirectConnector:
     ) -> dict[str, Any]:
         """Map canonical ordered content directly to the QQ native send operation.
 
-            中文：将规范的有序内容直接映射到 QQ 原生发送操作。
+            中文:将规范的有序内容直接映射到 QQ 原生发送操作。
         """
 
         config = self._require_configured()
@@ -563,7 +563,7 @@ class QQNTDirectConnector:
     ) -> dict[str, Any]:
         """Map canonical approval requests to fixed QQ friend or group operations.
 
-            中文：将规范审批请求映射为固定的 QQ 好友或群组操作。
+            中文:将规范审批请求映射为固定的 QQ 好友或群组操作。
         """
 
         config = self._require_configured()
@@ -621,7 +621,7 @@ class QQNTDirectConnector:
     ) -> dict[str, Any]:
         """Invoke one allow-listed QQ operation with no service/method passthrough.
 
-            中文：调用一个允许列表中的 QQ 操作，不允许透传 service 或 method。
+            中文:调用一个允许列表中的 QQ 操作,不允许透传 service 或 method。
         """
 
         config = self._require_configured()
@@ -657,7 +657,7 @@ class QQNTDirectConnector:
             # Explicit lifecycle actions are authoritative. Do not invoke the
             # complete bootstrap sequence before the action requested by the
             # caller, otherwise create/init/startNT would be duplicated.
-            # 中文：生命周期操作显式指定时，以该操作为准。不要在执行调用方请求的操作前运行完整 bootstrap 流程，否则会重复执行 create/init/startNT。
+            # 中文:生命周期操作显式指定时,以该操作为准。不要在执行调用方请求的操作前运行完整 bootstrap 流程,否则会重复执行 create/init/startNT。
             self._ensure_host_started()
         else:
             self._ensure_started()
@@ -715,7 +715,7 @@ class QQNTDirectConnector:
     ) -> tuple[bool, Any]:
         """Adapt canonical protobuf and explicit QQ JSON calls to direct operations.
 
-            中文：将规范 protobuf 调用和显式 QQ JSON 调用适配为 direct 操作。
+            中文:将规范 protobuf 调用和显式 QQ JSON 调用适配为 direct 操作。
         """
 
         del request_id, stream_results
@@ -790,7 +790,7 @@ class QQNTDirectConnector:
     ) -> str | None:
         """Attach one binding-local event stream and enable the native listener.
 
-            中文：附加一个 binding 本地事件流，并启用原生 listener。
+            中文:附加一个 binding 本地事件流,并启用原生 listener。
         """
 
         if capability not in {"message.connector.v1", QQ_CAPABILITY_ID}:
@@ -819,7 +819,7 @@ class QQNTDirectConnector:
     def on_unsubscribe(self, subscription_id: str, reason: str) -> None:
         """Remove one subscription without touching another binding or generation.
 
-            中文：移除一个订阅，不影响其他 binding 或代次。
+            中文:移除一个订阅,不影响其他 binding 或代次。
         """
 
         del reason
@@ -842,7 +842,7 @@ class QQNTDirectConnector:
     def on_shutdown(self, grace_period_ms: int) -> None:
         """Close the QQ Host process tree within the worker shutdown budget.
 
-            中文：在 Worker 关闭预算内关闭整个 QQ Host 进程树。
+            中文:在 Worker 关闭预算内关闭整个 QQ Host 进程树。
         """
 
         del grace_period_ms
@@ -851,7 +851,7 @@ class QQNTDirectConnector:
     def close(self) -> None:
         """Drain subscriptions and reap the binding-local QQ Host child.
 
-            中文：排空订阅，并回收 binding 本地的 QQ Host 子进程。
+            中文:排空订阅,并回收 binding 本地的 QQ Host 子进程。
         """
 
         self._subscriptions.clear()
@@ -863,7 +863,7 @@ class QQNTDirectConnector:
     def publish_inbound_event(self, event: Mapping[str, Any]) -> int:
         """Normalize one direct native event and emit it to matching subscribers.
 
-            中文：规范化一个 direct 原生事件，并将其发给匹配的订阅者。
+            中文:规范化一个 direct 原生事件,并将其发给匹配的订阅者。
         """
 
         return self._on_host_event(event)
@@ -898,7 +898,7 @@ class QQNTDirectConnector:
     def _ensure_host_started(self) -> None:
         """Start or recover the Host without implicitly bootstrapping QQ.
 
-            中文：启动或恢复 Host，但不隐式 bootstrap QQ。
+            中文:启动或恢复 Host,但不隐式 bootstrap QQ。
         """
 
         if self._host is None:
@@ -934,7 +934,7 @@ class QQNTDirectConnector:
     def _finish_startup(self) -> None:
         """Restore subscriptions after a generation has completed startup.
 
-            中文：在某个代次完成启动后恢复订阅。
+            中文:在某个代次完成启动后恢复订阅。
         """
 
         if (
@@ -984,7 +984,7 @@ class QQNTDirectConnector:
             def remember_request(request_id: str) -> None:
                 """Bind a callback-capable native call to its originating request.
 
-                    中文：将一个支持回调的原生调用关联到其发起请求。
+                    中文:将一个支持回调的原生调用关联到其发起请求。
                 """
 
                 nonlocal callback_request_id
@@ -1013,7 +1013,7 @@ class QQNTDirectConnector:
     def _remember_callback_request(self, request_id: str, operation: str) -> None:
         """Remember callback-capable request identities for this generation.
 
-            中文：记录此代次中支持回调的请求标识。
+            中文:记录此代次中支持回调的请求标识。
         """
 
         if not isinstance(request_id, str) or not request_id:
@@ -1027,7 +1027,7 @@ class QQNTDirectConnector:
     def _forget_callback_request(self, request_id: str | None) -> None:
         """Discard a callback identity when its originating request failed.
 
-            中文：当发起请求失败时，丢弃对应的回调标识。
+            中文:当发起请求失败时,丢弃对应的回调标识。
         """
 
         if not request_id:
@@ -1122,14 +1122,14 @@ class QQNTDirectConnector:
                 if not isinstance(request_id, str):
                     # A callback without a generation-scoped originating
                     # request is ambiguous; never expose it as a generic event.
-                    # 中文：没有按代次关联的发起请求时，无法判定回调属于哪个操作；绝不能将其作为通用事件公开。
+                    # 中文:没有按代次关联的发起请求时,无法判定回调属于哪个操作;绝不能将其作为通用事件公开。
                     return 0
                 with self._callback_lock:
                     originating_operation = self._callback_requests.get(request_id)
                 if originating_operation not in originating_operations:
                     # A callback without a generation-scoped originating
                     # request is ambiguous; never expose it as a generic event.
-                    # 中文：没有按代次关联的发起请求时，无法判定回调属于哪个操作；绝不能将其作为通用事件公开。
+                    # 中文:没有按代次关联的发起请求时,无法判定回调属于哪个操作;绝不能将其作为通用事件公开。
                     return 0
                 normalized_callback = _normalize_callback(
                     callback_operation, request_id, event.get("event_id"), payload
@@ -1139,7 +1139,7 @@ class QQNTDirectConnector:
                     # request identity makes a second callback with a different
                     # event_id harmless as well as making same-id duplicates
                     # harmless through the event-id deduplication above.
-                    # 中文：完成回调是终态记录。消费请求标识后，即使后续回调使用不同的 event_id 也会被安全忽略；上方的 event-id 去重逻辑同样会忽略相同 ID 的重复回调。
+                    # 中文:完成回调是终态记录。消费请求标识后,即使后续回调使用不同的 event_id 也会被安全忽略;上方的 event-id 去重逻辑同样会忽略相同 ID 的重复回调。
                     self._callback_requests.pop(request_id, None)
                 return self._emit(
                     "qq_callback", normalized_callback, QQ_CALLBACK_TYPE_URL
@@ -1176,7 +1176,7 @@ class QQNTDirectConnector:
 def _connector_host_error(error: QQHostError) -> ConnectorError:
     """Map Host process errors to the existing generic connector error vocabulary.
 
-        中文：将 Host 进程错误映射为现有的通用 connector 错误词汇。
+        中文:将 Host 进程错误映射为现有的通用 connector 错误词汇。
     """
 
     mapping = {
@@ -1201,7 +1201,7 @@ def _canonical_send_request(
 ) -> dict[str, Any]:
     """Convert canonical protobuf fields to Python data without a OneBot JSON hop.
 
-        中文：将规范 protobuf 字段转换为 Python 数据，全程不经过 OneBot JSON。
+        中文:将规范 protobuf 字段转换为 Python 数据,全程不经过 OneBot JSON。
     """
 
     conversation = request.conversation
@@ -1272,7 +1272,7 @@ def _reference_from_proto(
 ) -> dict[str, Any]:
     """Preserve remote and vendor media references as typed direct data.
 
-        中文：将远程媒体引用和供应商媒体引用保留为类型化 direct 数据。
+        中文:将远程媒体引用和供应商媒体引用保留为类型化 direct 数据。
     """
 
     which = reference.WhichOneof("location")
@@ -1296,7 +1296,7 @@ def _reference_from_proto(
 def _delivery_payload(result: Mapping[str, Any]) -> bytes:
     """Build the canonical DeliveryResult protobuf from a native result.
 
-        中文：根据原生结果构造规范 DeliveryResult protobuf。
+        中文:根据原生结果构造规范 DeliveryResult protobuf。
     """
 
     response = message_contract.DeliveryResult(
@@ -1331,7 +1331,7 @@ def _conversation_for_send(
 ) -> dict[str, Any]:
     """Validate direct conversation identity and preserve QQ peer identifiers.
 
-        中文：校验 direct 会话身份，并保留 QQ 对端标识。
+        中文:校验 direct 会话身份,并保留 QQ 对端标识。
     """
 
     conversation = _mapping(request.get("conversation"), "conversation")
@@ -1369,7 +1369,7 @@ def _qq_peer_identity_facts(request: Mapping[str, Any]) -> dict[str, str]:
     values when the caller has them, so the adapter never has to guess which
     native identifier a generic conversation ID represents.
 
-        中文：提取原生发送操作明确提供的 QQ 对端身份。`conversation_id` 始终是规范 connector 标识符；如果调用方提供了可选的供应商事实，这些事实会携带彼此独立的 QQ UID/UIN/peerUid/群号。适配器绝不会猜测通用会话 ID 对应哪个原生标识。
+        中文:提取原生发送操作明确提供的 QQ 对端身份。`conversation_id` 始终是规范 connector 标识符;如果调用方提供了可选的供应商事实,这些事实会携带彼此独立的 QQ UID/UIN/peerUid/群号。适配器绝不会猜测通用会话 ID 对应哪个原生标识。
     """
 
     extension = request.get("vendor_extension")
@@ -1406,7 +1406,7 @@ def _qq_peer_identity_facts(request: Mapping[str, Any]) -> dict[str, str]:
 def _build_native_elements(request: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Map canonical ordered parts to direct native element objects.
 
-        中文：将规范有序内容部分映射为 direct 原生元素对象。
+        中文:将规范有序内容部分映射为 direct 原生元素对象。
     """
 
     content = request.get("content")
@@ -1461,7 +1461,7 @@ def _build_native_elements(request: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _native_reference(value: Any, field: str) -> dict[str, str]:
     """Validate a binding-safe remote or QQ media reference.
 
-        中文：校验适用于当前 binding 的远程媒体引用或 QQ 媒体引用。
+        中文:校验适用于当前 binding 的远程媒体引用或 QQ 媒体引用。
     """
 
     reference = _mapping(value, field)
@@ -1489,7 +1489,7 @@ def _normalize_native_message(
 ) -> dict[str, Any]:
     """Normalize a Host-native message without serializing through OneBot.
 
-        中文：规范化 Host 原生消息，不通过 OneBot 序列化。
+        中文:规范化 Host 原生消息,不通过 OneBot 序列化。
     """
 
     account_id = _required_identifier(payload.get("account_id"), "account_id")
@@ -1631,7 +1631,7 @@ def _native_inbound_reference(
 ) -> dict[str, Any]:
     """Convert a normalized native media object to a canonical attachment reference.
 
-        中文：将规范化的原生媒体对象转换为规范附件引用。
+        中文:将规范化的原生媒体对象转换为规范附件引用。
     """
 
     remote = element.get("remote_uri")
@@ -1654,7 +1654,7 @@ def _normalize_native_request(
 ) -> dict[str, Any]:
     """Normalize a direct friend/group request for the canonical approval seam.
 
-        中文：规范化 direct 好友／群组请求，供规范审批接口使用。
+        中文:规范化 direct 好友／群组请求,供规范审批接口使用。
     """
 
     account_id = _required_identifier(payload.get("account_id"), "account_id")
@@ -1682,7 +1682,7 @@ def _normalize_native_request(
 def _inbound_message_payload(value: Mapping[str, Any]) -> bytes:
     """Build the canonical protobuf event from normalized direct data.
 
-        中文：根据规范化的 direct 数据构造规范 protobuf 事件。
+        中文:根据规范化的 direct 数据构造规范 protobuf 事件。
     """
 
     payload = message_contract.InboundMessagePayload()
@@ -1738,7 +1738,7 @@ def _inbound_message_payload(value: Mapping[str, Any]) -> bytes:
 def _decode_json_object(payload: bytes, field: str) -> dict[str, Any]:
     """Decode one bounded JSON object used by an explicit owner-scoped method.
 
-        中文：解码显式 owner-scoped 方法使用的一个有界 JSON 对象。
+        中文:解码显式 owner-scoped 方法使用的一个有界 JSON 对象。
     """
 
     try:
@@ -1753,7 +1753,7 @@ def _decode_json_object(payload: bytes, field: str) -> dict[str, Any]:
 def _decode_filter(payload: bytes) -> dict[str, Any]:
     """Validate the small binding-local subscription filter.
 
-        中文：校验精简的 binding 本地订阅过滤器。
+        中文:校验精简的 binding 本地订阅过滤器。
     """
 
     if not payload:
@@ -1772,7 +1772,7 @@ def _filter_matches(
 ) -> bool:
     """Apply event-type and conversation filters without payload-based routing.
 
-        中文：应用事件类型和会话过滤条件，不按负载内容路由。
+        中文:应用事件类型和会话过滤条件,不按负载内容路由。
     """
 
     if filter_value.get("event_type") not in {None, event_type}:
@@ -1793,7 +1793,7 @@ def _filter_matches(
 def _facts_from_result(result: Mapping[str, Any]) -> list[dict[str, str]]:
     """Keep only bounded identity facts from a native send result.
 
-        中文：仅保留原生发送结果中有界的身份事实。
+        中文:仅保留原生发送结果中有界的身份事实。
     """
 
     facts: list[dict[str, str]] = []
@@ -1820,7 +1820,7 @@ def _normalize_callback(
 ) -> dict[str, Any]:
     """Normalize only typed callback facts correlated to an originating call.
 
-        中文：仅规范化与发起调用相关联的类型化回调事实。
+        中文:仅规范化与发起调用相关联的类型化回调事实。
     """
 
     result: dict[str, Any] = {
@@ -1912,7 +1912,7 @@ def _mapping(value: Any, field: str) -> Mapping[str, Any]:
 def _validated_remote_uri(value: Any, field: str) -> str:
     """Accept only bounded HTTP(S) references across the canonical seam.
 
-        中文：只接受有界的 HTTP(S) 引用，通过规范接口传递。
+        中文:只接受有界的 HTTP(S) 引用,通过规范接口传递。
     """
 
     remote = _required_text(value, field)
@@ -1927,7 +1927,7 @@ def _validated_remote_uri(value: Any, field: str) -> str:
 def _validated_local_result_reference(value: Any, field: str) -> str:
     """Accept only bounded binding-private references for local media results.
 
-        中文：只接受用于本地媒体结果的有界 binding 私有引用。
+        中文:只接受用于本地媒体结果的有界 binding 私有引用。
     """
 
     reference = _required_text(value, field)
@@ -1976,7 +1976,7 @@ def _positive_number(value: Any, field: str) -> float:
 def _bounded_number(value: Any, field: str, *, minimum: float, maximum: float) -> float:
     """Validate one finite numeric setting against a strict safety range.
 
-        中文：根据严格的安全范围校验一个有限数值设置。
+        中文:根据严格的安全范围校验一个有限数值设置。
     """
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -1993,7 +1993,7 @@ def _bounded_number(value: Any, field: str, *, minimum: float, maximum: float) -
 def _bounded_integer(value: Any, field: str, *, minimum: int, maximum: int) -> int:
     """Validate one bounded integer setting without accepting booleans.
 
-        中文：校验一个有界整数设置，并拒绝布尔值。
+        中文:校验一个有界整数设置,并拒绝布尔值。
     """
 
     if isinstance(value, bool) or not isinstance(value, int):

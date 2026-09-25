@@ -1,6 +1,6 @@
 """Regenerate the Python binding for the Plugins-owned direct runtime.
 
-中文：重新生成 Plugins 持有的直连运行时 Python 绑定。"""
+中文:重新生成 Plugins 持有的直连运行时 Python 绑定。"""
 
 from __future__ import annotations
 

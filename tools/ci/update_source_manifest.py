@@ -9,7 +9,7 @@ Derived digests (license, repository policy, protected files) follow their
 files. Protected-file digest changes are rejected unless
 --accept-protected-changes is passed explicitly after review.
 
-中文：在审查过的源码变更后刷新 `source-manifest.json` 记录。该 manifest 是 CI 对导出树的权威清单。此工具会将记录列表与工作树协调：加入新的负载文件；如果文件字节、模式或符号链接目标变化，则重写对应条目；移除已删除的负载。派生摘要（许可证、仓库策略、受保护文件）跟随对应文件更新。若受保护文件摘要变化，除非审查后显式传入 `--accept-protected-changes`，否则会拒绝更新。
+中文:在审查过的源码变更后刷新 `source-manifest.json` 记录。该 manifest 是 CI 对导出树的权威清单。此工具会将记录列表与工作树协调:加入新的负载文件;如果文件字节、模式或符号链接目标变化,则重写对应条目;移除已删除的负载。派生摘要(许可证、仓库策略、受保护文件)跟随对应文件更新。若受保护文件摘要变化,除非审查后显式传入 `--accept-protected-changes`,否则会拒绝更新。
 """
 
 from __future__ import annotations
@@ -31,14 +31,14 @@ SYMLINK_MODE = "120000"
 class ManifestUpdateError(ValueError):
     """Raised when the working tree cannot be reconciled with the manifest.
 
-        中文：无法将工作树与 manifest 协调一致时抛出的错误。
+        中文:无法将工作树与 manifest 协调一致时抛出的错误。
     """
 
 
 def _digest(content: bytes) -> str:
     """Hash one payload value the way the verifier does.
 
-        中文：按照 verifier 的方式计算一个负载值的哈希。
+        中文:按照 verifier 的方式计算一个负载值的哈希。
     """
 
     return hashlib.sha256(content).hexdigest()
@@ -47,7 +47,7 @@ def _digest(content: bytes) -> str:
 def _load(manifest_path: Path) -> dict:
     """Read the manifest and require a record list.
 
-        中文：读取 manifest 并要求其中包含记录列表。
+        中文:读取 manifest 并要求其中包含记录列表。
     """
 
     if manifest_path.is_symlink() or not manifest_path.is_file():
@@ -64,7 +64,7 @@ def _load(manifest_path: Path) -> dict:
 def _ignored_untracked(root: Path) -> set[str]:
     """Return untracked paths excluded by the repository's ignore rules.
 
-        中文：返回被仓库忽略规则排除的未跟踪路径。
+        中文:返回被仓库忽略规则排除的未跟踪路径。
     """
 
     try:
@@ -96,7 +96,7 @@ def _ignored_untracked(root: Path) -> set[str]:
 def _is_ignored(relative: str, ignored: set[str]) -> bool:
     """Return whether a path is inside an ignored untracked subtree.
 
-        中文：返回某个路径是否处于被忽略的未跟踪子树中。
+        中文:返回某个路径是否处于被忽略的未跟踪子树中。
     """
 
     return any(relative == item or relative.startswith(item + "/") for item in ignored)
@@ -105,7 +105,7 @@ def _is_ignored(relative: str, ignored: set[str]) -> bool:
 def _collect(root: Path) -> dict[str, dict]:
     """Return manifest records for every payload file and symlink under root.
 
-        中文：返回 root 下每个负载文件和符号链接对应的 manifest 记录。
+        中文:返回 root 下每个负载文件和符号链接对应的 manifest 记录。
     """
 
     entries: dict[str, dict] = {}
@@ -163,7 +163,7 @@ def _collect(root: Path) -> dict[str, dict]:
 def _existing_records(manifest: dict) -> dict[str, dict]:
     """Index current manifest records by path.
 
-        中文：按路径索引当前 manifest 记录。
+        中文:按路径索引当前 manifest 记录。
     """
 
     records: dict[str, dict] = {}
@@ -178,7 +178,7 @@ def _existing_records(manifest: dict) -> dict[str, dict]:
 def _protected_changes(manifest: dict, changed: list[str], observed: dict[str, dict]) -> list[dict]:
     """Describe protected files whose digest moved away from the manifest record.
 
-        中文：描述摘要偏离 manifest 记录的受保护文件。
+        中文:描述摘要偏离 manifest 记录的受保护文件。
     """
 
     protected = {
@@ -200,7 +200,7 @@ def _protected_changes(manifest: dict, changed: list[str], observed: dict[str, d
 def refresh(root: Path, manifest: dict, *, accept_protected_changes: bool) -> dict:
     """Reconcile manifest records with the working tree in place.
 
-        中文：就地协调 manifest 记录与工作树。
+        中文:就地协调 manifest 记录与工作树。
     """
 
     observed = _collect(root)
@@ -242,7 +242,7 @@ def refresh(root: Path, manifest: dict, *, accept_protected_changes: bool) -> di
 def main(argv: list[str] | None = None) -> int:
     """Run source-manifest reconciliation from the command line.
 
-        中文：从命令行执行 source-manifest 协调。
+        中文:从命令行执行 source-manifest 协调。
     """
 
     parser = argparse.ArgumentParser(description=__doc__)
