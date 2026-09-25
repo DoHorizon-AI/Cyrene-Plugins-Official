@@ -1,3 +1,9 @@
+> **已迁移 / Migrated**
+>
+> 本包的 UI 源码已迁移至 `Cyrene-Studio/apps/navigator/`，本目录保留来源记录，不再是主要开发位置。
+>
+> This package's UI source has been moved to `Cyrene-Studio/apps/navigator/`. This directory is retained for provenance only.
+
 # cyrene.ui.navigator / Navigator Web Console
 
 This package is the Plugins-owned home of the Cyrene Navigator web console.
