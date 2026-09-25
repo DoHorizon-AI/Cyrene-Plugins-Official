@@ -46,8 +46,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "README.md",
-      "sha256": "8d84b68354656e4ff678f26a5f782e09f46bade47a47409cbdb164248c1936c5",
-      "size_bytes": 3418
+      "sha256": "7a1c1eb734ce7f54d40d1a0a7946e45e80924cb66bda343c93195a9f030c57b3",
+      "size_bytes": 5691
     },
     {
       "kind": "file",
@@ -67,15 +67,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/README.md",
-      "sha256": "67ebe6295605712118d09a4d6caca634c28e19f53e1ad63ec8473ede641e76af",
-      "size_bytes": 4514
+      "sha256": "47ac19a1d6cbe7e8a5cbea464510b594f8932ed8ab065094491b52d91e7497dc",
+      "size_bytes": 7118
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/VERSIONING.md",
-      "sha256": "30b3361e09fbb8ed315f72a1b800b67b34f06720ce7c5f414597f6c6cc1f001b",
-      "size_bytes": 1825
+      "sha256": "ef5e57d706cd2e886d87a11ec5171642faf8b78093e58132a719c1b83d7aa784",
+      "size_bytes": 2843
     },
     {
       "kind": "file",
@@ -109,8 +109,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/cabi/v1/README.md",
-      "sha256": "cea5152afef77201cd90a73b66b7773955df041a6a51b5f414795737b9ba7755",
-      "size_bytes": 2530
+      "sha256": "581536aee4a898d007cefdd30d3e1657bb42cc4508c428a264f7642c6aa070be",
+      "size_bytes": 4645
     },
     {
       "kind": "symlink",
@@ -425,29 +425,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/agent_runtime_contract_tck.rs",
-      "sha256": "638ba1e3e7be929ceb97728364d8eaa771e919f0f9eaf497974f9df04df8f4e5",
-      "size_bytes": 7726
+      "sha256": "ab79dd105c52ddda001ac06a0ee514c926bebaf1873e54ebce9820996141567c",
+      "size_bytes": 7928
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/computer_runtime_contract_tck.rs",
-      "sha256": "5e0cb8ae4d9e93ac7783d1ba2740a82b052e8ff61b165f7bc9bad6d7f4f0170b",
-      "size_bytes": 6199
+      "sha256": "b8ed8e6b7ad87e8a62d215c041e6295ec044d3f091875efc17ddfe22ec27c11f",
+      "size_bytes": 6407
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/cross_language_golden_fixtures_tck.rs",
-      "sha256": "ef67076fb64c169314837782559ec8411d84cb377b60036c64d97c687482a57b",
-      "size_bytes": 7442
+      "sha256": "07f8bde86c4048df018a7a7cdf5db2f680c434cde94594f22fef3e13159a942f",
+      "size_bytes": 7945
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/memory_provider_contract_tck.rs",
-      "sha256": "cf7c920e2eb4b143d43a392da3bdbed304539d31d125f41527b002254420c629",
-      "size_bytes": 5424
+      "sha256": "11d6974c1a33f7a6bd295b16b0508b840eccb97a3d54be7da2998f2c8e5d42c4",
+      "size_bytes": 5630
     },
     {
       "kind": "file",
@@ -474,15 +474,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs",
-      "sha256": "6a31d72d1604c64f34da86a36d868d31891ffbcc2c6533ec68cc7f7b670fff5c",
-      "size_bytes": 6435
+      "sha256": "f787ea34975cca942f17b5779ecce878fd9ac567c3a114127e178302bc75e267",
+      "size_bytes": 6769
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/computer-runtime-v1/README.md",
-      "sha256": "53fe8db32b1dea5f9efe227be1e3032654ea1c5f654dbb03f2b90ad3dcd1eac4",
-      "size_bytes": 1400
+      "sha256": "63f00f78ed5ce4a006e9431a00ff88546e7f33589e02e2883f6bf4be0c02c850",
+      "size_bytes": 2499
     },
     {
       "kind": "file",
@@ -495,29 +495,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/computer-runtime-v1/dotnet/Program.cs",
-      "sha256": "e1e23de06a2ab96a9ba8fe1e39e3abd0e5ef067ab0dd1c57a6be7ea3df3783e3",
-      "size_bytes": 3231
+      "sha256": "0e05b09d4349cd45cf702d0144e06871ccac71e676276cf87b1c8d082f36bdfc",
+      "size_bytes": 3527
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/execution-engine-v1/README.md",
-      "sha256": "0d6ee6a9d604fcdf43d1944030fbea1011fb8f893305caa25e5686ef7e1c35d8",
-      "size_bytes": 1360
+      "sha256": "261a48bfa3efcf5d2238a68aeda7661c9810127b3da64bbb710d732aedd5285f",
+      "size_bytes": 2465
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/execution-engine-v1/test_execution_engine_tck.py",
-      "sha256": "c8d61f7cee7d019d0fb28a5d24ad326c44a3e9e3b043f7a894c9aa3104c4f3f4",
-      "size_bytes": 7246
+      "sha256": "29acdf7aa2f1ff1f033f9999d8b7ca9817b460588ad9a48def5a3f54ca6650ff",
+      "size_bytes": 7327
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/message-connector-v1/README.md",
-      "sha256": "db9e7efa7f47c127aca74714ccca6bf4a2fff1ff8fe892c915af4238ca1b6682",
-      "size_bytes": 755
+      "sha256": "4aaab4f1457ebfbc885bfcd5e13a7910c76530bdc6092bf9be86d40ae595e19d",
+      "size_bytes": 1367
     },
     {
       "kind": "file",
@@ -558,8 +558,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/message-connector-v1/python/run_tck.py",
-      "sha256": "68664df0777162e1ab2e49fe08446ca98519dc542014e216dedf5b82d8a6e2f8",
-      "size_bytes": 1642
+      "sha256": "336e560ff63ffe6bcc490699bf1fbafb70745d8f7886de2dc4bc2b669d62c564",
+      "size_bytes": 1704
     },
     {
       "kind": "file",
@@ -572,8 +572,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/README.md",
-      "sha256": "1429d8757936c0141c0137247ad3616703954f0ed9e39fd99c9b4bcc56bc1ca7",
-      "size_bytes": 752
+      "sha256": "efe691b360fa3be870811e09835e9ba9badf8adc6a41134e9d754381d5a57539",
+      "size_bytes": 1338
     },
     {
       "kind": "file",
@@ -586,8 +586,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/dotnet/Program.cs",
-      "sha256": "295f983b8c892a973eca7176893e97e0878edc72c95326413da969a0d4e9ee8d",
-      "size_bytes": 4412
+      "sha256": "b681014fbdb2476a4a5f69319efbf2edcf135e86758d758e3c90686816a35c72",
+      "size_bytes": 4545
     },
     {
       "kind": "file",
@@ -656,8 +656,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/python/run_tck.py",
-      "sha256": "4a49977bb52217dd780dd733f0612335810c8dfabaa458b0f2d9c5db406d38ed",
-      "size_bytes": 4718
+      "sha256": "cb1717feab600ab75ec16c54b8c3ce0453c64735c7a6360fd387f1e1ca6c03ac",
+      "size_bytes": 4928
     },
     {
       "kind": "file",
@@ -677,15 +677,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/tool-provider-v1/README.md",
-      "sha256": "0d78bcdb57e8fbf1ce9e2ef0bb709cef952c6740b70f0916961ee8757a72783a",
-      "size_bytes": 1344
+      "sha256": "0a24e3a965dea7de372236fab38f1e11d05f67aa99c719673980864f0787b590",
+      "size_bytes": 2511
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/training-llama-factory-v1/README.md",
-      "sha256": "140376ad012c33154a1f527be2ab2ae323b610f2d4f599a48ed9126c9c695666",
-      "size_bytes": 1078
+      "sha256": "224bf3f21923b43abe34087aaec25da415b6994acc13a90071c8a0bced06e540",
+      "size_bytes": 1982
     },
     {
       "kind": "file",
@@ -705,8 +705,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/logging-and-errors.md",
-      "sha256": "12867e353b01b476defb30d7b2f5f54e772bf4d3b7b01e074fbb0779c381936b",
-      "size_bytes": 34667
+      "sha256": "796e944727fcae8641f68812b3b4c0f4e4158d5bd21850eae98c21849d9d4a9b",
+      "size_bytes": 67649
     },
     {
       "kind": "file",
@@ -733,50 +733,50 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/NATIVE_AOT_OPERATIONS.md",
-      "sha256": "a7cf2a6e2a8d85365bbc0fa31691577cc46a8fb6b8200f8c8692421c0f89868c",
-      "size_bytes": 1729
+      "sha256": "4e819a7238137d2b2d8dbdded8e8550285a99a59dd4b8322249c383ca8788d5c",
+      "size_bytes": 2706
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/QQNT_DIRECT_API_MATRIX.md",
-      "sha256": "385067d45b515390a0e045463074e77da00d661b1d8a43a59183897e4ea4eb6d",
-      "size_bytes": 20187
+      "sha256": "0ad382445ca2e9c03e2d8ae258dfcebbcac33b40cd83ede9d77fa9a5547515da",
+      "size_bytes": 35871
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/QQNT_DIRECT_PROTOCOL.md",
-      "sha256": "09a5c0762d8656a41efd24f0c51203360c2eb8aa6e73b604a7c0c358db68ba17",
-      "size_bytes": 11257
+      "sha256": "eb513cc515bbd65e0ab6bc0ff8fe5c35749e11d2988d615d4843b274696f2d3b",
+      "size_bytes": 17323
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/QQNT_DIRECT_REAL_SMOKE.md",
-      "sha256": "e04db88a28ff338bae0df43ebbe4923edad30c53272618243002c74c28cc2273",
-      "size_bytes": 8170
+      "sha256": "3e4e6d1a353590db6ef1b425112641cd1f8ff925139de4c904dc243f2752d624",
+      "size_bytes": 13997
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/QQ_API_PLAN.md",
-      "sha256": "c6a1f8072b8fd775e5fa7c3b9e3d7a26d9897eab078888a56f3eee1a046d92d5",
-      "size_bytes": 6334
+      "sha256": "c5740ebe0d2c871b4a8ced83bd53c1a0d23bcbe3fbc4962f696adc54698a3b1c",
+      "size_bytes": 10317
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/QQ_SIDE_INTERFACES.md",
-      "sha256": "79e337b8517b7cfd9493b8a7560c325f336fb0bb5b5cb0e13edfdb4dc0185ceb",
-      "size_bytes": 13724
+      "sha256": "7f8aa12c6d7c0eb080eba6326dbb9525f14a3a6a3b6b4a1158aeda67ca79986d",
+      "size_bytes": 22870
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/README.md",
-      "sha256": "fb0b24b086451976eaf3c968b459373605f97a05d80766df56d0da8e4c3b7c29",
-      "size_bytes": 1497
+      "sha256": "c4dbf4376cf8570aed08f090e3b09b177bdf7ae6a80af0a306e7d8fbe08b4c6d",
+      "size_bytes": 2790
     },
     {
       "kind": "file",
@@ -831,8 +831,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/__init__.py",
-      "sha256": "1dc0f69f8f1553b13d3826cf329c921b9dceb1e513c65e25f5bccbe2ccd1320a",
-      "size_bytes": 2155
+      "sha256": "c09c07f773a51abc304e128b8c1bdc0124dd2835aa22c900acd35e3662f4dc54",
+      "size_bytes": 2206
     },
     {
       "kind": "file",
@@ -852,148 +852,148 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/plugin.py",
-      "sha256": "94d60e602b33048f8966a7a2d02b5dc88b4affe05e1c726f0a9543a3c9412fa5",
-      "size_bytes": 4755
+      "sha256": "60bcb751181fc5bf229aa531833332a0abc7d0dde1caea09033752a72139c566",
+      "size_bytes": 5509
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct.py",
-      "sha256": "c5f2b6f3a405742ada2b380e2eb4af8f5575c742950dc3182bc8a87f097607c3",
-      "size_bytes": 73751
+      "sha256": "66fd257047196f32d3deeb21f8f11051c3e08566a2c26fee6c850d018fb2dc90",
+      "size_bytes": 79085
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_discovery.py",
-      "sha256": "0bed23cb76540d818d13fe49d03ae2cdba7e2f378813787baa0fbcb07046f396",
-      "size_bytes": 10544
+      "sha256": "673068f78393b45dd9bab97cc27d043a4c0cff279aa4807f95c7d8d02e67dfb4",
+      "size_bytes": 11959
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_host.py",
-      "sha256": "71721d1cfaf86a4c23b4d6dc68ba28ce2372bae9648c299ee8018320647ca52f",
-      "size_bytes": 36130
+      "sha256": "de1ea71c7ae51692af907ed4fe1c9dc00b300484496387db05267c5a2d551f20",
+      "size_bytes": 39921
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_operations.py",
-      "sha256": "c334c039f6ace27458984719652d495711f0caa34828d7bb3b0977ede0633b82",
-      "size_bytes": 41228
+      "sha256": "94db3badcb11b808cd54c75b2885313cb7afd961d8ae02feece89019837c7ecd",
+      "size_bytes": 44069
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_protocol.py",
-      "sha256": "d6ed0236fe8bcba3917e61b326d235d42ce5635ec613dd98fb936497ea4aa5df",
-      "size_bytes": 4083
+      "sha256": "a3435ef189feb595e51246bdf9dc0c4036815a71bc27152d7f141e7f2a069b48",
+      "size_bytes": 4932
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/support.py",
-      "sha256": "b8b8593b56fce8dc9564bb95ba89f2dab309b4eb4a3030c05c4d936a47691910",
-      "size_bytes": 2377
+      "sha256": "d9bff6ee39f9e2b2393cba51f9d7c1933ad72984f95832533f95e9ab6cb8ed3d",
+      "size_bytes": 2796
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/fixtures/fake_qq_host.py",
-      "sha256": "d70adc205936e653c2154a09df3bd4e3ea1d81d59c017a9f980202855212dd78",
-      "size_bytes": 21529
+      "sha256": "fb053e04116d741d56ba0ae571f7afbb0f3a12f146b3fa50230d51394b707659",
+      "size_bytes": 22835
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/test_im_native_package.py",
-      "sha256": "1d3ae48f1ac7b01111a8bbd02da9afc6ac741a6f92385d5b65fa282a55ca33f7",
-      "size_bytes": 2569
+      "sha256": "ae230cdb861608a0b1c16420ac7844981971a967c96d4f3b4d748ee8ed483952",
+      "size_bytes": 2775
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/test_package.py",
-      "sha256": "e03599c359db65ed65454549a19e8b680f9fcf259f47863cc8cc94ad48704914",
-      "size_bytes": 12892
+      "sha256": "dc6337464be8dc64b546fe44c0bc893b876221cde07ff0ff8a97969576f9292a",
+      "size_bytes": 13941
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/test_qqnt_dependency_boundary.py",
-      "sha256": "4dad822f8665c2998ed4a14ffe0b4e3f1723a850caa876ffd93b231b60dadcb2",
-      "size_bytes": 1834
+      "sha256": "19705b3777c38335e3279f6e05ad57e32ab5bdf8902e7f4793a51bfbef88d392",
+      "size_bytes": 2035
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/test_qqnt_direct.py",
-      "sha256": "790b0e7d7fa32328b87b774010dd0b67be204282ed1f00b814578f43e6faa55d",
-      "size_bytes": 57211
+      "sha256": "ad9bfe45e1d2b82001042b65f9d0b06b463a7843d01f5699273b79e57d4e74ea",
+      "size_bytes": 57706
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/test_qqnt_host_tck.py",
-      "sha256": "e2ccab03fedbe1d54983257b07925c9b4b8d37ac9bdf39222bc64de06a6f6780",
-      "size_bytes": 10053
+      "sha256": "584164e2d85c466b58df1cff6d7e456b6fed751289cb5bcd8e8675bb278e2a5c",
+      "size_bytes": 10875
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tools/assemble_native_package.py",
-      "sha256": "fc2f271a34e1eecd0bf70a3c8be42f0ef6850d993c34c604c2fa20522b9815c1",
-      "size_bytes": 9590
+      "sha256": "05dced9d4b94f829ca710278630b7a30336411a5c40ef2d15a01136c1d92aa06",
+      "size_bytes": 10463
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tools/assemble_package.py",
-      "sha256": "03681e49d1fe8509657f4488653ac504feb022c4a3b07971dba99aabb6fba2d5",
-      "size_bytes": 9666
+      "sha256": "accea39db4ac07730fd91b1349ca818ae59650070c6302692cfc5231b38d6427",
+      "size_bytes": 11137
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tools/verify_behavior_matrix.py",
-      "sha256": "954710a7851c3a4a1b04ef0e2a582069c8acd3cae868946b60030d790e396462",
-      "size_bytes": 5682
+      "sha256": "c806512a72709b5b4299899405ab32b162970fd40d73105c540f5896ee4be2ec",
+      "size_bytes": 6095
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tools/verify_direct_dependency_boundary.py",
-      "sha256": "ec3f9326d9c90ae73da0b130b2bcd328dfb31e8ceadde508166fa099abee5bbe",
-      "size_bytes": 7957
+      "sha256": "2a2cdedead42d21e755f2419e6b347097cef653b2d55fa1174eff55bbe26742d",
+      "size_bytes": 8785
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/NATIVE_AOT_MIGRATION_PLAN.md",
-      "sha256": "608f1fecf2fdf9b8a29ac089e204aa68c10feb28d12aa8885ea203e761cdc55f",
-      "size_bytes": 1818
+      "sha256": "8a09680e215a91773be8b33be586de8697ccdd49423b32c69212e656520ccf96",
+      "size_bytes": 2857
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/NATIVE_AOT_OPERATIONS.md",
-      "sha256": "8c7bccb93a3c629a11538a073fa9c350bbd66d54b8c77401c832a5d5436b5a83",
-      "size_bytes": 1223
+      "sha256": "772f0557019964748384b504a1de8902fa8da7cd0d1992b9aee55673401c3e5b",
+      "size_bytes": 1980
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/PACKAGE_BUILD.md",
-      "sha256": "7f4778ac34432257634d5508d117f71fb2e49334309abd064b47640c05979dbf",
-      "size_bytes": 967
+      "sha256": "37a0def28a9103be1bd2cc9c3f3a4f0fc6b40f0431d1a7d506e6018f93285a56",
+      "size_bytes": 1898
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "93a00c15b161e5419eaf926f8974300dde07fb13a308bbee5a43bbab4486b3e8",
-      "size_bytes": 1158
+      "sha256": "8daa0c4eb1ea23cddb0528397bfe4b56c3a858e3cdacf8db2343b1833d4de559",
+      "size_bytes": 2222
     },
     {
       "kind": "file",
@@ -1034,8 +1034,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/rollback/python-0.2.0/README.md",
-      "sha256": "ae7706089c3dfecb409021b4a58b3efe9338c9dc1942b6e6050449aa349b9456",
-      "size_bytes": 440
+      "sha256": "035153b3e6c60e91ab9af3f9742e6397945324d1c55e17a4f714487fb960a151",
+      "size_bytes": 740
     },
     {
       "kind": "file",
@@ -1055,22 +1055,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/README.md",
-      "sha256": "d19233645730afe711b4ec937323ea85cb258e6b8a0e277a4404a4bfd64908dd",
-      "size_bytes": 1058
+      "sha256": "ef2569b1ea2e0d6375b700d118673e0b37e2157460439183cdc1475115a6ff77",
+      "size_bytes": 1671
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/README.md",
-      "sha256": "03db005f08d7bc1a7ec26dd56caa7f010ebba4e4b3ea2e4e40945e11ba90b878",
-      "size_bytes": 1450
+      "sha256": "ea5aa118aa8d6b2c6ebd894b1975dc9045b1abeb66f4156947994f043c0fb6b8",
+      "size_bytes": 2263
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/__init__.py",
-      "sha256": "0f883d4cc3b8316c4acd6b5715c08cf7a3188f32ffc68ee0e72659d85f4c59ce",
-      "size_bytes": 2142
+      "sha256": "f79784dfaf95a9ff1fac6e04cf931d9c5a3178e1ffc9869c2da0c0e2faa82fbb",
+      "size_bytes": 2196
     },
     {
       "kind": "file",
@@ -1097,22 +1097,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/connector.py",
-      "sha256": "82fe95df639240f8857568e400ef2e2b738998c0b144bd13d12f0e6cc4e6aea1",
-      "size_bytes": 63161
+      "sha256": "b4060d7fa98b26834a656b22e01e477a90e5144b21466e5edab36c8773ebf2a5",
+      "size_bytes": 67702
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/plugin.py",
-      "sha256": "30136fb741ca78728b076e1e0eb4c4ab7432eebd13bfe9bde64b95d253f400e0",
-      "size_bytes": 5021
+      "sha256": "d3907b8cfafb8b926b6d4b1b12f9a39e893de6566b5e88906203edad4044cd07",
+      "size_bytes": 5718
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/transport.py",
-      "sha256": "ee2ed675fc0cf7900ae39da4a8c34c2320601346228aea6869a909d5b1ec4292",
-      "size_bytes": 32245
+      "sha256": "ba05be555e54fa09587721c8d4bd7ff27e20c6999036a6c1ebdcab33669ae26a",
+      "size_bytes": 34206
     },
     {
       "kind": "file",
@@ -1125,78 +1125,78 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_connector.py",
-      "sha256": "fca8fe3de5ab4458d99d5b7897a593fc60eeec6a5ab3b60749fa5812189deb6b",
-      "size_bytes": 23049
+      "sha256": "5b0482695799e9bb73881584e26922777c3d0da39cfb5a244145e5e37018acb3",
+      "size_bytes": 23224
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_equivalence_fixtures.py",
-      "sha256": "366a10c66028faddac2125f2b86be72a97149455d2f65d9a4be17e8238c32fe3",
-      "size_bytes": 1412
+      "sha256": "3fb1980ddf87fe12001e300a8fa55bf31caa0ec3fc69382544313d544b3a1cc1",
+      "size_bytes": 1483
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_native_package.py",
-      "sha256": "c8d77b16a8050b2e71bad44788b3318f272114513cdf2f3802a2b8b0e15f5b34",
-      "size_bytes": 6599
+      "sha256": "b8235ab0c666806e8ac4b563e7a3ba11fea04565e04b6ac8b5b7c907c2b49fb0",
+      "size_bytes": 6812
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_real_parity.py",
-      "sha256": "7a85378a14c6c229eb9d10aa73722b86c17a9a3896ec1615db121b10c044411e",
-      "size_bytes": 2803
+      "sha256": "6a7ed8e917de7dd5cddff954ee190fee5f9299b7070a3050103f1c2cc16835cf",
+      "size_bytes": 3137
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_reference_artifact.py",
-      "sha256": "4bd27cde737f7c07a5bb6aa59f98a8d59b43cd88937a54f8f301b0ce5aace879",
-      "size_bytes": 2915
+      "sha256": "dfedfa82f5682d8e8c07218fdaed0c6c7034d57944943713f1cf84584bf8ab7f",
+      "size_bytes": 3131
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tests/test_transport.py",
-      "sha256": "9f24b1cfe550469019ef6d82f042ed3ae896a55445eec66504b20dafa7ae882d",
-      "size_bytes": 21805
+      "sha256": "f474f8d00b09127c66d0594314758b4b2302cf1ae355b992f2b276771a8afbe9",
+      "size_bytes": 21901
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/assemble_native_package.py",
-      "sha256": "f4d8bb60f73fb8f3dfd334252265860fc320023c2a5db42a90d82661f11516a5",
-      "size_bytes": 10036
+      "sha256": "e42d1bb20ef293e6c20940c3ec377b88a8d32b58ed8eec7cf398faa0f4d61e09",
+      "size_bytes": 10754
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/assemble_package.py",
-      "sha256": "58d899a66ba7d421b77909d6de2f08aeb94a00855fe6a174a9a97dff29a8fa0c",
-      "size_bytes": 5204
+      "sha256": "53513bd8208134ec171dc5ce00c0943b16d28600f7020a6afbde19da869136d4",
+      "size_bytes": 5529
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/generate_equivalence_fixtures.py",
-      "sha256": "420593a0cd88711e36de100ccc96e245cadd8ab5d816f146e895e04444f3d9f0",
-      "size_bytes": 12584
+      "sha256": "b0c4571f5d6229f0eac112002d96cd48d9b9e3f11a7044fc54d10a30745593f2",
+      "size_bytes": 13260
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py",
-      "sha256": "a7ea1c8fa9dbd0b0cc69b8983b9ebf1a0551274334de81defd067150c4b6b279",
-      "size_bytes": 2273
+      "sha256": "2d30057067f96e53e43be15ce3c6a4d21123e333730cafc631d52b54b6d3a0ab",
+      "size_bytes": 2538
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/README.md",
-      "sha256": "3e15478949b6a796ef6dff5bcd10b41f5ad8c5099d849abe5b8f1b5e4a897b5a",
-      "size_bytes": 2729
+      "sha256": "5d6522534b225c3497533ce77f9b7685a7556a8d3734395b638f9a5ea5583bd8",
+      "size_bytes": 5163
     },
     {
       "kind": "file",
@@ -1223,8 +1223,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/__init__.py",
-      "sha256": "fbdce921d2462db8d1384ac73c9118414cf768dc3277472eb644a92dfe7d62fe",
-      "size_bytes": 599
+      "sha256": "ce255e6b0d233b725b0dd8045c09f456dcb04ccf17ae01b6d43aff419dff7183",
+      "size_bytes": 674
     },
     {
       "kind": "file",
@@ -1237,36 +1237,36 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/connector.py",
-      "sha256": "5900edc5267868ce52dd04b716507ebcc491584f62ee6d3072cd11b423ace963",
-      "size_bytes": 38132
+      "sha256": "03d63dd4d98cdad868323730573de884f1c93bec1091679c1112ca8e1c9fd594",
+      "size_bytes": 39592
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_connector.py",
-      "sha256": "29af6a24256297cc548a25eec5ef5d1f439a0cbd0a4660ad4278767fbf71e89e",
-      "size_bytes": 17670
+      "sha256": "503c1c145c6ab59257691d6cb3bf148d07a2644e5389a472a9852eec9238e874",
+      "size_bytes": 17891
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_transport.py",
-      "sha256": "304de10400464c011db6a2b23b25bab78dfd331caf2362c453a9b1f92ce67978",
-      "size_bytes": 7523
+      "sha256": "828e18acbccfbd120613f12935e5ff481c33d2ae91e280a12e3266b71724715a",
+      "size_bytes": 7689
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tools/generate_message_connector_bindings.py",
-      "sha256": "a247b10aa63c842089589e9f94e8f0d7765a8615105d7eb0a5118dcf428c5a92",
-      "size_bytes": 1991
+      "sha256": "6984eebd65b70f1356d8470dba3ac0e0e4871da4e0ee6618f0f68e642aa11f82",
+      "size_bytes": 2427
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/evaluator-pack/README.md",
-      "sha256": "b2940a1086dac104cfb1f9fbb22fabf86c78e18dc833ba6c58ceda7418312492",
-      "size_bytes": 2070
+      "sha256": "c129df83ca446943b3c3aad993f676fed5aea50f01ff86869d0ae7c6f44ec7c8",
+      "size_bytes": 3651
     },
     {
       "kind": "file",
@@ -1279,8 +1279,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/evaluator-pack/evaluator_pack.py",
-      "sha256": "bd1d0a84056ca06de21e3ff516cc24742d11752b221d2a96143524b86e6e647b",
-      "size_bytes": 13845
+      "sha256": "fc8514251d74f0ced303d8e77d7be33cfe5b85747bae3a90bfca73cc7ddf214d",
+      "size_bytes": 14701
     },
     {
       "kind": "file",
@@ -1300,15 +1300,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/evaluator-pack/tests/test_evaluator_pack.py",
-      "sha256": "35ca01a43d7daa5efc956de371a60e4bdf3eedd501592c4c310f255275abb346",
-      "size_bytes": 11042
+      "sha256": "0aa64996133609dcb6c43842579e216a5c421118b45fefa5dfd019a2b580fad7",
+      "size_bytes": 11121
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/exact-match/README.md",
-      "sha256": "225b789127095c29ee2da986b98f01c9afe07543933a7c386a8b468b9ae52d16",
-      "size_bytes": 1143
+      "sha256": "6aea5058a674d150cbdfec1a758b9d8b8f57e99e919149a5b6029865161dbace",
+      "size_bytes": 2054
     },
     {
       "kind": "file",
@@ -1321,8 +1321,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/exact-match/exact_match_evaluator.py",
-      "sha256": "01e77b3c4c442424e689df09f7c4d64b9a3ccbabbaa72819b8fea316d97accc4",
-      "size_bytes": 7689
+      "sha256": "1266becfa0af8c91b0ff33eec539c66021c57da141fd6df0b1c190c01c3c7515",
+      "size_bytes": 8226
     },
     {
       "kind": "file",
@@ -1342,8 +1342,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/llm-judge/README.md",
-      "sha256": "b1e22e0244dfcb81e9bac78c77acf6a5405a0074eae0a331469afd3deb29231f",
-      "size_bytes": 2142
+      "sha256": "7201ec8eeaac3feec9eb2665d66405e163024ad5fbfe25b66d31b555efb24c4c",
+      "size_bytes": 3779
     },
     {
       "kind": "file",
@@ -1363,8 +1363,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/llm-judge/llm_judge.py",
-      "sha256": "d7c01d252bd5115a4af6650000b9a01621d89b9cc695ea18892d0461c822a851",
-      "size_bytes": 20732
+      "sha256": "787072f801ad5bf0abc9a7ca6305cc40761cac80ebc7b0d404b31c029f9f1eaa",
+      "size_bytes": 21770
     },
     {
       "kind": "file",
@@ -1384,15 +1384,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/llm-judge/tests/test_llm_judge.py",
-      "sha256": "143d42a854b23b4a5a13ff068bfe18620163a4f5bd4d648815d679876836df5a",
-      "size_bytes": 11345
+      "sha256": "0ab9d776333d71e13da94e86d565d591d99e81b30aa73d974db15288b4307942",
+      "size_bytes": 11690
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/models/hf-model-analyzer/README.md",
-      "sha256": "20a165eb3aa604244749c058efff69860b7f4c3d191ce5778c7878bcd27dca73",
-      "size_bytes": 248
+      "sha256": "fedb09d078b92877fb05baf9b8e0480d08b4f8daeca4af02ce3b0dcad990114c",
+      "size_bytes": 540
     },
     {
       "kind": "file",
@@ -1405,8 +1405,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/models/hf-model-analyzer/hf_model_analyzer.py",
-      "sha256": "d83b223657feac279dbc6b091ffbdd4e9785deab3c7fe566b003b2ccc884613b",
-      "size_bytes": 15757
+      "sha256": "b6aa760fb7c7b157aba2320e5e2fa34dcad1b83e0a9c3661caf0f258479925c9",
+      "size_bytes": 16498
     },
     {
       "kind": "file",
@@ -1426,15 +1426,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/policy/compat-rules/README.md",
-      "sha256": "6f7885bf755fbde6a034a716d9e5cc72871eb47770c04e3910630d83a5e20e0b",
-      "size_bytes": 194
+      "sha256": "e403110d130167d38e396a8edbcc84f50d9058a26465ef120c798c001f2c481f",
+      "size_bytes": 460
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/policy/compat-rules/compat_rules.py",
-      "sha256": "efea442685ccc24f7de306cc58a962f68a7d918b06b2ddfcec6ada72617792a3",
-      "size_bytes": 20759
+      "sha256": "66ffbdff791da2dd69c95304c643b0cdaed798cf7a4e22ed96af07f4cda22e76",
+      "size_bytes": 21740
     },
     {
       "kind": "file",
@@ -1461,8 +1461,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/README.md",
-      "sha256": "159bb0805aadaf9268deaaa4cef39a443b7a1e41935d28f11b6d646ae83677dc",
-      "size_bytes": 2413
+      "sha256": "90223b0ae576b64e6e7aea4d6a649547bf0cd263303fee374b14c6788ccbdd31",
+      "size_bytes": 4699
     },
     {
       "kind": "file",
@@ -1496,57 +1496,57 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/mapping.py",
-      "sha256": "2a2b969c80f49cd0ad40bee430765fb68c1b1e7bfcb003d606bd3520d3f544b2",
-      "size_bytes": 10120
+      "sha256": "d60297699f8e3f64c400157a21f63d8419f6669c25722dc9c582370c9281db61",
+      "size_bytes": 11175
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/plugin.py",
-      "sha256": "1d59ffc3b3bb8dc7f3e96d8070bce3ca1dd7b0db56c2cd0795516a962399b511",
-      "size_bytes": 7884
+      "sha256": "4a6a68e078e7a4020f2c1760465d88e3f6aac53bece865f3be1a1b0222f11b8e",
+      "size_bytes": 9102
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/settings.py",
-      "sha256": "63bd53506276a7161da0141e1dbc746139f443d12ab6ffd80ef76a47abc8705e",
-      "size_bytes": 2669
+      "sha256": "f77403bed93ad575058b34faff02e7e440f5d9f604fa5452ae48a7c1b77a1288",
+      "size_bytes": 3010
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/upstream.py",
-      "sha256": "dd953766b73e360882773091a81a2972cd3539c5b0e387604232fa655d060646",
-      "size_bytes": 11218
+      "sha256": "7264c0cbf99e09a9c0bf35f47852517f63e03acf3b0b517d005bb971d696c213",
+      "size_bytes": 12570
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/tests/test_chat_mapping.py",
-      "sha256": "737bd198d30659e75e20956d866e2f738d9eda96edeef6390b7f6efeed75e733",
-      "size_bytes": 9951
+      "sha256": "f7f6b12ac7699a9b138105f98341ee5a0724507aefdd9bcfe310356e85fba9fe",
+      "size_bytes": 10661
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/tests/test_model_api_connector.py",
-      "sha256": "a9910b881098ed53e167092ec28516de25d3632441f4b1e858114bdcbbb37b7f",
-      "size_bytes": 13046
+      "sha256": "19da773a64f75dca5d6bc8d8fe4a6c29e805da249c1592daa52f1c195df92523",
+      "size_bytes": 13664
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/PROVENANCE.md",
-      "sha256": "e2b158f2c95e9ec88683600939d636e27bd16b66a15d08ab0a63f4359ab05d18",
-      "size_bytes": 2091
+      "sha256": "9ea7b436ac7ddea2214452d03b27d3fdc89071e07caf2d19e16e50ce49774065",
+      "size_bytes": 3486
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/README.md",
-      "sha256": "3f6ebae672068113f11d77808a9aff3f62c92e52501fb286e8da365cb07b9845",
-      "size_bytes": 2692
+      "sha256": "b80676eb499e41ca6c8f85b598a72f7bdf909161404025194d143c93a4a8584d",
+      "size_bytes": 4546
     },
     {
       "kind": "file",
@@ -1573,22 +1573,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/tests/test_vllm_diagnostics.py",
-      "sha256": "64b6d165c55c5a1ff3bef29b0aeff256821df02f8a0cc65f157357629c794ab4",
-      "size_bytes": 6862
+      "sha256": "1b5bb6c938883f746acb6065780d7fded93fd797a3a73c3bcc70399c28e98774",
+      "size_bytes": 7373
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/tests/test_vllm_runtime.py",
-      "sha256": "71eeaa8e861be0d955fe01299c8ab62df9e495a8e522101756cd861dc8b88e04",
-      "size_bytes": 12233
+      "sha256": "3debec0ad7f13a7733ee00a0e39f797dec933205971131fdbb75281d8bf17e69",
+      "size_bytes": 12517
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/vllm_runtime.py",
-      "sha256": "50856b8d32d4149e496457e78f6d85c36980786954281dcadbd3c3a166829e28",
-      "size_bytes": 40934
+      "sha256": "483cc25d25d78e8a02fc7761d53b1f6ac9750f632e2250949b3406c2cf2eff42",
+      "size_bytes": 43375
     },
     {
       "kind": "file",
@@ -1601,8 +1601,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/README.md",
-      "sha256": "ef4849e1d7d869d9092f2b88388b444915453fbe8efb6f52ad0b3c638d1aeab5",
-      "size_bytes": 1251
+      "sha256": "d87bb72687ff8256ed0e7291a645be7b963bc3acf9286b4b2fbe8774e0a9f3be",
+      "size_bytes": 2306
     },
     {
       "kind": "file",
@@ -1615,8 +1615,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/dataset_preparation.py",
-      "sha256": "1fe3060b3c51a84e0c84773f81ff16e318a373d281e07f0c4569ed089ba9b745",
-      "size_bytes": 27493
+      "sha256": "4f46787d5fb67ce2565465bfc2f9e9d20380fa8d8161f9f950cca16533ec0ec4",
+      "size_bytes": 28633
     },
     {
       "kind": "file",
@@ -1636,15 +1636,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/tests/test_dataset_preparation.py",
-      "sha256": "da1ec2b129b044b0a6802a79220cb3c82310bdf43634745e83ce5bf61e8f2842",
-      "size_bytes": 9391
+      "sha256": "a14b9d352f6972c69c5d1f65484af17fc31465a65681064bea5dbbe1dd6870fd",
+      "size_bytes": 9450
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/README.md",
-      "sha256": "2e9419c4054dccd63a3a5363030f17a4c4444cbf7785b6a42c95a67ba0f182be",
-      "size_bytes": 764
+      "sha256": "ec2faa8086df8c6ee60914e27d3f9a837c7a2a520a82998eab9a4d98725585ac",
+      "size_bytes": 1396
     },
     {
       "kind": "file",
@@ -1657,8 +1657,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/dataset_validator.py",
-      "sha256": "7fd8d8d30cfa398633cc3cf0d42189f54ae670bb2cf3aa4558ff21b6bb444696",
-      "size_bytes": 15882
+      "sha256": "b079c9e0f2a7cdd34031b59b821307e3a39655768da9ef6ae8e283ccb43a7043",
+      "size_bytes": 16183
     },
     {
       "kind": "file",
@@ -1685,15 +1685,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/PROVENANCE.md",
-      "sha256": "9a152f607d82610643bf952bf8e28751ceddebd610eb176be13eefbab7e2e6bc",
-      "size_bytes": 1705
+      "sha256": "90f06f6cd530e3ef54f2be046aeb91fe34a935a79580cb153c53fe091bfd7d00",
+      "size_bytes": 2878
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/README.md",
-      "sha256": "895c48e799bdcef9ddfe22d017dc75ed2cd3b400e8353b4877514d4836f3b190",
-      "size_bytes": 1523
+      "sha256": "9e1f7c744b6390c0edbac3cbf3f9172ffa32b4554522a2e23b4126c208a52842",
+      "size_bytes": 2673
     },
     {
       "kind": "file",
@@ -1706,8 +1706,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/llama_factory.py",
-      "sha256": "9731fb298bead5a6e4c192d5de52f735f93246be8084123a80f860553d4c4369",
-      "size_bytes": 13615
+      "sha256": "22ba920d952b7ff1292fe5060eeeeb9c8e0ecdb6fcdb4fd57233cc2e5e8b9b4d",
+      "size_bytes": 14332
     },
     {
       "kind": "file",
@@ -1727,29 +1727,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/tests/test_checkpoint_mapping.py",
-      "sha256": "f619245ac92aa3a581e1d306f89f96837c3d8ea11bd0f7a505748dc5ca1dbe64",
-      "size_bytes": 1290
+      "sha256": "8cd01f70731e750f86fa9a8a24c8e0c47179ad9c72fc63b7bd65fb8b9112bf78",
+      "size_bytes": 1353
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/tests/test_llama_factory.py",
-      "sha256": "017ab5d3d2fe0dc0e8db809464178ed885940cc519d7b9acd23e3abe201f4965",
-      "size_bytes": 4329
+      "sha256": "7bd4b8203ed05cc1c279755e1678ff4a0f74726426e34dd10c4d1d95aad1ef89",
+      "size_bytes": 4391
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/PROVENANCE.md",
-      "sha256": "3b190df25e8a0f6635cfa7e91dd4ad942e3c4aac6c985504ba216fd9188339b1",
-      "size_bytes": 2176
+      "sha256": "21c5ae88e6be62870a8aa17307296c9ac0b4fb69953eed591bdd039f6c672518",
+      "size_bytes": 3740
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/README.md",
-      "sha256": "d73e28509a2b1fdf94416a0774069c3b7693f6dc5c10b95d3f5d703c4699ec07",
-      "size_bytes": 3176
+      "sha256": "6e5715102c37f6132886776a04fd456530958c84cb36a0d77cc0c979ccd8622a",
+      "size_bytes": 5540
     },
     {
       "kind": "file",
@@ -1776,57 +1776,57 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/App.tsx",
-      "sha256": "b20de600651c8b904802735a5b7232c0f7be6c3f5a8ac818e19eea0af309ea9a",
-      "size_bytes": 10536
+      "sha256": "675267e110c1311e26a48a984d5e0f08b4ab02fb4133becbebbc22cfe09a6818",
+      "size_bytes": 10899
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.test.ts",
-      "sha256": "ff0f05ce9927b97154ea089b6ca68570e3f22a905b4731995b497517109ced44",
-      "size_bytes": 12659
+      "sha256": "813ceb71c06557f836dae9a20547096432927449150b9a573d65915abdcecea4",
+      "size_bytes": 12753
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/api.ts",
-      "sha256": "93b73bba2a76cc6f58ad756b3c45892090980371b6e1f521ab35107c6ad0f875",
-      "size_bytes": 35475
+      "sha256": "f2a8050db06c426969ea39f9ec30ef08305d6b7288bdb317e318221e21adf650",
+      "size_bytes": 41398
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/components.tsx",
-      "sha256": "89084b5bfe93b2369e4d3edfcfe4751f791c3dc3932124bb92c6b3ca64210736",
-      "size_bytes": 6402
+      "sha256": "1e71ab92506e740e01d52f4995836f3d2a3e6dc5e31c11996f22db7ac30d719e",
+      "size_bytes": 7298
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/main.tsx",
-      "sha256": "9daa690d1589323888b1d94e84e14eb1d8e5e1654866cd228b4a64e58ac8e925",
-      "size_bytes": 580
+      "sha256": "0f8bab244bfb0696f948e9777bcf46a859e95fdaa77d2765b07936cd80dfb53c",
+      "size_bytes": 666
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/pages.tsx",
-      "sha256": "af5273ccf801d2d323b34b1c2eced98ef4078b0e45a465c1b33d6cb386865ea8",
-      "size_bytes": 128027
+      "sha256": "ad8f82d8ec4a0538e996c598a10382df706aec33e2feaf1e59655651cc6cf59e",
+      "size_bytes": 131382
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/router.test.ts",
-      "sha256": "2f74b92b66db59ee3c182349539926b8cc56c06b9cd964ff0a8e9fc38fd5e662",
-      "size_bytes": 1516
+      "sha256": "8ca7667db5b50f44f75e84450756bfc23b3bc5218a46e7d17c22585f4f32f3bc",
+      "size_bytes": 1609
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/src/router.ts",
-      "sha256": "d9561e749a8d35fb8ee8a87ab3c2bac424c0ef5a24444c7f5109e270c985f653",
-      "size_bytes": 2886
+      "sha256": "c32de3feb13a33be4ff176239592651e5d61ace680ca6e58102d398f3f4054a3",
+      "size_bytes": 3321
     },
     {
       "kind": "file",
@@ -1846,8 +1846,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/vite.config.ts",
-      "sha256": "f843541a53fa858b1e79248ac3a8c9c7a02ac94d80dfab1461fbfcbd29b8b833",
-      "size_bytes": 1053
+      "sha256": "fc327f2eaccfefcd6f004a1c8fbd7eccb030714c321d730fd03810a5cb08c603",
+      "size_bytes": 1352
     },
     {
       "kind": "file",
@@ -1867,71 +1867,71 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectEventSubscriptionRegistry.cs",
-      "sha256": "00e1c205579a90df1ac702a5cb7499971290012af2675c786a34d4dad3f8eb9c",
-      "size_bytes": 12478
+      "sha256": "9e4c04c9d384502dab8484329c249ea754f1a2a29476c0d64c84722d4e04fe71",
+      "size_bytes": 12915
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectInvocationDispatcher.cs",
-      "sha256": "6735eae11c90388667c8f003217eca02e20ef99e7165a23196c35469f734ffff",
-      "size_bytes": 26382
+      "sha256": "65137c348269a14af14d110c630374af189e00e05304a45103858f615abc9141",
+      "size_bytes": 26561
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectMessageMapper.cs",
-      "sha256": "289b73ae4b5d01a104137ed62859d1cd9d1eff3eb39e3d2243f22a4aab1e8255",
-      "size_bytes": 36324
+      "sha256": "fc2fe055dc3ffa48fa758bbdf778edb41270cb4ceef986e957aaae111ab98746",
+      "size_bytes": 37122
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectProfile.cs",
-      "sha256": "31b2b157833c2e0c75e0910c85e74713fc592134cc011a5cb6ef7ed863f4370d",
-      "size_bytes": 12190
+      "sha256": "2216e317d8b6317d61746ff6c18a4f28518baf940fca818531c66590ab8a3f58",
+      "size_bytes": 12456
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostClient.cs",
-      "sha256": "e13a3ddf8fab09fd2eae6c45419804e8cfe70835d2157a68346dcee0d1063a93",
-      "size_bytes": 43100
+      "sha256": "c6d96f85e224ddcba7b0f975e56ec495f140d41abf636a8e63a3a4df40ec63cc",
+      "size_bytes": 44052
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostInstallation.cs",
-      "sha256": "e2ebf1cf1d6052d8c636db22b4f744354b50ada913a02c730ccfe5620e31d728",
-      "size_bytes": 11794
+      "sha256": "882a35b2900b46be875557aa38c5765a1ef0949c2739877f089d4559898386ff",
+      "size_bytes": 11890
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostJsonModels.cs",
-      "sha256": "c91a12df2701d49352e249485f74b50acdb1701e7eb3bed1d0243ffb30159bbf",
-      "size_bytes": 15972
+      "sha256": "c80766c3fa9dac794c6397e32e7aca2098a3f2020b8fff320a7455d023c32d97",
+      "size_bytes": 17846
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostOperationRegistry.cs",
-      "sha256": "38394dcb45eed8664be358bc9d4ca1254aebef9ed2d3f6b9e1b7ca2b89ceeb93",
-      "size_bytes": 11781
+      "sha256": "51cfc816ef37dfb73a3f9ae8e6c8f0c82703a8799c8fe712b42bb4c7f44d499a",
+      "size_bytes": 11927
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostOperationValidator.cs",
-      "sha256": "06a333c72917265f53da3580c28349a1b9e37f0fc6d539e3f4dc25db879084bf",
-      "size_bytes": 27835
+      "sha256": "cad348d9b91bf7d4877cbc144ae0290d7a41ce00f4c02281ec957b58c7af9584",
+      "size_bytes": 28157
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostProtocol.cs",
-      "sha256": "560f68eaa8f0a307095c4df91ce1bf830da78651e0e02f1487df1b65476f4023",
-      "size_bytes": 5452
+      "sha256": "b9ee156e691dfe243b174ca59e68d7bea8f22af5d126a9192bc205dbeda44e03",
+      "size_bytes": 5636
     },
     {
       "kind": "file",
@@ -1944,8 +1944,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Host/Program.cs",
-      "sha256": "8bf67fd42cccbcbd7f3272e71feb65b7da108de7e7daf582e54625ec0c35c056",
-      "size_bytes": 6121
+      "sha256": "5bd7c41bcc85466af6c1ee73163787d1f34345a43bbe65f7bbb3cc4442eeb120",
+      "size_bytes": 6279
     },
     {
       "kind": "file",
@@ -1979,43 +1979,43 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotEventNormalizer.cs",
-      "sha256": "0d654b319c0763bcffdec1d550339f40b809175b6146d7e0856d2702315a505e",
-      "size_bytes": 18716
+      "sha256": "f285c661d81f50b4acc6677d742f8c5ac0be66bdeaa784e7a92e66cab24e090b",
+      "size_bytes": 18904
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotEventSubscriptionRegistry.cs",
-      "sha256": "9d1f8f25470df389672bc16cc7f36c895d30070721f8b12f5eb63b3a26e366ed",
-      "size_bytes": 13040
+      "sha256": "5fafb168ce687fd91354cc0e071b14370fbfb5930eb7d65d908d801fba0319d7",
+      "size_bytes": 13205
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotHttpTransport.cs",
-      "sha256": "17fbe6aee375b1ec573f9525fd5f1e850e97f303cdbc348ae1db04a9f019a211",
-      "size_bytes": 9709
+      "sha256": "b485d896b0fed841cbcde5d6856720eed6e479d1c93d12f90daf87ae58ec941e",
+      "size_bytes": 9970
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotInvocationDispatcher.cs",
-      "sha256": "0ff66dfff93f3e51c54860db3e8918e39edad8436d596c0985b63016bcbf3f50",
-      "size_bytes": 11505
+      "sha256": "ac6780fbb55b6d8ac0d4b2ba1449ad8388647349d4cd43713ad613d62295825f",
+      "size_bytes": 11598
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotJsonModels.cs",
-      "sha256": "965e5b0d83894390d0dcad1e4d86d86d4dae636baf3232760df52d5f3dd7241a",
-      "size_bytes": 5657
+      "sha256": "bd78e99dca04e5957574b9a98e6fff1745375e7f62eecb0521033146d3332b9d",
+      "size_bytes": 6302
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotMessageMapper.cs",
-      "sha256": "d9d78f013756826d3e2154bba1af1fe778ce28954c4d214784821560b94acb17",
-      "size_bytes": 9482
+      "sha256": "50e56effbc89248491b0cfadf07382939ea7207b4a121ba339bca0da497a6421",
+      "size_bytes": 9641
     },
     {
       "kind": "file",
@@ -2028,8 +2028,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotRequestMapper.cs",
-      "sha256": "9844c8ef3d47e753ea9508146077f8f34feceac440072e526ea8b840c3ff80ff",
-      "size_bytes": 7988
+      "sha256": "4fbc2b42873e3b66c7c18f602951552665e5581dabf56fb79b3d50041d274215",
+      "size_bytes": 8222
     },
     {
       "kind": "file",
@@ -2042,8 +2042,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Core/OneBotWebSocketTransport.cs",
-      "sha256": "7aa050d5bfd99fe6b561d1699643b7c0f037dae4cd80261caae7fdfe595ad0b8",
-      "size_bytes": 20097
+      "sha256": "7991af690dd851ab81bcc551386f532430ca56b3111224d8501954da6607f10f",
+      "size_bytes": 20262
     },
     {
       "kind": "file",
@@ -2056,8 +2056,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.OneBot.V11.Host/Program.cs",
-      "sha256": "5a78d7785b429ae04ea5f5d6be5ec5e231bded10a9dd38d71975ea440dad61d5",
-      "size_bytes": 7656
+      "sha256": "a0bd64b6cfbf15d21d2d139dedb9bdd9ffcddb6ec133d1d9cd588a339964783d",
+      "size_bytes": 8070
     },
     {
       "kind": "file",
@@ -2105,8 +2105,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
-      "sha256": "bf5dc43237d6cb0eab4f0d24d8e49dfe35d6f6caffcde75905318e428bae60b7",
-      "size_bytes": 5421
+      "sha256": "c8dc467a7c721b645cf8de6814a0f62f06cba5b28834396e45753babda033e28",
+      "size_bytes": 5555
     },
     {
       "kind": "file",
@@ -2126,8 +2126,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/StatusCode.cs",
-      "sha256": "da511dd3a400f464d0c3e18f56504583fdb77bf319f1fbf546dcae2dcb0df219",
-      "size_bytes": 1438
+      "sha256": "4bf426ec733d4bf4f34d7d18e4aac95ff8327d10cda13b010665bf22020e391d",
+      "size_bytes": 1523
     },
     {
       "kind": "file",
@@ -2140,8 +2140,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.Host/Program.cs",
-      "sha256": "d715b2b6ee9efb4ac520c03ef23ec9d17fd8f16dc0bac6327bd0b58bbca68988",
-      "size_bytes": 12709
+      "sha256": "c426e27e3cbacd3c6a1cf3408b99ef41ebb093b88270bcdebf71d38d2ea4058f",
+      "size_bytes": 13290
     },
     {
       "kind": "file",
@@ -2154,8 +2154,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.NativeLib/PluginNativeAbi.cs",
-      "sha256": "40e63e7ac72d909143c0981f86754e3eec242cab225c207d22b472dba725ea40",
-      "size_bytes": 18205
+      "sha256": "a5a76c16278722845af28548b30bb689642b55851cd85ba55be66111e94dfb3e",
+      "size_bytes": 18458
     },
     {
       "kind": "file",
@@ -2182,8 +2182,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Plugin.RuntimeHost/RuntimeLaunchAnnouncement.cs",
-      "sha256": "888f62ccfa9c889f91a4474871395a75f07253893939bcf8f94578c6c469a205",
-      "size_bytes": 2181
+      "sha256": "148cad03178191e0366958d751441b0a98841cab7602f33acf4e51af38bf056b",
+      "size_bytes": 2273
     },
     {
       "kind": "file",
@@ -2196,8 +2196,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/AnthropicVendorAdapter.cs",
-      "sha256": "7da4d79e86fac9b1f505498fabcc79158c6ee2994df3eb3cdfe45ee26ab77bf7",
-      "size_bytes": 11792
+      "sha256": "7ec60f5f326601c265288c9205246e4b032c03dac8efd36c044685ca7879d0d1",
+      "size_bytes": 12458
     },
     {
       "kind": "file",
@@ -2210,8 +2210,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Anthropic/Program.cs",
-      "sha256": "2bb127d1d0be4d5beead80b913c5faecf273cb39fa5bcdf316de2b2ed1f58981",
-      "size_bytes": 1157
+      "sha256": "6ba8d65d6091a64efa6f10bd9cd193b44804b18f58fb0fb3a3958bbe877a564b",
+      "size_bytes": 1321
     },
     {
       "kind": "file",
@@ -2224,22 +2224,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/GeminiVendorAdapter.cs",
-      "sha256": "e4d4eb450ed8916aacaebd388db6ad57cb94cc3235738acffd7ce69dc35c0497",
-      "size_bytes": 20234
+      "sha256": "039c8fa0f9ce35170bdbd4321823eab97206017f362db43efaf41c69b7577584",
+      "size_bytes": 21434
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Gemini/Program.cs",
-      "sha256": "83df05dd2d29998c8694c1bb8da8089197eb0c476ab93331da6e8a3e1fefcec2",
-      "size_bytes": 1151
+      "sha256": "cf79e190e765eb1fee082920cdeddde5ea2767fc16541f9dd4105cbaccac004c",
+      "size_bytes": 1304
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Capability/CapabilityProfiles.cs",
-      "sha256": "c7c38fa2defa05a1c4303b5f213a4a5e1c4a2eab68536d832da498d4c11078f8",
-      "size_bytes": 5284
+      "sha256": "bdb2d96a84cdc7be4374daeace0ebb9852e0bf96956f7f3c5711ae8ed47da959",
+      "size_bytes": 5790
     },
     {
       "kind": "file",
@@ -2252,29 +2252,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Diagnostics/ProviderErrors.cs",
-      "sha256": "344fa0ecd61099511ff1198d5f733db4a85e37f9b86e4e779720557302b71c61",
-      "size_bytes": 2402
+      "sha256": "2cfc89f42d85fcb7f7cb26f33ac01bddc3ec33a77b3b40f830b8f1f8a4db5084",
+      "size_bytes": 2584
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Security/SecurityComponents.cs",
-      "sha256": "acca556ab4c10264a2c1514eea66f51c12ad10a29fe004d5b9e21aac7374b473",
-      "size_bytes": 2554
+      "sha256": "74dfeedf6c152ce6a7d9c27a2f7f6d136744b6992d1ce34569ffcbdba7bca570",
+      "size_bytes": 2837
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Serialization/WireModels.cs",
-      "sha256": "90c2a08273904c6412773b3bfd8e6b9d7fa741f783664726cf211148f710475f",
-      "size_bytes": 14673
+      "sha256": "7dd420cf543ddf0d0996b60334ff9a458b321c9e57949837547fe85ad3d60c97",
+      "size_bytes": 15230
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Infrastructure/Transport/TransportComponents.cs",
-      "sha256": "0b0995c322cccd84ffcb854cdb1cbbe25c1db00190353331206fabc4954eb63a",
-      "size_bytes": 3628
+      "sha256": "394594d0eb0086436f298d45b1b4b4775f19aa6f11c56961fa32f77c7f416244",
+      "size_bytes": 3872
     },
     {
       "kind": "file",
@@ -2287,15 +2287,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi/OpenAiVendorAdapter.cs",
-      "sha256": "486862381a1764f10a87b0462c54632607e5317c1c15df2794ba232c04c683c6",
-      "size_bytes": 11287
+      "sha256": "3bc85f9d59a31dc0d5261609888d3089c92be7d2e2be88fa220d019bec09f32f",
+      "size_bytes": 11462
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.OpenAi/Program.cs",
-      "sha256": "bddf151ff8b5f9bd3e552c6e556f590f0633cfcc91fb17ed6e639af706792d62",
-      "size_bytes": 1151
+      "sha256": "6a3ab0b0e4144b816921b83381a56408814d827d8078cc6bd97a7c21bb4ba622",
+      "size_bytes": 1312
     },
     {
       "kind": "file",
@@ -2308,8 +2308,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Provider.Tests/ProviderTests.cs",
-      "sha256": "e0925b3c94895b58a02be2bf6b5aa3b40ffa78f506bd46cdc92bd771c7521fa3",
-      "size_bytes": 50721
+      "sha256": "7c5d8fcd8c1a6a4fd493a67fb3049c099135a4bd9f10869632946cd087005e3e",
+      "size_bytes": 52598
     },
     {
       "kind": "file",
@@ -2322,8 +2322,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/README.md",
-      "sha256": "8e8e01fba5a57e358b731c1738b8e6a776e8befc4dd85d9165175112b6f547c7",
-      "size_bytes": 6300
+      "sha256": "71a3436f21a58f4458950707ef19b7910504d1b2f03327785506622fa6bfad84",
+      "size_bytes": 9850
     },
     {
       "kind": "file",
@@ -2406,43 +2406,43 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/engine/turn_loop.rs",
-      "sha256": "3a16c06cf70f1f5ab0b430bf43905969dd8b703031311e8ce80fc4b9465ad426",
-      "size_bytes": 27837
+      "sha256": "c9ac66923df062d09a69230e612dcaa2edb4ecdf6530226031e466ee7aa93922",
+      "size_bytes": 29033
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/lib.rs",
-      "sha256": "d8988eb0c6cd090ecf58646ea74cce66001dbe87124490dcbae7790862691b10",
-      "size_bytes": 1986
+      "sha256": "8d79a9c7c9f37ef60032a65ff09f96048ea542bce25606b69792f2cb6e46e50d",
+      "size_bytes": 2067
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/limits.rs",
-      "sha256": "0a1a3a718a5015e8e83961bafb732ee59ea923ffb069576fcfadb1012a56d8b0",
-      "size_bytes": 3705
+      "sha256": "20b66ee1826c8ae16db33da8a63e02bc5c593786ad2b2c7d87fd27388b6074d8",
+      "size_bytes": 3743
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/src/tck/mod.rs",
-      "sha256": "ed4ca93ab486e23a263b35ae682a3821d9b3695beed7b34cdaf016f1772c162e",
-      "size_bytes": 18073
+      "sha256": "7b4e471873d10aae4218235b0fd2c4e4639fd33277990d63ffeacaab0e25ed71",
+      "size_bytes": 19567
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/tests/agent_runtime_tests.rs",
-      "sha256": "eb8bd9b6ebe239933cc2f4431c0d79899f4e3d06a8fd22dfcba2665fc5efd308",
-      "size_bytes": 6779
+      "sha256": "7294f155a461090b721d93eca16acc8fb57ee4aaca4b0efb5d2a19e1834eaa4c",
+      "size_bytes": 7204
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-agent-runtime/tests/tool_catalog_tck.rs",
-      "sha256": "ba644dbe7719fe7683564a066bbb9b94467f1fcc029abbdc43c083fe14135762",
-      "size_bytes": 7542
+      "sha256": "9206cbaa57f98177b9956e7c0da46cf93ceee20a1b42f7138becee084e7fbe16",
+      "size_bytes": 7696
     },
     {
       "kind": "file",
@@ -2462,8 +2462,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/artifact/artifact_store.rs",
-      "sha256": "558b339336b39e56ca4081863544555a326d0fdb12e9640b1a393ca8032238be",
-      "size_bytes": 9036
+      "sha256": "f5d37762fe0d8c0bb2b30f0eea37bb7b4cf38abde20230437c7fb4d26247173f",
+      "size_bytes": 10068
     },
     {
       "kind": "file",
@@ -2476,8 +2476,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/browser/browser_service.rs",
-      "sha256": "d109e986aeb6cee443f75667f67ebf432be38d242a5bd2f277451d7b12c1bf2f",
-      "size_bytes": 7096
+      "sha256": "978270b92cbdce03d5e625b41db890c95a3601c42300279e8ecc8b1b6e894f69",
+      "size_bytes": 8032
     },
     {
       "kind": "file",
@@ -2504,8 +2504,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/lib.rs",
-      "sha256": "2f66c1a066732f7c9053f9cc185a1d26492682ecce49dbb5753956ad8bb662be",
-      "size_bytes": 6163
+      "sha256": "fde5fdad9dbab0385778da6396effe3f622e12907deea4fff470b7fcbfb4e0d2",
+      "size_bytes": 6320
     },
     {
       "kind": "file",
@@ -2525,8 +2525,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/security/env_filter.rs",
-      "sha256": "1054b22e92e76a55e2f126ed1cbb3f8fbd61ce1bb2e4568d2d5ff5f2d51001f3",
-      "size_bytes": 3052
+      "sha256": "3fc8f01aaa0e4bf70f0a799594024e90f1c28b141ce3e25fc48a2d451e1a35f4",
+      "size_bytes": 3422
     },
     {
       "kind": "file",
@@ -2539,15 +2539,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/security/output_limiter.rs",
-      "sha256": "1502dbdd82c8b363c8d05fdab6888d9c3fea0361c9a05a7ccba22492cbdc7b93",
-      "size_bytes": 2463
+      "sha256": "9c7505a6066c23e1617cdcfc785ac36e21f6345cd023267dd7156589cca6422d",
+      "size_bytes": 2592
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/security/path_validator.rs",
-      "sha256": "f274d45400bd53f71271b567e814d46631c60b52e35492daafd5bdab091e3ab3",
-      "size_bytes": 5840
+      "sha256": "6cbeffe0c29f8a5255c349cd2ffdabb8833f02c7091e04e9498cef16ad94e2aa",
+      "size_bytes": 6495
     },
     {
       "kind": "file",
@@ -2560,15 +2560,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/shell/process_runner.rs",
-      "sha256": "0eb5e53fe383c9c0b25502d0690484b34627e17e057a7b05c7b35fc7a04d76df",
-      "size_bytes": 17034
+      "sha256": "fb9095179b05cc6c138a13b5fcd33e14b8bf4242973be08df50c70fd31168de4",
+      "size_bytes": 17861
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/tests/computer_runtime_tests.rs",
-      "sha256": "b794b3f955fc690df063e138f3641e9e465bca8664bdf440685414c1d1db31be",
-      "size_bytes": 26599
+      "sha256": "738ee68d7737380f32114768ffe7e58bccc7ae88cda26445e8205047fb7249f4",
+      "size_bytes": 29747
     },
     {
       "kind": "file",
@@ -2588,29 +2588,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-mcp-provider/src/client.rs",
-      "sha256": "942c5e6e34e09314feb02c64ba4fe78c1b7a39a1ffbdbbb4d39cb5b9d992ec95",
-      "size_bytes": 13493
+      "sha256": "6a967ff12a1d3e9fd61434b6f719799ed5996f1893e22973f1584cc69de3cf5d",
+      "size_bytes": 16161
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-mcp-provider/src/lib.rs",
-      "sha256": "fdc71e390b8bfa1eb3233f876108e1471df1b79fc6853eb091d4fbefed4f8261",
-      "size_bytes": 16337
+      "sha256": "9d3dd9857a645202a9fee619720f9c36933d28bfbff16890ee13988b0f2059d3",
+      "size_bytes": 18443
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-mcp-provider/tests/fixtures/fake_mcp_server.py",
-      "sha256": "75d28dd00fa1bb8af3c8bbc6b590f51ede327fd908df44b005984d791b170b90",
-      "size_bytes": 3757
+      "sha256": "21a5b40463940750ab627e8f58c5ca8f17a5543b35299aec45d2e048dac2483d",
+      "size_bytes": 4223
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-mcp-provider/tests/mcp_provider_tests.rs",
-      "sha256": "1f6359ab8a3dfa0a07702e784f155e056644899d3eb15a3824530f7cd5a62dd2",
-      "size_bytes": 11405
+      "sha256": "2d4585da404896651fe853e220f4f4e3c214e4fa882555f678f1d32b382867c1",
+      "size_bytes": 11920
     },
     {
       "kind": "file",
@@ -2644,15 +2644,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/src/backend/sqlite.rs",
-      "sha256": "5d30af5b4f2206c57038cf6ec7d9bb442fbd29495ff1c6f60fec09f34c77faf8",
-      "size_bytes": 24250
+      "sha256": "6c786ad98e7a8d018141e4316b5eff3eb947f70f0853cf1ab95ecd6e0b57b850",
+      "size_bytes": 24748
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/src/embedding.rs",
-      "sha256": "1e3c186f927ec6297e8d9a79b0b99b721424d1c740061abbe7d064ce4ddcbdc6",
-      "size_bytes": 2230
+      "sha256": "ce1803844500403310d6751dc26b87e825bfd9b830ca927745256e59044d02f9",
+      "size_bytes": 2718
     },
     {
       "kind": "file",
@@ -2665,22 +2665,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/src/model.rs",
-      "sha256": "6af1accc58ebe4fabf1dab076e14d572ece1a95f1f24153380a104a780ee0286",
-      "size_bytes": 1947
+      "sha256": "a0bbc68b776b0dab212cc009a5df55a50d6529f7de699ff5be5e359cc1be3750",
+      "size_bytes": 2391
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/src/service.rs",
-      "sha256": "f9741dc44dbbe2ca728522598118291c13e452c387b385292a9690b1c42b8d70",
-      "size_bytes": 18803
+      "sha256": "2c639d09edc5e93d2c40630d99fb429f2ebf0716034a08dc6d1f3bfd2f164750",
+      "size_bytes": 19449
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/tests/memory_runtime_tests.rs",
-      "sha256": "8695e9a976e36c80b84ecd9d17e16fe2276866e2d4ffd9e770a3dc2855884b4c",
-      "size_bytes": 21472
+      "sha256": "961b8b86aa2b7a3c3517a67db94d62a28643c0a6b1c5fd8fee3654febc78376d",
+      "size_bytes": 23021
     },
     {
       "kind": "file",
@@ -2700,15 +2700,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-cabi/README.md",
-      "sha256": "8438fca8918405e0defcfc156a01f84bfcf4d012bd1fd2c0c248ffc37390e17a",
-      "size_bytes": 1502
+      "sha256": "3cda238267d1b27d38815fe4f7b4cca4bede5b47d4d167279751be394ffd2147",
+      "size_bytes": 2746
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-cabi/src/lib.rs",
-      "sha256": "1168631f7eae01238aaf7fbffb6e1f835c609eaaaca15dcd1af38f1cff0c87c5",
-      "size_bytes": 29444
+      "sha256": "8fa8f9e10830cf3267dd3bbb882c879662e673fa80fa8b145c85cf272b8ac346",
+      "size_bytes": 35936
     },
     {
       "kind": "file",
@@ -2735,29 +2735,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/main.rs",
-      "sha256": "ba31eb89771263618d8325a558b203561620ebe01488bba408ec0b567d134f26",
-      "size_bytes": 2019
+      "sha256": "bf9a78e3e4e210ee776bc7f6d5ae4853d47b00d84e83679084243bdf4542877a",
+      "size_bytes": 2387
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
-      "sha256": "79581f29ebdfb539e7b307f10d10ac017a57cddd858712db37cf5a3bf698d8d1",
-      "size_bytes": 47518
+      "sha256": "d376c911c49b954af45d5ca445c0310b429a0010cd9a1c2ee9d111d3c56f82b1",
+      "size_bytes": 48375
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/packaged_runtime_acceptance.rs",
-      "sha256": "12a56cd9844bc01b88af98f08aee724737fedbfda98424aa9efad90f08403356",
-      "size_bytes": 14564
+      "sha256": "f66c36f6bd6ee35aa22bad09e46770448d07fc0b8e995e522dd84fcc75d0faf7",
+      "size_bytes": 14993
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "f859b418608cbeee966dc59917fec24965efedc5e2465b37a5767da863c594af",
-      "size_bytes": 37157
+      "sha256": "1b5b49b86e57075cba1e0674799853c4688b4264c640d8fc46b89e18fb2eaee3",
+      "size_bytes": 38752
     },
     {
       "kind": "file",
@@ -2777,8 +2777,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/channel/CyreneChannelManager.java",
-      "sha256": "c4cb1b6f298cf84790d898720322b37533af7aca6a78b6fce02b49dbe14f0d4d",
-      "size_bytes": 6986
+      "sha256": "dcc9d23852b1c8b207da2da15eef0d6c0413519efe8c0f29028925fe0f14556d",
+      "size_bytes": 7457
     },
     {
       "kind": "file",
@@ -2791,22 +2791,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/context/InvocationContext.java",
-      "sha256": "04760ebc0fa913ff7b4797a4b4ff7405c2aa96b539fe060e4d81373f7212ec0e",
-      "size_bytes": 7487
+      "sha256": "20037f634de2a2b9afc1d0d8045b6dca9d3cc2f805614b4c30b6d8460d864266",
+      "size_bytes": 7751
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/policy/CyreneInvocationPolicy.java",
-      "sha256": "89c9967405cb8a97ce2fe9df4ee9afcd016b36cc9ed64db1d4dbdc5d9034b251",
-      "size_bytes": 4368
+      "sha256": "bb970ea92e766f90939c486a73fdf88abe1d0cf70a2faec906b356ca6501af0c",
+      "size_bytes": 4890
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/runtime/DirectPluginRuntimeClient.java",
-      "sha256": "5ea422dd25be2e2d9b24bd724a765baa7092d0def0dd7b7ffa41be971537191e",
-      "size_bytes": 9462
+      "sha256": "12b94e9c60bab5a56ba0388e3f48f1b21d59d2096319a4da18b8a66df3860d98",
+      "size_bytes": 9606
     },
     {
       "kind": "file",
@@ -2819,22 +2819,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/ConnectionRef.java",
-      "sha256": "cb536f46f48b0fb2cdcd33a24036a49d891a2080386a0aadaef0e56d420a364d",
-      "size_bytes": 4614
+      "sha256": "23e99fb368398045c7f621e63039e6ecbed832ec4b6f95a5e3197d03d21c3195",
+      "size_bytes": 4933
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/CyreneBindingResolver.java",
-      "sha256": "d7e317377903d3c6db7ceb7e5cf4a8bb31aa557f26326c0554a4b10a6bb9ab15",
-      "size_bytes": 1991
+      "sha256": "75921439a1778a01253cf796c3d5d149c971d338a463e81595a711bdc87d5619",
+      "size_bytes": 2240
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/spi/PlatformProjectionBindingResolver.java",
-      "sha256": "83d4813b2f0ff0310d0b2b979bd43bc9c950cce051bd428601c8dc5f5ee031f9",
-      "size_bytes": 3308
+      "sha256": "bf5735888a0420db8df917445f5465f26804b9487e2b3b28aad4657c7a61ef40",
+      "size_bytes": 3402
     },
     {
       "kind": "file",
@@ -2861,15 +2861,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/ComputerClient.java",
-      "sha256": "eb041292c025068438f0e4172ba3e0b5adfafc57ecdd98ddab22a701192e1505",
-      "size_bytes": 9639
+      "sha256": "ec19a93dc5ebdaa94a7790b83758c2f2b3bb9fa79c1cb9d08541e1b4f29e9c7c",
+      "size_bytes": 9729
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/ConnectorClient.java",
-      "sha256": "00df1a99704b2f3b568760d4580f0ec10a027d585fd8c11f7a1fdee6f557ab15",
-      "size_bytes": 4320
+      "sha256": "8331e2851659418ce7c772fbf3694dc04252751ff2c6516ac90a8a6660c3c2f6",
+      "size_bytes": 4411
     },
     {
       "kind": "file",
@@ -2889,15 +2889,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/main/java/io/cyrene/plugin/client/typed/ToolClient.java",
-      "sha256": "afd1bc003c38aa03282bc7d594205037fef519aa764188ec2429cdfccbd6c7a4",
-      "size_bytes": 3013
+      "sha256": "8cfe940af2e4c30c6bca9c2bd79aab0b4927518dc5e4cc5689a972d0e170827d",
+      "size_bytes": 3100
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/CyreneChannelManagerTest.java",
-      "sha256": "218c84a362b50e5cc4397b5b8d384f76ca9e02403f909a314a1215e01ae71177",
-      "size_bytes": 4148
+      "sha256": "cb6edbca2d456380863444ed07f57f6b96730476fd759c17684679a30c3f83d3",
+      "size_bytes": 4422
     },
     {
       "kind": "file",
@@ -2910,15 +2910,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/DirectPluginRuntimeClientTest.java",
-      "sha256": "1f8cc3fdb1e9b5b75b8e74c8f840c482d94ec919e0eed9b1f0d5e984587a2d6c",
-      "size_bytes": 15798
+      "sha256": "bbea5874c78c296f737df257332e4a398a46f8e15741483e7b63671effb8e288",
+      "size_bytes": 16072
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/VerticalIntegrationTest.java",
-      "sha256": "7dfded793923b0a7898d6e56d90802cfd345e78201b60cc7b8c7701fc8d0e012",
-      "size_bytes": 16749
+      "sha256": "ab8275e53e071edbb5853b9a09a0ed3eb56f453ba14178bf5129b23565759b3c",
+      "size_bytes": 17058
     },
     {
       "kind": "file",
@@ -2987,8 +2987,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-contracts/src/main/java/io/cyrene/plugin/runtime/v1/DirectPluginRuntimeGrpc.java",
-      "sha256": "f782fe4b9b2a8f69c794b5e56a7b93c546c7d421dd1eeb4d9937da2f8a473643",
-      "size_bytes": 14943
+      "sha256": "e961ac61f512d8c48c5f462a2165e29f2ed818c8fa9744e4f74b970e3e405665",
+      "size_bytes": 15230
     },
     {
       "kind": "file",
@@ -4338,22 +4338,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/main/java/io/cyrene/plugin/spring/CyreneAutoConfiguration.java",
-      "sha256": "929f29f153c3389158b2f2c836e0f77c5b7b01589b7a3661541424ca3a891fc2",
-      "size_bytes": 5769
+      "sha256": "39c870bf9fd96dc6c28d826e09119ddc5f3d4a18d652fe81fc56ae40beb3483a",
+      "size_bytes": 5940
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/main/java/io/cyrene/plugin/spring/CyreneHealthIndicator.java",
-      "sha256": "61aa4208593bda8f4ca7574b187a1b68100228e42a8b39acbec9516f786f4c4c",
-      "size_bytes": 3523
+      "sha256": "1455171a8ef23eb6595952a45654168181def51760ea5784a8930b5214707b10",
+      "size_bytes": 3619
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-spring-boot-starter/src/main/java/io/cyrene/plugin/spring/CyrenePluginProperties.java",
-      "sha256": "4823369412b7d33f5a8ab7ef6bd55944e91078ff5f3a78a5c7a86a6b197cdc22",
-      "size_bytes": 3586
+      "sha256": "553721f74915b4563f690203eeeb65e4cb3c1bdc4a98f26a874b0b3e0893132a",
+      "size_bytes": 3660
     },
     {
       "kind": "file",
@@ -4380,22 +4380,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/main/java/io/cyrene/plugin/spring/CyreneAutoConfiguration.java",
-      "sha256": "e3dcc3c2a2c48a0d7c421475c4409b60afd8d270cb7fbf106c875bef788dbe55",
-      "size_bytes": 5773
+      "sha256": "118601754ed7403a8f4910201404d61735ac5da8097fd0290956f76ffd7d2b96",
+      "size_bytes": 5944
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/main/java/io/cyrene/plugin/spring/CyreneHealthIndicator.java",
-      "sha256": "63db4f36812c9c9e05a743c10b5d5e08a782f712212de82e1921b5e543e4a3f1",
-      "size_bytes": 3531
+      "sha256": "b4fb2529ac757e8b2973c40d57656bf51639766620b4ad667a5a896f34c4aba4",
+      "size_bytes": 3627
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-spring-boot4-starter/src/main/java/io/cyrene/plugin/spring/CyrenePluginProperties.java",
-      "sha256": "4823369412b7d33f5a8ab7ef6bd55944e91078ff5f3a78a5c7a86a6b197cdc22",
-      "size_bytes": 3586
+      "sha256": "553721f74915b4563f690203eeeb65e4cb3c1bdc4a98f26a874b0b3e0893132a",
+      "size_bytes": 3660
     },
     {
       "kind": "file",
@@ -4443,15 +4443,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-spring-sample/src/test/java/io/cyrene/plugin/sample/SampleApplicationExitGateTest.java",
-      "sha256": "2b96c1be6d5655507766d8c46f5d481aaaad343513527901502e65c354166444",
-      "size_bytes": 11030
+      "sha256": "7ee3f191ef0bf113b75bf68705c0e1a62c0632b128bcd879549c2f4fb8efd3e3",
+      "size_bytes": 11857
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/docs/adr-001-legacy-starter-policy.md",
-      "sha256": "cd24b716117cca4c39f3754299c3d3422235f9fe9e8ce9a98d0d706ade56a0b4",
-      "size_bytes": 1271
+      "sha256": "a8960a168dc57bebf5e37c174adc25340fef322973317c186de6797c640d0cde",
+      "size_bytes": 2488
     },
     {
       "kind": "file",
@@ -4464,8 +4464,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/README.md",
-      "sha256": "861ae12c529b9bde7c6825824eb483ba41ab4d6a0e03c7f581b2287712748f7e",
-      "size_bytes": 728
+      "sha256": "e2f6f83c415bb740d8dbcd585d6c75016ad6ba99954a4269227ea511d64a9bac",
+      "size_bytes": 1193
     },
     {
       "kind": "file",
@@ -4485,15 +4485,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/_wire.py",
-      "sha256": "490485dbadb40622040ff5f86ce259adb2e33c398dab3895174dd81c7d910db9",
-      "size_bytes": 5936
+      "sha256": "241f05e0c95ba1a091c6c56ae62ca108950f98d43e51c30085f6fd4962871337",
+      "size_bytes": 7541
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/chat.py",
-      "sha256": "08090b7af9958ab30c98c2f71184a8b76795d22c7685590f39d90662d72dab08",
-      "size_bytes": 41568
+      "sha256": "5673fd871ecab87291a9b22da982b938c8d4d33ed01447b43e6a9893ab3d208c",
+      "size_bytes": 44837
     },
     {
       "kind": "file",
@@ -4506,8 +4506,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/README.md",
-      "sha256": "10ef6078485ed359924e15c0084af9a6f7c8ea89e3564e195ac4af5fa59cd5c2",
-      "size_bytes": 3035
+      "sha256": "1f4d0442022d04a05ca8e1a3bd7efb1fb26929f5c9a46b2624e72d3b7d913d42",
+      "size_bytes": 5668
     },
     {
       "kind": "file",
@@ -4520,22 +4520,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/scripts/generate_bindings.py",
-      "sha256": "2433728c5f9bfe252005dc2ac9d93784439605e2a350b530336ec92794a93f06",
-      "size_bytes": 1153
+      "sha256": "e4103ce363c6327afd5f4997295c633e1f2a207b088f211d023e6d3fc06f7986",
+      "size_bytes": 1224
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/README.md",
-      "sha256": "2ca3a86fbe53211c77394cc3fd099ee7bd97f01613103f92db622b1c86272d8f",
-      "size_bytes": 1065
+      "sha256": "a75e439ae34083c9ee1bf4fbb8344bb759ccd37d26a580d5891d66c6c7aff4d7",
+      "size_bytes": 1705
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/__init__.py",
-      "sha256": "404014d9d9895c15f0e33c061017d15c891c681f4093163ef8d135126846de3b",
-      "size_bytes": 1930
+      "sha256": "cf05bbb74d530e1b0ade01cd3207b08e41fa818014b65e23fec058c7d96501bb",
+      "size_bytes": 2062
     },
     {
       "kind": "file",
@@ -4562,22 +4562,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/bootstrap.py",
-      "sha256": "9df1de6b983f1c24f016c7cedbc220b42d9a42a653ceb15a18550dbd57a0b528",
-      "size_bytes": 1778
+      "sha256": "5df24fe3576dc12c609f0a4ca18a41e019472b7269fc2e4b516f3cb72846f7c1",
+      "size_bytes": 2044
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/client.py",
-      "sha256": "f4efd2f85ec231aee4656e764b0f983fc91a8a9a9e42bbe518a9d69dde3aaa3e",
-      "size_bytes": 10720
+      "sha256": "2dfd7f32a1a0ffc20fbbeeb154c326fc0e9a83f50040b3f5306d8b014d84eb77",
+      "size_bytes": 11747
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/configuration.py",
-      "sha256": "4e0eae9199ca8abf6d7a5dbf03cd5db2a0d3e3d950564b3464afbe0b2d3276dc",
-      "size_bytes": 1436
+      "sha256": "d3f40fbe46cf0668bde4f523afe11aff5599be97343fbee89a4eca89505a4d94",
+      "size_bytes": 1599
     },
     {
       "kind": "file",
@@ -4590,22 +4590,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/errors.py",
-      "sha256": "405e54ca6da7d541302e3eafe6f9a4b748171809d590a327a159e0df6a908a9c",
-      "size_bytes": 3723
+      "sha256": "a7d1fbc01ba17c522d6a4ad19de169090c6b1e4acec4e4eefdabf8624f969d6e",
+      "size_bytes": 3824
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/execution_engine.py",
-      "sha256": "2229021d4f7f71c66c25719afb43ba358f2dbc52c1aacb63f0f891b05e51feb1",
-      "size_bytes": 11068
+      "sha256": "15e5637f7777c605a57e0e2bf54661b686ca5fbee6d88396384ee19877b2ff2d",
+      "size_bytes": 11762
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/logging.py",
-      "sha256": "1d3110515de04ad21713d24e12e05fdb6e31ffe7192008cea739ba4e79ccee30",
-      "size_bytes": 5806
+      "sha256": "d7d8c3623658ac8620dd016ec6cc5ea457c068601bb46dc48ca3a4f8dc41d1c0",
+      "size_bytes": 6267
     },
     {
       "kind": "file",
@@ -4618,22 +4618,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/server.py",
-      "sha256": "31b4738ec07db2653f9122d461038b668204fc67f63cdc5cfdeeff8ffcd22367",
-      "size_bytes": 18520
+      "sha256": "e47ccee8aa4c856e934bc435182aec45597fd60fd9dad82e49b08fd19a88b610",
+      "size_bytes": 18918
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_configuration.py",
-      "sha256": "9efc271152e2b5a92526b6879bdb4f9687b02615c15fbe96ccbc5115246c1a72",
-      "size_bytes": 1248
+      "sha256": "9b8918c75c2b23ef8a12bb4c7c8d3ed2846362b5a00c986440dd37a489f77fd3",
+      "size_bytes": 1316
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_correlation_and_errors.py",
-      "sha256": "2e9640bd74133dba7a44802f422c0be8b8749abfafc03287848a87e93bd92243",
-      "size_bytes": 5560
+      "sha256": "06ff273b6a1e55054e63bda274b0be40dfcdb91f03fd438a36ae9adfbe2ebbe0",
+      "size_bytes": 5991
     },
     {
       "kind": "file",
@@ -4646,127 +4646,127 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_direct_runtime.py",
-      "sha256": "15057ad8ca10664fd606d00c6b24cf87bc8e4463ebd3bf324392c0a49983bea5",
-      "size_bytes": 13310
+      "sha256": "9082bd4185b768f59690640500e74dea4f010e0e67b1b33da368141cd3d16400",
+      "size_bytes": 13866
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/check_dotnet_aot_rules.py",
-      "sha256": "85e69130e2e5d6b10e53665aa7a49ca6f22e436acd1bc3401c054defb0aa6d5e",
-      "size_bytes": 3323
+      "sha256": "ade33d3bd53d2e5db3db0fbd26697d072811783fdc9a3147538772d883e09c5b",
+      "size_bytes": 3658
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/assemble_onebot_reference.py",
-      "sha256": "4dedaa11c8c68e1a3a17cd9c2e2c9009b4f3e8882b1c7ac2ae4ffbf85a5a1041",
-      "size_bytes": 10094
+      "sha256": "8bec1c34075c8e7ab3b5be2b6f62b7b9b7a36075d3fd624e6608100b8c7e1f41",
+      "size_bytes": 11365
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/assert_no_test_skips.py",
-      "sha256": "2b7b25772e76bf48a68936b198ed8efc4268d1bfc60a2013c09c0e6fc7a34e3a",
-      "size_bytes": 2847
+      "sha256": "8444afc0c33cb3c71effda28bf126f914f27986a0a516ef38f52d37145a86a86",
+      "size_bytes": 3105
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/benchmark_onebot_native_aot.py",
-      "sha256": "1fb4cf1cbcaaff9670202971108e874fba4dc326e80a39be6e6d14840d568076",
-      "size_bytes": 13995
+      "sha256": "b6a629e80d3bdda5d85158f1639a656ac2bbf49beefb74ca2a070aed4430cd90",
+      "size_bytes": 14929
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/capability_catalog.py",
-      "sha256": "3fafb11bc363e6ff520f622ab754b00909553f3e12d99c43b5f02205a443a9f4",
-      "size_bytes": 27180
+      "sha256": "8aa0b4cddd27ff91a1591d97de7b2f1d847a0b1bf18267ff87feeb2e9d2ed5c3",
+      "size_bytes": 29773
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/check_public_repository.py",
-      "sha256": "ddbcc71deef416cac3f94895ec8cfefef982aac0363b6454ea1115d4c3fbc4b6",
-      "size_bytes": 3655
+      "sha256": "e248c5e87973fd43acaa631f740d3aec1bfe16d2da3c87edcfc7a475e72ee82a",
+      "size_bytes": 4016
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/exercise_im_native_qqnt.py",
-      "sha256": "2149f29635d32625146c820a5850a2a1127371b497d82ef6511878f5dfcf5dff",
-      "size_bytes": 16066
+      "sha256": "8632bca84df80941dce55457b6206eefc23821807e965a478a8de6bd8614e412",
+      "size_bytes": 16620
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/exercise_onebot_native_transports.py",
-      "sha256": "4f984065166c94f5fb86d201c37662d3c4e13670a750c2210adb39b8e421b4b4",
-      "size_bytes": 22416
+      "sha256": "48cdf594a2a5ba30f3c848ed9a4f026bd346fa4916580a7ca9a937ceed90bde8",
+      "size_bytes": 23993
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/im_real_smoke.py",
-      "sha256": "763cf5841d499b4a5a8b2dff30884b5f5fbdebc654f8b7b8b620b364139cbc5b",
-      "size_bytes": 22928
+      "sha256": "7cfa60f1165a3cfef38f63bef69998bda216bdb419c03c7b185c772f34a03a71",
+      "size_bytes": 24696
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/onebot_real_smoke.py",
-      "sha256": "ba09df86d5e51234d7d85add00b26558cbffe13498fd22df7d3f04a36ac2f8c1",
-      "size_bytes": 17119
+      "sha256": "403d845ba9852df37bb64bbdea4dfa5a8accc2eb1d6d6ded40af3540f824a27e",
+      "size_bytes": 18582
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/onebot_reference_parity.py",
-      "sha256": "56455f5150465c2210696901e77ce04e687d1e549cfd005be875766e2156f17a",
-      "size_bytes": 7687
+      "sha256": "c233f261db89bac301686cf15547c0b9d85c488f3c4a792d9e83c3dad357c45e",
+      "size_bytes": 8711
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/package_release_artifact.py",
-      "sha256": "1d248a506588bfae386613c32415f73c1deb8393e3fdcef4eb7838d328afd40d",
-      "size_bytes": 5860
+      "sha256": "cbf799dc703bd5bb81e7e7cd9ef39f5a44606d5df63f48aea5bc2457e18aebe9",
+      "size_bytes": 6349
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/publish_native_aot.py",
-      "sha256": "254db6b612323cd991023e6c2bec05a9636a6f4cf6868514a218553b66045dd6",
-      "size_bytes": 10268
+      "sha256": "76aa6d9837d7bcb5acad7c8cb493d7d57a59b68e8390d4b2e7a05f5d614563fa",
+      "size_bytes": 11012
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/publish_onebot_native_aot.py",
-      "sha256": "ee437681756554782af90a7884ed87c84252b87b6b539bde715bea653669f524",
-      "size_bytes": 14017
+      "sha256": "d7b6d2fa3a3c7d75525e81b2ddb79436740a3d175cf0903d11454ec554ca2ea6",
+      "size_bytes": 14820
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/update_source_manifest.py",
-      "sha256": "8849ea407cdd17059bb0a9e8de3c7484f3a709550984231b8e7e2c93bbd36d51",
-      "size_bytes": 9462
+      "sha256": "30e4dfa59ac5cc9965093f1cf540835957cdcebe63a5005b488b87dd38d774eb",
+      "size_bytes": 10729
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/validate_manifests.py",
-      "sha256": "7b436ded24d9ffe6714f1b5ce8081ded7c45ccaf7ef0761248831ca0d7553d66",
-      "size_bytes": 3079
+      "sha256": "87f7cc1c2be657c91db2adff3adda400013143cca8399ee3bd77eaf819d27f9a",
+      "size_bytes": 3638
     },
     {
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/verify_source_manifest.py",
-      "sha256": "698c826abaf03c3542147163500e529030eb3a9917ca3121ca8052d78055f0ee",
-      "size_bytes": 13686
+      "sha256": "d1ada9d34d48a72afd8f0e4c6f8a21d051acf101edb5edf94af585dc71637c15",
+      "size_bytes": 14723
     }
   ],
   "history_policy": "EMPTY_HISTORY_REQUIRED",
@@ -4778,15 +4778,15 @@
   "protected_files": [
     {
       "path": "plugins/connectors/im/QQ_API_PLAN.md",
-      "sha256": "c6a1f8072b8fd775e5fa7c3b9e3d7a26d9897eab078888a56f3eee1a046d92d5"
+      "sha256": "c5740ebe0d2c871b4a8ced83bd53c1a0d23bcbe3fbc4962f696adc54698a3b1c"
     },
     {
       "path": "plugins/connectors/im/QQ_SIDE_INTERFACES.md",
-      "sha256": "79e337b8517b7cfd9493b8a7560c325f336fb0bb5b5cb0e13edfdb4dc0185ceb"
+      "sha256": "7f8aa12c6d7c0eb080eba6326dbb9525f14a3a6a3b6b4a1158aeda67ca79986d"
     },
     {
       "path": "plugins/connectors/onebot-v11/README.md",
-      "sha256": "93a00c15b161e5419eaf926f8974300dde07fb13a308bbee5a43bbab4486b3e8"
+      "sha256": "8daa0c4eb1ea23cddb0528397bfe4b56c3a858e3cdacf8db2343b1833d4de559"
     }
   ],
   "schema_version": "cyrene.public-source-manifest.v1",
