@@ -21,3 +21,28 @@ This directory contains the source files for the module boundary shown in its pa
 Read the direct implementation or package entry point, then child directories in the table above, and finally the nearest tests or conformance notes.
 
 先读直接实现或包入口，再按上表进入子目录，最后阅读最近的测试或一致性说明。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# 目录指南：plugins/connectors/onebot-v11/src
+
+本目录包含路径所示模块边界的源文件。先阅读直接入口，再继续查看子 package 和测试。
+
+## 内容
+
+| 文件 | 职责 |
+| --- | --- |
+| （无） | 没有直接源文件；此 package 用于组织子模块。 |
+
+## 子目录
+
+| 目录 | 职责 |
+| --- | --- |
+| onebot_v11_connector/ | 子 package 或分层目录 |
+
+## 建议阅读顺序
+
+先阅读直接实现或 package 入口，再查看上表中的子目录，最后阅读最近的测试或一致性说明。

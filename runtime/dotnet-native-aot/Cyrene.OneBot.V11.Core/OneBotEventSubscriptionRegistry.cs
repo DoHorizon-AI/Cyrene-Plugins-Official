@@ -14,6 +14,7 @@ using Cyrene.Plugin.Runtime.V1;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>Invalid subscription request at the direct runtime boundary.</summary>
+/// <remarks>中文：direct runtime 边界处的无效订阅请求。</remarks>
 public sealed class OneBotSubscriptionException : Exception
 {
     public OneBotSubscriptionException(string domainCode, string message)
@@ -79,6 +80,7 @@ public sealed class OneBotEventSubscription : IDisposable
 }
 
 /// <summary>Validated filter accepted by the v1 subscription boundary.</summary>
+/// <remarks>中文：v1 订阅边界接受的经过校验的过滤器。</remarks>
 internal sealed record OneBotSubscriptionFilter(
     string? EventType,
     string? ConversationId,

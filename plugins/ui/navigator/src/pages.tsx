@@ -2,6 +2,7 @@
 // Module: src/pages.tsx
 // Role: The seven Navigator console pages and their owning Product reads.
 // -----------------------------------------------------------------------------
+// 中文：// 中文：模块职责：实现 Navigator 控制台的七个页面及其所属 Product 的读取操作。
 
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
@@ -45,7 +46,10 @@ interface SettingsPageProps extends PageProps {
   session: SessionPayload;
 }
 
-/** Workspace-level status cards and independently refreshed service observations. */
+/**
+ * Workspace-level status cards and independently refreshed service observations.
+ * 展示 Workspace 级状态卡片和分别刷新的服务观测信息。
+ */
 export function OverviewPage({ api }: PageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -285,7 +289,10 @@ export function OverviewPage({ api }: PageProps) {
   );
 }
 
-/** Reactor model imports, binding choices, validation evidence, and import form. */
+/**
+ * Reactor model imports, binding choices, validation evidence, and import form.
+ * 提供 Reactor 模型导入、binding 选择、校验依据和导入表单。
+ */
 export function ModelsPage({ api }: PageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [models, setModels] = useState<JsonRecord[] | null>(null);
@@ -331,6 +338,7 @@ export function ModelsPage({ api }: PageProps) {
         setBindingError(errorMessage(bindingResult.reason));
       }
       // Credentials are metadata only; the select exposes names, never secrets.
+      // 中文：凭据只保留元数据；选择框只显示名称，绝不显示密钥。
       setCredentials(credentialResult.status === "fulfilled" ? credentialResult.value : null);
       setLoading(false);
     });
@@ -488,8 +496,14 @@ export function ModelsPage({ api }: PageProps) {
   );
 }
 
-/** Catalyst dataset containers with a deliberately small create surface. */
-/** Media type to send when the browser reports none. */
+/**
+ * Catalyst dataset containers with a deliberately small create surface.
+ * 提供有意保持精简创建流程的 Catalyst 数据集容器。
+ */
+/**
+ * Media type to send when the browser reports none.
+ * 浏览器未报告媒体类型时应发送的默认值。
+ */
 function contentTypeFor(filename: string): string {
   const suffix = filename.slice(filename.lastIndexOf(".")).toLowerCase();
   if (suffix === ".csv") return "text/csv";
@@ -511,6 +525,7 @@ export function DatasetsPage({ api }: PageProps) {
   const [description, setDescription] = useState("");
 
   // Sample preview state
+  // 中文：样本预览状态。
   const [previewVersionId, setPreviewVersionId] = useState("");
   const [previewLimit, setPreviewLimit] = useState(10);
   const [previewOffset, setPreviewOffset] = useState(0);
@@ -519,6 +534,7 @@ export function DatasetsPage({ api }: PageProps) {
   const [previewData, setPreviewData] = useState<DatasetPreview | null>(null);
 
   // Preparation workflow: upload -> map -> confirm -> publish -> hand to Yield.
+  // 中文：预处理流程：上传 → 映射 → 确认 → 发布 → 交给 Yield。
   const [selectedDatasetId, setSelectedDatasetId] = useState("");
   const [preparations, setPreparations] = useState<JsonRecord[] | null>(null);
   const [preparationId, setPreparationId] = useState("");
@@ -641,6 +657,7 @@ export function DatasetsPage({ api }: PageProps) {
       // Catalyst reads the raw body, so the text is sent as-is. Browsers often
       // report no MIME type for .jsonl, and Catalyst derives CSV/Parquet from
       // the media type, so fall back to the suffix instead of assuming JSON.
+      // 中文：Catalyst 读取原始请求正文，因此会原样发送文本。浏览器通常不会为 `.jsonl` 报告媒体类型；Catalyst 会根据媒体类型推断 CSV/Parquet，所以这里根据文件后缀回退，而不是假定内容一定是 JSON。
       const content = await file.text();
       const created = await api.createPreparation(
         selectedDatasetId,
@@ -991,12 +1008,18 @@ export function DatasetsPage({ api }: PageProps) {
 export interface ParamFieldProps {
   label: string;
   hint: string;
-  /** Omitted for fields that are not LLaMA Factory parameters, such as pickers. */
+  /**
+   * Omitted for fields that are not LLaMA Factory parameters, such as pickers.
+   * 对于非 LLaMA Factory 参数（例如选择器），此属性会省略。
+   */
   llamaKey?: string;
   children: React.ReactNode;
 }
 
-/** Parameter field with user-friendly hint and toggleable LLaMA Factory key. */
+/**
+ * Parameter field with user-friendly hint and toggleable LLaMA Factory key.
+ * 参数字段：显示用户友好提示，并可切换 LLaMA Factory 参数键。
+ */
 export function ParamField({ label, hint, llamaKey, children }: ParamFieldProps) {
   const [showKey, setShowKey] = useState(false);
   return (
@@ -1027,7 +1050,10 @@ export function ParamField({ label, hint, llamaKey, children }: ParamFieldProps)
   );
 }
 
-/** Read a prepared draft's base model so a relaunch does not have to re-choose one. */
+/**
+ * Read a prepared draft's base model so a relaunch does not have to re-choose one.
+ * 读取已准备草稿的基础模型，使重新启动时无需再次选择模型。
+ */
 function draftBaseModel(row: JsonRecord): JsonRecord | null {
   const configuration = row["configuration"];
   if (typeof configuration !== "object" || configuration === null) {
@@ -1040,7 +1066,10 @@ function draftBaseModel(row: JsonRecord): JsonRecord | null {
   return baseModel as JsonRecord;
 }
 
-/** Training draft list with explicit launch actions and hyperparameter reference. */
+/**
+ * Training draft list with explicit launch actions and hyperparameter reference.
+ * 展示训练草稿列表、明确的启动操作和超参数参考。
+ */
 export function TrainingPage({ api }: PageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [drafts, setDrafts] = useState<JsonRecord[] | null>(null);
@@ -1050,6 +1079,7 @@ export function TrainingPage({ api }: PageProps) {
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Hyperparameter fields state
+  // 中文：超参数字段状态。
   const [epochs, setEpochs] = useState("3");
   const [learningRate, setLearningRate] = useState("0.0002");
   const [batchSize, setBatchSize] = useState("2");
@@ -1061,6 +1091,7 @@ export function TrainingPage({ api }: PageProps) {
 
   // Picker sources: a draft is launched from a chosen dataset version and base
   // model rather than from identifiers typed by hand.
+  // 中文：选择器的数据来源：启动草稿时选择数据集版本和基础模型，不要求用户手动输入标识。
   const [datasets, setDatasets] = useState<JsonRecord[] | null>(null);
   const [datasetId, setDatasetId] = useState("");
   const [versions, setVersions] = useState<JsonRecord[] | null>(null);
@@ -1145,6 +1176,7 @@ export function TrainingPage({ api }: PageProps) {
    * needs. `PrepareTrainingDraft.baseModel` requires both a portable model
    * artifact and a pinned {repository, revision} source, and the model is
    * declared with extra="forbid", so a partial payload would be rejected.
+   * 仅当 Reactor 已发布 Yield 所需的全部信息时，才提供所选基础模型。`PrepareTrainingDraft.baseModel` 同时要求可移植模型制品和已固定的 `{repository, revision}` 来源；模型声明了 `extra="forbid"`，因此不完整的负载会被拒绝。
    */
   const selectedBaseModel = (() => {
     if (!baseModelId || !modelImports) return null;
@@ -1175,6 +1207,8 @@ export function TrainingPage({ api }: PageProps) {
    *
    * Launching without the PATCH silently trains with whatever the draft already
    * carried, so every value edited here would be discarded with no error.
+   * 先将编辑后的超参数持久化到 Yield，再启动训练。
+   * 如果没有 PATCH 就启动，训练会静默使用草稿原有的参数，因此这里编辑的所有值都会无错误地丢失。
    */
   const startDraft = async (id: string, row: JsonRecord) => {
     setActionId(id);
@@ -1462,8 +1496,14 @@ export function TrainingPage({ api }: PageProps) {
   );
 }
 
-/** Run lookup and attempt diagnostics, reflecting the published Yield API shape. */
-/** Minimal canvas loss curve so the console needs no charting dependency. */
+/**
+ * Run lookup and attempt diagnostics, reflecting the published Yield API shape.
+ * 展示运行查询和尝试诊断信息，并遵循已发布的 Yield API 结构。
+ */
+/**
+ * Minimal canvas loss curve so the console needs no charting dependency.
+ * 使用最精简的 canvas 绘制损失曲线，使控制台无需引入图表依赖。
+ */
 function LossChart({ series }: { series: number[] }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
@@ -1501,7 +1541,10 @@ function LossChart({ series }: { series: number[] }) {
   );
 }
 
-/** Human-readable duration for an ETA in seconds. */
+/**
+ * Human-readable duration for an ETA in seconds.
+ * 将 ETA 秒数格式化为人类可读的时长。
+ */
 function formatDuration(seconds: number): string {
   const total = Math.max(0, Math.round(seconds));
   const hours = Math.floor(total / 3600);
@@ -1522,6 +1565,7 @@ export function RunsPage({ api }: PageProps) {
   const [canceling, setCanceling] = useState(false);
 
   // SSE Realtime events stream state
+  // 中文：SSE 实时事件流状态。
   const [events, setEvents] = useState<JsonRecord[]>([]);
   const [latestLoss, setLatestLoss] = useState<number | null>(null);
   const [currentStep, setCurrentStep] = useState<number | null>(null);
@@ -1573,6 +1617,7 @@ export function RunsPage({ api }: PageProps) {
   const resultRecord = (run?.["result"] ?? null) as JsonRecord | null;
   const resultId = resultRecord ? text(resultRecord["id"], "") : "";
   // Resume needs both a terminal failure state and the checkpoint to resume from.
+  // 中文：恢复运行必须同时具备终态失败状态和待恢复的检查点。
   const canResume = ["FAILED", "CANCELLED"].includes(runState) && latestCheckpoint !== null;
   const canDeploy = Boolean(resultId);
 
@@ -1689,6 +1734,7 @@ export function RunsPage({ api }: PageProps) {
                 }
               } catch {
                 // Ignore parse errors
+                // 中文：忽略解析错误。
               }
             }
           }
@@ -1940,7 +1986,10 @@ export function RunsPage({ api }: PageProps) {
   );
 }
 
-/** Reactor deployment intent, observed state, and explicit stop action. */
+/**
+ * Reactor deployment intent, observed state, and explicit stop action.
+ * 展示 Reactor 部署意图、观测状态和明确的停止操作。
+ */
 export function DeploymentsPage({ api }: PageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [deployments, setDeployments] = useState<JsonRecord[] | null>(null);
@@ -1952,6 +2001,7 @@ export function DeploymentsPage({ api }: PageProps) {
   const [actionError, setActionError] = useState<string | null>(null);
 
   // Deployment events timeline state
+  // 中文：部署事件时间线状态。
   const [selectedDeploymentId, setSelectedDeploymentId] = useState<string | null>(null);
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventsError, setEventsError] = useState<string | null>(null);
@@ -2202,7 +2252,10 @@ export function DeploymentsPage({ api }: PageProps) {
   );
 }
 
-/** Exchange Gateway routes, invocation snippets, and API key lifecycle administration. */
+/**
+ * Exchange Gateway routes, invocation snippets, and API key lifecycle administration.
+ * 管理 Exchange Gateway 路由、调用示例和 API key 生命周期。
+ */
 export function GatewayPage({ api }: PageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [routes, setRoutes] = useState<JsonRecord[] | null>(null);
@@ -2215,6 +2268,7 @@ export function GatewayPage({ api }: PageProps) {
   const [activeCodeTab, setActiveCodeTab] = useState<"curl" | "python" | "javascript">("curl");
 
   // New key form state
+  // 中文：新建 API key 表单状态。
   const [keyName, setKeyName] = useState("");
   const [expiresDays, setExpiresDays] = useState("");
   const [modelScope, setModelScope] = useState("");
@@ -2254,6 +2308,7 @@ export function GatewayPage({ api }: PageProps) {
 
       // A missing status only costs us the published gateway URL; the route and
       // key panels above must still render.
+      // 中文：状态缺失只会导致无法显示已发布的 Gateway URL；上方的路由和密钥面板仍必须正常显示。
       setSystem(systemRes.status === "fulfilled" ? systemRes.value : null);
       setLoading(false);
     });
@@ -2328,6 +2383,7 @@ export function GatewayPage({ api }: PageProps) {
   // The published gateway URL wins. Deriving it in the browser assumed Exchange
   // sits on one fixed port, which is wrong for the dev stack (8000) and for any
   // HTTPS deployment, so every snippet below was pointing at a dead endpoint.
+  // 中文：优先使用已发布的 Gateway URL。若在浏览器中自行推导地址，就等于假设 Exchange 固定使用一个端口；开发环境端口为 8000，HTTPS 部署也不同，因此下方所有调用示例都会指向失效 Endpoint。
   const baseUrl =
     system?.gatewayBaseUrl ??
     (typeof window !== "undefined"
@@ -2669,7 +2725,10 @@ console.log(response.choices[0].message.content);`,
   );
 }
 
-/** Web Host session metadata and write-only credential administration. */
+/**
+ * Web Host session metadata and write-only credential administration.
+ * 展示 Web Host 会话元数据并管理只写凭据。
+ */
 export function SettingsPage({ api, session }: SettingsPageProps) {
   const [reloadKey, setReloadKey] = useState(0);
   const [system, setSystem] = useState<SystemStatus | null>(null);
@@ -2839,13 +2898,17 @@ export function SettingsPage({ api, session }: SettingsPageProps) {
   );
 }
 
-/** Interactive test chat surface bound to the session's active Gateway route. */
+/**
+ * Interactive test chat surface bound to the session's active Gateway route.
+ * 提供绑定到当前会话活动 Gateway 路由的交互式测试聊天界面。
+ */
 export function ChatPage({ api }: PageProps) {
   const [activeRoute, setActiveRoute] = useState<ActiveRoutePayload | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(true);
   const [routeError, setRouteError] = useState<string | null>(null);
 
   // API Key stored in sessionStorage ONLY (never localStorage or server)
+  // 中文：API key 仅存储在 sessionStorage 中，绝不写入 localStorage 或服务器。
   const [apiKey, setApiKey] = useState(() => {
     if (typeof window !== "undefined" && window.sessionStorage) {
       return window.sessionStorage.getItem("cyrene_chat_api_key") ?? "";
@@ -2931,6 +2994,7 @@ export function ChatPage({ api }: PageProps) {
           }
         } catch {
           // ignore parse error
+          // 中文：忽略解析错误。
         }
         throw new Error(errDetail);
       }
@@ -2972,6 +3036,7 @@ export function ChatPage({ api }: PageProps) {
                 });
               } catch {
                 // Ignore parse errors on stream chunks
+                // 中文：忽略 SSE 数据块的解析错误。
               }
             }
           }

@@ -183,6 +183,7 @@ async fn test_packaged_runtime_start_dispatch_and_bounded_filesystem() {
     let (_server, mut client) = start_packaged_runtime().await;
 
     // install/start + direct dispatch
+    // 中文：安装／启动并通过 DirectPluginRuntime 分派。
     let health = client.health(HealthRequest {}).await.unwrap().into_inner();
     assert_eq!(health.status, health_response::Status::Serving as i32);
     assert!(health
@@ -191,6 +192,7 @@ async fn test_packaged_runtime_start_dispatch_and_bounded_filesystem() {
         .any(|capability| capability == "computer.runtime.v1"));
 
     // ExecuteCommand
+    // 中文：ExecuteCommand。
     let evidence = expect_evidence(
         run_command(
             &mut client,
@@ -202,6 +204,7 @@ async fn test_packaged_runtime_start_dispatch_and_bounded_filesystem() {
     assert_eq!(evidence.stdout, "packaged-hello");
 
     // ListDir
+    // 中文：ListDir。
     let mut payload = Vec::new();
     ListDirRequest {
         path: ".".to_string(),
@@ -234,6 +237,7 @@ async fn test_packaged_runtime_start_dispatch_and_bounded_filesystem() {
         .any(|entry| entry.name == "Cargo.toml" && !entry.is_directory));
 
     // Path traversal denial
+    // 中文：拒绝路径遍历。
     let mut payload = Vec::new();
     ListDirRequest {
         path: "../".to_string(),
@@ -273,6 +277,7 @@ async fn test_packaged_runtime_environment_filtering_and_artifact_roundtrip() {
 
     // Host secrets never reach the managed command; requested names carrying
     // sensitive patterns are stripped; benign requested names pass through.
+    // 中文：主机密钥绝不会传入托管命令；名称中包含敏感模式的请求会被剔除，普通请求名称则会保留并传递。
     let mut env = HashMap::new();
     env.insert(
         "CYRENE_ACCEPTANCE_VISIBLE".to_string(),
@@ -296,6 +301,7 @@ async fn test_packaged_runtime_environment_filtering_and_artifact_roundtrip() {
     assert_eq!(evidence.stdout, "unset|visible-ok|unset");
 
     // Artifact roundtrip.
+    // 中文：Artifact 往返传输。
     let artifact_data = b"packaged acceptance artifact".to_vec();
     let mut payload = Vec::new();
     CreateArtifactRequest {
@@ -422,5 +428,5 @@ async fn test_packaged_runtime_stream_cancellation_kills_the_process_group() {
         wait_for_process_exit(pid, Duration::from_secs(5)).await,
         "cancelled stream left descendant {pid} running"
     );
-    let _ = Code::InvalidRequest; // keep the error-code import used on all paths
+    let _ = Code::InvalidRequest; // keep the error-code import used on all paths | 中文：确保所有执行路径都会使用该错误码导入
 }

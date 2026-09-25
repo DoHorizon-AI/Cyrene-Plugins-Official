@@ -151,6 +151,7 @@ internal sealed class NativePluginInstance : IDisposable
             if (!_allocations.Remove(intPtr))
             {
                 // Double free or foreign pointer
+                // 中文：Double free 或外来指针。
                 return StatusCode.InvalidArgument;
             }
         }
@@ -248,7 +249,7 @@ public static unsafe class PluginNativeAbi
         while (ptr[len] != 0)
         {
             len++;
-            if (len > 4096) return false; // Guard against unterminated strings
+            if (len > 4096) return false; // Guard against unterminated strings | 中文：防止字符串缺少终止符时持续扫描
         }
         try
         {
@@ -269,6 +270,7 @@ public static unsafe class PluginNativeAbi
 
         // Only contract-backed capabilities are advertised over the C ABI;
         // speech/rerank have no canonical contract and no implementation (W6-3).
+        // 中文：C ABI 只公布有规范契约支撑的 capability；speech/rerank 没有规范契约，也没有实现（W6-3）。
         s_capabilities = new CapabilityDescriptorV1[]
         {
             new() { CapabilityId = (byte*)s_cap1Handle.AddrOfPinnedObject(), VersionMajor = 1, VersionMinor = 0 },

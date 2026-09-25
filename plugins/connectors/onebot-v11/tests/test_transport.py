@@ -56,7 +56,9 @@ class Cancellation:
 
 
 class FakeOneBotPeer:
-    """A real TCP/WebSocket peer for transport tests, not a connector fake."""
+    """A real TCP/WebSocket peer for transport tests, not a connector fake.
+
+        中文:用于传输测试的真实 TCP/WebSocket 对端,不是连接器模拟对象。"""
 
     def __init__(self, access_token: str | None = "token") -> None:
         self.access_token = access_token

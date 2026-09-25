@@ -26,6 +26,7 @@ public final class PlatformProjectionBindingResolver implements CyreneBindingRes
 
     /**
      * Minimal projection record exposed by platform registry/discovery service.
+     * <p>中文：由 Platform registry／discovery 服务暴露的最小投影记录。</p>
      */
     public record ProjectionRecord(
         String targetUri,

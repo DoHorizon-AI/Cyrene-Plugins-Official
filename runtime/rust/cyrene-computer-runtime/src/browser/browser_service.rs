@@ -16,10 +16,13 @@ use tokio::process::Command;
 #[derive(Clone, Debug)]
 pub enum BrowserBackend {
     /// Real headless browser binary discovered or configured
+    /// 已发现或配置的真实无头浏览器 binary。
     HeadlessBinary(PathBuf),
     /// Controlled test driver with explicit mock response
+    /// 带有显式 mock 响应的受控测试 driver。
     MockDriver { response: String },
     /// No headless browser available in environment
+    /// 当前环境中没有可用的无头浏览器。
     Unavailable { reason: String },
 }
 
@@ -36,11 +39,13 @@ impl Default for BrowserService {
 
 impl BrowserService {
     /// Creates a BrowserService by actively probing the host system environment.
+    /// 通过主动探测 host 系统环境创建 BrowserService。
     pub fn new() -> Self {
         Self::with_backend(Self::probe_environment())
     }
 
     /// Creates a BrowserService with an explicit backend.
+    /// 使用显式 backend 创建 BrowserService。
     pub fn with_backend(backend: BrowserBackend) -> Self {
         Self {
             backend,
@@ -49,6 +54,7 @@ impl BrowserService {
     }
 
     /// Creates a BrowserService with a controlled mock driver for testing.
+    /// 使用受控 mock driver 创建用于测试的 BrowserService。
     pub fn with_mock_driver(response: impl Into<String>) -> Self {
         Self::with_backend(BrowserBackend::MockDriver {
             response: response.into(),
@@ -56,18 +62,22 @@ impl BrowserService {
     }
 
     /// Returns whether a functional browser backend is available.
+    /// 返回当前是否有可正常工作的 browser backend。
     pub fn is_available(&self) -> bool {
         !matches!(self.backend, BrowserBackend::Unavailable { .. })
     }
 
     /// Returns the active backend description.
+    /// 返回当前 backend 的说明。
     pub fn backend(&self) -> &BrowserBackend {
         &self.backend
     }
 
     /// Probes the system for available headless browser binaries.
+    /// 探测系统中可用的无头浏览器 binary。
     pub fn probe_environment() -> BrowserBackend {
         // 1. Check explicit environment override
+        // 1. 检查显式环境覆盖值。
         if let Ok(bin_str) = std::env::var("CYRENE_HEADLESS_BROWSER_BIN") {
             let p = PathBuf::from(bin_str);
             if p.is_file() {
@@ -76,6 +86,7 @@ impl BrowserService {
         }
 
         // 2. Probe standard binary locations in PATH
+        // 2. 探测 PATH 中的标准 binary 路径。
         for candidate in &[
             "chromium",
             "chromium-browser",
@@ -102,8 +113,11 @@ impl BrowserService {
 
     /// Isolated browser navigate hook.
     /// Invariant (R04): Never returns fake success when no real browser backend exists!
+    /// 隔离的 browser navigate 钩子。
+    /// 不变量（R04）：没有真实 browser backend 时绝不返回虚假的成功结果！
     pub async fn navigate(&self, target_url: &str) -> Result<String, ComputerError> {
         // 1. Validate scheme strictly
+        // 1. 严格验证 scheme。
         if !target_url.starts_with("http://") && !target_url.starts_with("https://") {
             return Err(ComputerError {
                 code: ComputerErrorCode::ExecutionDenied as i32,
@@ -113,6 +127,7 @@ impl BrowserService {
         }
 
         // 2. Dispatch according to backend
+        // 2. 根据 backend 分派。
         match &self.backend {
             BrowserBackend::Unavailable { reason } => Err(ComputerError {
                 code: ComputerErrorCode::ExecutionDenied as i32,
@@ -125,6 +140,7 @@ impl BrowserService {
             )),
             BrowserBackend::HeadlessBinary(bin_path) => {
                 // Execute headless browser with sandboxed dump-dom
+                // 使用隔离运行的 headless browser 执行 dump-dom。
                 let mut cmd = Command::new(bin_path);
                 cmd.arg("--headless")
                     .arg("--disable-gpu")

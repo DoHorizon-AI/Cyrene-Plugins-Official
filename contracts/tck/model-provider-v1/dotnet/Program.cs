@@ -52,6 +52,7 @@ if (!packedChat.Is(ChatCompletionRequest.Descriptor)
 
 // Structured chat v2: index, identity, type, function facts, usage, and
 // finish_reason must survive the projection byte-for-byte.
+// 中文：结构化聊天 v2：索引、标识、类型、函数事实、usage 和 finish_reason 都必须逐字节保持不变。
 var toolChat = new ChatCompletionRequest
 {
     Model = "deterministic-model",

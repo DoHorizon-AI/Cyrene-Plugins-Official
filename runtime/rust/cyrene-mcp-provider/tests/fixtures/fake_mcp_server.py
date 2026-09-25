@@ -4,6 +4,10 @@
 Not a product: it exists so the Rust provider tests (and the plugin-server
 integration tests) can exercise a real child process, real stdio framing, and
 real tool payloads without external dependencies.
+
+中文:测试/开发夹具:基于按行分隔 JSON-RPC 的最小 MCP 标准输入输出服务器。
+
+中文:这不是产品代码;它用于让 Rust 提供方测试和 plugin-server 集成测试在没有外部依赖的情况下,执行真实子进程、真实标准输入输出分帧和真实工具载荷。
 """
 
 from __future__ import annotations
@@ -45,7 +49,9 @@ def _result(request_id: object, payload: dict) -> dict:
 
 
 def handle(request: dict) -> dict | None:
-    """Answer one JSON-RPC message; return None when no response is expected."""
+    """Answer one JSON-RPC message; return None when no response is expected.
+
+        中文:响应一条 JSON-RPC 消息;若无需响应则返回 None。"""
 
     method = request.get("method")
     request_id = request.get("id")
@@ -103,7 +109,9 @@ def handle(request: dict) -> dict | None:
 
 
 def main() -> int:
-    """Serve newline-delimited JSON-RPC until stdin closes."""
+    """Serve newline-delimited JSON-RPC until stdin closes.
+
+        中文:持续处理按行分隔的 JSON-RPC,直到标准输入关闭。"""
 
     arguments = sys.argv[1:]
     if arguments and arguments[0] == "--pid-file" and len(arguments) > 1:

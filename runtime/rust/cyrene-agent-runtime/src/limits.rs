@@ -14,7 +14,7 @@ pub const ABSOLUTE_MAX_TURNS: i32 = 50;
 pub const DEFAULT_MAX_TOOL_CONCURRENCY: i32 = 4;
 pub const ABSOLUTE_MAX_TOOL_CONCURRENCY: i32 = 16;
 
-pub const MAX_REQUEST_PAYLOAD_BYTES: usize = 1_048_576; // 1 MB
+pub const MAX_REQUEST_PAYLOAD_BYTES: usize = 1_048_576; // 1 MB | 中文：请求负载上限为 1 MB
 pub const MAX_STREAMING_EVENTS: usize = 10_000;
 
 #[derive(Debug, Clone)]

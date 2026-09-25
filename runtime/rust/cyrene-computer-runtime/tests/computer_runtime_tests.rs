@@ -42,6 +42,7 @@ use cyrene_plugin_contracts::computer_runtime_v1::{
 };
 
 // ── T73 & T76: Command Execution with Complete Evidence ────────────────
+// 中文：T73 与 T76：命令执行及完整证据。
 
 #[tokio::test]
 async fn test_command_execution_evidence_t73_t76() {
@@ -75,6 +76,7 @@ async fn test_command_execution_evidence_t73_t76() {
 }
 
 // ── T74: Separate FS, Shell, Browser, Artifact Operations ──────────────
+// 中文：T74：文件系统、Shell、Browser 与 Artifact 操作分别隔离。
 
 #[tokio::test]
 async fn test_separated_architecture_t74() {
@@ -82,6 +84,7 @@ async fn test_separated_architecture_t74() {
     let validator = PathValidator::new(vec![tmp.path().to_path_buf()]);
 
     // 1. Filesystem operation isolated
+    // 中文：1. 文件系统操作相互隔离。
     let fs_srv = FilesystemService::new(validator.clone());
     let write_res = fs_srv.write_file(WriteFileRequest {
         path: "module_test.txt".to_string(),
@@ -94,6 +97,7 @@ async fn test_separated_architecture_t74() {
     ));
 
     // 2. Shell runner isolated
+    // 中文：2. Shell 执行器相互隔离。
     let shell_srv = ShellProcessRunner::new(validator, EnvironmentFilter::new());
     let cmd_res = shell_srv
         .execute_command(
@@ -115,6 +119,7 @@ async fn test_separated_architecture_t74() {
     }
 
     // 3. Artifact store isolated
+    // 中文：3. Artifact 存储相互隔离。
     let art_srv = ArtifactStore::new();
     let art_res = art_srv.create_artifact(CreateArtifactRequest {
         name: "test_artifact.bin".to_string(),
@@ -128,8 +133,10 @@ async fn test_separated_architecture_t74() {
     assert!(!art_meta.artifact_id.is_empty());
 
     // 4. Browser service isolated (T74, R04)
+    // 中文：4. Browser 服务相互隔离（T74、R04）。
     let browser_srv = BrowserService::new();
     // When no headless browser binary is installed, it strictly fails-closed instead of returning fake success
+    // 中文：未安装无头浏览器二进制时，必须严格失败关闭，不能返回伪造的成功结果。
     let nav_res = browser_srv.navigate("https://cyrene.io/docs").await;
     if !browser_srv.is_available() {
         assert!(
@@ -139,6 +146,7 @@ async fn test_separated_architecture_t74() {
     }
 
     // Controlled driver executes correctly
+    // 中文：受控驱动程序可以正确执行。
     let mock_browser = BrowserService::with_mock_driver("<html><h1>Cyrene</h1></html>");
     let mock_res = mock_browser
         .navigate("https://cyrene.io/docs")
@@ -148,6 +156,7 @@ async fn test_separated_architecture_t74() {
 }
 
 // ── T75 & T80: Path Traversal & Symlink Escape Prevention ───────────────
+// 中文：T75 与 T80：防止路径遍历和符号链接逃逸。
 
 #[test]
 fn test_path_traversal_denied_t75_t80() {
@@ -155,14 +164,17 @@ fn test_path_traversal_denied_t75_t80() {
     let validator = PathValidator::new(vec![tmp.path().to_path_buf()]);
 
     // Absolute sensitive host path
+    // 中文：指向敏感主机绝对路径的情况。
     let err1 = validator.validate_path("/etc/passwd").unwrap_err();
     assert_eq!(err1.code, ComputerErrorCode::PathTraversalDenied as i32);
 
     // Relative escape through parent directory
+    // 中文：通过父目录进行相对路径逃逸。
     let err2 = validator.validate_path("../../etc/shadow").unwrap_err();
     assert_eq!(err2.code, ComputerErrorCode::PathTraversalDenied as i32);
 
     // Empty path
+    // 中文：空路径。
     let err3 = validator.validate_path("   ").unwrap_err();
     assert_eq!(err3.code, ComputerErrorCode::PathTraversalDenied as i32);
 }
@@ -176,12 +188,14 @@ fn test_symlink_escape_prevention_t75_t80() {
 
     let inside_link = tmp.path().join("symlink_to_outside");
     // Create symlink inside allowlist that points to outside secret
+    // 中文：在允许列表目录中创建指向外部机密文件的符号链接。
     symlink(&outside_secret, &inside_link).unwrap();
 
     let validator = PathValidator::new(vec![tmp.path().to_path_buf()]);
     let result = validator.validate_path(inside_link.to_str().unwrap());
 
     // Canonicalization resolves symlink to outside_secret which escapes allowlist
+    // 中文：规范化路径会将符号链接解析到允许列表之外的 `outside_secret`。
     assert!(
         result.is_err(),
         "Symlink pointing outside allowed root must be rejected"
@@ -193,6 +207,7 @@ fn test_symlink_escape_prevention_t75_t80() {
 }
 
 // ── T75 & T80: Environment Variable Sanitization (No Leakage) ──────────
+// 中文：T75 与 T80：清理环境变量，避免信息泄漏。
 
 #[test]
 fn test_environment_filtering_and_leakage_protection_t75_t80() {
@@ -216,6 +231,7 @@ fn test_environment_filtering_and_leakage_protection_t75_t80() {
 }
 
 // ── T75 & T80: Output Bomb Truncation Protection ───────────────────────
+// 中文：T75 与 T80：防止超大输出绕过截断保护。
 
 #[tokio::test]
 async fn test_output_bomb_truncation_t75_t80() {
@@ -223,6 +239,7 @@ async fn test_output_bomb_truncation_t75_t80() {
     let service = ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]);
 
     // Command outputs 20,000 bytes with limit capped at 1024 bytes
+    // 中文：命令输出 20,000 字节，但上限截为 1,024 字节。
     let req = CommandExecutionRequest {
         command: "python3 -c 'print(\"A\" * 20000)'".to_string(),
         cwd: Some(tmp.path().to_str().unwrap().to_string()),
@@ -242,6 +259,7 @@ async fn test_output_bomb_truncation_t75_t80() {
 }
 
 // ── T80: Command Timeout Enforcement ───────────────────────────────────
+// 中文：T80：强制执行命令超时。
 
 #[tokio::test]
 async fn test_command_timeout_enforcement_t80() {
@@ -252,7 +270,7 @@ async fn test_command_timeout_enforcement_t80() {
         command: "sleep 10".to_string(),
         cwd: Some(tmp.path().to_str().unwrap().to_string()),
         env: HashMap::new(),
-        timeout_ms: Some(200), // 200ms timeout
+        timeout_ms: Some(200), // 200ms timeout | 中文：超时时间为 200 毫秒
         max_output_bytes: None,
     };
 
@@ -267,6 +285,7 @@ async fn test_command_timeout_enforcement_t80() {
 }
 
 // ── T80: Cancellation Propagation ──────────────────────────────────────
+// 中文：T80：传播取消信号。
 
 #[tokio::test]
 async fn test_command_cancellation_t80() {
@@ -299,6 +318,7 @@ async fn test_command_cancellation_t80() {
 }
 
 // ── T80: Descendant Process Group Cleanup ──────────────────────────────
+// 中文：T80：清理后代进程组。
 
 #[tokio::test]
 async fn test_descendant_process_cleanup_t80() {
@@ -309,13 +329,14 @@ async fn test_descendant_process_cleanup_t80() {
     let service = ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]);
 
     // Spawn parent bash script which spawns a background sleeper and records its PID
+    // 中文：启动一个父 Bash 脚本；该脚本会派生后台休眠进程并记录其 PID。
     let script = format!("(sleep 30 & echo $! > {}) && sleep 10", marker_str);
 
     let req = CommandExecutionRequest {
         command: script,
         cwd: Some(tmp.path().to_str().unwrap().to_string()),
         env: HashMap::new(),
-        timeout_ms: Some(300), // Short timeout kills parent and process group
+        timeout_ms: Some(300), // Short timeout kills parent and process group | 中文：较短的超时会终止父进程及其进程组
         max_output_bytes: None,
     };
 
@@ -326,13 +347,16 @@ async fn test_descendant_process_cleanup_t80() {
     ));
 
     // Wait a moment for OS signals to settle
+    // 中文：等待片刻，让操作系统信号处理稳定下来。
     tokio::time::sleep(Duration::from_millis(200)).await;
 
     // Check if child PID is still alive
+    // 中文：检查子进程 PID 是否仍然存活。
     if marker_file.exists() {
         let child_pid_str = fs::read_to_string(&marker_file).unwrap();
         if let Ok(pid) = child_pid_str.trim().parse::<i32>() {
             // kill -0 pid checks if process exists
+            // 中文：`kill -0 pid` 用于检查进程是否存在。
             let exists = unsafe { libc::kill(pid, 0) == 0 };
             assert!(
                 !exists,
@@ -344,6 +368,7 @@ async fn test_descendant_process_cleanup_t80() {
 }
 
 // ── T80: Streaming Execution & Partial Stream Handling ─────────────────
+// 中文：T80：流式执行与部分流处理。
 
 #[tokio::test]
 async fn test_streaming_command_and_partial_stream_t80() {
@@ -373,11 +398,13 @@ async fn test_streaming_command_and_partial_stream_t80() {
     assert!(!events.is_empty());
 
     // Verify monotonic sequence numbers
+    // 中文：验证序列号单调递增。
     for (idx, evt) in events.iter().enumerate() {
         assert_eq!(evt.sequence_number, (idx + 1) as i64);
     }
 
     // Verify terminal exit evidence exists
+    // 中文：验证存在终态退出证据。
     let last = events.last().unwrap();
     assert!(matches!(
         last.event.as_ref().unwrap(),
@@ -386,6 +413,7 @@ async fn test_streaming_command_and_partial_stream_t80() {
 }
 
 // ── T78: Isolation Level Labeling (Bounded Managed Execution) ──────────
+// 中文：T78：标注隔离级别（有界托管执行）。
 
 #[test]
 fn test_default_isolation_labeling_t78() {
@@ -393,6 +421,7 @@ fn test_default_isolation_labeling_t78() {
     let service = ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]);
     // Verifies the default implementation is explicitly labeled BoundedManagedExecution,
     // NOT HostileCodeContainment
+    // 中文：验证默认实现明确标记为 BoundedManagedExecution，而不是 HostileCodeContainment。
     assert_eq!(
         service.isolation_level(),
         IsolationLevel::BoundedManagedExecution
@@ -406,6 +435,7 @@ fn test_default_isolation_labeling_t78() {
 }
 
 // ── T79: External Sandbox Provider Adapter for Hard Isolation ──────────
+// 中文：T79：用于实现强隔离的外部 Sandbox Provider 适配器。
 
 struct MockMicroVmSandboxAdapter;
 
@@ -464,10 +494,12 @@ async fn test_external_hard_isolation_adapter_t79() {
 }
 
 // ── M5C Exit Gate Verification ─────────────────────────────────────────
+// 中文：M5C 退出门槛验证。
 
 #[test]
 fn test_m5c_exit_gate_platform_owns_process_lifecycle_plugin_owns_bounded_behavior() {
     // 1. Filesystem access is strictly bounded to allowed roots
+    // 中文：1. 文件系统访问严格限制在允许的根目录内。
     let tmp = tempdir().unwrap();
     let service = ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]);
 
@@ -482,6 +514,7 @@ fn test_m5c_exit_gate_platform_owns_process_lifecycle_plugin_owns_bounded_behavi
     ));
 
     // 2. Artifact transfer is artifact-only
+    // 中文：2. Artifact 传输仅允许传输制品。
     let art = service.create_artifact(CreateArtifactRequest {
         name: "output.log".to_string(),
         mime_type: "text/plain".to_string(),
@@ -504,6 +537,7 @@ fn test_m5c_exit_gate_platform_owns_process_lifecycle_plugin_owns_bounded_behavi
 }
 
 // ── R02: Strict env_clear Prevents Host Secret Leakage ────────────────
+// 中文：R02：严格调用 `env_clear`，避免泄漏主机密钥。
 
 #[tokio::test]
 async fn test_r02_strict_env_clear_prevents_host_secret_leakage() {
@@ -511,10 +545,12 @@ async fn test_r02_strict_env_clear_prevents_host_secret_leakage() {
     let service = ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]);
 
     // 1. Inject sensitive variables into host process
+    // 中文：1. 向主机进程注入敏感变量。
     std::env::set_var("CYRENE_HOST_SECRET_API_KEY", "fixture-not-exported-alpha");
     std::env::set_var("AWS_SECRET_ACCESS_KEY", "fixture-not-exported-beta");
 
     // 2. Execute unary command checking if host variables leaked
+    // 中文：2. 执行单次命令，检查主机变量是否发生泄漏。
     let mut user_env = HashMap::new();
     user_env.insert("SAFE_APP_VAR".to_string(), "safe_value".to_string());
     user_env.insert("USER_API_KEY".to_string(), "should_be_stripped".to_string());
@@ -556,6 +592,7 @@ async fn test_r02_strict_env_clear_prevents_host_secret_leakage() {
     }
 
     // 3. Execute streaming command verifying the same env_clear guarantee
+    // 中文：3. 执行流式命令，验证相同的 `env_clear` 保证。
     let (tx, mut rx) = mpsc::channel::<CommandStreamEvent>(50);
     let stream_req = CommandExecutionRequest {
         command: "echo \"STREAM_LEAK=$CYRENE_HOST_SECRET_API_KEY\"".to_string(),
@@ -588,6 +625,7 @@ async fn test_r02_strict_env_clear_prevents_host_secret_leakage() {
 }
 
 // ── R03: Artifact Externalization, Opaque Token & Tamper Detection ────
+// 中文：R03：Artifact 外部化、不透明令牌与篡改检测。
 
 #[test]
 fn test_r03_artifact_externalization_and_opaque_token() {
@@ -600,6 +638,7 @@ fn test_r03_artifact_externalization_and_opaque_token() {
     );
 
     // 1. Create a binary artifact
+    // 中文：1. 创建二进制制品。
     let payload = vec![0xDE, 0xAD, 0xBE, 0xEF, 0xCA, 0xFE];
     let create_resp = service.create_artifact(CreateArtifactRequest {
         name: "test_binary.bin".to_string(),
@@ -616,6 +655,7 @@ fn test_r03_artifact_externalization_and_opaque_token() {
     assert_eq!(meta.size_bytes, 6);
 
     // 2. Verify externalization: File exists on disk at storage dir
+    // 中文：2. 验证制品已外部化：文件存在于存储目录中。
     let file_path = service
         .get_artifact_path(&meta.artifact_id)
         .expect("Path must be resolved");
@@ -624,6 +664,7 @@ fn test_r03_artifact_externalization_and_opaque_token() {
     assert_eq!(on_disk_bytes, payload, "On disk content must match exactly");
 
     // 3. Retrieve via GetArtifact on-demand read
+    // 中文：3. 通过 GetArtifact 按需读取制品。
     let get_resp = service.get_artifact(GetArtifactRequest {
         artifact_id: meta.artifact_id.clone(),
     });
@@ -636,6 +677,7 @@ fn test_r03_artifact_externalization_and_opaque_token() {
     }
 
     // 4. Tamper detection: modify the file on disk and verify checksum failure
+    // 中文：4. 检测篡改：修改磁盘上的文件，并验证校验和失败。
     fs::write(&file_path, b"corrupted bytes").unwrap();
     let get_tampered = service.get_artifact(GetArtifactRequest {
         artifact_id: meta.artifact_id.clone(),
@@ -650,10 +692,12 @@ fn test_r03_artifact_externalization_and_opaque_token() {
 }
 
 // ── R04: Browser Environment Probing, Scheme Validation & Fail-Closed ─
+// 中文：R04：探测 Browser 环境、校验 scheme，并在失败时关闭访问。
 
 #[tokio::test]
 async fn test_r04_browser_environment_probing_and_rejection() {
     // 1. Invalid schemes rejected
+    // 中文：1. 拒绝无效的 scheme。
     let browser = BrowserService::with_mock_driver("mock response");
     let err_file = browser.navigate("file:///etc/shadow").await.unwrap_err();
     assert_eq!(err_file.code, ComputerErrorCode::ExecutionDenied as i32);
@@ -663,6 +707,7 @@ async fn test_r04_browser_environment_probing_and_rejection() {
     assert_eq!(err_ftp.code, ComputerErrorCode::ExecutionDenied as i32);
 
     // 2. Unavailable environment strictly fails closed
+    // 中文：2. 环境不可用时必须严格失败关闭。
     let unavailable = BrowserService::with_backend(
         cyrene_computer_runtime::browser::browser_service::BrowserBackend::Unavailable {
             reason: "Headless browser not provisioned on worker node".to_string(),
@@ -676,6 +721,7 @@ async fn test_r04_browser_environment_probing_and_rejection() {
         .contains("Headless browser not provisioned"));
 
     // 3. Mock backend works as expected
+    // 中文：3. Mock 后端能够按预期工作。
     let valid_mock = BrowserService::with_mock_driver("<html><title>Test</title></html>");
     let resp = valid_mock.navigate("https://cyrene.io").await.unwrap();
     assert!(resp.contains("[MockDriver]"));

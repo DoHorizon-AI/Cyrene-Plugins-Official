@@ -4,6 +4,9 @@
 //! Exposes the canonical memory.provider.v1 methods:
 //! store, get, recall, delete, prune, export_batch, import_batch.
 //! Strictly pure capability: no profile inference, no dream audits, no proactive state.
+//! Memory Provider Service 实现（任务 T66、T68、T69、T70、T71、T72）。
+//! 暴露规范 memory.provider.v1 method：store、get、recall、delete、prune、export_batch、import_batch。
+//! 这是纯 capability：不执行 profile 推断、dream audit 或主动状态管理。
 
 use crate::backend::MemoryStorageBackend;
 use crate::embedding::ModelEmbeddingClient;
@@ -46,6 +49,7 @@ impl CyreneMemoryService {
     }
 
     /// 1. Store
+    /// 1. 存储（Store）。
     pub async fn store(&self, req: StoreMemoryRequest) -> StoreMemoryResponse {
         let tenant_id = req.tenant_id.trim();
         if tenant_id.is_empty() {
@@ -72,6 +76,7 @@ impl CyreneMemoryService {
         };
 
         // Dimension mismatch validation (Task T72)
+        // 维度不匹配校验（任务 T72）。
         if !item.embedding.is_empty() && item.embedding.len() != self.expected_dimension {
             return StoreMemoryResponse {
                 result: Some(store_memory_response::Result::Error(MemoryError {
@@ -87,6 +92,7 @@ impl CyreneMemoryService {
         }
 
         // Embedding generation if needed (Task T69)
+        // 按需生成 embedding（任务 T69）。
         let embedding = if item.embedding.is_empty() {
             if let Some(ref client) = self.embedding_client {
                 match client
@@ -186,6 +192,7 @@ impl CyreneMemoryService {
     }
 
     /// 2. Get
+    /// 2. 获取（Get）。
     pub async fn get(&self, req: GetMemoryRequest) -> GetMemoryResponse {
         let tenant_id = req.tenant_id.trim();
         match self.backend.get(tenant_id, &req.item_id).await {
@@ -229,6 +236,7 @@ impl CyreneMemoryService {
     }
 
     /// 3. Recall
+    /// 3. 召回（Recall）。
     pub async fn recall(&self, req: RecallMemoryRequest) -> RecallMemoryResponse {
         let tenant_id = req.tenant_id.trim();
         if tenant_id.is_empty() {
@@ -323,6 +331,7 @@ impl CyreneMemoryService {
     }
 
     /// 4. Delete
+    /// 4. 删除（Delete）。
     pub async fn delete(&self, req: DeleteMemoryRequest) -> DeleteMemoryResponse {
         let tenant_id = req.tenant_id.trim();
         match self.backend.delete(tenant_id, &req.item_id).await {
@@ -336,6 +345,7 @@ impl CyreneMemoryService {
     }
 
     /// 5. Prune
+    /// 5. 清理（Prune）。
     pub async fn prune(&self, req: PruneMemoryRequest) -> PruneMemoryResponse {
         let tenant_id = req.tenant_id.trim();
         let now = self.now_ms();
@@ -354,6 +364,7 @@ impl CyreneMemoryService {
     }
 
     /// 6. Export Batch
+    /// 6. 批量导出（Export Batch）。
     pub async fn export_batch(&self, req: ExportMemoryRequest) -> ExportMemoryResponse {
         let tenant_id = req.tenant_id.trim();
         let limit = req.limit.map(|l| l.max(1) as usize);
@@ -389,6 +400,7 @@ impl CyreneMemoryService {
     }
 
     /// 7. Import Batch
+    /// 7. 批量导入（Import Batch）。
     pub async fn import_batch(&self, req: ImportMemoryRequest) -> ImportMemoryResponse {
         let tenant_id = req.tenant_id.trim();
         let now = self.now_ms();

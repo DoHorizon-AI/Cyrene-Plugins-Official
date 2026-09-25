@@ -8,6 +8,12 @@ only JSON traces and never imports the repository's source tree.
 The verifier fails closed: a missing profile, an incomplete scenario, a
 non-passing required check, a different canonical payload, or a different
 error/event result is a migration blocker.
+
+中文:比较经过脱敏的 Python 与 C# OneBot 实际运行轨迹。
+
+中文:此验证器刻意独立于任一实现。它只读取 JSON 轨迹,且从不导入仓库源代码树,因此可以安全地随外部 Python 参考产物一起发布。
+
+中文:验证器采用失败即拒绝策略:缺少配置、场景不完整、必需检查未通过、规范载荷不同,或错误/事件结果不同,都会阻止迁移。
 """
 
 from __future__ import annotations
@@ -51,11 +57,15 @@ _VOLATILE_KEYS = frozenset(
 
 
 class ParityVerificationError(ValueError):
-    """Raised when real-run evidence cannot authorize migration."""
+    """Raised when real-run evidence cannot authorize migration.
+
+        中文:当实际运行证据不足以批准迁移时引发。"""
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    """Read one JSON object without accepting malformed evidence."""
+    """Read one JSON object without accepting malformed evidence.
+
+        中文:读取一个 JSON 对象,不接受格式错误的证据。"""
 
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -67,7 +77,9 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _required_text(value: Any, field: str) -> str:
-    """Require bounded non-empty text for evidence metadata."""
+    """Require bounded non-empty text for evidence metadata.
+
+        中文:要求证据元数据为非空且长度受限的文本。"""
 
     if not isinstance(value, str) or not value.strip() or len(value) > 512:
         raise ParityVerificationError(f"{field} must be bounded non-empty text")
@@ -75,7 +87,9 @@ def _required_text(value: Any, field: str) -> str:
 
 
 def _normalize(value: Any, *, key: str | None = None) -> Any:
-    """Normalize deployment-generated identifiers while preserving semantics."""
+    """Normalize deployment-generated identifiers while preserving semantics.
+
+        中文:规范化部署生成的标识,同时保留语义。"""
 
     if key in _VOLATILE_KEYS:
         return "<normalized>"
@@ -91,7 +105,9 @@ def _normalize(value: Any, *, key: str | None = None) -> Any:
 
 
 def _validate_trace(trace: dict[str, Any], label: str) -> dict[str, Any]:
-    """Validate one complete runtime trace and return its normalized copy."""
+    """Validate one complete runtime trace and return its normalized copy.
+
+        中文:验证一份完整的运行时轨迹并返回其规范化副本。"""
 
     if trace.get("schema") != TRACE_SCHEMA:
         raise ParityVerificationError(f"{label} has an unsupported trace schema")
@@ -147,7 +163,9 @@ def compare_traces(
     python_trace: dict[str, Any],
     native_trace: dict[str, Any],
 ) -> dict[str, Any]:
-    """Compare two complete traces and return redacted migration evidence."""
+    """Compare two complete traces and return redacted migration evidence.
+
+        中文:比较两份完整轨迹并返回脱敏的迁移证据。"""
 
     python_normalized = _validate_trace(python_trace, "python")
     native_normalized = _validate_trace(native_trace, "csharp")
@@ -178,7 +196,9 @@ def compare_traces(
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse two external trace paths and a redacted output path."""
+    """Parse two external trace paths and a redacted output path.
+
+        中文:解析两个外部轨迹路径和一个脱敏输出路径。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--python-trace", type=Path, required=True)
@@ -188,7 +208,9 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Compare the two traces and write PASS evidence only on exact parity."""
+    """Compare the two traces and write PASS evidence only on exact parity.
+
+        中文:比较两份轨迹,只有完全一致时才写入 PASS 证据。"""
 
     args = _parse_args()
     try:

@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 //! Cyrene Standalone Native Plugin gRPC Server (R08)
+//! Cyrene 独立原生插件 gRPC 服务（R08）
 //!
 //! Exposes agent.runtime.v1, memory.provider.v1, and computer.runtime.v1
 //! over standard tonic gRPC DirectPluginRuntimeService.
+//! 通过标准 tonic gRPC DirectPluginRuntimeService 暴露 agent.runtime.v1、memory.provider.v1 和 computer.runtime.v1。
 
 pub mod proto {
     // Tonic generates Result signatures whose error type is intentionally
     // fixed by the gRPC API; downstream code cannot box or shrink it.
+    //     Tonic 生成的 Result 签名使用 gRPC API 固定的错误类型；下游代码不能将其装箱或缩小。
     #![allow(clippy::result_large_err)]
     tonic::include_proto!("cyrene.plugin.runtime.v1");
 }
@@ -49,6 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bound_addr = listener.local_addr()?;
 
     // Print announcement header to stdout for caller detection
+    // 向 stdout 输出公告头，供调用方检测服务启动
     println!("[CYRENE_SERVER_STARTED] addr={}", bound_addr);
     std::io::stdout().flush().ok();
 

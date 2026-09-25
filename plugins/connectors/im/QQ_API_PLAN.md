@@ -82,3 +82,62 @@ that status.
 
 API 在指定真实客户端版本上实际执行前保持 `NOT_RUN`。接口声明、编译成功、Mock 或模拟
 Peer 均不能改变该状态。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# QQ 客户端 API 覆盖计划
+
+本文定义需要验证的 QQ 客户端 API 范围。内容只涉及客户端能力和验收条件，不描述 Product、connector 或第三方 runtime 实现。
+
+## 1. Capability 范围
+
+| 优先级 | Capability | QQ 客户端接口与方法 |
+| --- | --- | --- |
+| P0 | Session 生命周期 | NodeIQQNTWrapperSession.create、init、startNT；NodeIKernelLoginService.connect、online、offline |
+| P0 | 登录状态 | getLoginList、quickLoginWithUin、passwordLogin、getQRCodePicture、startPolling、getSelfStatus |
+| P0 | 当前账号身份 | NodeIKernelProfileService.getCoreAndBaseInfo、getUserSimpleInfo |
+| P0 | 接收消息 | NodeIKernelMsgService.addKernelMsgListener；NodeIKernelMsgListener.onRecvMsg |
+| P0 | 发送消息 | NodeIKernelMsgService.sendMsg；必要时通过 onMsgInfoListUpdate 获取完成结果 |
+| P0 | 会话对象解析 | getUidByUin、getUinByUid、getUixConvertService().getUid、getUixConvertService().getUin |
+| P1 | 消息查询 | getMsgsIncludeSelf、getMsgsBySeqAndCount、getMsgsByMsgId、getSingleMsg、queryMsgsWithFilterEx |
+| P1 | 撤回与转发 | recallMsg、forwardMsg、forwardMsgWithComment、multiForwardMsg |
+| P1 | 已读状态与表情点赞 | setMsgRead、setAllC2CAndGroupMsgRead、setMsgEmojiLikes、getMsgEmojiLikesList |
+| P1 | 群发现 | getGroupList、getGroupDetailInfo、getAllMemberList、getMemberInfo |
+| P1 | 好友发现 | getBuddyListV2、getBuddyListFromCache、getBuddyReq |
+| P1 | 媒体下载 | getRichMediaElement、downloadRichMedia、getVideoPlayUrlV2、onRichMediaDownloadComplete |
+| P1 | 文件 | getGroupFileList、searchFile、downloadFile、forwardFile、saveAs |
+| P2 | 群管理 | modifyGroupName、modifyGroupRemark、setMemberShutUp、setGroupShutUp、kickMember、quitGroup |
+| P2 | 好友申请 | approvalFriendRequest、getDoubtBuddyReq、approvalDoubtBuddyReq、reqToAddFriends、delBuddy |
+| P2 | 资料修改 | modifySelfProfile、setNickName、setLongNick、setBirthday、setGander、setHeader |
+| P2 | 搜索 | searchStranger、searchGroup、searchContact、searchMsgWithKeywords、searchFileWithKeywords |
+| P2 | 在线状态 | setStatus、getOnLineDev、getLikeList、setLikeStatus、checkLikeStatus |
+
+## 2. 必需请求与结果数据
+
+| 领域 | 必需数据 |
+| --- | --- |
+| 账号 | 登录状态、QQ UIN、用户 UID、显示名称和客户端版本 |
+| 会话对象 | 聊天类型、peerUid、群号或私聊用户身份 |
+| 消息 | 消息 ID、序列号、随机值、发送者、时间戳和有序消息元素 |
+| 群 | 群号、名称、权限、成员身份和管理结果 |
+| 媒体 | 元素 ID、文件 ID、编解码器或媒体类型、进度、本地结果引用和错误 |
+| 回调 | 账号、会话、请求、消息、文件或搜索关联身份 |
+
+## 3. 验证顺序
+
+1. 确认 Session 创建、初始化、登录状态观测、自身身份读取和正常离线行为。
+2. 分别对好友、群和一个已知会话对象验证一次无副作用读取。
+3. 验证私聊和群聊文本接收，包括账号、会话、消息、时间戳及有序元素身份。
+4. 验证私聊和群聊文本发送，包括回调关联和返回的消息身份。
+5. 验证消息查询、撤回、转发、已读状态及重复回调处理。
+6. 验证媒体和文件下载，要求存储有界且失败结果明确。
+7. 只有只读和消息操作通过后，才验证修改及管理方法。
+
+## 4. 验收记录
+
+每个经过验证的方法都必须记录准确的 QQ 客户端版本、宿主平台、Service 接口、方法签名、输入标识符类型、直接返回值、Listener 回调、超时行为和观测到的错误。不得记录凭据、登录 ticket、设备 secret 或私聊内容。
+
+只有在指定真实客户端版本上实际运行后，API 才能离开 NOT_RUN 状态。仅有接口声明、编译成功、mock 或模拟 peer 都不能改变该状态。

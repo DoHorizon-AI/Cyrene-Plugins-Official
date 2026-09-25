@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.Tests                                   │
 // │  Role: Comprehensive test suite for M5D (T81 - T88).                │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：ProviderTests.cs
+// 中文：命名空间：Cyrene.Provider.Tests
+// 中文：职责：针对 M5D（T81–T88）的综合测试套件。
 
 using System.Net;
 using System.Text;
@@ -107,6 +110,7 @@ public class ProviderTests
     }
 
     // ── T81: Separate Capability Profiles ──────────────────────────────────
+// 中文：T81：分离 capability profile。
 
     [Fact]
     public void Test_T81_SeparateCapabilityProfiles()
@@ -124,11 +128,13 @@ public class ProviderTests
         Assert.Equal("IRerankCapability", rerankCapName);
 
         // Verify independent implementations are decoupled
+// 中文：验证彼此独立的实现互不耦合。
         Assert.False(typeof(IModelCapability).IsAssignableFrom(typeof(IEmbeddingCapability)));
         Assert.False(typeof(ITtsCapability).IsAssignableFrom(typeof(ISttCapability)));
     }
 
     // ── T82: Redaction Sanitizer ───────────────────────────────────────────
+// 中文：T82：脱敏清理器。
 
     [Fact]
     public void Test_T82_RedactionSanitizer_ScrubsSecrets()
@@ -150,6 +156,7 @@ public class ProviderTests
     }
 
     // ── T82: SSE Stream Reader ─────────────────────────────────────────────
+// 中文：T82：SSE 流读取器。
 
     [Fact]
     public async Task Test_T82_SseStreamReader_ParsesAndTerminatesOnDone()
@@ -169,6 +176,7 @@ public class ProviderTests
     }
 
     // ── T83 & T85: OpenAI Wire Translation ─────────────────────────────────
+// 中文：T83 与 T85：OpenAI wire 格式转换。
 
     [Fact]
     public async Task Test_T83_T85_OpenAiVendorAdapter_WireTranslation()
@@ -204,6 +212,7 @@ public class ProviderTests
     }
 
     // ── T83 & T85: Anthropic Wire Translation ──────────────────────────────
+// 中文：T83 与 T85：Anthropic wire 格式转换。
 
     [Fact]
     public async Task Test_T83_T85_AnthropicVendorAdapter_WireTranslation()
@@ -546,6 +555,7 @@ public class ProviderTests
     }
 
     // ── T86: Sanitized Fixtures Testing ────────────────────────────────────
+// 中文：T86：使用脱敏 fixture 进行测试。
 
     [Fact]
     public async Task Test_T86_AuthFailureFixture_401()
@@ -633,12 +643,14 @@ public class ProviderTests
         }
 
         // Must yield 2 valid events and not throw unhandled exception
+// 中文：必须产生两个有效事件，且不得抛出未处理异常。
         Assert.Equal(2, events.Count);
         Assert.Contains("Hello", events[0]);
         Assert.Contains("world", events[1]);
     }
 
     // ── T87: Credential Injection (No Raw Secret Storage) ──────────────────
+// 中文：T87：注入凭据（不存储原始密钥）。
 
     [Fact]
     public void Test_T87_CredentialInjection_NeverLogsSecrets()
@@ -654,6 +666,7 @@ public class ProviderTests
     }
 
     // ── T88: Native AOT prototype must not claim runtime readiness ─────────
+// 中文：T88：Native AOT 原型不得宣称运行时已就绪。
 
     [Fact]
     public void Test_T88_ProviderReadiness_FailsClosedWithoutGrpcHost()
@@ -672,11 +685,13 @@ public class ProviderTests
     }
 
     // ── M5D Exit Gate Verification ─────────────────────────────────────────
+// 中文：M5D 退出门槛验证。
 
     [Fact]
     public void Test_M5D_ExitGate_ProvidersShareInfrastructureNotGlobalRouting()
     {
         // 1. Providers share HttpTransportClient, SseStreamReader, RedactionSanitizer
+// 中文：1. 各 Provider 共用 HttpTransportClient、SseStreamReader 和 RedactionSanitizer。
         var config1 = new ProviderBindingConfiguration(new Uri("https://api.openai.com"), "sk-key-1");
         var config2 = new ProviderBindingConfiguration(new Uri("https://api.anthropic.com"), "ant-key-2");
 
@@ -684,11 +699,13 @@ public class ProviderTests
         var anthropicAdapter = new AnthropicVendorAdapter(config2);
 
         // 2. Both adapters are completely independent instances without shared mutable global routing
+// 中文：2. 两个适配器是完全独立的实例，不会共享可变的全局路由状态。
         Assert.NotNull(openAiAdapter);
         Assert.NotNull(anthropicAdapter);
         Assert.NotSame(openAiAdapter, anthropicAdapter);
     }
     // ── W6-2: Gemini Native Provider Wire Translation ──────────────────────
+// 中文：W6-2：Gemini 原生 Provider wire 格式转换。
 
     private const string GeminiStreamSse = """
         data: {"candidates":[{"content":{"role":"model","parts":[{"text":"Hel"}]},"index":0}],"usageMetadata":{"promptTokenCount":7,"candidatesTokenCount":1,"totalTokenCount":8}}
@@ -744,6 +761,7 @@ public class ProviderTests
         Assert.Equal("/v1beta/models/gemini-2.0-flash:generateContent", capturedPath);
         Assert.Equal("gemini-test-key", capturedKey);
         // Gemini native responses carry no message id.
+// 中文：Gemini 原生响应不携带消息 ID。
         Assert.Equal(string.Empty, result.Id);
         Assert.Equal("Hello Cyrene", result.Content);
         Assert.Equal("STOP", result.FinishReason);
@@ -756,6 +774,7 @@ public class ProviderTests
         Assert.Contains("\"generationConfig\":{", capturedBody);
         Assert.Contains("\"maxOutputTokens\":64", capturedBody);
         // System messages are hoisted out of contents into systemInstruction.
+// 中文：将 system 消息从 contents 中移出，提升到 systemInstruction。
         Assert.DoesNotContain("\"role\":\"system\"", capturedBody);
     }
 
@@ -834,6 +853,7 @@ public class ProviderTests
         Assert.Equal("Paris", functionCall.GetProperty("args").GetProperty("city").GetString());
 
         // Tool responses correlate by function name, not by call id.
+// 中文：工具响应根据函数名称关联，而不是根据调用 ID。
         var functionResponse = contents[2]
             .GetProperty("parts")[0]
             .GetProperty("functionResponse");
@@ -847,6 +867,7 @@ public class ProviderTests
         // Two parallel calls to the same function must stay distinguishable in
         // the capability model even though the Gemini wire protocol carries no
         // call ids.
+// 中文：对同一函数发起的两个并行调用，在 capability 模型中必须仍可区分，即使 Gemini wire 协议没有调用 ID。
         const string mockResponseJson = "{\"candidates\":[{\"content\":{\"role\":\"model\",\"parts\":[{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"Paris\"}}},{\"functionCall\":{\"name\":\"get_weather\",\"args\":{\"city\":\"London\"}}}]},\"finishReason\":\"STOP\",\"index\":0}],\"usageMetadata\":{\"promptTokenCount\":20,\"candidatesTokenCount\":8,\"totalTokenCount\":28}}";
 
         var handler = new MockHttpMessageHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
@@ -895,6 +916,7 @@ public class ProviderTests
                 new("gemini-call-2", "function", new ChatToolCallFunction("get_time", "{\"zone\":\"UTC\"}"))
             }),
             // The runtime reports the results out of order on purpose.
+// 中文：运行时会故意打乱结果顺序。
             new("tool", "{\"temp_c\":14}", ToolCallId: "gemini-call-1"),
             new("tool", "{\"utc\":\"12:00\"}", ToolCallId: "gemini-call-2"),
             new("tool", "{\"temp_c\":21}", ToolCallId: "gemini-call-0")
@@ -907,12 +929,14 @@ public class ProviderTests
         var contents = request.RootElement.GetProperty("contents");
 
         // The model turn keeps the calls in their original order.
+// 中文：模型轮次仍按原始顺序保留这些调用。
         var calls = contents[1].GetProperty("parts");
         Assert.Equal("Paris", calls[0].GetProperty("functionCall").GetProperty("args").GetProperty("city").GetString());
         Assert.Equal("London", calls[1].GetProperty("functionCall").GetProperty("args").GetProperty("city").GetString());
         Assert.Equal("get_time", calls[2].GetProperty("functionCall").GetProperty("name").GetString());
 
         // Responses are emitted in call order: Paris, London, then time.
+// 中文：按调用顺序发出响应：Paris、London，最后是时间。
         Assert.Equal(5, contents.GetArrayLength());
         var paris = contents[2].GetProperty("parts")[0].GetProperty("functionResponse");
         var london = contents[3].GetProperty("parts")[0].GetProperty("functionResponse");
@@ -962,10 +986,12 @@ public class ProviderTests
             .GetProperty("functionResponse")
             .GetProperty("response");
         // functionResponse requires a JSON object; plain text is wrapped deterministically.
+// 中文：functionResponse 要求 JSON 对象；如果输入是纯文本，则按确定性规则将其包装起来。
         Assert.Equal("all good", response.GetProperty("output").GetString());
 
         // A tool message whose tool_call_id has no matching assistant tool call is rejected
         // before any network call, because Gemini correlates by function name.
+// 中文：如果工具消息的 tool_call_id 找不到匹配的 assistant 工具调用，就会在任何网络请求发出之前被拒绝，因为 Gemini 根据函数名称进行关联。
         var unroutable = new List<ChatMessage> { new("tool", "x", ToolCallId: "missing") };
         var exception = await Assert.ThrowsAsync<ProviderException>(() => adapter.CompleteChatAsync(
             new ChatCompletionParameters("gemini-2.0-flash", unroutable)

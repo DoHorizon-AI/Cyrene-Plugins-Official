@@ -176,3 +176,95 @@ exact-version mapping, authorization record, and test before being added.
 `QQ_SIDE_INTERFACES.md` 中 collection、album、robot、ticket、setting、mini-app、
 third-party signature 等额外 getter 不在本矩阵声明范围内。只有新增固定操作、Schema、精确版本
 映射、授权记录和测试后，才可加入。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# QQNT Direct API 映射矩阵
+
+本矩阵是 src/qq_connector/qqnt_direct_operations.py 中可执行固定操作表的人工可读投影。capability 来源见 QQ_API_PLAN.md。计划中命名的每项操作都列于下表；额外的 qq.friend.set_remark 是明确登记的 adapter 扩展，不会用来隐藏任意原生调用。
+
+## 目标与证据策略
+
+首个受支持的真实目标平台是 Linux x86_64。部署必须提供书面授权记录、准确的 QQ 客户端 build 字符串和准确的 Host ABI。配置将 build 字符串记录为 required_client_version，将 ABI 记录为 required_host_abi；Host hello 则提供 client_version 和 abi。由于本仓库没有获授权的 QQ build 或原生 Host，所有真实 API 行当前都是 NOT_RUN。Fake Host 测试只能证明 worker 边界、映射机制和失败处理。
+
+下表的请求/结果列描述规范化的 qq.client.v1 envelope，并非臆造的原生重载签名。某一行要改为 PASS，验收记录必须针对配置的 build 写明准确的原生签名、输入标识符类型、直接返回值、Listener 回调、超时/取消结果和观测到的错误；不得记录凭据、ticket、session 文件或私聊正文。
+
+规范 message.connector.v1 mapper 当前只有四种内容：text、mention、image 和 file；reply 使用单独的 reply reference。原生 audio/video 元素不会被强制转换为其他类型。在规范 connector contract 定义对应内容类型之前，这些元素只通过固定 QQ media/file 操作边界提供。
+
+## 覆盖矩阵
+
+| 优先级 | QQ API 行 | 直连操作 | 原生 Service 与方法 | 请求字段 | 结果或回调 | 目标与证据 |
+| --- | --- | --- | --- | --- | --- | --- |
+| P0 | Session 生命周期 | qq.session.create、qq.session.init、qq.session.start_nt、qq.login.connect、qq.login.online、qq.login.offline | NodeIQQNTWrapperSession.create/init/startNT；NodeIKernelLoginService.connect/online/offline | account_id?、platform、client_version、data_dir、login_policy | state、session_id、account_id、client_version、abi；login/session 状态回调 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P0 | 登录状态 | qq.login.list、qq.login.quick、qq.login.password、qq.login.qr、qq.login.poll | NodeIKernelLoginService.getLoginList/quickLoginWithUin/passwordLogin/getQRCodePicture/startPolling | account_id?、uin?、secret_ref?、qr_code?、poll_interval_seconds? | login_state、account_id、QQ UIN、用户 UID、显示名称、QR/进度结果；login 回调 | Linux x86_64 + 准确 build/ABI；密码只能通过 secret_ref；NOT_RUN |
+| P0 | 登录状态观测 | qq.login.self_status | NodeIKernelProfileService.getSelfStatus | account_id?、uin?、uid? | login_state、account_id、QQ UIN、用户 UID、显示名称 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P0 | 当前账号身份 | qq.account.core、qq.account.simple | NodeIKernelProfileService.getCoreAndBaseInfo/getUserSimpleInfo | account_id?、uid?、uin? | account ID、QQ UIN、用户 UID、显示名称、profile 结果 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P0 | 接收消息 | qq.message.subscribe | NodeIKernelMsgService.addKernelMsgListener + NodeIKernelMsgListener.onRecvMsg | account_id?、events?、filter? | message.received 回调：账号、会话、message ID、sequence、random、时间戳、有序元素 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P0 | 发送消息 | send_message、qq.message.send、qq.message.send_completion（仅回调） | NodeIKernelMsgService.sendMsg + onMsgInfoListUpdate | 规范 conversation/content/reply；peer、elements | 已接受的 DeliveryResult、原生 message ID、sequence、random、peer；完成回调 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P0 | 会话对象解析 | qq.peer.uid_by_uin、qq.peer.uin_by_uid、qq.peer.uid、qq.peer.uin | NodeIKernelProfileService.getUidByUin/getUinByUid；NodeIKernelUixConvertService.getUid/getUin | account_id?、uid?、uin?、user_uid?、user_uin?、peer_uid? | 明确的 UID/UIN/peer identity 结果；不得有损替换 ID | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P1 | 消息查询 | qq.message.history_include_self、qq.message.history_by_seq、qq.message.by_id、qq.message.single、qq.message.search | getMsgsIncludeSelf/getMsgsBySeqAndCount/getMsgsByMsgId/getSingleMsg/queryMsgsWithFilterEx | account_id、peer、message_id?、sequence?、random?、offset?、count?、filter?、query? | 按顺序返回消息，并包含 message ID、sender、timestamp、sequence、random 和 elements | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P1 | 撤回与转发 | qq.message.recall、qq.message.forward、qq.message.forward_comment、qq.message.multi_forward | recallMsg/forwardMsg/forwardMsgWithComment/multiForwardMsg | account_id、source、destination、message_id?、message_ids?、comment?、messages? | accepted/rejected 结果、源/目标身份、生成的 message ID；存在时返回完成结果 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P1 | 已读与表情点赞 | qq.message.read、qq.message.read_all、qq.message.emoji_likes、qq.message.emoji_likes_list | setMsgRead/setAllC2CAndGroupMsgRead/setMsgEmojiLikes/getMsgEmojiLikesList | account_id、peer?、message_id?、message_ids?、like_id?、like_type? | 状态、已读标记、点赞列表/数量和消息身份 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P1 | 群发现 | qq.group.list、qq.group.detail、qq.group.members、qq.group.member | getGroupList/getGroupDetailInfo/getAllMemberList/getMemberInfo | account_id、group_id?、group_code?、member_uid?、member_uin?、offset?、count? | 群号、名称、权限、成员 UID/UIN 和显示数据 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P1 | 好友发现 | qq.friend.list、qq.friend.cached、qq.friend.requests | getBuddyListV2/getBuddyListFromCache/getBuddyReq | account_id、uid?、uin?、offset?、count? | 好友 UID/UIN、显示数据、请求身份/状态 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P1 | 媒体下载 | qq.media.element、qq.media.download、qq.media.video_url、qq.media.download_complete（仅回调） | getRichMediaElement/downloadRichMedia/getVideoPlayUrlV2/onRichMediaDownloadComplete | account_id、message_id?、element_id?、media_id?、media_type?、codec?、download? | element/file ID、媒体类型、进度、有界 remote_uri 或 QQ media ref、本地结果 ref、错误；下载回调 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P1 | 文件 | qq.file.list、qq.file.search、qq.file.download、qq.file.forward、qq.file.save | getGroupFileList/searchFile/downloadFile/forwardFile/saveAs | account_id、group_id?、folder_id?、file_id?、file_uuid?、file_name?、query?、source?、destination? | 有界 file reference、名称/类型、进度、本地结果 ref、错误；文件回调 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P2 | 群管理 | qq.group.modify_name、qq.group.modify_remark、qq.group.mute_member、qq.group.mute、qq.group.kick、qq.group.quit | modifyGroupName/modifyGroupRemark/setMemberShutUp/setGroupShutUp/kickMember/quitGroup | account_id、group_id、member_uid?、member_uin?、name?、remark?、duration_seconds? | accepted/rejected 状态、目标身份、原因；原生 API 发出时记录管理回调 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P2 | 群申请审批 adapter | qq.group.approve | NodeIKernelGroupService.operateSysNotify | account_id、request_id、group_id?、user_id?、approve、comment?、vendor_request? | 已接受/拒绝的请求结果、请求/群/成员身份 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P2 | 好友申请与备注 | qq.friend.approve、qq.friend.doubt_requests、qq.friend.approve_doubt、qq.friend.add、qq.friend.delete、qq.friend.set_remark | approvalFriendRequest/getDoubtBuddyReq/approvalDoubtBuddyReq/reqToAddFriends/delBuddy/setBuddyRemark | account_id、request_id?、uid?、uin?、approve?、comment?、remark? | 请求/好友身份、决定/状态、原因；原生 API 发出时记录请求回调 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P2 | 资料修改 | qq.profile.modify、qq.profile.nickname、qq.profile.long_nick、qq.profile.birthday、qq.profile.gender、qq.profile.header | modifySelfProfile/setNickName/setLongNick/setBirthday/setGander/setHeader | account_id、profile?、nickname?、long_nick?、birthday?、gender?、header? | 字段级 accepted/rejected 结果和账号身份 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P2 | 搜索 | qq.search.stranger、qq.search.group、qq.search.contact、qq.search.message、qq.search.file | searchStranger/searchGroup/searchContact/searchMsgWithKeywords/searchFileWithKeywords | account_id、query?、keywords?、scope?、offset?、count?、filter? | 保留 UID/UIN/group/file/message identity 的类型化结果列表 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+| P2 | 在线状态与点赞 | qq.online.status、qq.online.devices、qq.online.likes、qq.online.set_like、qq.online.check_like | setStatus/getOnLineDev/getLikeList/setLikeStatus/checkLikeStatus | account_id、status?、device_id?、like_id?、like_type?、target_id? | 包含账号和目标身份的状态/设备/点赞结果 | Linux x86_64 + 准确 build/ABI；NOT_RUN |
+
+## 横切契约 profile
+
+每个固定操作通过 QQOperation 中可执行的 mapping 值选择一个 profile。此 profile 定义该行每个操作的 request/result 边界；native Host 仍负责准确的 overload 校验。
+
+| Mapping profile | 适用范围 | Request 契约 | Result/callback 契约 |
+| --- | --- | --- | --- |
+| session | Session 生命周期 | account_id?、platform、client_version、data_dir、login_policy | state/session/account/version/ABI；生命周期回调 |
+| login | 登录状态 | account/UIN、secret_ref?、QR/poll 字段 | login state、account/UIN/UID、QR/进度；login 回调 |
+| account | 当前账号身份 | account/UIN/UID selector | account/UIN/UID/display name/profile |
+| message | 订阅、撤回、转发、多消息转发 | account、peer/source/destination/message identity；适用时包含有序元素 | message identity 或 accepted status；适用时包含 native 完成回调 |
+| send_message | 规范发送和回调记录 qq.message.send_completion | 规范 conversation/content/reply 加 QQ peer/elements | DeliveryResult、message ID/sequence/random/peer 和完成回调；回调记录不能作为 request 调用 |
+| peer | 会话对象解析 | 明确的 UID/UIN/account selector | 明确的 UID/UIN/peer 结果 |
+| lookup | 历史消息、按 ID 查询和搜索 | account、peer、message/sequence/filter/page 字段 | 包含 identity 字段的有序类型化消息 |
+| read | 已读状态 | account、peer/message selector | accepted status/read marker |
+| emoji | 表情点赞 | account、message/like selector | 点赞列表/数量/状态 |
+| group | 群发现 | account、group/member selector 和分页参数 | 群/成员身份、名称、权限 |
+| friend | 好友发现 | account、好友 selector 和分页参数 | 好友/请求身份和显示数据 |
+| media | 媒体下载 | account、message/element/media selector 和媒体选项 | 有界媒体引用、进度、本地结果 ref、错误；下载回调 |
+| file | 文件操作 | account、group/folder/file selector 和 source/destination | 有界文件引用、metadata、进度、本地结果 ref、错误 |
+| group_mutation | 群管理和审批 | account、群/成员/请求目标、决定或修改字段 | 目标身份、accepted/rejected 状态、原因 |
+| friend_mutation | 好友申请和备注修改 | account、请求/好友目标、决定/备注 | 请求/好友身份、accepted/rejected 状态、原因 |
+| profile | 资料修改 | account 和字段专用 profile 值 | 字段级状态和账号身份 |
+| search | 搜索操作 | account、query/keywords/scope/filter/page | 保留类型化 identity 的结果列表 |
+| online | 在线状态和点赞 | account、status/device/like target | 状态/设备/点赞结果 |
+
+canonical message.connector.v1 发送可选携带 vendor=qq 的 vendor_extension，其中可包含 qq_peer_uid、qq_peer_uin、qq_group_code、qq_user_uid 和 qq_user_uin 等身份事实。直连 adapter 只将这些已识别事实复制到原生 peer 对象，并拒绝重复值；conversation_id 仍是规范 connector 标识。原生 Host 提供这些值时，入站消息和已接受的发送结果也会将其作为单独的 QQ fact 暴露。
+
+## 共享安全规则
+
+| 领域 | 规则 | 证据状态 |
+| --- | --- | --- |
+| 关联 | 使用 binding_id + generation + request_id；UID、UIN、peer UID、群号、message ID、sequence 和 random 都是不同值。callback record 必须匹配发起它的 request，分别保留 peer identity 字段，且只消费一次。未知 event name 会被丢弃。 | Fake Host 已测试；真实接口 NOT_RUN |
+| 超时/取消 | deadline 有界；取消会发送 control frame；被移除的 request 会忽略迟到响应；不会隐式重试有副作用的调用。 | Fake Host 已测试；真实接口 NOT_RUN |
+| 账号/session | 必须精确匹配已配置的 platform/build/ABI 和可选的预期账号；ready account 缺失或不匹配时失败关闭。 | Fake Host 已测试；真实接口 NOT_RUN |
+| 媒体/文件 | 只有 HTTP(S) URI 或 binding 私有 QQ media reference 能跨越规范边界；不能传递 Product 本地路径或无界内容。 | Schema 和 mapper 已测试；真实接口 NOT_RUN |
+| 安全 | qq.login.password 接受 secret_ref，绝不接受 password；诊断会脱敏类似凭据的字段，并限制长度。 | 静态/测试边界；真实接口 NOT_RUN |
+| 进程隔离 | 每个 binding 独占一个 data directory 和 process group；关闭时回收该 binding 的后代进程；不使用 TCP/WS/OneBot transport。 | Fake Host 已测试；真实接口 NOT_RUN |
+| 安装选择 | 通过 Linux x86_64 operator 路径或唯一且精确的 installation manifest 选择；候选为零/多个或 build 漂移时失败关闭。 | Discovery 测试已覆盖；真实接口 NOT_RUN |
+| 崩溃监管 | 意外退出时使用有界的 binding 本地重启预算和 circuit；失败操作绝不隐式 replay。 | Fake Host 恢复/circuit 测试已覆盖；真实接口 NOT_RUN |
+
+## 操作 Schema
+
+plugin.manifest.json 为 79 个操作分别引用自己的 request schema，形式为 contracts/v1/schema.json#/$defs/<operation>_request。可执行 worker allow-list 与这些 schema property set 会校验是否一致。字段采用 QQ_API_PLAN.md 所列的保守公共 envelope；授权 Host 仍负责对精确目标客户端 overload 和原生消息形状进行验证。
+
+在 IPC 前，Python worker 还会校验基础类型、有限数值、集合深度/大小和保留字段。因此，即使调用方绕过仓库的 schema-validation tooling，格式错误的 JSON 和过大的嵌套值也不会到达 native Host。
+
+manifest 还为每项操作单独引用 output schema：contracts/v1/schema.json#/$defs/<operation>_response。响应 envelope 固定操作名称、优先级和精确 service/method 映射；result 按操作选择 mapping profile。profile result object 保持可扩展，因为授权 Host 负责精确的 overload 字段；同时 Python worker 仍会在 IPC 前拒绝格式错误、超限或含凭据的值。
+
+QQ_SIDE_INTERFACES.md 中额外列出的 getter（collection、album、robot、ticket、setting、mini-app、third-party signature 等 Service）不在本矩阵声明范围内。只有为其增加单独的固定操作、schema、精确版本映射、授权记录和测试后，才会纳入本矩阵。

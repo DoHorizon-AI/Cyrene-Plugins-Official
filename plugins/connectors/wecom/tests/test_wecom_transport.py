@@ -1,4 +1,6 @@
-"""Real HTTP tests for the urllib WeCom transport against a local fake API."""
+"""Real HTTP tests for the urllib WeCom transport against a local fake API.
+
+中文:针对本地模拟 API,对 urllib WeCom 传输进行真实 HTTP 测试。"""
 
 from __future__ import annotations
 
@@ -18,7 +20,9 @@ from wecom_connector import (
 
 
 class _FakeWeComApi(BaseHTTPRequestHandler):
-    """Minimal WeCom REST surface: media fetch, token, upload, and send."""
+    """Minimal WeCom REST surface: media fetch, token, upload, and send.
+
+        中文:最小 WeCom REST 接口:媒体获取、令牌、上传和发送。"""
 
     token_requests: list[dict[str, list[str]]] = []
     upload_requests: list[dict[str, Any]] = []

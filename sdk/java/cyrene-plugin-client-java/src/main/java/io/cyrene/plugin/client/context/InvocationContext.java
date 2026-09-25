@@ -37,7 +37,7 @@ import java.util.concurrent.TimeUnit;
  */
 public final class InvocationContext {
 
-    public static final int MAX_METADATA_BYTES = 8192; // 8 KB bounded metadata
+    public static final int MAX_METADATA_BYTES = 8192; // 8 KB bounded metadata | 中文：元数据大小上限为 8 KB
 
     private static final Metadata.Key<String> KEY_REQUEST_ID =
         Metadata.Key.of("x-request-id", Metadata.ASCII_STRING_MARSHALLER);
@@ -88,6 +88,7 @@ public final class InvocationContext {
 
     /**
      * Applies this context to a gRPC stub (deadline, interceptors for metadata propagation).
+     * <p>中文：将 deadline 和用于传递 metadata 的 interceptor 等上下文应用到 gRPC stub。</p>
      */
     public <T extends AbstractStub<T>> T applyToStub(T stub) {
         T configured = stub;
@@ -105,6 +106,7 @@ public final class InvocationContext {
                 ClientCall<ReqT, RespT> call = next.newCall(method, callOptions);
 
                 // Register cooperative cancellation
+// 中文：注册协作式取消。
                 cancellationToken.onCancel(() -> {
                     try {
                         call.cancel("Invocation cancelled by client context", null);
@@ -168,6 +170,7 @@ public final class InvocationContext {
 
         public InvocationContext build() {
             // Check bounded metadata size (T51)
+// 中文：检查 metadata 大小是否处于有界范围内（T51）。
             int totalBytes = 0;
             for (Map.Entry<String, String> entry : metadata.entrySet()) {
                 totalBytes += entry.getKey().getBytes().length + entry.getValue().getBytes().length;

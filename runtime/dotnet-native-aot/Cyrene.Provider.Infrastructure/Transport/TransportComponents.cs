@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.Infrastructure.Transport                │
 // │  Role: AOT-compatible HTTP transport and SSE reader (T82).          │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：TransportComponents.cs
+// 中文：命名空间：Cyrene.Provider.Infrastructure.Transport
+// 中文：职责：兼容 AOT 的 HTTP 传输与 SSE 读取器（T82）。
 
 using System.Net.Http.Headers;
 using System.Runtime.CompilerServices;
@@ -32,6 +35,7 @@ public static class SseStreamReader
             if (trimmed.Length == 0 || trimmed.StartsWith(':'))
             {
                 // Skip empty keep-alive or comments
+// 中文：跳过空的 keep-alive 帧或注释帧。
                 continue;
             }
 

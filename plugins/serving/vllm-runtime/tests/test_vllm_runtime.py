@@ -1,4 +1,6 @@
-"""Serving runtime contract tests for Reactor serving bindings."""
+"""Serving runtime contract tests for Reactor serving bindings.
+
+中文:Reactor 服务绑定的服务运行时契约测试。"""
 
 from __future__ import annotations
 
@@ -19,7 +21,9 @@ TOKEN = "serving-runtime-token-0123456789abcdef"
 
 
 class FakeVllmHandler(BaseHTTPRequestHandler):
-    """Minimal OpenAI-compatible peer that stands in for a vLLM process."""
+    """Minimal OpenAI-compatible peer that stands in for a vLLM process.
+
+        中文:替代 vLLM 进程的最小 OpenAI 兼容对端。"""
 
     def do_GET(self) -> None:
         if self.path == "/v1/models":
@@ -46,7 +50,9 @@ class FakeVllmHandler(BaseHTTPRequestHandler):
 
 
 def _fake_vllm_script(tmp_path: Path) -> Path:
-    """Write a launcher that starts the fake peer on the requested port."""
+    """Write a launcher that starts the fake peer on the requested port.
+
+        中文:写入一个启动器,在请求的端口上启动模拟对端。"""
 
     script = tmp_path / "fake_vllm.py"
     script.write_text(
@@ -200,7 +206,9 @@ def test_unknown_execution_fails_closed(tmp_path: Path) -> None:
 
 
 def _model_directory(tmp_path: Path) -> Path:
-    """Create the minimum servable text-model directory for import tests."""
+    """Create the minimum servable text-model directory for import tests.
+
+        中文:为导入测试创建最小可服务文本模型目录。"""
 
     model = tmp_path / "candidate"
     model.mkdir()

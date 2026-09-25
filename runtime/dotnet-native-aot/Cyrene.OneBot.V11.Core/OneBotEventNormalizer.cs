@@ -13,6 +13,7 @@ using Google.Protobuf;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>One normalized event ready for the DirectPluginRuntime stream.</summary>
+/// <remarks>中文：已规范化、可供 DirectPluginRuntime 流发送的单个事件。</remarks>
 public sealed record OneBotNormalizedEvent(
     string EventType,
     string TypeUrl,
@@ -22,6 +23,7 @@ public sealed record OneBotNormalizedEvent(
     string? RequestKind);
 
 /// <summary>Malformed OneBot event data at the protocol boundary.</summary>
+/// <remarks>中文：协议边界处格式错误的 OneBot 事件数据。</remarks>
 public sealed class OneBotEventNormalizationException : Exception
 {
     public OneBotEventNormalizationException(string message)

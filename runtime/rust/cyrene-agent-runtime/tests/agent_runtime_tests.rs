@@ -22,6 +22,7 @@ use cyrene_plugin_contracts::memory_provider_v1::{
 };
 
 // ── T57: Run TCK against CyreneNativeAgentLoop ─────────────────────────
+// 中文：T57：针对 CyreneNativeAgentLoop 运行 TCK。
 
 #[tokio::test]
 async fn test_native_agent_loop_tck_single_turn_t57() {
@@ -54,6 +55,7 @@ async fn test_native_agent_loop_tck_cancellation_t57_t59() {
 }
 
 // ── T57 & T58: Run TCK against Rig internal adapter ────────────────────
+// 中文：T57 与 T58：针对 Rig 内部适配器运行 TCK。
 
 #[tokio::test]
 async fn test_rig_adapter_tck_suite_t57_t58() {
@@ -66,6 +68,7 @@ async fn test_rig_adapter_tck_suite_t57_t58() {
 }
 
 // ── T62: Memory explicitly accepted as injected capability ─────────────
+// 中文：T62：明确接受作为注入能力提供的 Memory。
 
 struct MockInjectedMemory;
 
@@ -109,6 +112,7 @@ async fn test_injected_memory_no_durable_sessions_t62() {
 }
 
 // ── T64: Limit enforcement on payload byte size ────────────────────────
+// 中文：T64：强制执行负载字节大小上限。
 
 #[test]
 fn test_limits_payload_byte_size_t64() {
@@ -120,6 +124,7 @@ fn test_limits_payload_byte_size_t64() {
 }
 
 // ── M5A Exit Gate Verification ─────────────────────────────────────────
+// 中文：M5A 退出门槛验证。
 
 #[tokio::test]
 async fn test_m5a_exit_gate_independently_replaceable_and_stateless() {
@@ -130,6 +135,7 @@ async fn test_m5a_exit_gate_independently_replaceable_and_stateless() {
 
     for driver in drivers {
         // Invocation 1: session A
+        // 中文：调用 1：会话 A。
         let model1 = cyrene_agent_runtime::tck::MockModelProvider::simple_text();
         let tools1 = cyrene_agent_runtime::tck::MockToolProvider::new();
         let req1 = AgentRunRequest {
@@ -150,6 +156,7 @@ async fn test_m5a_exit_gate_independently_replaceable_and_stateless() {
         ));
 
         // Invocation 2: session B (verifies no state carried over from session A)
+        // 中文：调用 2：会话 B（验证不会沿用会话 A 的任何状态）。
         let model2 = cyrene_agent_runtime::tck::MockModelProvider::simple_text();
         let tools2 = cyrene_agent_runtime::tck::MockToolProvider::new();
         let req2 = AgentRunRequest {

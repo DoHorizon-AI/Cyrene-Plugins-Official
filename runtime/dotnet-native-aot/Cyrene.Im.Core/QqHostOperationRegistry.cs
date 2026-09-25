@@ -9,6 +9,7 @@
 namespace Cyrene.Im.Core;
 
 /// <summary>One explicitly registered QQ operation.</summary>
+/// <remarks>中文：显式注册的一个 QQ 操作。</remarks>
 public sealed record QqHostOperation(
     string Name,
     string Service,
@@ -18,6 +19,7 @@ public sealed record QqHostOperation(
     bool Requestable = true);
 
 /// <summary>Authoritative fixed operation registry for qq.client.v1.</summary>
+/// <remarks>中文：qq.client.v1 的权威固定操作注册表。</remarks>
 public static class QqHostOperationRegistry
 {
     private static readonly IReadOnlyDictionary<string, QqHostOperation> Operations =

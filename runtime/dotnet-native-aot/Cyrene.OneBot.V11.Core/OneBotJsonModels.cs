@@ -12,6 +12,7 @@ using System.Text.Json.Serialization;
 namespace Cyrene.OneBot.V11.Core;
 
 /// <summary>Bounded parameters for one OneBot v11 action.</summary>
+/// <remarks>中文：单个 OneBot v11 action 的有界参数。</remarks>
 public sealed record OneBotActionRequest
 {
     [JsonPropertyName("flag")]
@@ -40,6 +41,7 @@ public sealed record OneBotActionRequest
 }
 
 /// <summary>One ordered OneBot v11 message segment.</summary>
+/// <remarks>中文：一条有序的 OneBot v11 消息 segment。</remarks>
 public sealed class OneBotMessageSegment
 {
     [JsonPropertyName("type")]
@@ -50,6 +52,7 @@ public sealed class OneBotMessageSegment
 }
 
 /// <summary>Known scalar data fields for the supported OneBot segments.</summary>
+/// <remarks>中文：受支持 OneBot segment 中已知的标量数据字段。</remarks>
 public sealed class OneBotSegmentData
 {
     [JsonPropertyName("id")]
@@ -72,6 +75,7 @@ public sealed class OneBotSegmentData
 }
 
 /// <summary>One OneBot v11 action response envelope.</summary>
+/// <remarks>中文：单个 OneBot v11 action 的响应封套。</remarks>
 public sealed class OneBotActionResponse
 {
     [JsonPropertyName("status")]
@@ -88,6 +92,7 @@ public sealed class OneBotActionResponse
 }
 
 /// <summary>One forward-WebSocket action envelope.</summary>
+/// <remarks>中文：单个 forward-WebSocket action 封套。</remarks>
 public sealed class OneBotWebSocketActionRequest
 {
     [JsonPropertyName("action")]
@@ -101,6 +106,7 @@ public sealed class OneBotWebSocketActionRequest
 }
 
 /// <summary>Decoded response/event projection for a OneBot WebSocket frame.</summary>
+/// <remarks>中文：OneBot WebSocket 帧的解码响应／事件投影。</remarks>
 public sealed class OneBotWebSocketFrame
 {
     [JsonPropertyName("status")]
@@ -117,6 +123,7 @@ public sealed class OneBotWebSocketFrame
 }
 
 /// <summary>Canonical JSON payload for one normalized OneBot request event.</summary>
+/// <remarks>中文：单个规范化 OneBot 请求事件的 JSON 负载。</remarks>
 public sealed class OneBotInboundRequestPayload
 {
     [JsonPropertyName("account_id")]
@@ -136,6 +143,7 @@ public sealed class OneBotInboundRequestPayload
 }
 
 /// <summary>JSON result returned after a OneBot request decision.</summary>
+/// <remarks>中文：OneBot 请求决策后返回的 JSON 结果。</remarks>
 public sealed class OneBotRequestResponseResult
 {
     [JsonPropertyName("status")]

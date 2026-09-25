@@ -31,3 +31,22 @@ QQ Service/Method。Host 安装、客户端版本、ABI、账号和重启策略�
 - C# 单元/等价测试与 fake Host TCK 证明实现行为。
 - 打包后的 Native AOT exercise 证明脱离源码目录仍能启动并提供运行时合约。
 - 未获得精确授权 QQ build 与账号环境前，受保护真实烟测保持 `NOT_RUN`。
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# IM Native AOT 运维说明
+
+正式 package 为 cyrene.connectors.im@0.1.0，通过 DirectPluginRuntime 协议启动，入口为 bin/cyrene-im。可执行文件提供 message.connector.v1 和 qq.client.v1。
+
+## Runtime 边界
+
+IM runtime 使用继承的 stdio 和 cyrene.qq.host.v1 framing contract 启动经过授权的 QQ Host 子进程。它不会开放公共 listener、加载 Python 或动态程序集，也不会接受任意 QQ service/method 名称。Host 安装、客户端版本、ABI、账号和重启策略均为 binding 级配置。
+
+## 证据策略
+
+- C# 单元/一致性测试和 fake Host TCK 用于证明实现行为。
+- 打包后的 Native AOT 运行演练用于证明已发布的目录布局可以脱离源码树启动，并提供 runtime contract。
+- 只有在明确提供精确授权的 QQ build 和账号环境后，才会运行受保护的真实 smoke；否则状态保持 NOT_RUN。

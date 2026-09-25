@@ -1,4 +1,6 @@
-"""LLM judge tests: scripted model provider over real gRPC, parsing, fail-closed."""
+"""LLM judge tests: scripted model provider over real gRPC, parsing, fail-closed.
+
+中文:LLM Judge 测试:通过真实 gRPC 调用脚本化模型提供方,验证解析和失败即拒绝行为。"""
 
 from __future__ import annotations
 
@@ -49,7 +51,9 @@ class _Payload:
 
 
 class ScriptedModelProvider:
-    """Answers model.provider.v1 chat_completion from a reply queue."""
+    """Answers model.provider.v1 chat_completion from a reply queue.
+
+        中文:从回复队列中响应 model.provider.v1 chat_completion 请求。"""
 
     plugin_id = "test.scripted-model-provider"
     version = "0.1.0"
@@ -87,7 +91,9 @@ class ScriptedModelProvider:
 
 
 class _ModelFixture:
-    """One scripted model provider plus a judge configured against it."""
+    """One scripted model provider plus a judge configured against it.
+
+        中文:一个脚本化模型提供方,以及针对该提供方配置的 Judge。"""
 
     def __init__(self, replies: list[str]) -> None:
         self.provider = ScriptedModelProvider(replies)
@@ -163,6 +169,7 @@ def test_pointwise_scores_against_the_threshold_and_records_judge_identity() -> 
     assert first.model == "judge-model"
     assert first.temperature == 0.0
     assert first.messages[0].role == 1  # system
+                                        # 中文:系统
     assert "Expected" in first.messages[1].content
     assert "42" in first.messages[1].content
 

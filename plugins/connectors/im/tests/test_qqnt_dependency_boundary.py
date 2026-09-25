@@ -1,4 +1,6 @@
-"""Tests for the QQNT direct dependency boundary gate."""
+"""Tests for the QQNT direct dependency boundary gate.
+
+中文:QQNT 直连依赖边界门禁测试。"""
 
 from __future__ import annotations
 
@@ -23,13 +25,17 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
 
 
 def test_current_direct_dependency_boundary_is_clean() -> None:
-    """The checked-in direct runtime has no forbidden dependency surface."""
+    """The checked-in direct runtime has no forbidden dependency surface.
+
+        中文:已检入的直连运行时不包含禁止的依赖接口。"""
 
     assert scan_root(REPOSITORY_ROOT) == []
 
 
 def test_boundary_rejects_forbidden_import_and_lineage(tmp_path: Path) -> None:
-    """A copied third-party runtime cannot silently enter the direct profile."""
+    """A copied third-party runtime cannot silently enter the direct profile.
+
+        中文:复制的第三方运行时不能悄然进入直连配置。"""
 
     connector_root = tmp_path / "plugins/connectors/im"
     direct_source = connector_root / "src/qq_connector"

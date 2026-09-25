@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.Gemini                                  │
 // │  Role: Standalone Native AOT Gemini provider entrypoint.            │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：Program.cs
+// 中文：命名空间：Cyrene.Provider.Gemini
+// 中文：职责：独立的 Native AOT Gemini Provider 入口点。
 
 namespace Cyrene.Provider.Gemini;
 

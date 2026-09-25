@@ -150,7 +150,7 @@ public static class Program
             count++;
             if (count == 1)
             {
-                cancelled = true; // Cooperatively trigger cancellation after first event
+                cancelled = true; // Cooperatively trigger cancellation after first event | 中文：收到第一个事件后协作式触发取消
             }
             if (chunk.IsTerminal)
             {
@@ -170,6 +170,7 @@ public static class Program
     {
         using var plugin = new PluginCoreInstance(null, 0, 0);
         // Epoch 1ms expired long ago
+        // 中文：纪元只剩 1 毫秒时早已过期。
         var result = plugin.Invoke("Echo", null, Array.Empty<byte>(), 1);
         if (result.Status == StatusCode.DeadlineExceeded)
         {
@@ -210,11 +211,13 @@ public static class Program
         Console.WriteLine($"[INFO] Running Native AOT Benchmark ({totalOps} operations)...");
 
         // 1. Cold start estimation
+        // 中文：1. 冷启动耗时估算。
         long coldStartTicks = Stopwatch.GetTimestamp();
         using var plugin = new PluginCoreInstance(null, 0, 0);
         byte[] payload = Encoding.UTF8.GetBytes("Benchmark Test Payload");
 
         // 2. First-call latency
+        // 中文：2. 首次调用延迟。
         var swFirst = Stopwatch.StartNew();
         var firstResult = plugin.Invoke("Echo", "bench.type", payload, 0);
         swFirst.Stop();
@@ -227,6 +230,7 @@ public static class Program
         }
 
         // 3. Steady-state throughput
+        // 中文：3. 稳态吞吐量。
         var swSteady = Stopwatch.StartNew();
         for (int i = 0; i < totalOps; i++)
         {
@@ -242,10 +246,12 @@ public static class Program
         double throughput = totalOps / steadySeconds;
 
         // 4. Memory measurement (WorkingSet / RSS)
+        // 中文：4. 内存测量（WorkingSet／RSS）。
         long workingSetBytes = Process.GetCurrentProcess().WorkingSet64;
         double workingSetMb = workingSetBytes / (1024.0 * 1024.0);
 
         // 5. Binary size
+        // 中文：5. 二进制文件大小。
         string procPath = Environment.ProcessPath ?? "";
         long binarySizeBytes = File.Exists(procPath) ? new FileInfo(procPath).Length : 0;
         double binarySizeMb = binarySizeBytes / (1024.0 * 1024.0);
@@ -270,12 +276,15 @@ public static class Program
         Console.WriteLine("[INFO] Running Cyrene Native AOT Plugin Host Self-Test Suite...");
 
         // 1. Manifest
+        // 中文：1. Manifest。
         PrintManifest();
 
         // 2. Health
+        // 中文：2. Health。
         PrintHealth();
 
         // 3. Unary
+        // 中文：3. Unary 调用。
         using var plugin = new PluginCoreInstance(null, 0, 0);
         byte[] payload = Encoding.UTF8.GetBytes("Self-Test Payload");
         var res = plugin.Invoke("Echo", "self.test", payload, 0);
@@ -286,6 +295,7 @@ public static class Program
         }
 
         // 4. Streaming
+        // 中文：4. 流式调用。
         int streamCount = 0;
         foreach (var c in plugin.InvokeStream("EchoStream", "self.test", payload, 0, () => false))
         {
@@ -298,9 +308,11 @@ public static class Program
         }
 
         // 5. Cancel
+        // 中文：5. 取消操作。
         if (RunCancelTest() != 0) return 1;
 
         // 6. Deadline
+        // 中文：6. Deadline。
         if (RunDeadlineTest() != 0) return 1;
 
         Console.WriteLine("[PASS] All Native AOT Host self-tests PASSED successfully.");

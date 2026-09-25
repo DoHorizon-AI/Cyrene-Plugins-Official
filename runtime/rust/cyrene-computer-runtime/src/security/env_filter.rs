@@ -55,6 +55,10 @@ impl EnvironmentFilter {
     /// Filters and produces an isolated sanitized environment map.
     /// 1. Host environment variables are stripped by default, retaining only safe whitelist items.
     /// 2. User-provided environment variables are inspected: any containing sensitive patterns are rejected or stripped.
+    ///
+    /// 过滤并生成隔离的净化环境映射。
+    /// 1. 默认移除 host 环境变量，只保留安全 allowlist 项。
+    /// 2. 检查用户提供的环境变量：任何包含敏感模式的变量都会被拒绝或剔除。
     pub fn sanitize_environment(
         &self,
         requested_env: &HashMap<String, String>,
@@ -62,6 +66,7 @@ impl EnvironmentFilter {
         let mut clean_env = HashMap::new();
 
         // 1. Inherit safe whitelist from host
+        // 1. 从 host 继承安全 allowlist 中的变量。
         for key in &self.allowed_host_vars {
             if let Ok(val) = std::env::var(key) {
                 clean_env.insert((*key).to_string(), val);
@@ -69,6 +74,7 @@ impl EnvironmentFilter {
         }
 
         // 2. Merge requested environment, filtering out any sensitive names
+        // 2. 合并请求的环境变量，并过滤敏感名称。
         for (k, v) in requested_env {
             let upper = k.to_uppercase();
             let is_sensitive = self

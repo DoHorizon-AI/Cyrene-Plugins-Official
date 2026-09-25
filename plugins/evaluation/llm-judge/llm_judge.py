@@ -56,31 +56,49 @@ _DEFAULT_RUBRIC = "Score how well the actual answer matches the expected answer.
 
 @dataclass(frozen=True, slots=True)
 class TypedPayload:
-    """Typed response consumed by DirectPluginRuntime."""
+    """Typed response consumed by DirectPluginRuntime.
+
+        中文:DirectPluginRuntime 使用的类型化响应。
+    """
 
     value: bytes
     type_url: str
 
 
 class RequestError(ValueError):
-    """Request-level contract violation; the whole evaluation fails closed."""
+    """Request-level contract violation; the whole evaluation fails closed.
+
+        中文:请求级 contract 违规会使整个评估失败关闭。
+    """
 
 
 class JudgeConfigError(ValueError):
-    """The judge has no usable model provider binding."""
+    """The judge has no usable model provider binding.
+
+        中文:judge 没有可用的模型 Provider binding。
+    """
 
 
 class JudgeUpstreamError(RuntimeError):
-    """The model provider could not answer; the whole request fails closed."""
+    """The model provider could not answer; the whole request fails closed.
+
+        中文:模型 Provider 无法返回结果;整个请求失败关闭。
+    """
 
 
 class JudgeOutputError(ValueError):
-    """One sample's judge reply was unusable; only that sample fails."""
+    """One sample's judge reply was unusable; only that sample fails.
+
+        中文:某个样本的 judge 回复不可用;只将该样本判为失败。
+    """
 
 
 @dataclass(frozen=True, slots=True)
 class JudgeConfig:
-    """One resolved model provider binding for the judge."""
+    """One resolved model provider binding for the judge.
+
+        中文:解析出的、供 judge 使用的一个模型 Provider binding。
+    """
 
     binding_id: str
     model_endpoint: str
@@ -92,7 +110,10 @@ class JudgeConfig:
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, str]) -> JudgeConfig:
-        """Build configuration from the standard plugin activation environment."""
+        """Build configuration from the standard plugin activation environment.
+
+            中文:根据标准 Plugin activation 环境构造配置。
+        """
 
         binding_id = settings.get("binding_id")
         if not binding_id:
@@ -157,7 +178,10 @@ def _config_integer(
 
 
 class LLMJudgePlugin:
-    """Pointwise and pairwise LLM judging over Product-supplied records."""
+    """Pointwise and pairwise LLM judging over Product-supplied records.
+
+        中文:对 Product 提供的记录执行逐项和成对 LLM 判断。
+    """
 
     plugin_id = "cyrene.evaluation.llm-judge"
     version = "0.1.0"
@@ -180,7 +204,10 @@ class LLMJudgePlugin:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, TypedPayload | str]:
-        """Dispatch one typed judge request."""
+        """Dispatch one typed judge request.
+
+            中文:分派一个类型化 judge 请求。
+        """
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -219,7 +246,10 @@ class LLMJudgePlugin:
         return True, TypedPayload(value=encoded, type_url=f"{TYPE_PREFIX}.evaluate.response")
 
     def evaluate(self, request: dict[str, Any]) -> dict[str, Any]:
-        """Judge every record and return the typed response payload."""
+        """Judge every record and return the typed response payload.
+
+            中文:判断每条记录,并返回类型化响应负载。
+        """
 
         config = self._config
         if config is None:
@@ -389,6 +419,7 @@ class LLMJudgePlugin:
 
 
 # ── Response builders ──────────────────────────────────────────────────
+# 中文:# 中文:构造响应。
 
 def _pointwise_sample(
     sample_index: int, score: float, passed: bool, detail: str | None
@@ -432,6 +463,7 @@ def _winner_score(winner: str) -> float:
 
 
 # ── Parsing helpers ────────────────────────────────────────────────────
+# 中文:# 中文:解析辅助函数。
 
 def _parse_score(reply: str) -> float:
     payload = _parse_judge_json(reply)
@@ -454,7 +486,10 @@ def _parse_winner(reply: str) -> tuple[str, str | None]:
 
 
 def _parse_judge_json(reply: str) -> dict[str, Any]:
-    """Return the first JSON object in a judge reply, fenced or embedded."""
+    """Return the first JSON object in a judge reply, fenced or embedded.
+
+        中文:返回 judge 回复中的第一个 JSON 对象,无论该对象被代码围栏包裹还是嵌在文本中。
+    """
 
     candidate = reply.strip()
     if candidate.startswith("```"):
@@ -476,6 +511,7 @@ def _parse_judge_json(reply: str) -> dict[str, Any]:
 
 
 # ── Request helpers ────────────────────────────────────────────────────
+# 中文:# 中文:请求辅助函数。
 
 def _record_entry(entry: Any) -> tuple[int, dict[str, Any]]:
     if not isinstance(entry, dict):

@@ -3,6 +3,7 @@ using Google.Protobuf;
 using Google.Protobuf.WellKnownTypes;
 
 // 1. Descriptors and enum numbers are contract facts, not implementation details.
+// 中文：1. Descriptor 和枚举编号属于契约事实，而非实现细节。
 if (ListDirRequest.Descriptor.FullName != "cyrene.computer.runtime.v1.ListDirRequest")
 {
     throw new InvalidOperationException("ListDirRequest descriptor moved.");
@@ -19,6 +20,7 @@ if ((int)ComputerErrorCode.PathTraversalDenied != 1
 }
 
 // 2. Bounded filesystem payloads round-trip through Any.
+// 中文：2. 有界文件系统负载能够通过 Any 往返传递。
 var listRequest = new ListDirRequest
 {
     Path = ".",
@@ -50,6 +52,7 @@ if (unpackedResponse.ResultCase != ListDirResponse.ResultOneofCase.Entries
 }
 
 // 3. Errors stay typed inside the capability payload.
+// 中文：3. 错误在 capability 负载中保持类型化。
 var denied = new ListDirResponse
 {
     Error = new ComputerError
@@ -68,6 +71,7 @@ if (unpackedDenied.ResultCase != ListDirResponse.ResultOneofCase.Error
 }
 
 // 4. Execution evidence preserves hash, truncation flags, and resource usage.
+// 中文：4. 执行证据会保留哈希、截断标志和资源用量。
 var evidence = new ExecutionEvidence
 {
     ExitCode = 0,

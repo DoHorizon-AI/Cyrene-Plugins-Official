@@ -52,6 +52,7 @@ public record ChatCompletionChunk(
 
 // Structured chat (interface version 2) capability models. They mirror the
 // optional model.provider.v1 fields carried by the chat_completion_v2 method.
+// 中文：结构化聊天（接口版本 2）capability 模型。它们对应 `chat_completion_v2` 方法携带的可选 `model.provider.v1` 字段。
 
 public record ChatFunctionDefinition(
     string Name,
@@ -63,6 +64,7 @@ public record ChatFunctionDefinition(
 public record ChatTool(string Type, ChatFunctionDefinition Function);
 
 // A named function uses Mode "function" and sets FunctionName.
+// 中文：命名函数会使用 Mode `function` 并设置 FunctionName。
 public record ChatToolChoice(string Mode, string? FunctionName = null);
 
 public record ChatToolCallFunction(string Name, string Arguments);
@@ -100,6 +102,7 @@ public interface IEmbeddingCapability
 // canonical contract, no runtime dispatch, and must not be published or
 // advertised as capabilities (W6-3). Resurrect them only with a real consumer
 // and a canonical contract.
+// 中文：下方的 speech 和 rerank profile 只是内部种子数据：它们没有规范契约、没有运行时分派，且不得作为 capability 发布或对外公布（W6-3）。只有在出现真实消费者且建立规范契约后，才可以恢复这些 profile。
 public record TtsParameters(string Model, string Text, string Voice, string OutputFormat = "mp3", float? Speed = null);
 
 public record TtsResult(byte[] AudioData, string MimeType, int DurationMs);

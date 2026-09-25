@@ -9,7 +9,9 @@
 # 职责：协议或消息连接器实现。
 # 本文件属于活动插件边界；运行时行为保持不变。
 ###############################################################################
-"""Official generic OneBot v11 connector package."""
+"""Official generic OneBot v11 connector package.
+
+中文:官方通用 OneBot v11 连接器软件包。"""
 
 from .connector import (
     CAPABILITY_ID,

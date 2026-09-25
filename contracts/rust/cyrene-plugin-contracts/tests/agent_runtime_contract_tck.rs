@@ -3,6 +3,9 @@
 // ║ Module: CYRENE Plugins Official                                     ║
 // ║ Role: Direct agent.runtime.v1 capability conformance & TCK.         ║
 // ╚══════════════════════════════════════════════════════════════════════╝
+// 中文：文件：agent_runtime_contract_tck.rs
+// 中文：模块：CYRENE Plugins Official
+// 中文：职责：对直接使用 agent.runtime.v1 capability 的实现执行一致性验证与 TCK。
 
 use cyrene_plugin_contracts::{
     agent_runtime::{

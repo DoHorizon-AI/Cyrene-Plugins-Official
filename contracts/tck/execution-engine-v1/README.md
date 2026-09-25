@@ -30,3 +30,31 @@ Coverage map / 覆盖说明:
   `ready: false`.
 - Fail-closed imports: `trustRemoteCode` stays refused and an incomplete model
   directory is rejected with a typed error.
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# execution.engine.v1 TCK
+
+本 TCK 使用 vLLM serving runtime 发布的 owner 范围 schema，验证 execution.engine.v1 binding payload。默认在进程内针对 Plugins 实现运行，也可以通过环境变量探测 operator 配置的 binding。
+
+```bash
+python3 -m pytest -q contracts/tck/execution-engine-v1
+```
+
+## 可选外部 binding
+
+```bash
+export CYRENE_ENGINE_TCK_BASE_URL=http://127.0.0.1:19400
+export CYRENE_ENGINE_TCK_TOKEN=<mode-0600-file>
+python3 -m pytest -q contracts/tck/execution-engine-v1
+```
+
+## 覆盖说明
+
+- **Schema 一致性**：POST /imports 和 execution 生命周期响应根据 plugins/serving/vllm-runtime/contracts/v1/schema.json 进行验证。
+- **导入不变量**：经过验证的 model artifact 使用 content-addressed Platform URI；重复导入时 manifest digest 保持稳定。
+- **释放证据**：POST /executions/{id}/stop 返回 released: true 和 ready: false。
+- **失败关闭的导入**：trustRemoteCode 仍被拒绝；不完整的 model 目录会以类型化错误被拒绝。

@@ -4,6 +4,11 @@ The formal package is the C# Native AOT artifact assembled by
 ``assemble_native_package.py``. This builder creates the Python implementation
 reference used for cross-language parity and fake-Host TCK runs. It never
 copies a QQ installation, native Host, account data, or credentials.
+
+中文：组装隔离的 Python IM parity reference package。
+正式 package 是由 `assemble_native_package.py` 组装的 C# Native AOT 制品。
+此 builder 生成 Python 实现参考,用于跨语言 parity 和 fake-Host TCK。它绝不复制 QQ 安装、
+原生 Host、账户数据或凭据。
 """
 
 from __future__ import annotations
@@ -31,11 +36,17 @@ LOCAL_SCHEMA_FILES = ("contracts/v1/schema.json",)
 
 
 class PackageAssemblyError(ValueError):
-    """Raised when a package candidate cannot be assembled safely."""
+    """Raised when a package candidate cannot be assembled safely.
+
+        中文:无法安全组装 package 候选项时抛出的错误。
+    """
 
 
 def _read_json(path: Path) -> dict[str, Any]:
-    """Read one package metadata document as a JSON object."""
+    """Read one package metadata document as a JSON object.
+
+        中文:将一份 package 元数据文档作为 JSON 对象读取。
+    """
 
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
@@ -49,7 +60,10 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def _write_json(path: Path, value: dict[str, Any]) -> None:
-    """Write normalized package metadata with stable UTF-8 formatting."""
+    """Write normalized package metadata with stable UTF-8 formatting.
+
+        中文:使用稳定的 UTF-8 格式写入规范化 package 元数据。
+    """
 
     path.write_text(
         json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
@@ -58,7 +72,10 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def _rewrite_manifest_refs(manifest: dict[str, Any]) -> None:
-    """Make shared schema references resolve from the package root."""
+    """Make shared schema references resolve from the package root.
+
+        中文:使共享 schema 引用能够从 package 根目录解析。
+    """
 
     for method in manifest.get("methods", []):
         if not isinstance(method, dict):
@@ -72,7 +89,10 @@ def _rewrite_manifest_refs(manifest: dict[str, Any]) -> None:
 
 
 def _rewrite_descriptor_refs(descriptor: dict[str, Any]) -> None:
-    """Make descriptor references self-contained in an installed archive."""
+    """Make descriptor references self-contained in an installed archive.
+
+        中文:使 descriptor 引用在已安装 archive 中自包含。
+    """
 
     package = descriptor.get("package")
     if isinstance(package, dict):
@@ -109,7 +129,10 @@ def _rewrite_descriptor_refs(descriptor: dict[str, Any]) -> None:
 
 
 def _rewrite_python_manifest(manifest: dict[str, Any]) -> None:
-    """Project formal native metadata into a Python-only reference launcher."""
+    """Project formal native metadata into a Python-only reference launcher.
+
+        中文:将正式原生元数据投影为纯 Python reference 启动器。
+    """
 
     manifest["version"] = PACKAGE_VERSION
     runtime = manifest.get("runtime")
@@ -133,7 +156,10 @@ def _rewrite_python_manifest(manifest: dict[str, Any]) -> None:
 
 
 def _copy_required_file(source: Path, destination: Path) -> None:
-    """Copy one required file and fail instead of creating a partial package."""
+    """Copy one required file and fail instead of creating a partial package.
+
+        中文:复制一个必需文件;若无法复制则失败,不生成不完整 package。
+    """
 
     if not source.is_file():
         raise PackageAssemblyError(f"required package file is missing: {source}")
@@ -153,6 +179,12 @@ def assemble_package(repository_root: Path, output_root: Path) -> Path:
 
     Raises:
         PackageAssemblyError: If inputs are missing or output is not empty.
+
+        中文:组装一个未打包的 package 根目录,并返回解析后的路径。
+
+参数 `repository_root` 是包含 connector 和 SDK 的 Plugins 仓库;
+`output_root` 是接收 package 负载的空目录。返回解析后的 package 根目录。
+如果输入缺失或输出目录非空,则抛出 `PackageAssemblyError`。
     """
 
     repository_root = repository_root.resolve(strict=True)
@@ -207,7 +239,10 @@ def assemble_package(repository_root: Path, output_root: Path) -> Path:
 
 
 def build_package_archive(repository_root: Path, output_path: Path) -> Path:
-    """Build a deterministic ZIP archive from an assembled package candidate."""
+    """Build a deterministic ZIP archive from an assembled package candidate.
+
+        中文:根据已组装的 package 候选项生成确定性 ZIP archive。
+    """
 
     output_path = output_path.resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -228,7 +263,10 @@ def build_package_archive(repository_root: Path, output_path: Path) -> Path:
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse the package candidate command-line arguments."""
+    """Parse the package candidate command-line arguments.
+
+        中文:解析 package 候选项的命令行参数。
+    """
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repository-root", type=Path, required=True)
@@ -242,7 +280,10 @@ def _parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Build one candidate package without publishing or mutating repository files."""
+    """Build one candidate package without publishing or mutating repository files.
+
+        中文:构建一个候选 package,但不发布制品,也不修改仓库文件。
+    """
 
     args = _parse_args()
     if args.directory:

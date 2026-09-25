@@ -11,6 +11,7 @@ using System.Text.Json.Serialization;
 namespace Cyrene.Plugin.RuntimeHost;
 
 /// <summary>Stable stdout record consumed by the package process supervisor.</summary>
+/// <remarks>中文：由 package 进程监督器读取的稳定 stdout 记录。</remarks>
 public sealed class RuntimeLaunchAnnouncement
 {
     [JsonPropertyName("event")]

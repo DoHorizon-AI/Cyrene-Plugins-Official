@@ -13,6 +13,7 @@ use tonic::transport::{Channel, Server};
 use prost::Message;
 
 // Proto generated client & types
+// 中文：Proto 生成的客户端与类型。
 pub mod proto {
     #![allow(clippy::result_large_err)]
     tonic::include_proto!("cyrene.plugin.runtime.v1");
@@ -25,6 +26,7 @@ use proto::direct_plugin_runtime_server::DirectPluginRuntimeServer;
 use proto::{health_response, DirectInvocationRequest, DirectStreamMode, HealthRequest};
 
 // Contract types
+// 中文：契约类型。
 use cyrene_agent_runtime::adapter::{snapshot_tool_catalog, SnapshotToolProvider};
 use cyrene_agent_runtime::engine::cancel::CancellationToken;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
@@ -49,17 +51,22 @@ use cyrene_plugin_contracts::tool_provider_v1::{
 };
 
 // Service implementation
+// 中文：服务实现。
 #[path = "../src/service.rs"]
 mod service;
 
 use service::{DirectPluginRuntimeServiceImpl, McpCatalogSource};
 
 /// Helper to spin up an in-process server instance listening on an ephemeral port.
+///
+/// 中文：Helper：在临时端口上启动进程内服务实例。
 async fn start_test_server() -> (DirectPluginRuntimeClient<Channel>, SocketAddr) {
     start_server(DirectPluginRuntimeServiceImpl::with_simulated_dependencies_for_tests()).await
 }
 
 /// Starts the same service configuration used by the production binary.
+///
+/// 中文：启动与生产二进制使用相同配置的服务。
 async fn start_production_server() -> (DirectPluginRuntimeClient<Channel>, SocketAddr) {
     start_server(DirectPluginRuntimeServiceImpl::new()).await
 }
@@ -80,6 +87,7 @@ async fn start_server(
     });
 
     // Give server a moment to start
+    // 中文：稍等片刻，让服务器启动。
     tokio::time::sleep(Duration::from_millis(50)).await;
 
     let endpoint = format!("http://{}", addr);
@@ -141,6 +149,7 @@ async fn test_r08_memory_crud_roundtrip() {
     let (mut client, _addr) = start_test_server().await;
 
     // 1. Store memory
+    // 中文：1. 存储记忆。
     let item_to_store = MemoryItem {
         item_id: "item-r08-1".into(),
         tenant_id: "tenant-r08".into(),
@@ -186,6 +195,7 @@ async fn test_r08_memory_crud_roundtrip() {
     assert_eq!(stored_id, "item-r08-1");
 
     // 2. Get memory
+    // 中文：2. 获取记忆。
     let get_req = GetMemoryRequest {
         tenant_id: "tenant-r08".into(),
         item_id: stored_id.clone(),
@@ -223,6 +233,7 @@ async fn test_r08_memory_crud_roundtrip() {
     );
 
     // 3. Recall memory
+    // 中文：3. 检索记忆。
     let recall_req = RecallMemoryRequest {
         tenant_id: "tenant-r08".into(),
         scope: None,
@@ -262,6 +273,7 @@ async fn test_r08_memory_crud_roundtrip() {
     assert!(!matches.matches.is_empty());
 
     // 4. Delete memory
+    // 中文：4. 删除记忆。
     let del_req = DeleteMemoryRequest {
         tenant_id: "tenant-r08".into(),
         item_id: stored_id.clone(),
@@ -342,6 +354,7 @@ async fn test_r08_computer_artifact_lifecycle() {
     let (mut client, _addr) = start_test_server().await;
 
     // 1. Create Artifact
+    // 中文：1. 创建 Artifact。
     let artifact_data = b"Hello from Cyrene Server Artifact".to_vec();
     let create_art_req = CreateArtifactRequest {
         name: "test.txt".into(),
@@ -380,6 +393,7 @@ async fn test_r08_computer_artifact_lifecycle() {
     assert_eq!(meta.size_bytes, artifact_data.len() as i64);
 
     // 2. Get Artifact
+    // 中文：2. 获取 Artifact。
     let get_art_req = GetArtifactRequest {
         artifact_id: artifact_id.clone(),
     };
@@ -418,6 +432,7 @@ async fn test_w2_list_dir_roundtrip_and_traversal_denied() {
     let (mut client, _addr) = start_test_server().await;
 
     // 1. List the crate root; the bounded root is the server working directory.
+    // 中文：1. 列出 crate 根目录；有界根目录就是服务器工作目录。
     let list_req = ListDirRequest {
         path: ".".into(),
         max_depth: Some(1),
@@ -455,6 +470,7 @@ async fn test_w2_list_dir_roundtrip_and_traversal_denied() {
     );
 
     // 2. Path traversal is denied by the bounded validator.
+    // 中文：2. 有界路径校验器会拒绝路径遍历。
     let bad_req = ListDirRequest {
         path: "../".into(),
         max_depth: Some(1),
@@ -489,6 +505,7 @@ async fn test_w2_list_dir_roundtrip_and_traversal_denied() {
 }
 
 // ── W6-3: canonical contract method names and their v1 compatibility aliases ──
+// 中文：W6-3：规范契约方法名及其 v1 兼容别名。
 
 async fn invoke_list_dir(
     client: &mut DirectPluginRuntimeClient<Channel>,
@@ -645,6 +662,7 @@ async fn test_w6_canonical_methods_and_legacy_aliases_agree() {
     let (mut client, _addr) = start_test_server().await;
 
     // computer.runtime.v1: list_dir (canonical) and ListDir (v1 alias).
+    // 中文：computer.runtime.v1：`list_dir` 是规范名称，`ListDir` 是 v1 别名。
     let canonical = invoke_list_dir(&mut client, "list_dir", "req-w6-list-canonical").await;
     let alias = invoke_list_dir(&mut client, "ListDir", "req-w6-list-alias").await;
     let canonical_entries = match canonical.result.unwrap() {
@@ -659,6 +677,7 @@ async fn test_w6_canonical_methods_and_legacy_aliases_agree() {
     assert_eq!(canonical_entries.len(), alias_entries.len());
 
     // agent.runtime.v1: run (canonical) and Run (v1 alias).
+    // 中文：agent.runtime.v1：`run` 是规范名称，`Run` 是 v1 别名。
     for response in [
         invoke_agent_run(&mut client, "run", "req-w6-run-canonical").await,
         invoke_agent_run(&mut client, "Run", "req-w6-run-alias").await,
@@ -671,6 +690,7 @@ async fn test_w6_canonical_methods_and_legacy_aliases_agree() {
 
     // memory.provider.v1: store through the legacy alias and recall through the
     // canonical name, proving the two spellings share one memory.
+    // 中文：memory.provider.v1：通过旧别名存储，再通过规范名称检索，以证明两种名称操作的是同一条记忆。
     let store = invoke_store_memory(&mut client, "StoreMemory", "req-w6-store-alias").await;
     match store.result.unwrap() {
         store_memory_response::Result::ItemId(id) => assert_eq!(id, "item-w6-1"),
@@ -731,6 +751,7 @@ async fn test_w3_mcp_tool_provider_dispatch() {
     let (mut client, _addr) = start_server(service).await;
 
     // list_tools returns the recorded catalog snapshot.
+    // 中文：`list_tools` 返回记录的目录快照。
     let mut list_buf = Vec::new();
     ListToolsRequest { binding_id: None }
         .encode(&mut list_buf)
@@ -766,6 +787,7 @@ async fn test_w3_mcp_tool_provider_dispatch() {
         .any(|tool| tool.provider_tool_id == "echo" && tool.binding_id == "mcp.fake"));
 
     // call_tool dispatches through the recorded snapshot.
+    // 中文：`call_tool` 根据已记录的快照分派工具调用。
     let mut call_buf = Vec::new();
     CallToolRequest {
         binding_id: "mcp.fake".into(),
@@ -801,6 +823,7 @@ async fn test_w3_mcp_tool_provider_dispatch() {
     }
 
     // A tool outside the snapshot is rejected before any child process starts.
+    // 中文：快照之外的工具会在启动任何子进程之前被拒绝。
     let mut missing_buf = Vec::new();
     CallToolRequest {
         binding_id: "mcp.fake".into(),
@@ -876,6 +899,7 @@ async fn test_r09_fail_closed_guarantees() {
     let (mut client, _addr) = start_test_server().await;
 
     // Case 1: Unsupported interface version
+    // 中文：用例 1：不支持的接口版本。
     let inv_resp = client
         .invoke(DirectInvocationRequest {
             interface_version: "999.0".into(),
@@ -902,6 +926,7 @@ async fn test_r09_fail_closed_guarantees() {
     }
 
     // Case 2: Unknown capability
+    // 中文：用例 2：未知能力。
     let inv_resp = client
         .invoke(DirectInvocationRequest {
             interface_version: "1".into(),
@@ -926,6 +951,7 @@ async fn test_r09_fail_closed_guarantees() {
     }
 
     // Case 3: Unknown method within known capability
+    // 中文：用例 3：已知能力中的未知方法。
     let inv_resp = client
         .invoke(DirectInvocationRequest {
             interface_version: "1".into(),
@@ -950,6 +976,7 @@ async fn test_r09_fail_closed_guarantees() {
     }
 
     // Case 4: Invalid / Malicious Type URL
+    // 中文：用例 4：无效或恶意的 Type URL。
     let inv_resp = client
         .invoke(DirectInvocationRequest {
             interface_version: "1".into(),
@@ -974,12 +1001,13 @@ async fn test_r09_fail_closed_guarantees() {
     }
 
     // Case 5: Corrupted Protobuf payload
+    // 中文：用例 5：损坏的 Protobuf 负载。
     let inv_resp = client
         .invoke(DirectInvocationRequest {
             interface_version: "1".into(),
             capability: "memory.provider.v1".into(),
             method: "GetMemory".into(),
-            payload: vec![0xFF, 0xFF, 0xFF, 0xFF], // Illegal protobuf varint bytes
+            payload: vec![0xFF, 0xFF, 0xFF, 0xFF], // Illegal protobuf varint bytes | 中文：非法的 protobuf varint 字节
             payload_type_url: "type.cyrene.io/cyrene.memory.provider.v1.GetMemoryRequest".into(),
             request_id: "req-fc-05".into(),
             stream_mode: DirectStreamMode::Unspecified as i32,

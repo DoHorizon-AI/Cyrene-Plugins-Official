@@ -21,6 +21,7 @@ import java.util.Map;
  * ════════════════════════════════════════════════════════════════════════
  * Spring Actuator HealthIndicator for Cyrene Plugin bindings (T52).
  * ════════════════════════════════════════════════════════════════════════
+ * <p>中文：针对 Cyrene Plugin binding 的 Spring Actuator HealthIndicator（T52）。</p>
  */
 public class CyreneHealthIndicator implements HealthIndicator {
 

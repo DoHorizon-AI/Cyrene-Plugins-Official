@@ -11,6 +11,7 @@ using System.Text.Json;
 namespace Cyrene.Im.Core;
 
 /// <summary>Validated QQNT direct configuration for one binding.</summary>
+/// <remarks>中文：经过校验、供单个 binding 使用的 QQNT direct 配置。</remarks>
 public sealed record QqDirectProfile(
     string BindingId,
     string HostExecutable,
@@ -52,6 +53,7 @@ public sealed record QqDirectProfile(
 }
 
 /// <summary>Configuration failure safe to expose across the plugin boundary.</summary>
+/// <remarks>中文：可安全跨插件边界公开的配置错误。</remarks>
 public sealed class QqDirectConfigurationException : Exception
 {
     public QqDirectConfigurationException(string domainCode, string message)
@@ -64,6 +66,7 @@ public sealed class QqDirectConfigurationException : Exception
 }
 
 /// <summary>Loads qqnt-direct configuration without runtime reflection.</summary>
+/// <remarks>中文：无需运行时反射即可加载 qqnt-direct 配置。</remarks>
 public static class QqDirectProfileLoader
 {
     private const string RuntimeProfile = "qqnt-direct";

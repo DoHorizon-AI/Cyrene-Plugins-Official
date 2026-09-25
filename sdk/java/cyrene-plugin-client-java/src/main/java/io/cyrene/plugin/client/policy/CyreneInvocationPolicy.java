@@ -47,9 +47,11 @@ public final class CyreneInvocationPolicy {
      * Asserts that business invocations do NOT perform hidden retries (T50).
      *
      * @param operationName The business operation name (e.g. "Invoke", "InvokeStream").
+     * <p>中文：断言业务调用不会执行隐藏重试（T50）。参数 operationName 是业务操作名称，例如 “Invoke” 或 “InvokeStream”。</p>
      */
     public void assertNoHiddenBusinessRetry(String operationName) {
         // Enforced contractually: business callers are informed that failures are terminal
+// 中文：契约层会强制执行此规则，让业务调用方知道失败即为终态。
         log.trace("Executing non-retryable business operation: {}", operationName);
     }
 
@@ -61,6 +63,7 @@ public final class CyreneInvocationPolicy {
      * @param action The idempotent callable.
      * @return The operation result.
      * @throws Exception If all bounded attempts fail.
+     * <p>中文：对显式声明为幂等的操作（例如 binding 解析或 health check）执行有界重试和指数退避。参数包括幂等操作名称、幂等 callable；返回操作结果；若所有有界重试均失败则抛出 Exception。</p>
      */
     public <T> T executeIdempotentWithRetry(String operationName, Callable<T> action) throws Exception {
         Exception lastException = null;

@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.OpenAi                                  │
 // │  Role: Standalone Native AOT Provider entrypoint (T87, T88).        │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：Program.cs
+// 中文：命名空间：Cyrene.Provider.OpenAi
+// 中文：职责：独立的 Native AOT Provider 入口点（T87、T88）。
 
 namespace Cyrene.Provider.OpenAi;
 

@@ -42,7 +42,10 @@ MESSAGE_TYPE_URL = (
 
 
 def _parse_args() -> argparse.Namespace:
-    """Parse a packaged binary and evidence destination."""
+    """Parse a packaged binary and evidence destination.
+
+        中文:解析已打包二进制文件和证据输出位置。
+    """
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", type=Path, required=True)
@@ -52,7 +55,10 @@ def _parse_args() -> argparse.Namespace:
 
 
 def _read_exact(connection: socket.socket, size: int) -> bytes:
-    """Read exactly one bounded WebSocket field."""
+    """Read exactly one bounded WebSocket field.
+
+        中文:读取一个有界的 WebSocket 字段。
+    """
 
     output = bytearray()
     while len(output) < size:
@@ -64,7 +70,10 @@ def _read_exact(connection: socket.socket, size: int) -> bytes:
 
 
 def _read_headers(connection: socket.socket) -> bytes:
-    """Read one bounded HTTP upgrade header block."""
+    """Read one bounded HTTP upgrade header block.
+
+        中文:读取一段有界的 HTTP upgrade header。
+    """
 
     output = bytearray()
     while b"\r\n\r\n" not in output:
@@ -84,7 +93,10 @@ def _send_frame(
     *,
     mask: bool,
 ) -> None:
-    """Send one small or extended WebSocket frame."""
+    """Send one small or extended WebSocket frame.
+
+        中文:发送一个短帧或扩展长度的 WebSocket 帧。
+    """
 
     if len(payload) > 16 * 1024 * 1024:
         raise ValueError("test WebSocket payload exceeds the 16 MiB limit")
@@ -108,7 +120,10 @@ def _send_frame(
 
 
 def _read_frame(connection: socket.socket) -> tuple[int, bytes]:
-    """Read one WebSocket frame and unmask it when necessary."""
+    """Read one WebSocket frame and unmask it when necessary.
+
+        中文:读取一帧 WebSocket 数据,并在需要时解除掩码。
+    """
 
     first, second = _read_exact(connection, 2)
     opcode = first & 0x0F
@@ -128,7 +143,10 @@ def _read_frame(connection: socket.socket) -> tuple[int, bytes]:
 
 
 class FakeOneBotWebSocketPeer:
-    """Minimal real TCP/WebSocket peer for packaged transport acceptance."""
+    """Minimal real TCP/WebSocket peer for packaged transport acceptance.
+
+        中文:用于已打包传输验收的精简真实 TCP／WebSocket 对端。
+    """
 
     def __init__(self, *, server: bool) -> None:
         self._server_mode = server
@@ -151,7 +169,10 @@ class FakeOneBotWebSocketPeer:
             self.port = 0
 
     def start(self) -> None:
-        """Start the forward-WebSocket server peer."""
+        """Start the forward-WebSocket server peer.
+
+            中文:启动 forward-WebSocket 服务端对端。
+        """
 
         if not self._server_mode:
             raise RuntimeError("client peer must use connect")
@@ -160,12 +181,18 @@ class FakeOneBotWebSocketPeer:
 
     @property
     def server_mode(self) -> bool:
-        """Return whether this peer accepts a forward-WebSocket connection."""
+        """Return whether this peer accepts a forward-WebSocket connection.
+
+            中文:返回此对端是否接受 forward-WebSocket 连接。
+        """
 
         return self._server_mode
 
     def connect(self, host: str, port: int) -> None:
-        """Connect as a reverse-WebSocket client peer."""
+        """Connect as a reverse-WebSocket client peer.
+
+            中文:作为 reverse-WebSocket 客户端对端连接。
+        """
 
         if self._server_mode:
             raise RuntimeError("server peer must use start")
@@ -186,13 +213,19 @@ class FakeOneBotWebSocketPeer:
         self._activate(connection)
 
     def wait_ready(self, timeout: float = 5.0) -> None:
-        """Wait until the protocol handshake and reader are active."""
+        """Wait until the protocol handshake and reader are active.
+
+            中文:等待协议握手完成且 reader 已开始工作。
+        """
 
         if not self._ready.wait(timeout):
             raise TimeoutError("fake OneBot WebSocket peer did not become ready")
 
     def send_event(self, payload: dict[str, Any]) -> None:
-        """Send one OneBot inbound event to the Native AOT transport."""
+        """Send one OneBot inbound event to the Native AOT transport.
+
+            中文:向 Native AOT 传输发送一条 OneBot 入站事件。
+        """
 
         self.wait_ready()
         encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
@@ -203,7 +236,10 @@ class FakeOneBotWebSocketPeer:
         _send_frame(connection, 0x1, encoded, mask=not self._server_mode)
 
     def wait_action(self, timeout: float = 5.0) -> dict[str, Any]:
-        """Wait for one correlated OneBot action from the Native AOT transport."""
+        """Wait for one correlated OneBot action from the Native AOT transport.
+
+            中文:等待 Native AOT 传输发出一个有关联的 OneBot action。
+        """
 
         try:
             return self._actions.get(timeout=timeout)
@@ -211,7 +247,10 @@ class FakeOneBotWebSocketPeer:
             raise TimeoutError("Native AOT transport did not send a WebSocket action") from error
 
     def close(self) -> None:
-        """Stop the peer and close all owned sockets."""
+        """Stop the peer and close all owned sockets.
+
+            中文:停止对端并关闭其拥有的所有 socket。
+        """
 
         self._stop.set()
         for connection in (self._connection, self._server):
@@ -246,7 +285,10 @@ class FakeOneBotWebSocketPeer:
                 return
 
     def _server_handshake(self, connection: socket.socket) -> None:
-        """Accept a RFC 6455 upgrade from a forward client."""
+        """Accept a RFC 6455 upgrade from a forward client.
+
+            中文:接受来自 forward client 的 RFC 6455 upgrade。
+        """
 
         headers = _read_headers(connection).decode("ascii", errors="replace")
         values: dict[str, str] = {}
@@ -315,7 +357,10 @@ class FakeOneBotWebSocketPeer:
 
 
 def _read_ready(process: subprocess.Popen[str]) -> dict[str, Any]:
-    """Read the bounded Native AOT readiness announcement."""
+    """Read the bounded Native AOT readiness announcement.
+
+        中文:读取有界的 Native AOT readiness 通告。
+    """
 
     if process.stdout is None:
         raise RuntimeError("Native AOT stdout is not captured")
@@ -361,7 +406,10 @@ def _read_ready(process: subprocess.Popen[str]) -> dict[str, Any]:
 
 
 def _canonical_send_request(message_wire: Any) -> Any:
-    """Build one canonical message shared by both WebSocket profiles."""
+    """Build one canonical message shared by both WebSocket profiles.
+
+        中文:构造一条由两种 WebSocket profile 共用的规范消息。
+    """
 
     return message_wire.SendMessageRequest(
         conversation=message_wire.ConversationScope(
@@ -379,7 +427,10 @@ def _canonical_send_request(message_wire: Any) -> Any:
 
 
 def _message_event() -> dict[str, Any]:
-    """Build one OneBot event for the subscription stream."""
+    """Build one OneBot event for the subscription stream.
+
+        中文:为订阅流构造一条 OneBot 事件。
+    """
 
     return {
         "time": 1,
@@ -394,7 +445,10 @@ def _message_event() -> dict[str, Any]:
 
 
 def _subscription_request(runtime_wire: Any, request_id: str) -> Any:
-    """Build one canonical direct-runtime subscription request."""
+    """Build one canonical direct-runtime subscription request.
+
+        中文:构造一个规范 direct-runtime 订阅请求。
+    """
 
     return runtime_wire.DirectInvocationRequest(
         capability=CAPABILITY,
@@ -417,7 +471,10 @@ def _exercise_profile(
     message_wire: Any,
     grpc_module: Any,
 ) -> dict[str, Any]:
-    """Exercise Health, subscription, event normalization, and action invoke."""
+    """Exercise Health, subscription, event normalization, and action invoke.
+
+        中文:依次验证 Health、订阅、事件规范化和 action 调用。
+    """
 
     if peer.server_mode:
         peer.start()
@@ -541,7 +598,10 @@ def _exercise_profile(
 
 
 def main() -> int:
-    """Run both WebSocket profiles against one packaged binary."""
+    """Run both WebSocket profiles against one packaged binary.
+
+        中文:使用同一个已打包二进制运行两种 WebSocket profile。
+    """
 
     args = _parse_args()
     binary = args.binary.resolve(strict=True)

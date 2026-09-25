@@ -13,3 +13,19 @@ dotnet run --project contracts/tck/message-connector-v1/dotnet/MessageConnectorC
 bash contracts/tck/message-connector-v1/generate-bindings.sh
 uv run python plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py
 ```
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# message.connector.v1 TCK
+
+本 TCK 独立验证 Plugins 所有的 payload schema，不依赖 Platform。它检查生成的 Rust、C#、Java、Kotlin、Python 投影和真实 OneBot v11 connector package。
+
+```bash
+cargo test --manifest-path contracts/rust/cyrene-plugin-contracts/Cargo.toml
+dotnet run --project contracts/tck/message-connector-v1/dotnet/MessageConnectorContractTck.csproj
+bash contracts/tck/message-connector-v1/generate-bindings.sh
+uv run python plugins/connectors/onebot-v11/tools/generate_message_connector_bindings.py
+```

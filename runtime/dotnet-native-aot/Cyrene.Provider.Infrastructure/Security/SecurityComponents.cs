@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.Infrastructure.Security                 │
 // │  Role: Redaction sanitizer and injected binding config (T82, T87).  │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：SecurityComponents.cs
+// 中文：命名空间：Cyrene.Provider.Infrastructure.Security
+// 中文：职责：凭据脱敏清理器与注入式 binding 配置（T82、T87）。
 
 using System.Text.RegularExpressions;
 
@@ -49,6 +52,7 @@ public sealed class ProviderBindingConfiguration
     }
 
     // Explicitly prohibit printing raw credentials in string representation or logs (T87)
+// 中文：明确禁止在字符串表示或日志中打印原始凭据（T87）。
     public override string ToString()
     {
         return $"ProviderBindingConfiguration(Endpoint={EndpointUri}, OrganizationId={OrganizationId ?? "none"}, ApiKey=REDACTED, Timeout={Timeout.TotalSeconds}s)";

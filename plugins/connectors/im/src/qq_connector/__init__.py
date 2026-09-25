@@ -6,7 +6,9 @@
 # 模块：Cyrene Plugins Official
 # 职责：独立 QQ/IM Python 参考实现边界。
 ###############################################################################
-"""Independent QQNT reference implementation for the IM connector."""
+"""Independent QQNT reference implementation for the IM connector.
+
+中文:IM 连接器的独立 QQNT 参考实现。"""
 
 from .plugin import ConnectorPlugin
 from .qqnt_direct import (

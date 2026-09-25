@@ -23,7 +23,7 @@ public final class DirectPluginRuntimeGrpc {
 
     public static final String SERVICE_NAME = "cyrene.plugin.runtime.v1.DirectPluginRuntime";
 
-    // ── Method Descriptors ───────────────────────────────────────────────
+    // ── Method Descriptors ─────────────────────────────────────────────── | 中文：方法描述符
 
     private static volatile io.grpc.MethodDescriptor<DirectInvocationRequest, DirectInvocationResponse> getInvokeMethod;
 
@@ -91,7 +91,7 @@ public final class DirectPluginRuntimeGrpc {
         return getHealthMethod;
     }
 
-    // ── Stub Factories ───────────────────────────────────────────────────
+    // ── Stub Factories ─────────────────────────────────────────────────── | 中文：存根工厂
 
     public static DirectPluginRuntimeStub newStub(io.grpc.Channel channel) {
         return DirectPluginRuntimeStub.newStub(FACTORY_ASYNC, channel);
@@ -129,10 +129,11 @@ public final class DirectPluginRuntimeGrpc {
             }
         };
 
-    // ── Stub Implementations (T42) ───────────────────────────────────────
+    // ── Stub Implementations (T42) ─────────────────────────────────────── | 中文：存根实现（T42）
 
     /**
      * Async stub for DirectPluginRuntime.
+     * 中文：DirectPluginRuntime 的异步存根。
      */
     public static final class DirectPluginRuntimeStub extends io.grpc.stub.AbstractAsyncStub<DirectPluginRuntimeStub> {
         private DirectPluginRuntimeStub(io.grpc.Channel channel, io.grpc.CallOptions callOptions) {
@@ -162,6 +163,7 @@ public final class DirectPluginRuntimeGrpc {
 
     /**
      * Blocking stub for DirectPluginRuntime.
+     * 中文：DirectPluginRuntime 的阻塞式存根。
      */
     public static final class DirectPluginRuntimeBlockingStub extends io.grpc.stub.AbstractBlockingStub<DirectPluginRuntimeBlockingStub> {
         private DirectPluginRuntimeBlockingStub(io.grpc.Channel channel, io.grpc.CallOptions callOptions) {
@@ -191,6 +193,7 @@ public final class DirectPluginRuntimeGrpc {
 
     /**
      * Future stub for DirectPluginRuntime.
+     * 中文：DirectPluginRuntime 的 Future 存根。
      */
     public static final class DirectPluginRuntimeFutureStub extends io.grpc.stub.AbstractFutureStub<DirectPluginRuntimeFutureStub> {
         private DirectPluginRuntimeFutureStub(io.grpc.Channel channel, io.grpc.CallOptions callOptions) {
@@ -213,7 +216,7 @@ public final class DirectPluginRuntimeGrpc {
         }
     }
 
-    // ── Server-side Base Implementation ──────────────────────────────────
+    // ── Server-side Base Implementation ────────────────────────────────── | 中文：服务端基础实现
 
     public static abstract class DirectPluginRuntimeImplBase implements io.grpc.BindableService {
         public void invoke(DirectInvocationRequest request, io.grpc.stub.StreamObserver<DirectInvocationResponse> responseObserver) {

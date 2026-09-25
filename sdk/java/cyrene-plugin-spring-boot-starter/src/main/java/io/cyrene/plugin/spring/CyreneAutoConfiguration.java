@@ -33,6 +33,7 @@ import java.util.Map;
  * ════════════════════════════════════════════════════════════════════════
  * Spring Boot auto-configuration for Cyrene Plugin Java SDK (T52).
  * ════════════════════════════════════════════════════════════════════════
+ * <p>中文：用于 Cyrene Plugin Java SDK 的 Spring Boot 自动配置（T52）。</p>
  */
 @AutoConfiguration
 @ConditionalOnProperty(prefix = "cyrene.plugin", name = "enabled", havingValue = "true", matchIfMissing = true)
@@ -110,6 +111,7 @@ public class CyreneAutoConfiguration {
     }
 
     // ── Actuator Health Indicator (T52) via nested static configuration ──
+// 中文：通过嵌套静态配置提供 Actuator Health Indicator（T52）。
 
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnClass(HealthIndicator.class)

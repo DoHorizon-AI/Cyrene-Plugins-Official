@@ -51,6 +51,7 @@ class CyreneChannelManagerTest {
         assertThat(ch1.isShutdown()).isFalse();
 
         // New generation arrives (e.g. upgrade or restart)
+// 中文：新代次到达（例如升级或重启）。
         BindingResolution gen2 = BindingResolution.of("binding-echo", "direct://127.0.0.1:50052", "gen-2");
         ManagedChannel ch2 = channelManager.getOrCreateChannel(gen2);
 
@@ -64,19 +65,21 @@ class CyreneChannelManagerTest {
     @Test
     void testPermitInsecureOnlyForLoopbackOrLocalSockets_T49() {
         // Loopback endpoints are allowed
+// 中文：允许 loopback Endpoint。
         ConnectionRef loopback1 = ConnectionRef.of("direct://127.0.0.1:50051");
         assertThat(loopback1.isLoopbackOrLocal()).isTrue();
-        loopback1.validateTransportSecurity(true); // Must not throw
+        loopback1.validateTransportSecurity(true); // Must not throw | 中文：不应抛出异常
 
         ConnectionRef loopback2 = ConnectionRef.of("direct://localhost:50051");
         assertThat(loopback2.isLoopbackOrLocal()).isTrue();
-        loopback2.validateTransportSecurity(true); // Must not throw
+        loopback2.validateTransportSecurity(true); // Must not throw | 中文：不应抛出异常
 
         ConnectionRef unixSocket = ConnectionRef.of("unix:///tmp/cyrene.sock");
         assertThat(unixSocket.isLoopbackOrLocal()).isTrue();
-        unixSocket.validateTransportSecurity(true); // Must not throw
+        unixSocket.validateTransportSecurity(true); // Must not throw | 中文：不应抛出异常
 
         // Remote endpoint with insecure MUST throw SecurityException
+// 中文：远程 Endpoint 使用不安全传输时必须抛出 SecurityException。
         ConnectionRef remoteEndpoint = ConnectionRef.of("direct://192.168.1.100:50051");
         assertThat(remoteEndpoint.isLoopbackOrLocal()).isFalse();
         assertThatThrownBy(() -> remoteEndpoint.validateTransportSecurity(true))

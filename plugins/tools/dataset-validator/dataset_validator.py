@@ -25,14 +25,18 @@ SUPPORTED_SCHEMAS = frozenset({"instruction", "conversation", "sharegpt"})
 
 @dataclass(frozen=True, slots=True)
 class TypedPayload:
-    """Typed response consumed by DirectPluginRuntime."""
+    """Typed response consumed by DirectPluginRuntime.
+
+        中文:由 DirectPluginRuntime 使用的有类型响应。"""
 
     value: bytes
     type_url: str
 
 
 class DatasetValidatorPlugin:
-    """Validate reusable dataset structure without owning Product state."""
+    """Validate reusable dataset structure without owning Product state.
+
+        中文:验证可复用数据集结构,不持有 Product 状态。"""
 
     plugin_id = "cyrene.tools.dataset-validator"
     version = "0.2.0"
@@ -48,7 +52,9 @@ class DatasetValidatorPlugin:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, TypedPayload | str]:
-        """Dispatch one typed dataset-validation request."""
+        """Dispatch one typed dataset-validation request.
+
+            中文:分发一个有类型的数据集验证请求。"""
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -106,7 +112,9 @@ class DatasetValidatorPlugin:
         max_errors: int = 100,
         max_sequence_length: int = 2048,
     ) -> dict[str, Any]:
-        """Load and validate one local dataset staged for this Plugin process."""
+        """Load and validate one local dataset staged for this Plugin process.
+
+            中文:加载并验证为此 Plugin 进程暂存的一个本地数据集。"""
 
         path = Path(file_path)
         if not path.is_file():

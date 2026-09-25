@@ -60,6 +60,7 @@ class DirectPluginRuntimeClientTest {
     @BeforeEach
     void setUp() throws Exception {
         // Start real Netty test server on loopback port
+// 中文：在 loopback 端口上启动真实 Netty 测试服务器。
         DirectPluginRuntimeGrpc.DirectPluginRuntimeImplBase serviceImpl =
             new DirectPluginRuntimeGrpc.DirectPluginRuntimeImplBase() {
                 @Override
@@ -89,6 +90,7 @@ class DirectPluginRuntimeClientTest {
                             .build());
                     } else {
                         // Echo payload
+// 中文：回显负载。
                         resp.onNext(DirectInvocationResponse.newBuilder()
                             .setPayload(DirectPayload.newBuilder()
                                 .setTypeUrl(request.getPayloadTypeUrl())
@@ -219,7 +221,7 @@ class DirectPluginRuntimeClientTest {
             items.add(iterator.next());
         }
 
-        assertThat(items).hasSize(4); // 3 payloads + 1 end
+        assertThat(items).hasSize(4); // 3 payloads + 1 end | 中文：3 个 payload 和 1 个结束事件
         assertThat(items.get(0).getPayload().getTypeUrl()).isEqualTo(AgentClient.TYPE_URL_EVENT);
         assertThat(items.get(3).hasEnd()).isTrue();
     }
@@ -245,6 +247,7 @@ class DirectPluginRuntimeClientTest {
         assertThat(resp.getSuccess().getOutputText()).isEqualTo("Agent completed: Run");
 
         // Streaming
+// 中文：流式调用。
         Iterator<AgentStreamEvent> stream = agentClient.runStream("binding-test", runReq, InvocationContext.empty());
         List<AgentStreamEvent> events = new ArrayList<>();
         while (stream.hasNext()) {
@@ -291,6 +294,7 @@ class DirectPluginRuntimeClientTest {
     @Test
     void testR05_typeUrlAndInterfaceVersionUnification() {
         // R05: Verify all typed clients strictly use "1" and "type.cyrene.io/"
+// 中文：R05：验证所有强类型客户端都严格使用版本 "1" 和 "type.cyrene.io/"。
         assertThat(io.cyrene.plugin.client.typed.AgentClient.INTERFACE_VERSION).isEqualTo("1");
         assertThat(io.cyrene.plugin.client.typed.AgentClient.TYPE_URL_RUN_REQUEST)
             .isEqualTo("type.cyrene.io/cyrene.agent.runtime.v1.AgentRunRequest");

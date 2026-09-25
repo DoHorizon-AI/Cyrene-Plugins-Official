@@ -14,6 +14,7 @@ using Cyrene.Plugin.Runtime.V1;
 namespace Cyrene.Im.Core;
 
 /// <summary>One normalized QQ event ready for DirectPluginRuntime streaming.</summary>
+/// <remarks>中文：已规范化、可供 DirectPluginRuntime 流式传输的 QQ 事件。</remarks>
 public sealed record QqDirectNormalizedEvent(
     string EventType,
     string TypeUrl,
@@ -23,6 +24,7 @@ public sealed record QqDirectNormalizedEvent(
     string? RequestKind);
 
 /// <summary>Invalid QQ subscription request at the direct runtime boundary.</summary>
+/// <remarks>中文：Direct runtime 边界处的无效 QQ 订阅请求。</remarks>
 public sealed class QqDirectSubscriptionException : Exception
 {
     public QqDirectSubscriptionException(string domainCode, string message)
@@ -35,6 +37,7 @@ public sealed class QqDirectSubscriptionException : Exception
 }
 
 /// <summary>One binding-local QQ event stream.</summary>
+/// <remarks>中文：binding 本地的单个 QQ 事件流。</remarks>
 public sealed class QqDirectEventSubscription : IDisposable
 {
     private readonly QqDirectEventSubscriptionRegistry _owner;
@@ -85,6 +88,7 @@ public sealed class QqDirectEventSubscription : IDisposable
 }
 
 /// <summary>Validated filter for the v1 QQ subscription boundary.</summary>
+/// <remarks>中文：经过校验、用于 v1 QQ 订阅边界的过滤器。</remarks>
 internal sealed record QqDirectSubscriptionFilter(
     string? EventType,
     string? ConversationId,
@@ -125,6 +129,7 @@ internal sealed record QqDirectSubscriptionFilter(
 }
 
 /// <summary>Owns QQ subscriptions for one configured direct binding.</summary>
+/// <remarks>中文：为一个已配置的 direct binding 管理 QQ 订阅。</remarks>
 public sealed class QqDirectEventSubscriptionRegistry : IDisposable
 {
     public const int MaxFilterBytes = 16 * 1024;

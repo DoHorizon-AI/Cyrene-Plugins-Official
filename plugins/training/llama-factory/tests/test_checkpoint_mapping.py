@@ -1,4 +1,6 @@
-"""Checkpoint argument mapping for the LLaMA Factory Plugin contract."""
+"""Checkpoint argument mapping for the LLaMA Factory Plugin contract.
+
+中文:LLaMA Factory Plugin 契约的检查点参数映射。"""
 
 from __future__ import annotations
 

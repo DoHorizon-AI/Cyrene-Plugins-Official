@@ -24,6 +24,7 @@ import java.util.Objects;
  * ════════════════════════════════════════════════════════════════════════
  * Strongly-typed client for message.connector.v1 capability (T43, R05).
  * ════════════════════════════════════════════════════════════════════════
+ * <p>中文：message.connector.v1 capability 的强类型客户端（T43、R05）。</p>
  */
 public final class ConnectorClient {
 

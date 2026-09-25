@@ -32,6 +32,7 @@ use crate::engine::cancel::CancellationToken;
 use crate::limits::RuntimeLimits;
 
 /// Project the run's declared tools into the model-facing tool list.
+/// 将本次 run 声明的工具投影为面向模型的工具列表。
 fn advertise_tools(request: &AgentRunRequest) -> Vec<ChatTool> {
     request
         .available_tools
@@ -82,6 +83,7 @@ impl CyreneNativeAgentLoop {
         let start_time = Instant::now();
         // The run's tool declarations are exactly the snapshot the caller took
         // at run start (decision B); the model only ever sees these names.
+        // 本次 run 的工具声明正是调用方在 run 开始时取得的 snapshot（决策 B）；模型只能看到这些名称。
         let advertised_tools = advertise_tools(&request);
 
         let timeout_cancel = if let Some(t_ms) = limits.timeout_ms {
@@ -97,9 +99,11 @@ impl CyreneNativeAgentLoop {
         let mut completion_tokens = 0;
 
         // Working message history for this stateless invocation
+        // 本次无状态调用使用的工作消息历史。
         let mut conversation_messages: Vec<ModelChatMessage> = Vec::new();
 
         // 1. Initial Prompt & messages from request
+        // 1. 初始 Prompt 和 request 中的消息。
         if !request.prompt.is_empty() {
             conversation_messages.push(ModelChatMessage {
                 role: chat_message::Role::User as i32,
@@ -128,6 +132,7 @@ impl CyreneNativeAgentLoop {
 
         loop {
             // Check cancellation / deadline
+            // 检查取消状态和 deadline。
             if cancel.is_cancelled() || timeout_cancel.is_cancelled() {
                 let code = if timeout_cancel.is_deadline_expired() {
                     AgentErrorCode::DeadlineExceeded
@@ -145,6 +150,7 @@ impl CyreneNativeAgentLoop {
             }
 
             // Check maximum turns limit (T59, T64)
+            // 检查最大 turn 数限制（T59、T64）。
             if turn_count >= limits.max_turns {
                 return Ok(AgentRunResponse {
                     result: Some(agent_run_response::Result::Error(AgentRunError {
@@ -163,6 +169,7 @@ impl CyreneNativeAgentLoop {
             model_call_count += 1;
 
             // Prepare completion request to model.provider.v1 (T60)
+            // 准备发往 model.provider.v1 的 completion request（T60）。
             let completion_req = ChatCompletionRequest {
                 messages: conversation_messages.clone(),
                 model: request
@@ -217,6 +224,7 @@ impl CyreneNativeAgentLoop {
                 .unwrap_or_else(|| "stop".to_string());
 
             // Check if model requested tool calls
+            // 检查模型是否请求调用工具。
             if !first_chunk.tool_calls.is_empty() {
                 let tool_provider = match tools {
                     Some(tp) => tp,
@@ -235,6 +243,7 @@ impl CyreneNativeAgentLoop {
                 };
 
                 // Build Assistant message with tool calls
+                // 构造包含 tool call 的 Assistant 消息。
                 let model_tool_calls: Vec<ChatToolCall> = first_chunk
                     .tool_calls
                     .iter()
@@ -282,6 +291,7 @@ impl CyreneNativeAgentLoop {
                     };
 
                     // Feed tool result back into conversation history
+                    // 将工具结果送回会话消息历史。
                     conversation_messages.push(ModelChatMessage {
                         role: chat_message::Role::Tool as i32,
                         content: result.output_json,
@@ -292,10 +302,12 @@ impl CyreneNativeAgentLoop {
                 }
 
                 // Continue loop with updated history
+                // 使用更新后的历史继续循环。
                 continue;
             }
 
             // Model completed with text response
+            // 模型已通过文本响应完成。
             let duration_ms = start_time.elapsed().as_millis() as i64;
             return Ok(AgentRunResponse {
                 result: Some(agent_run_response::Result::Success(AgentRunSuccess {
@@ -336,6 +348,7 @@ impl CyreneNativeAgentLoop {
         };
 
         // 1. Emit RunStartedEvent (seq = 1)
+        // 1. 发出 RunStartedEvent（seq = 1）。
         let resolved_model = request
             .config
             .as_ref()
@@ -373,6 +386,7 @@ impl CyreneNativeAgentLoop {
 
         loop {
             // Check cancellation / timeout
+            // 检查取消状态或超时。
             if cancel.is_cancelled() || timeout_cancel.is_cancelled() {
                 let code = if timeout_cancel.is_deadline_expired() {
                     AgentErrorCode::DeadlineExceeded
@@ -394,6 +408,7 @@ impl CyreneNativeAgentLoop {
             }
 
             // Check maximum turns limit (T59, T64)
+            // 检查最大 turn 数限制（T59、T64）。
             if turn_count >= limits.max_turns {
                 let _ = sender
                     .send(AgentStreamEvent {
@@ -533,6 +548,7 @@ impl CyreneNativeAgentLoop {
                     };
 
                     // Emit ToolCallStartedEvent
+                    // 发出 ToolCallStartedEvent。
                     let _ = sender
                         .send(AgentStreamEvent {
                             sequence_number: seq.fetch_add(1, Ordering::SeqCst),
@@ -567,6 +583,7 @@ impl CyreneNativeAgentLoop {
                     };
 
                     // Emit ToolCallCompletedEvent
+                    // 发出 ToolCallCompletedEvent。
                     let _ = sender
                         .send(AgentStreamEvent {
                             sequence_number: seq.fetch_add(1, Ordering::SeqCst),
@@ -592,6 +609,7 @@ impl CyreneNativeAgentLoop {
             }
 
             // Emit ContentDeltaEvent for text output
+            // 为文本输出发出 ContentDeltaEvent。
             accumulated_output.push_str(&delta_text);
             let _ = sender
                 .send(AgentStreamEvent {
@@ -604,6 +622,7 @@ impl CyreneNativeAgentLoop {
                 .await;
 
             // Emit terminal RunCompletedEvent
+            // 发出终态 RunCompletedEvent。
             let duration_ms = start_time.elapsed().as_millis() as i64;
             let _ = sender
                 .send(AgentStreamEvent {

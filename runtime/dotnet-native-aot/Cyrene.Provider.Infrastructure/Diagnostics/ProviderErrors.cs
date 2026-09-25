@@ -3,6 +3,9 @@
 // │  Namespace: Cyrene.Provider.Infrastructure.Diagnostics              │
 // │  Role: Error mapping, status codes, and exceptions (T82).           │
 // └─────────────────────────────────────────────────────────────────────┘
+// 中文：文件：ProviderErrors.cs
+// 中文：命名空间：Cyrene.Provider.Infrastructure.Diagnostics
+// 中文：职责：错误映射、状态码与异常处理（T82）。
 
 namespace Cyrene.Provider.Infrastructure.Diagnostics;
 

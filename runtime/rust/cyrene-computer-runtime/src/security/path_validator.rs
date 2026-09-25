@@ -27,6 +27,8 @@ impl PathValidator {
 
     /// Validates and resolves a path against allowed roots.
     /// Rejects path traversal (`..`), empty paths, and symlinks escaping the roots.
+    /// 根据允许的根目录校验并解析路径。
+    /// 拒绝路径遍历（..）、空路径以及逃出根目录的符号链接。
     pub fn validate_path(&self, raw_path: &str) -> Result<PathBuf, ComputerError> {
         if raw_path.trim().is_empty() {
             return Err(ComputerError {
@@ -39,13 +41,16 @@ impl PathValidator {
         let input_path = Path::new(raw_path);
 
         // Disallow suspicious components in non-canonical input
+        // 对非规范输入中的可疑路径组件予以拒绝。
         for comp in input_path.components() {
             if matches!(comp, Component::ParentDir) {
                 // If path contains `..`, verify it strictly after canonicalization or relative resolution
+                // 如果路径包含 ..，则必须在规范化或相对路径解析后严格检查。
             }
         }
 
         // If path is relative, resolve it relative to the first allowed root
+        // 如果路径是相对路径，则以第一个允许的根目录为基准解析。
         let full_path = if input_path.is_absolute() {
             input_path.to_path_buf()
         } else {
@@ -61,6 +66,7 @@ impl PathValidator {
         };
 
         // Canonicalize to resolve symlinks and `..`
+        // 执行规范化以解析符号链接和 ..。
         let resolved = if full_path.exists() {
             full_path.canonicalize().map_err(|e| ComputerError {
                 code: ComputerErrorCode::PathTraversalDenied as i32,
@@ -69,6 +75,7 @@ impl PathValidator {
             })?
         } else {
             // For write/create operations, validate the existing parent directory
+            // 对写入/创建操作，验证现有父目录。
             let parent = full_path.parent().ok_or_else(|| ComputerError {
                 code: ComputerErrorCode::PathTraversalDenied as i32,
                 message: "Path has no parent directory".to_string(),
@@ -93,6 +100,7 @@ impl PathValidator {
         };
 
         // Check if resolved path is prefixed by any allowed root
+        // 检查解析后的路径是否以任一允许根目录为前缀。
         let is_allowed = self
             .allowed_roots
             .iter()
@@ -110,6 +118,7 @@ impl PathValidator {
     }
 
     /// Validates working directory for shell execution.
+    /// 校验 shell 执行的工作目录。
     pub fn validate_cwd(&self, cwd: Option<&str>) -> Result<PathBuf, ComputerError> {
         match cwd {
             Some(p) => {

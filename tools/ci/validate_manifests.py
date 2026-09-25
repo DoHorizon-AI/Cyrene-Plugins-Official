@@ -4,6 +4,10 @@
 This gate runs before capability catalog generation so malformed manifests
 never become catalog input. jsonschema is a pinned CI/dev dependency only;
 production runtime packages must not depend on it.
+
+中文:根据 manifests/plugin.manifest.schema.json 验证 Plugin 清单。
+
+中文:此门禁在生成能力目录之前运行,确保格式错误的清单不会成为目录输入。jsonschema 仅作为固定版本的 CI/开发依赖;生产运行时软件包不得依赖它。
 """
 
 from __future__ import annotations
@@ -19,11 +23,15 @@ PINNED_DEPENDENCY = "jsonschema==4.23.0"
 
 
 class ManifestSchemaError(ValueError):
-    """Raised when a plugin manifest does not satisfy the canonical schema."""
+    """Raised when a plugin manifest does not satisfy the canonical schema.
+
+        中文:当 Plugin 清单不符合规范架构时引发。"""
 
 
 def _load_validator(root: Path):
-    """Build a draft 2020-12 validator from the canonical repository schema."""
+    """Build a draft 2020-12 validator from the canonical repository schema.
+
+        中文:根据仓库规范架构构建一个 Draft 2020-12 验证器。"""
 
     try:
         import jsonschema
@@ -41,7 +49,9 @@ def _load_validator(root: Path):
 
 
 def validate_root(root: Path) -> list[str]:
-    """Validate every plugin manifest and return the validated relative paths."""
+    """Validate every plugin manifest and return the validated relative paths.
+
+        中文:验证每份 Plugin 清单并返回已验证的相对路径。"""
 
     validator = _load_validator(root)
     manifests = sorted(root.glob(MANIFEST_GLOB))
@@ -66,7 +76,9 @@ def validate_root(root: Path) -> list[str]:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run manifest schema validation from the command line."""
+    """Run manifest schema validation from the command line.
+
+        中文:从命令行运行清单架构验证。"""
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd())

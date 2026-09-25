@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Reject tracked state that would make the Plugin repository unsafe to publish."""
+"""Reject tracked state that would make the Plugin repository unsafe to publish.
+
+中文:拒绝会导致 Plugin 仓库不适合公开发布的已跟踪状态。"""
 
 from __future__ import annotations
 
@@ -24,7 +26,9 @@ FORBIDDEN_FILE_PATTERNS = (
 
 
 def _repository_files() -> list[Path]:
-    """Return tracked and pending files so the local gate matches the next commit."""
+    """Return tracked and pending files so the local gate matches the next commit.
+
+        中文:返回已跟踪和待提交文件,使本地门禁检查范围与下一次提交一致。"""
 
     result = subprocess.run(
         [
@@ -47,7 +51,9 @@ def _repository_files() -> list[Path]:
 
 
 def _text(path: Path) -> str | None:
-    """Read text for hygiene checks while deliberately ignoring binary artifacts."""
+    """Read text for hygiene checks while deliberately ignoring binary artifacts.
+
+        中文:为卫生检查读取文本,同时有意忽略二进制产物。"""
 
     try:
         return path.read_text(encoding="utf-8")
@@ -56,7 +62,9 @@ def _text(path: Path) -> str | None:
 
 
 def main() -> None:
-    """Validate public metadata, file names, local paths, and high-confidence secrets."""
+    """Validate public metadata, file names, local paths, and high-confidence secrets.
+
+        中文:验证公开元数据、文件名、本地路径和高置信度机密信息。"""
 
     failures: list[str] = []
     for relative_path in REQUIRED_ROOT_FILES:

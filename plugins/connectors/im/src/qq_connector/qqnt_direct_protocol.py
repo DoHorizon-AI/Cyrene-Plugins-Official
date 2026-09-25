@@ -18,7 +18,9 @@ FRAME_HEADER_BYTES = 4
 
 
 class QQHostProtocolError(ValueError):
-    """Raised when a QQ Host frame is malformed or exceeds its limits."""
+    """Raised when a QQ Host frame is malformed or exceeds its limits.
+
+        中文:当 QQ Host 帧格式错误或超出限制时引发。"""
 
 
 def encode_frame(message: dict[str, Any]) -> bytes:
@@ -30,6 +32,15 @@ def encode_frame(message: dict[str, Any]) -> bytes:
         A four-byte length header followed by the JSON payload.
     Raises:
         QQHostProtocolError: If the value is not an object or is too large.
+
+        中文:将一个 JSON 对象编码为带大端长度前缀的帧。
+
+        参数:
+            message:将编码为 UTF-8 JSON 的协议对象。
+        返回:
+            四字节长度标头,后接 JSON 载荷。
+        引发:
+            QQHostProtocolError:当值不是对象或数据过大时。
     """
 
     if not isinstance(message, dict):
@@ -49,7 +60,9 @@ def encode_frame(message: dict[str, Any]) -> bytes:
 
 
 def write_frame(stream: BinaryIO, message: dict[str, Any]) -> None:
-    """Write one complete frame to a binary stdio stream and flush it."""
+    """Write one complete frame to a binary stdio stream and flush it.
+
+        中文:将一个完整帧写入二进制标准输入输出流并刷新。"""
 
     frame = encode_frame(message)
     remaining = memoryview(frame)
@@ -62,7 +75,9 @@ def write_frame(stream: BinaryIO, message: dict[str, Any]) -> None:
 
 
 def _read_exact(stream: BinaryIO, size: int) -> bytes | None:
-    """Read exactly ``size`` bytes, distinguishing clean EOF from truncation."""
+    """Read exactly ``size`` bytes, distinguishing clean EOF from truncation.
+
+        中文:恰好读取 ``size`` 个字节,并区分正常 EOF 与数据截断。"""
 
     chunks: list[bytes] = []
     remaining = size
@@ -82,6 +97,11 @@ def read_frame(stream: BinaryIO) -> dict[str, Any] | None:
 
     A clean EOF returns ``None``. Partial headers, invalid UTF-8, malformed JSON,
     and non-object JSON values fail closed with :class:`QQHostProtocolError`.
+
+        中文:从标准输入输出流读取并验证一个带长度前缀的 JSON 对象。
+
+        中文：正常 EOF 会返回 ``None``。部分标头、无效 UTF-8、格式错误的 JSON,
+        以及非对象 JSON 值都会触发 :class:`QQHostProtocolError`,并按失败即拒绝处理。
     """
 
     raw_length = _read_exact(stream, FRAME_HEADER_BYTES)

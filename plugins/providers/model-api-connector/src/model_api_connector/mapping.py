@@ -29,7 +29,9 @@ _ROLE_NAMES = {
 
 
 class ProviderMappingError(ValueError):
-    """An upstream answer cannot be represented by the typed contract."""
+    """An upstream answer cannot be represented by the typed contract.
+
+        中文:上游响应无法用有类型契约表示。"""
 
 
 def _role_name(role: ChatRole | int) -> str:
@@ -40,6 +42,7 @@ def _message_body(message: ChatMessage) -> dict[str, Any]:
     body: dict[str, Any] = {"role": _role_name(message.role)}
     if message.tool_calls:
         # An assistant turn that only calls tools carries no text content.
+        # 中文:助手轮次若只调用工具,则不携带文本内容。
         body["content"] = message.content or None
         body["tool_calls"] = [
             {
@@ -62,7 +65,9 @@ def _message_body(message: ChatMessage) -> dict[str, Any]:
 
 
 def to_upstream_body(request: ChatCompletionRequest) -> dict[str, Any]:
-    """Project one typed request onto an OpenAI-compatible chat body."""
+    """Project one typed request onto an OpenAI-compatible chat body.
+
+        中文:将一个有类型请求映射为 OpenAI 兼容的聊天请求体。"""
 
     body: dict[str, Any] = {
         "messages": [_message_body(message) for message in request.messages],
@@ -112,6 +117,11 @@ def response_chunks(
 
     ``structured`` selects chat v2: the v1 codec cannot carry a role, tool calls
     or a reported total, so those fields are only set when v2 was negotiated.
+
+        中文:排列一个非流式提供方响应的数据块顺序。
+
+        中文：``structured`` 选择 chat v2:v1 编解码器无法承载角色、工具调用或已报告的总量,
+        因此只有在协商启用 v2 时才会设置这些字段。
     """
 
     choices = body.get("choices")
@@ -135,6 +145,7 @@ def response_chunks(
         chunks.append(ChatCompletionChunk(tool_calls=tool_calls))
     # A single non-streamed answer reports its terminal reason and its usage
     # together, so they travel as one closing chunk.
+    # 中文:单个非流式响应会同时报告结束原因和用量,因此二者作为一个结束数据块发送。
     finish_reason = choice.get("finish_reason")
     usage = _usage_chunk(body.get("usage"), structured=structured)
     if isinstance(finish_reason, str) or usage is not None:
@@ -152,7 +163,9 @@ def response_chunks(
 def chunk_from_event(
     event: Mapping[str, Any], *, structured: bool = False
 ) -> ChatCompletionChunk | None:
-    """Map one streamed provider event onto exactly one contract chunk."""
+    """Map one streamed provider event onto exactly one contract chunk.
+
+        中文:将一个流式提供方事件映射为且仅映射为一个契约数据块。"""
 
     choices = event.get("choices")
     choice = choices[0] if isinstance(choices, list) and choices else None
@@ -216,6 +229,7 @@ def _tool_call_deltas(raw: Any, *, require_index: bool = True) -> tuple[ChatTool
         if require_index and not isinstance(raw_index, int):
             # Streamed fragments identify their call by index; without one the
             # gateway cannot tell which call a fragment belongs to.
+            # 中文:流式片段通过索引标识所属调用;没有索引时,网关无法判断片段属于哪个调用。
             raise ProviderMappingError("streamed tool call carried no index")
         index = int(raw_index) if isinstance(raw_index, int) else position
         name = function_map.get("name")
@@ -237,6 +251,11 @@ def _usage_chunk(raw: Any, *, structured: bool = False) -> ChatCompletionChunk |
 
     The v1 codec cannot carry a reported total, so it is dropped unless v2 was
     negotiated; the prompt and completion counts remain exact.
+
+        中文:仅返回提供方报告的用量;绝不虚构总量。
+
+        中文：v1 编解码器无法承载已报告的总量,因此除非协商启用 v2,否则会丢弃该总量;
+        提示词和生成内容的计数仍保持准确。
     """
 
     if not isinstance(raw, Mapping):

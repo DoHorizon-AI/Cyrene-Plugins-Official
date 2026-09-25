@@ -36,6 +36,7 @@ use crate::adapter::tool_provider::ToolProvider;
 use crate::engine::cancel::CancellationToken;
 
 // ── Mock Providers for TCK ─────────────────────────────────────────────
+// 中文：TCK 使用的 Mock Provider。
 
 pub struct MockModelProvider {
     pub call_count: AtomicUsize,
@@ -54,6 +55,8 @@ impl MockModelProvider {
     }
 
     /// Ask for one named tool for the first `turns` model calls.
+    ///
+    /// 中文：Ask 在最初 `turns` 次模型调用中请求一个指定名称的工具。
     pub fn with_tool_call(
         tool_name: impl Into<String>,
         tool_arguments: impl Into<String>,
@@ -141,6 +144,8 @@ impl ToolProvider for MockToolProvider {
 }
 
 /// Deterministic tool.provider.v1 source for TCK vectors.
+///
+/// 中文：TCK 测试向量使用的确定性 tool.provider.v1 来源。
 pub struct MockToolCatalogSource {
     catalog: ToolCatalog,
     calls: Mutex<Vec<CallToolRequest>>,
@@ -158,6 +163,8 @@ impl MockToolCatalogSource {
     }
 
     /// Calls recorded so far, in order.
+    ///
+    /// 中文：到目前为止已记录的调用，按发生顺序排列。
     pub fn recorded_calls(&self) -> Vec<CallToolRequest> {
         self.calls.lock().expect("mock source lock").clone()
     }
@@ -201,11 +208,14 @@ fn mock_descriptor(binding_id: &str, provider_tool_id: &str) -> ToolDescriptor {
 }
 
 // ── TCK Test Runner ───────────────────────────────────────────────────
+// 中文：TCK 测试运行器。
 
 pub struct AgentTckSuite;
 
 impl AgentTckSuite {
     /// Test Vector 1: Stateless single-turn execution
+    ///
+    /// 中文：Test Vector 1：无状态的单轮执行。
     pub async fn run_tck_stateless_single_turn(driver: &(dyn AgentDriver + 'static)) {
         let model = MockModelProvider::simple_text();
         let tools = MockToolProvider::new();
@@ -237,6 +247,8 @@ impl AgentTckSuite {
     }
 
     /// Test Vector 2: Multi-turn tool loop execution (T59, T61)
+    ///
+    /// 中文：Test Vector 2：多轮工具调用循环执行（T59、T61）。
     pub async fn run_tck_tool_loop(driver: &(dyn AgentDriver + 'static)) {
         let model = MockModelProvider::with_tool_turns(2);
         let tools = MockToolProvider::new();
@@ -261,7 +273,7 @@ impl AgentTckSuite {
         match resp.result.unwrap() {
             agent_run_response::Result::Success(succ) => {
                 assert_eq!(succ.run_id, "tck-run-tool-loop");
-                assert_eq!(succ.total_turns, 3); // 2 tool turns + 1 final completion
+                assert_eq!(succ.total_turns, 3); // 2 tool turns + 1 final completion | 中文：2 轮工具调用，加 1 次最终完成
                 assert_eq!(tools.execution_count.load(Ordering::SeqCst), 2);
             }
             agent_run_response::Result::Error(e) => panic!("Expected success, got error: {:?}", e),
@@ -269,6 +281,8 @@ impl AgentTckSuite {
     }
 
     /// Test Vector 3: Strictly ordered monotonic streaming events (T59)
+    ///
+    /// 中文：Test Vector 3：严格按顺序递增的流式事件（T59）。
     pub async fn run_tck_ordered_streaming(driver: &(dyn AgentDriver + 'static)) {
         let model = MockModelProvider::with_tool_turns(1);
         let tools = MockToolProvider::new();
@@ -302,18 +316,21 @@ impl AgentTckSuite {
 
         assert!(!events.is_empty(), "Must receive streaming events");
         // Verify strictly monotonic sequence numbers starting at 1
+        // 中文：验证序列号从 1 开始且严格单调递增。
         for (idx, evt) in events.iter().enumerate() {
             assert_eq!(evt.sequence_number, (idx + 1) as i64);
             assert!(evt.timestamp_ms > 0);
         }
 
         // Verify first event is RunStarted
+        // 中文：验证第一个事件是 RunStarted。
         assert!(matches!(
             events.first().unwrap().event.as_ref().unwrap(),
             agent_stream_event::Event::RunStarted(_)
         ));
 
         // Verify last event is RunCompleted terminal event
+        // 中文：验证最后一个事件是终态事件 RunCompleted。
         assert!(matches!(
             events.last().unwrap().event.as_ref().unwrap(),
             agent_stream_event::Event::RunCompleted(_)
@@ -321,8 +338,11 @@ impl AgentTckSuite {
     }
 
     /// Test Vector 4: Maximum turns limit enforcement (T59, T64)
+    ///
+    /// 中文：Test Vector 4：强制执行最大轮数限制（T59、T64）。
     pub async fn run_tck_max_turns_limit(driver: &(dyn AgentDriver + 'static)) {
         // Model always requests tools (infinite loop without bound)
+        // 中文：模型始终请求工具；没有上限时会无限循环。
         let model = MockModelProvider::with_tool_turns(100);
         let tools = MockToolProvider::new();
 
@@ -333,7 +353,7 @@ impl AgentTckSuite {
             messages: Vec::new(),
             available_tools: Vec::new(),
             config: Some(AgentConfig {
-                max_turns: Some(3), // Limit to 3 turns
+                max_turns: Some(3), // Limit to 3 turns | 中文：最多运行 3 轮
                 ..Default::default()
             }),
         };
@@ -354,11 +374,13 @@ impl AgentTckSuite {
     }
 
     /// Test Vector 5: Cooperative cancellation propagation (T51, T59)
+    ///
+    /// 中文：Test Vector 5：协作式取消传播（T51、T59）。
     pub async fn run_tck_cancellation(driver: &(dyn AgentDriver + 'static)) {
         let model = MockModelProvider::with_tool_turns(10);
         let tools = MockToolProvider::new();
         let cancel = CancellationToken::new();
-        cancel.cancel(); // Pre-cancel
+        cancel.cancel(); // Pre-cancel | 中文：在调用前触发取消
 
         let req = AgentRunRequest {
             run_id: "tck-cancelled-run".to_string(),
@@ -385,6 +407,8 @@ impl AgentTckSuite {
     }
 
     /// Test Vector 6: per-run tool catalog snapshot with flat-name routing.
+    ///
+    /// 中文：Test Vector 6：每次运行固定工具目录快照，并按扁平名称路由。
     pub async fn run_tck_tool_catalog_snapshot(driver: &(dyn AgentDriver + 'static)) {
         let source = Arc::new(MockToolCatalogSource::new(
             vec![mock_descriptor("mcp.mock", "lookup_data")],
@@ -424,6 +448,7 @@ impl AgentTckSuite {
         assert_eq!(calls[0].catalog_version.as_deref(), Some("catalog-v1"));
 
         // A flat name outside the snapshot fails closed before any call.
+        // 中文：快照之外的扁平名称会失败关闭，且不会发起调用。
         let other_source = Arc::new(MockToolCatalogSource::new(
             vec![mock_descriptor("mcp.other", "different_tool")],
             "catalog-v2",

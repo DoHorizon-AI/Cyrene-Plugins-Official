@@ -37,6 +37,8 @@ fn descriptor(binding: &str, tool: &str) -> ToolDescriptor {
 }
 
 /// Records the model requests so the test can assert tool advertisement.
+///
+/// 中文：记录模型请求，供测试断言是否向模型公布工具。
 struct RecordingModelProvider {
     requests: Mutex<Vec<ChatCompletionRequest>>,
     call_count: AtomicUsize,
@@ -139,6 +141,7 @@ fn test_projection_sanitizes_and_disambiguates_names() {
     assert!(snapshot.route("read_file").is_none());
 
     // Projection is stable for the same catalog.
+    // 中文：对于相同的 catalog，投影结果保持稳定。
     let repeated = ToolCatalogSnapshot::from_catalog(&catalog);
     assert_eq!(
         repeated.declarations()[0].name,

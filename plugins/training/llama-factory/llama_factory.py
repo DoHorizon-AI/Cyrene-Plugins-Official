@@ -38,7 +38,9 @@ FORBIDDEN_ENV = frozenset(
 
 
 class TypedPayload:
-    """Typed response consumed by DirectPluginRuntime."""
+    """Typed response consumed by DirectPluginRuntime.
+
+        中文:由 DirectPluginRuntime 使用的有类型响应。"""
 
     def __init__(self, value: bytes, type_url: str) -> None:
         self.value = value
@@ -52,7 +54,9 @@ def _canonical_json(value: Any) -> bytes:
 
 
 def _entrypoint() -> list[str]:
-    """Resolve the trainer entrypoint the operator installed in the runtime."""
+    """Resolve the trainer entrypoint the operator installed in the runtime.
+
+        中文:解析操作者在运行时中安装的训练器入口。"""
 
     configured = os.environ.get("CYRENE_LLAMA_FACTORY_ENTRYPOINT", "").strip()
     if configured:
@@ -91,6 +95,10 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
     The Plugin writes the dataset index and the trainer config into the run
     directory so the launch stays a single deterministic command with no hidden
     environment authority.
+
+        中文:将 Product 训练意图映射为 LLaMA-Factory 参数。
+
+        中文:Plugin 会将数据集索引和训练器配置写入运行目录,使启动保持为一条确定性命令,不依赖隐藏的环境权限。
     """
 
     model = _mapping(spec.get("model"), "model")
@@ -171,7 +179,9 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
 
 
 class LlamaFactoryTrainingPlugin:
-    """Stateless LLaMA-Factory launch-contract implementation."""
+    """Stateless LLaMA-Factory launch-contract implementation.
+
+        中文:无状态的 LLaMA-Factory 启动契约实现。"""
 
     plugin_id = "cyrene.training.llama-factory"
     version = "0.1.0"
@@ -187,7 +197,9 @@ class LlamaFactoryTrainingPlugin:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, TypedPayload | str]:
-        """Dispatch one typed trainer request."""
+        """Dispatch one typed trainer request.
+
+            中文:分发一个有类型的训练器请求。"""
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -218,7 +230,9 @@ class LlamaFactoryTrainingPlugin:
         )
 
     def inspect(self) -> dict[str, Any]:
-        """Report the declared trainer surface without probing devices."""
+        """Report the declared trainer surface without probing devices.
+
+            中文:报告已声明的训练器接口,不探测设备。"""
 
         entrypoint = _entrypoint()
         return {
@@ -231,7 +245,9 @@ class LlamaFactoryTrainingPlugin:
         }
 
     def compile(self, spec: dict[str, Any]) -> dict[str, Any]:
-        """Materialize the run directory and return the launch description."""
+        """Materialize the run directory and return the launch description.
+
+            中文:创建运行目录并返回启动说明。"""
 
         output_dir = _text(spec.get("output_dir"), "output_dir")
         if output_dir is None:
@@ -301,7 +317,9 @@ class LlamaFactoryTrainingPlugin:
         }
 
     def parse_event(self, line: str) -> dict[str, Any]:
-        """Classify one trainer output line without owning run state."""
+        """Classify one trainer output line without owning run state.
+
+            中文:对一行训练器输出进行分类,不持有运行状态。"""
 
         try:
             payload = json.loads(line)

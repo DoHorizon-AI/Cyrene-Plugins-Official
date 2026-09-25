@@ -1,4 +1,6 @@
-"""WeCom application-message connector for ``message.connector.v1``."""
+"""WeCom application-message connector for ``message.connector.v1``.
+
+中文:面向 ``message.connector.v1`` 的 WeCom 应用消息连接器。"""
 
 from .connector import (
     CAPABILITY_ID,

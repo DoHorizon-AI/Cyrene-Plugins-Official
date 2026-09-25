@@ -1,4 +1,6 @@
-"""Assemble the generic OneBot Python behavior-reference package."""
+"""Assemble the generic OneBot Python behavior-reference package.
+
+中文:组装通用 OneBot Python 行为参考软件包。"""
 
 from __future__ import annotations
 
@@ -20,11 +22,15 @@ PACKAGE_FILES = (
 
 
 class PackageAssemblyError(ValueError):
-    """Raised when a reference package input is missing or unsafe."""
+    """Raised when a reference package input is missing or unsafe.
+
+        中文:当参考软件包输入缺失或不安全时引发。"""
 
 
 def _copy(source: Path, destination: Path) -> None:
-    """Copy one regular package input."""
+    """Copy one regular package input.
+
+        中文:复制一个常规软件包输入文件。"""
 
     if source.is_symlink() or not source.is_file():
         raise PackageAssemblyError(f"required package file is missing: {source}")
@@ -85,7 +91,9 @@ def _descriptor(value: dict[str, Any]) -> dict[str, Any]:
 
 
 def assemble_package(repository_root: Path, output_root: Path) -> Path:
-    """Assemble one self-contained generic OneBot Python reference package."""
+    """Assemble one self-contained generic OneBot Python reference package.
+
+        中文:组装一个自包含的通用 OneBot Python 参考软件包。"""
 
     repository_root = repository_root.resolve(strict=True)
     connector_root = repository_root / "plugins/connectors/onebot-v11"
@@ -127,7 +135,9 @@ def assemble_package(repository_root: Path, output_root: Path) -> Path:
 
 
 def build_package_archive(repository_root: Path, output_path: Path) -> Path:
-    """Build a deterministic ZIP reference archive."""
+    """Build a deterministic ZIP reference archive.
+
+        中文:构建确定性的 ZIP 参考归档。"""
 
     output_path = output_path.resolve()
     with tempfile.TemporaryDirectory(prefix="cyrene-onebot-reference-") as temporary:

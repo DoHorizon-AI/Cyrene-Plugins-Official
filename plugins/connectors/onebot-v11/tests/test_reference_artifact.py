@@ -1,4 +1,6 @@
-"""Tests for the immutable Python reference artifact builder."""
+"""Tests for the immutable Python reference artifact builder.
+
+中文:不可变 Python 参考产物构建器的测试。"""
 
 from __future__ import annotations
 
@@ -23,7 +25,9 @@ def test_reference_archive_contains_provenance_and_python_payload(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
-    """The reference archive records provenance and stays self-contained."""
+    """The reference archive records provenance and stays self-contained.
+
+        中文:参考归档会记录来源信息并保持自包含。"""
 
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
     output = tmp_path / "reference.zip"
@@ -57,7 +61,9 @@ def test_reference_archive_contains_provenance_and_python_payload(
 
 
 def test_reference_archive_is_deterministic(tmp_path: Path, monkeypatch) -> None:
-    """The same source and epoch produce byte-identical reference archives."""
+    """The same source and epoch produce byte-identical reference archives.
+
+        中文:相同源文件和纪元会生成字节完全相同的参考归档。"""
 
     monkeypatch.setenv("SOURCE_DATE_EPOCH", "1700000000")
     first = tmp_path / "first.zip"

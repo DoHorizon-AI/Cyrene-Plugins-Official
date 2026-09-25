@@ -37,7 +37,9 @@ _PARAMETER_PATTERN = re.compile(
 
 @dataclass(frozen=True, slots=True)
 class TypedPayload:
-    """Typed result consumed by the standard direct runtime."""
+    """Typed result consumed by the standard direct runtime.
+
+        中文:由标准直连运行时使用的有类型结果。"""
 
     value: bytes
     type_url: str
@@ -45,14 +47,18 @@ class TypedPayload:
 
 @dataclass(frozen=True)
 class VramEstimate:
-    """Backward-compatible aggregate estimates in gigabytes."""
+    """Backward-compatible aggregate estimates in gigabytes.
+
+        中文:以 GB 为单位、保持向后兼容的汇总估算值。"""
 
     train_gb: float
     infer_gb: float
 
 
 def _parameter_count_from_name(model_id: str) -> int | None:
-    """Read a parameter hint such as ``7B`` from a model identity."""
+    """Read a parameter hint such as ``7B`` from a model identity.
+
+        中文:从模型标识中读取 ``7B`` 之类的参数规模提示。"""
 
     match = _PARAMETER_PATTERN.search(model_id.lower())
     if match is None:
@@ -67,7 +73,9 @@ def _parameter_count_from_name(model_id: str) -> int | None:
 
 
 def _model_family(model_id: str) -> str | None:
-    """Return a stable best-effort model-family projection."""
+    """Return a stable best-effort model-family projection.
+
+        中文:返回稳定的尽力而为模型家族映射结果。"""
 
     name = model_id.strip().split("/", 1)[-1]
     if not name:
@@ -77,7 +85,9 @@ def _model_family(model_id: str) -> str | None:
 
 
 class HfModelAnalyzer:
-    """Analyze model identity, memory bounds, and shard integrity."""
+    """Analyze model identity, memory bounds, and shard integrity.
+
+        中文:分析模型标识、显存边界和分片完整性。"""
 
     plugin_id = "cyrene.models.hf-analyzer"
     version = "0.3.0"
@@ -96,7 +106,9 @@ class HfModelAnalyzer:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, TypedPayload | str]:
-        """Dispatch one typed JSON request through DirectPluginRuntime."""
+        """Dispatch one typed JSON request through DirectPluginRuntime.
+
+            中文:通过 DirectPluginRuntime 分发一个有类型的 JSON 请求。"""
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -168,7 +180,9 @@ class HfModelAnalyzer:
         quantization: str | None = None,
         workload_type: str = "infer",
     ) -> VramEstimate:
-        """Calculate backward-compatible aggregate memory estimates."""
+        """Calculate backward-compatible aggregate memory estimates.
+
+            中文:计算保持向后兼容的汇总显存估算值。"""
 
         del workload_type
         num_params = max(params_billion, 0.1)
@@ -200,7 +214,9 @@ class HfModelAnalyzer:
         model_info: dict[str, Any],
         workload_intent: dict[str, Any],
     ) -> dict[str, Any]:
-        """Return Product-neutral model facts and bounded memory evidence."""
+        """Return Product-neutral model facts and bounded memory evidence.
+
+            中文:返回与 Product 无关的模型事实和有界显存证据。"""
 
         if not isinstance(model_info, dict) or not isinstance(workload_intent, dict):
             raise TypeError("model_info and workload_intent must be objects")
@@ -297,7 +313,9 @@ class HfModelAnalyzer:
 
     @staticmethod
     def compute_sha256(file_path: str, chunk_size: int = 65536) -> str:
-        """Compute a prefixed SHA-256 digest."""
+        """Compute a prefixed SHA-256 digest.
+
+            中文:计算带前缀的 SHA-256 摘要。"""
 
         if not isinstance(file_path, str) or not file_path:
             raise ValueError("file_path must be non-empty text")
@@ -321,7 +339,9 @@ class HfModelAnalyzer:
         model_directory: str,
         verify_checksums: bool = False,
     ) -> dict[str, Any]:
-        """Validate a Hugging Face shard index and its referenced files."""
+        """Validate a Hugging Face shard index and its referenced files.
+
+            中文:验证 Hugging Face 分片索引及其引用的文件。"""
 
         if not isinstance(model_directory, str) or not model_directory:
             raise ValueError("model_directory must be non-empty text")

@@ -22,9 +22,10 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 // ── ABI Constants & Error Codes ──────────────────────────────────────────────
+// ── ABI 常量与错误码 ──────────────────────────────────────────────
 pub const CYRENE_ABI_VERSION_1: u32 = 1;
-pub const CYRENE_MAX_PAYLOAD_SIZE: u64 = 64 * 1024 * 1024; // 64 MB
-const ALLOC_MAGIC: u64 = 0x435952454E453031; // "CYRENE01" in ASCII hex
+pub const CYRENE_MAX_PAYLOAD_SIZE: u64 = 64 * 1024 * 1024; // 64 MB | 中文：负载大小上限为 64 MB
+const ALLOC_MAGIC: u64 = 0x435952454E453031; // "CYRENE01" in ASCII hex；即 "CYRENE01" 的 ASCII 十六进制表示
 
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -49,6 +50,7 @@ pub enum StatusCode {
 }
 
 // ── C ABI Struct Definitions Matching cyrene_plugin_abi_v1.h ─────────────────
+// ── 与 cyrene_plugin_abi_v1.h 对应的 C ABI 结构体定义 ─────────────────
 #[repr(C)]
 pub struct CapabilityDescriptorV1 {
     pub capability_id: *const c_char,
@@ -119,6 +121,7 @@ pub struct StreamRequestV1 {
 }
 
 // ── Tracked Allocator Header ────────────────────────────────────────────────
+// ── 受跟踪分配器的头部 ────────────────────────────────────────────────
 #[repr(C)]
 struct AllocHeader {
     magic: u64,
@@ -127,6 +130,7 @@ struct AllocHeader {
 }
 
 // ── Static Metadata ──────────────────────────────────────────────────────────
+// ── 静态元数据 ──────────────────────────────────────────────────────────
 static IMPLEMENTATION_NAME: &[u8] = b"cyrene-plugin-rust\0";
 static IMPLEMENTATION_VERSION: &[u8] = b"0.1.0\0";
 
@@ -159,6 +163,7 @@ static CAPABILITIES: [CapabilityDescriptorV1; 4] = [
 ];
 
 // ── Plugin Instance Internals ────────────────────────────────────────────────
+// ── 插件实例内部状态 ────────────────────────────────────────────────
 pub struct PluginInstance {
     #[allow(dead_code)]
     config: Option<String>,
@@ -202,6 +207,7 @@ impl PluginInstance {
     }
 
     /// Allocates a buffer tracked by this instance's allocation ledger.
+    /// 分配缓冲区，并将其登记到此实例的分配账本中。
     pub fn allocate_tracked_buffer(&self, data: &[u8]) -> Result<*mut u8, StatusCode> {
         let header_size = std::mem::size_of::<AllocHeader>();
         let total_size = header_size + data.len();
@@ -233,14 +239,16 @@ impl PluginInstance {
     }
 
     /// Allocates a null-terminated C string buffer tracked by this instance.
+    /// 分配以空字符结尾的 C 字符串缓冲区，并由此实例跟踪。
     pub fn allocate_tracked_string(&self, s: &str) -> Result<*mut c_char, StatusCode> {
         let mut bytes = s.as_bytes().to_vec();
-        bytes.push(0); // Null terminator
+        bytes.push(0); // Null terminator；空字符终止符
         let ptr = self.allocate_tracked_buffer(&bytes)?;
         Ok(ptr as *mut c_char)
     }
 
     /// Frees a buffer previously allocated and tracked by this instance.
+    /// 释放此前由此实例分配并跟踪的缓冲区。
     pub unsafe fn free_buffer(&self, ptr: *mut u8) -> StatusCode {
         if ptr.is_null() {
             return StatusCode::Ok;
@@ -263,7 +271,7 @@ impl PluginInstance {
 
             let total_size = header_size + (*header_ptr).size;
             let align = (*header_ptr).align;
-            (*header_ptr).magic = 0; // Invalidate header
+            (*header_ptr).magic = 0; // Invalidate header；将头部标记为无效
 
             let layout = match Layout::from_size_align(total_size, align) {
                 Ok(l) => l,
@@ -277,6 +285,7 @@ impl PluginInstance {
     }
 
     /// Registers a new cancellation token and returns its handle identifier.
+    /// 注册新的取消令牌并返回其句柄标识。
     pub fn register_cancel_token(&self) -> (usize, Arc<AtomicBool>) {
         let token_id = self.next_cancel_id.fetch_add(1, Ordering::SeqCst);
         let flag = Arc::new(AtomicBool::new(false));
@@ -286,12 +295,14 @@ impl PluginInstance {
     }
 
     /// Removes a cancellation token after stream completion.
+    /// 流完成后移除对应的取消令牌。
     pub fn unregister_cancel_token(&self, token_id: usize) {
         let mut tokens = self.cancel_tokens.lock().unwrap();
         tokens.remove(&token_id);
     }
 
     /// Triggers cancellation for a registered token handle.
+    /// 触发指定已注册令牌句柄的取消操作。
     pub fn trigger_cancellation(&self, token_id: usize) -> StatusCode {
         let tokens = self.cancel_tokens.lock().unwrap();
         if let Some(flag) = tokens.get(&token_id) {
@@ -299,6 +310,7 @@ impl PluginInstance {
             StatusCode::Ok
         } else {
             // Already finished or cancelled; safe idempotent response
+            // 已经结束或取消；可安全地幂等返回
             StatusCode::Ok
         }
     }
@@ -330,6 +342,7 @@ impl Drop for PluginInstance {
 }
 
 // ── Helper Functions ─────────────────────────────────────────────────────────
+// ── 辅助函数 ─────────────────────────────────────────────────────────
 fn current_epoch_ms() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -340,9 +353,15 @@ fn current_epoch_ms() -> u64 {
 // ═════════════════════════════════════════════════════════════════════════════
 //                        EXPORTED C ABI V1 ENTRYPOINTS
 // ═════════════════════════════════════════════════════════════════════════════
+// ═════════════════════════════════════════════════════════════════════════════
+// 导出的 C ABI V1 入口点
+// ═════════════════════════════════════════════════════════════════════════════
 
 /// ════════════════════════════════════════════════════════════════════════════
 /// @brief Negotiates ABI, capability list, and interface version.
+/// ════════════════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════════════════
+/// @brief 协商 ABI、能力列表和接口版本。
 /// ════════════════════════════════════════════════════════════════════════════
 #[no_mangle]
 pub unsafe extern "C" fn cyrene_plugin_get_api_v1(
@@ -378,6 +397,9 @@ pub unsafe extern "C" fn cyrene_plugin_get_api_v1(
 
 /// ════════════════════════════════════════════════════════════════════════════
 /// @brief Creates and initializes a new plugin instance.
+/// ════════════════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════════════════
+/// @brief 创建并初始化新的插件实例。
 /// ════════════════════════════════════════════════════════════════════════════
 #[no_mangle]
 pub unsafe extern "C" fn cyrene_plugin_create_v1(
@@ -415,6 +437,9 @@ pub unsafe extern "C" fn cyrene_plugin_create_v1(
 /// ════════════════════════════════════════════════════════════════════════════
 /// @brief Executes a synchronous blocking unary invocation.
 /// ════════════════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════════════════
+/// @brief 执行同步阻塞的一元调用。
+/// ════════════════════════════════════════════════════════════════════════════
 #[no_mangle]
 pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
     handle: *mut std::ffi::c_void,
@@ -434,6 +459,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
         let req = &*request;
 
         // Check input payload limits
+        // 检查输入载荷大小限制
         if req.input_size > CYRENE_MAX_PAYLOAD_SIZE {
             (*out_response).status_code = StatusCode::ResourceExhausted as i32;
             (*out_response).error_message = instance
@@ -446,6 +472,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
         }
 
         // Validate string inputs for null and UTF-8 correctness
+        // 检查字符串输入是否为空指针，并验证 UTF-8 编码
         if req.method.is_null() {
             return StatusCode::InvalidArgument;
         }
@@ -464,6 +491,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
         };
 
         // Check deadline
+        // 检查截止时间
         if req.deadline_ms > 0 && current_epoch_ms() > req.deadline_ms {
             (*out_response).status_code = StatusCode::DeadlineExceeded as i32;
             (*out_response).error_message = instance
@@ -476,6 +504,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
         }
 
         // Process request based on method
+        // 根据方法处理请求
         let input_bytes = if !req.input_data.is_null() && req.input_size > 0 {
             std::slice::from_raw_parts(req.input_data, req.input_size as usize)
         } else {
@@ -483,14 +512,16 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
         };
 
         // Standard Echo & Capability Round-trip dispatcher
+        // 标准 Echo 与能力往返分发器
         let (output_bytes, out_type_url) = match method {
             "Echo" | "cyrene.plugin.runtime.v1.DirectPluginRuntime/Invoke" => {
                 (input_bytes.to_vec(), type_url.to_string())
             }
             "agent.runtime.v1/Run" => {
                 // Return synthetic or reflected response
+                // 返回合成响应或原样映射的响应
                 let mut resp_data = Vec::new();
-                resp_data.extend_from_slice(b"\x0a\x06run_01\x10\x00"); // Minimal protobuf fields
+                resp_data.extend_from_slice(b"\x0a\x06run_01\x10\x00"); // Minimal protobuf fields；最小化的 Protobuf 字段
                 (
                     resp_data,
                     "type.cyrene.io/cyrene.agent.runtime.v1.AgentRunResponse".to_string(),
@@ -504,6 +535,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
         };
 
         // Allocate outputs tracked by instance
+        // 分配由实例跟踪的输出缓冲区
         let out_data_ptr = match instance.allocate_tracked_buffer(&output_bytes) {
             Ok(p) => p,
             Err(e) => return e,
@@ -535,6 +567,9 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_v1(
 /// ════════════════════════════════════════════════════════════════════════════
 /// @brief Initiates a streaming invocation, delivering events through a callback.
 /// ════════════════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════════════════
+/// @brief 启动流式调用，并通过回调传递事件。
+/// ════════════════════════════════════════════════════════════════════════════
 #[no_mangle]
 pub unsafe extern "C" fn cyrene_plugin_invoke_stream_v1(
     handle: *mut std::ffi::c_void,
@@ -564,6 +599,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_stream_v1(
         }
 
         // Register cancellation token
+        // 注册取消令牌
         let (token_id, cancel_flag) = instance.register_cancel_token();
         if !out_cancel_handle.is_null() {
             *out_cancel_handle = token_id as *mut std::ffi::c_void;
@@ -582,22 +618,25 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_stream_v1(
         };
 
         // Emit chunks (3 incremental events + 1 terminal event)
+        // 发送数据块（3 个增量事件和 1 个终态事件）
         let num_chunks = 3;
         let mut cancelled = false;
 
         for seq in 0..num_chunks {
             // Check cancellation
+            // 检查是否已取消
             if cancel_flag.load(Ordering::SeqCst) {
                 cancelled = true;
                 break;
             }
 
             // Check deadline
+            // 检查截止时间
             if req.deadline_ms > 0 && current_epoch_ms() > req.deadline_ms {
                 let err_msg = CString::new("Stream deadline exceeded").unwrap();
                 let event = StreamEventV1 {
                     sequence_number: seq,
-                    event_type: 3, // CYRENE_STREAM_EVENT_ERROR
+                    event_type: 3, // CYRENE_STREAM_EVENT_ERROR（错误事件）
                     status_code: StatusCode::DeadlineExceeded as i32,
                     error_message: err_msg.as_ptr(),
                     type_url: std::ptr::null(),
@@ -618,7 +657,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_stream_v1(
 
             let event = StreamEventV1 {
                 sequence_number: seq,
-                event_type: 0, // CYRENE_STREAM_EVENT_DATA
+                event_type: 0, // CYRENE_STREAM_EVENT_DATA（数据事件）
                 status_code: StatusCode::Ok as i32,
                 error_message: std::ptr::null(),
                 type_url: type_url_cstr.as_ptr(),
@@ -631,11 +670,12 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_stream_v1(
         }
 
         // Emit terminal event
+        // 发送终态事件
         if cancelled {
             let cancel_msg = CString::new("Stream cancelled by client").unwrap();
             let event = StreamEventV1 {
                 sequence_number: num_chunks,
-                event_type: 2, // CYRENE_STREAM_EVENT_CANCELLED
+                event_type: 2, // CYRENE_STREAM_EVENT_CANCELLED（取消事件）
                 status_code: StatusCode::Cancelled as i32,
                 error_message: cancel_msg.as_ptr(),
                 type_url: std::ptr::null(),
@@ -647,7 +687,7 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_stream_v1(
         } else {
             let event = StreamEventV1 {
                 sequence_number: num_chunks,
-                event_type: 1, // CYRENE_STREAM_EVENT_TERMINAL
+                event_type: 1, // CYRENE_STREAM_EVENT_TERMINAL（终态事件）
                 status_code: StatusCode::Ok as i32,
                 error_message: std::ptr::null(),
                 type_url: std::ptr::null(),
@@ -670,6 +710,9 @@ pub unsafe extern "C" fn cyrene_plugin_invoke_stream_v1(
 
 /// ════════════════════════════════════════════════════════════════════════════
 /// @brief Asynchronously requests cancellation of an ongoing stream operation.
+/// ════════════════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════════════════
+/// @brief 异步请求取消正在进行的流操作。
 /// ════════════════════════════════════════════════════════════════════════════
 #[no_mangle]
 pub unsafe extern "C" fn cyrene_plugin_cancel_v1(
@@ -699,6 +742,9 @@ pub unsafe extern "C" fn cyrene_plugin_cancel_v1(
 /// ════════════════════════════════════════════════════════════════════════════
 /// @brief Releases a buffer allocated by this plugin library.
 /// ════════════════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════════════════
+/// @brief 释放由此插件库分配的缓冲区。
+/// ════════════════════════════════════════════════════════════════════════════
 #[no_mangle]
 pub unsafe extern "C" fn cyrene_plugin_free_buffer_v1(
     handle: *mut std::ffi::c_void,
@@ -725,6 +771,9 @@ pub unsafe extern "C" fn cyrene_plugin_free_buffer_v1(
 /// ════════════════════════════════════════════════════════════════════════════
 /// @brief Destroys a plugin instance and cleans up all allocated resources.
 /// ════════════════════════════════════════════════════════════════════════════
+/// ════════════════════════════════════════════════════════════════════════════
+/// @brief 销毁插件实例并清理所有已分配资源。
+/// ════════════════════════════════════════════════════════════════════════════
 #[no_mangle]
 pub unsafe extern "C" fn cyrene_plugin_destroy_v1(handle: *mut std::ffi::c_void) -> i32 {
     let result = catch_unwind(AssertUnwindSafe(|| {
@@ -734,6 +783,7 @@ pub unsafe extern "C" fn cyrene_plugin_destroy_v1(handle: *mut std::ffi::c_void)
 
         let raw = handle as *mut PluginInstance;
         // Verify not double-destroyed
+        // 验证实例尚未被重复销毁
         if (*raw).is_destroyed.swap(true, Ordering::SeqCst) {
             return StatusCode::InvalidArgument;
         }

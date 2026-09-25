@@ -3,6 +3,9 @@
 // ║ Module: CYRENE Plugins Official                                     ║
 // ║ Role: Cross-language wire bytes, unknown fields & golden fixtures.  ║
 // ╚══════════════════════════════════════════════════════════════════════╝
+// 中文：文件：cross_language_golden_fixtures_tck.rs
+// 中文：模块：CYRENE Plugins Official
+// 中文：职责：验证跨语言 wire 字节、未知字段与 golden fixture。
 
 use cyrene_plugin_contracts::{
     agent_runtime_v1::{
@@ -62,6 +65,7 @@ fn generate_and_verify_agent_golden_fixtures() {
     assert_eq!(decoded.config.unwrap().max_turns, Some(5));
 
     // Stream events fixture
+    // 中文：流式事件 fixture。
     let stream_events = vec![
         AgentStreamEvent {
             sequence_number: 1,
@@ -172,6 +176,9 @@ fn verify_unknown_fields_forward_compatibility() {
     // Construct a byte array containing an unknown field tag (e.g. tag 99: varint 42)
     // Tag 99, wire type 0 (varint): (99 << 3) | 0 = 792 = 0x318 -> varint [0x98, 0x06]
     // Value: 42 -> 0x2a
+    // 中文：构造包含未知字段标记的字节数组（例如 tag 99：varint 42）。
+    // 中文：tag 99、wire type 0（varint）：(99 << 3) | 0 = 792 = 0x318 → varint [0x98, 0x06]。
+    // 中文：值 42 对应 0x2a。
     let base_req = CommandExecutionRequest {
         command: "ls -la".to_string(),
         cwd: None,
@@ -181,7 +188,7 @@ fn verify_unknown_fields_forward_compatibility() {
     };
 
     let mut wire = base_req.encode_to_vec();
-    wire.extend_from_slice(&[0x98, 0x06, 0x2a]); // Field 99 = 42
+    wire.extend_from_slice(&[0x98, 0x06, 0x2a]); // Field 99 = 42 | 中文：字段 99 的值为 42
 
     let decoded = CommandExecutionRequest::decode(wire.as_slice())
         .expect("Protobuf must ignore unknown fields forward-compatibly");

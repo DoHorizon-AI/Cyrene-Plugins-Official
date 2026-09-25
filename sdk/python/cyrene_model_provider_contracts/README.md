@@ -13,4 +13,14 @@ package.
 
 本包只包含契约值与编解码器。提供方选择、凭据、网络策略、重试、模型生命周期
 及 Product 状态均不由本包管理。
+---
 
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# Cyrene Model Provider Contracts
+
+本 package 是由 Plugins 持有的 model.provider.v1 contract 的 Python 投影。Product 使用它编码 request、解码 response，并与已解析的 Plugin endpoint 直接交换数据。
+
+它只包含 contract value 和 codec。Provider 选择、凭据、网络策略、重试、模型生命周期和 Product 状态都由本 package 之外的组件负责。

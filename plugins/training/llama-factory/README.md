@@ -27,3 +27,30 @@ executor owns `CUDA_VISIBLE_DEVICES`, mounts, and process lifetime.
 
 Verification: `cd plugins/training/llama-factory && python -m pytest tests`.
 Real CUDA training is not verified by these tests; see `contracts/capability-verification.json`.
+---
+
+<!-- Chinese Translation / 中文翻译 -->
+
+## 中文翻译
+
+# LLaMA-Factory Trainer
+
+这是由 Plugins 所有的 training.llama-factory.v1 规范实现。
+
+| Method | 职责 |
+| --- | --- |
+| inspect | 声明 trainer 能力，但不探测设备。 |
+| compile | 物化 LLaMA-Factory run 目录，并生成与 executor 无关的启动配置。 |
+| parse_event | 对一行 trainer 输出进行分类。 |
+
+compile 会将 train_config.json 和 dataset_info.json 写入 run 目录，并返回 argv、mount 和 resource request。它绝不分配设备：CUDA_VISIBLE_DEVICES、mount 和进程生命周期都由 Kernel executor 负责。
+
+## 配置
+
+| 变量 | 用途 |
+| --- | --- |
+| CYRENE_LLAMA_FACTORY_ENTRYPOINT | 完整 launcher 命令，例如 /opt/venv/bin/llamafactory-cli。 |
+| CYRENE_LLAMA_FACTORY_PYTHON | 未设置 entrypoint 时，用作 <python> -m llamafactory.cli 的解释器。 |
+| CYRENE_LLAMA_FACTORY_VERSION | inspect 报告的版本。 |
+
+验证方式：进入 plugins/training/llama-factory 并运行 python -m pytest tests。这些测试没有验证真实 CUDA 训练；请参阅 contracts/capability-verification.json。
