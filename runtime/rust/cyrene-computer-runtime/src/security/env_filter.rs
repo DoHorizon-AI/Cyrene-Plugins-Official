@@ -55,6 +55,7 @@ impl EnvironmentFilter {
     /// Filters and produces an isolated sanitized environment map.
     /// 1. Host environment variables are stripped by default, retaining only safe whitelist items.
     /// 2. User-provided environment variables are inspected: any containing sensitive patterns are rejected or stripped.
+    ///
     /// 过滤并生成隔离的净化环境映射。
     /// 1. 默认移除 host 环境变量，只保留安全 allowlist 项。
     /// 2. 检查用户提供的环境变量：任何包含敏感模式的变量都会被拒绝或剔除。
