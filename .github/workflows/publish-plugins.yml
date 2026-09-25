@@ -1,0 +1,105 @@
+name: publish-plugins
+
+on:
+  push:
+    branches: [develop, main, release, 'feat/**', 'fix/**']
+    paths:
+      - 'plugins/**'
+      - 'runtime/**'
+      - 'contracts/**'
+      - 'tools/ci/build_plugins.py'
+      - '.github/workflows/publish-plugins.yml'
+  pull_request:
+    branches: [develop, main, release]
+    paths:
+      - 'plugins/**'
+      - 'runtime/**'
+      - 'contracts/**'
+      - 'tools/ci/build_plugins.py'
+      - '.github/workflows/publish-plugins.yml'
+  workflow_dispatch:
+    inputs:
+      target_plugin:
+        description: 'Specific plugin ID or "all"'
+        required: false
+        default: 'all'
+      publish_release:
+        description: 'Publish release assets to GitHub Releases'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: publish-plugins-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-publish-plugins:
+    name: build & package modular plugins
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout Cyrene-Plugins-Official
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Python packaging dependencies
+        run: |
+          python3 -m pip install --upgrade pip wheel build setuptools
+
+      - name: Build Modular Plugins
+        run: |
+          TARGET="${{ github.event.inputs.target_plugin }}"
+          if [ -n "$TARGET" ] && [ "$TARGET" != "all" ]; then
+            python3 tools/ci/build_plugins.py --plugin "$TARGET" --output-dir dist/plugins
+          else
+            python3 tools/ci/build_plugins.py --all --output-dir dist/plugins
+          fi
+
+      - name: Verify Built Plugins & Manifest
+        run: |
+          ls -la dist/plugins
+          cat dist/plugins/plugins-manifest.json
+
+      - name: Upload Plugins Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cyrene-plugins-packages
+          path: dist/plugins/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish to GitHub Releases
+        if: (github.ref == 'refs/heads/main' || github.event.inputs.publish_release == 'true') && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="plugins-latest"
+          TITLE="Cyrene Official Plugins Release (Modular & Multi-language)"
+          NOTES="Modular plugin packages for Cyrene Exchange, Reactor, Yield, and Navigator. Includes Python wheels, Rust gRPC/cabi servers, and .NET Native AOT connectors."
+
+          # Check if release exists, delete or update tag
+          if gh release view "$TAG_NAME" >/dev/null 2>&1; then
+            echo "Updating existing release $TAG_NAME..."
+            gh release upload "$TAG_NAME" dist/plugins/* --clobber
+          else
+            echo "Creating new release $TAG_NAME..."
+            gh release create "$TAG_NAME" dist/plugins/* --title "$TITLE" --notes "$NOTES" --prerelease=false
+          fi
