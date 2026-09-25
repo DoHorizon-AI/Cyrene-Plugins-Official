@@ -127,7 +127,7 @@ class UpstreamCall:
         # A peer that answers with HTTP/1.0 leaves http.client's connection
         # object without a socket of its own, so the response and the captured
         # socket are the handles that actually shut the upstream down.
-        # 中文：对端若返回 HTTP/1.0,`http.client` 的 connection 对象就不会再持有自己的 socket。因此,
+        # 中文:对端若返回 HTTP/1.0,`http.client` 的 connection 对象就不会再持有自己的 socket。因此,
         # response 和捕获到的 socket 才是真正能够关闭上游的句柄。
         if sock is not None:
             with contextlib.suppress(OSError):
@@ -278,7 +278,7 @@ class OpenAICompatibleUpstream:
             connection.request("POST", target, body=encoded, headers=headers)
             # The socket must be captured before the response is read: a peer
             # answering with HTTP/1.0 makes http.client drop its own reference.
-            # 中文：读取 response 之前必须先捕获 socket:如果对端返回 HTTP/1.0,
+            # 中文:读取 response 之前必须先捕获 socket:如果对端返回 HTTP/1.0,
             # `http.client` 会丢弃自己对 socket 的引用。
             call.attach_socket(connection.sock)
             response = connection.getresponse()

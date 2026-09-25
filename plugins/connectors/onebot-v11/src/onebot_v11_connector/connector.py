@@ -815,7 +815,7 @@ class OneBotV11Connector:
         except ConnectorError as exc:
             return False, _direct_error(exc)
         except Exception as exc:  # Keep errors inside the worker protocol.
-        # 中文：将错误保留在 Worker 协议内。
+        # 中文:将错误保留在 Worker 协议内。
             return False, _direct_error(
                 ConnectorError("EXECUTION_FAILED", f"OneBot invocation failed: {exc}")
             )

@@ -659,7 +659,7 @@ class QQNTDirectConnector:
             # Explicit lifecycle actions are authoritative. Do not invoke the
             # complete bootstrap sequence before the action requested by the
             # caller, otherwise create/init/startNT would be duplicated.
-            # 中文：生命周期操作显式指定时,以该操作为准。
+            # 中文:生命周期操作显式指定时,以该操作为准。
             # 不要在执行调用方请求的操作前运行完整 bootstrap 流程,
             # 否则会重复执行 create/init/startNT。
             self._ensure_host_started()
@@ -1126,7 +1126,7 @@ class QQNTDirectConnector:
                 if not isinstance(request_id, str):
                     # A callback without a generation-scoped originating
                     # request is ambiguous; never expose it as a generic event.
-                    # 中文：没有按代次关联的发起请求时,无法判定回调属于哪个操作;
+                    # 中文:没有按代次关联的发起请求时,无法判定回调属于哪个操作;
                     # 绝不能将其作为通用事件公开。
                     return 0
                 with self._callback_lock:
@@ -1134,7 +1134,7 @@ class QQNTDirectConnector:
                 if originating_operation not in originating_operations:
                     # A callback without a generation-scoped originating
                     # request is ambiguous; never expose it as a generic event.
-                    # 中文：没有按代次关联的发起请求时,无法判定回调属于哪个操作;
+                    # 中文:没有按代次关联的发起请求时,无法判定回调属于哪个操作;
                     # 绝不能将其作为通用事件公开。
                     return 0
                 normalized_callback = _normalize_callback(
@@ -1145,7 +1145,7 @@ class QQNTDirectConnector:
                     # request identity makes a second callback with a different
                     # event_id harmless as well as making same-id duplicates
                     # harmless through the event-id deduplication above.
-                    # 中文：完成回调是终态记录。消费请求标识后,
+                    # 中文:完成回调是终态记录。消费请求标识后,
                     # 即使后续回调使用不同的 event_id 也会被安全忽略;
                     # 上方的 event-id 去重逻辑同样会忽略相同 ID 的重复回调。
                     self._callback_requests.pop(request_id, None)

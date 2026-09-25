@@ -7,7 +7,7 @@
 # The capability schema and the generated consumer live in the same repository,
 # so normal generation never checks out or reads Cyrene-Platform.
 ###############################################################################
-# 中文：模块：Cyrene Plugins Official
+# 中文:模块：Cyrene Plugins Official
 # 职责：生成 WeCom 连接器的 message.connector.v1 Python 绑定。
 # 能力架构与生成后的消费者位于同一仓库，常规生成不会检出 Cyrene-Platform。
 """Generate the WeCom connector binding from the Plugins-owned canonical proto.

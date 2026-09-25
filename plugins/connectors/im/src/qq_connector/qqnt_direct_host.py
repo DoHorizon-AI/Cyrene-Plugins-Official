@@ -532,7 +532,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
         # A well-behaved Host exits on shutdown, but it may have spawned
         # binding-local helpers.  Reap that process group even after the
         # leader has already exited.
-        # 中文：正常的 Host 会响应关闭请求并退出,但它可能已经派生了属于当前 binding
+        # 中文:正常的 Host 会响应关闭请求并退出,但它可能已经派生了属于当前 binding
         # 的辅助进程。因此,即使 leader 已退出,也要回收整个进程组。
         _terminate_process_tree(process, force=True, include_exited=True)
         for stream in (process.stdin, process.stdout, process.stderr):
@@ -816,7 +816,7 @@ def _terminate_process_tree(
             return
         except OSError:
             # Fall back to the child handle if the process group disappeared.
-            # 中文：如果进程组已消失，则回退使用子进程句柄。
+            # 中文:如果进程组已消失，则回退使用子进程句柄。
             pass
     try:
         (process.kill if force else process.terminate)()
@@ -882,7 +882,7 @@ def _linux_tcp_listening_inodes() -> set[str]:
         for line in lines:
             fields = line.split()
             # /proc/net/tcp: sl local_address rem_address st ... uid timeout inode
-            # 中文：/proc/net/tcp 字段依次为 sl、local_address、
+            # 中文:/proc/net/tcp 字段依次为 sl、local_address、
             # rem_address、st、...、uid、timeout、inode。
             if len(fields) > 9 and fields[3].upper() == "0A":
                 inodes.add(fields[9])
@@ -909,7 +909,7 @@ def _linux_process_tree(root_pid: int) -> tuple[int, ...]:
             closing = stat_line.rfind(")")
             fields = stat_line[closing + 2 :].split()
             # After the comm field: state, ppid, pgrp, ...
-            # 中文：comm 字段之后依次是 state、ppid、pgrp 等字段。
+            # 中文:comm 字段之后依次是 state、ppid、pgrp 等字段。
             if len(fields) > 2:
                 parents[int(entry.name)] = int(fields[1])
         except (OSError, ValueError):

@@ -54,7 +54,7 @@ def _op(
 # This table is the executable counterpart of QQNT_DIRECT_API_MATRIX.md. The
 # host receives the stable operation name and never receives an arbitrary
 # service/method pair from a Product request.
-# 中文：此表是 `QQNT_DIRECT_API_MATRIX.md` 的可执行对应物。
+# 中文:此表是 `QQNT_DIRECT_API_MATRIX.md` 的可执行对应物。
 # Host 接收稳定的 operation 名称,绝不会从 Product 请求中接收任意 service／method
 # 名称对。
 QQ_OPERATIONS = (
@@ -414,7 +414,7 @@ CALLBACK_ONLY_OPERATION_NAMES = frozenset(
 # configured QQ build, but the worker rejects fields from unrelated operation
 # families before IPC.  This keeps the operation allow-list meaningful without
 # inventing a generic service/method or raw-payload escape hatch.
-# 中文：只有下列顶层参数名称可以穿过 Worker／Host 边界。
+# 中文:只有下列顶层参数名称可以穿过 Worker／Host 边界。
 # 原生 Host 仍负责校验当前 QQ build 对应的精确重载;
 # 但 Worker 会在 IPC 之前拒绝来自无关 operation 家族的字段。
 # 这样可以确保 operation allow-list 有效,
@@ -639,7 +639,7 @@ def _fields(*names: str) -> frozenset[str]:
 # field from its family.  This table is intentionally conservative: it only
 # exposes names declared by QQ_API_PLAN.md/QQ_SIDE_INTERFACES.md and leaves
 # exact version-specific overload validation to the authorized Host.
-# 中文：matrix 描述的是参数类别,但公共 operation 不能继承其所属类别的全部字段。
+# 中文:matrix 描述的是参数类别,但公共 operation 不能继承其所属类别的全部字段。
 # 此表有意保持保守:只公开 `QQ_API_PLAN.md`／`QQ_SIDE_INTERFACES.md` 中声明的名称;
 # 版本相关的精确重载校验仍由已授权 Host 负责。
 _OPERATION_PARAMETER_FIELDS = {

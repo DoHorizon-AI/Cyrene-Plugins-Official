@@ -859,8 +859,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct.py",
-      "sha256": "a03fda2c54468150e4469e222962cff6ed6503bf3832c664bff629c0341bb186",
-      "size_bytes": 79263
+      "sha256": "a90944b0322a1608433efa76e1e8d2a12b5290724aca277052917a3b03124a52",
+      "size_bytes": 79255
     },
     {
       "kind": "file",
@@ -873,15 +873,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_host.py",
-      "sha256": "477c4e7a06ba892befae4d40bbf789ef9c9381e2275aba41b4ba67e7c193965d",
-      "size_bytes": 40060
+      "sha256": "634ee3c9de344e9670e473807c407cfe4c6541c03c4cfe2db57b1ff45b11e150",
+      "size_bytes": 40052
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_operations.py",
-      "sha256": "be3e5abc85774b6974017d43a02336a6219bd2e5c218b73fe0878c4ec534dd06",
-      "size_bytes": 44178
+      "sha256": "e6a459bcd1c3acd2bd115f1994f27ca4abfb32a4c824e00736862e160ab9ad69",
+      "size_bytes": 44172
     },
     {
       "kind": "file",
@@ -1097,8 +1097,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/src/onebot_v11_connector/connector.py",
-      "sha256": "49344b7e7e6e44ffc46d96d7d27206d74790914c26b7aed5373648132173f6e4",
-      "size_bytes": 67805
+      "sha256": "92979b89034e57f455e01b044523ea5faa8c9488fb26cf67900e82589492547f",
+      "size_bytes": 67803
     },
     {
       "kind": "file",
@@ -1258,8 +1258,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tools/generate_message_connector_bindings.py",
-      "sha256": "85386692ac421a7513eb942034da11b92d303aaf73a6e2e468848d44b541a841",
-      "size_bytes": 2290
+      "sha256": "94414013d8d76fd0560bbc5bb332eaf56ade1a566ac7208f39c3ba175c43be85",
+      "size_bytes": 2288
     },
     {
       "kind": "file",
@@ -1517,8 +1517,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/upstream.py",
-      "sha256": "bc92a1fe08646ff56d9edafa7474249953077e5962293b64e41693c164cda417",
-      "size_bytes": 12628
+      "sha256": "a531a3c98a49bc6d71ae97b33e9ab6ab77d633b193968a752a1e1f42d41b9604",
+      "size_bytes": 12624
     },
     {
       "kind": "file",
