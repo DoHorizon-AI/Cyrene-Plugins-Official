@@ -712,7 +712,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/logging-and-errors.md",
-      "sha256": "796e944727fcae8641f68812b3b4c0f4e4158d5bd21850eae98c21849d9d4a9b",
+      "sha256": "7f0862b837ae4901c533c65a4b1777a93f26e13fada3009fab4471621eec79ba",
       "size_bytes": 67649
     },
     {
@@ -1755,8 +1755,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/ui/navigator/README.md",
-      "sha256": "24147b9e9047368d0dfacfa64833b77fdaf6b858c73513d694cb2335168a8b8c",
-      "size_bytes": 5827
+      "sha256": "c614912f9927d61e1c336dba73830f225f58164c044c692445c6d29466924485",
+      "size_bytes": 6294
     },
     {
       "kind": "file",

@@ -1,19 +1,20 @@
 > **已迁移 / Migrated**
 >
-> 本包的 UI 源码已迁移至 `Cyrene-Studio/apps/navigator/`，本目录保留来源记录，不再是主要开发位置。
+> 本包的 UI 源码已迁移至 `Cyrene-Client/apps/web/services/navigator/`，本目录保留来源记录，不再是主要开发位置。
 >
-> This package's UI source has been moved to `Cyrene-Studio/apps/navigator/`. This directory is retained for provenance only.
+> This package's UI source has been moved to `Cyrene-Client/apps/web/services/navigator/`. This directory is retained for provenance only.
 
-# cyrene.ui.navigator / Navigator Web Console
+# cyrene.ui.navigator / Navigator Web Console Provenance
 
-This package is the Plugins-owned home of the Cyrene Navigator web console.
-The first RC rebuilds it as a React + TypeScript + Vite application served by
-the Navigator same-origin Web Host; it does not extend the retired
-API-probing preview shell that Navigator once carried.
+This directory records the former Plugins-owned source and migration context.
+The active React + TypeScript + Vite console is in
+`Cyrene-Client/apps/web/services/navigator/` and is served by the Navigator same-origin Web
+Host. It does not extend the retired API-probing preview shell that Navigator
+once carried.
 
-本软件包是 Cyrene Navigator Web 控制台的 Plugins 归属地。首个 RC 将以
-React + TypeScript + Vite 重建，并由 Navigator 同源 Web Host 托管；不会沿用
-Navigator 历史中仅探测 API 的预览页。
+本目录记录此前由 Plugins 持有的源码和迁移背景。当前 React + TypeScript + Vite
+控制台位于 `Cyrene-Client/apps/web/services/navigator/`，由 Navigator 同源 Web Host 托管；它
+没有沿用 Navigator 历史中仅探测 API 的预览页。
 
 ## Status / 状态
 
@@ -21,11 +22,11 @@ Navigator 历史中仅探测 API 的预览页。
 | --- | --- |
 | Package | `cyrene.ui.navigator` |
 | Wave 0 | Directory restored with provenance |
-| Wave 1 | React + TypeScript + Vite console with same-origin Web Host session handling |
+| Wave 1 | Migrated to `Cyrene-Client/apps/web/services/navigator/` in Client commit `016a503` |
 | Wave 2 | Product adapters remain on Navigator proxy prefixes; owner contracts are read live |
-| Owner | Plugins (UI surfaces), Navigator (Conversation/AgentRun authority) |
+| Owner | Client (UI implementation), Navigator (Conversation/AgentRun authority); Plugins retains provenance |
 
-## Planned surface / 计划界面
+## Migrated surface / 已迁移界面
 
 | Page | Responsibility |
 | --- | --- |
@@ -49,8 +50,12 @@ UI rules fixed by the RC plan / RC 计划固定的 UI 规则:
 
 ## Local verification / 本地验证
 
+Run checks from the active Client copy, starting at the Plugins repository root. /
+从 Plugins 仓库根目录切换到 Client 的当前源码目录后运行检查。
+
 ```bash
-npm install
+cd ../Cyrene-Client/apps/web/services/navigator
+npm ci
 npm run check
 ```
 
@@ -79,9 +84,9 @@ vanilla-TypeScript 预览 shell，完整旧客户端是 WinUI/C#，并非 Web �
 
 ## 中文翻译
 
-# cyrene.ui.navigator / Navigator Web Console
+# cyrene.ui.navigator / Navigator Web Console Provenance
 
-本 package 是 Cyrene Navigator Web 控制台由 Plugins 持有的归属地。首个 RC 将使用 React、TypeScript 和 Vite 重建应用，并由 Navigator 同源 Web Host 提供服务；不会在已退役的 API 探测预览 shell 上继续扩展。
+本目录记录此前由 Plugins 持有的 Cyrene Navigator Web 控制台源码和迁移背景。当前 React、TypeScript 和 Vite 控制台位于 `Cyrene-Client/apps/web/services/navigator/`，由 Navigator 同源 Web Host 提供服务；它没有沿用已退役的 API 探测预览 shell。
 
 ## 状态
 
@@ -89,11 +94,11 @@ vanilla-TypeScript 预览 shell，完整旧客户端是 WinUI/C#，并非 Web �
 | --- | --- |
 | Package | cyrene.ui.navigator |
 | Wave 0 | 已根据来源记录恢复目录。 |
-| Wave 1 | React + TypeScript + Vite 控制台，使用同源 Web Host session 处理。 |
+| Wave 1 | 已迁移至 `Cyrene-Client/apps/web/services/navigator/`，见 Client 提交 `016a503`。 |
 | Wave 2 | Product adapter 仍通过 Navigator proxy 前缀访问；实时读取 owner contract。 |
-| Owner | Plugins 负责 UI surface，Navigator 负责 Conversation/AgentRun authority。 |
+| Owner | Client 负责 UI 实现，Navigator 负责 Conversation/AgentRun authority；Plugins 仅保留来源记录。 |
 
-## 计划界面
+## 已迁移界面
 
 | 页面 | 职责 |
 | --- | --- |
