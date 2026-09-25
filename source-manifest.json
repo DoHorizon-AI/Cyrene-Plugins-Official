@@ -17,6 +17,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": ".github/workflows/publish-plugins.yml",
+      "sha256": "f8ab31d79d972311e1e9ac77c7b9c9d431609fe2cad7652fad32da3471415775",
+      "size_bytes": 3328
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": ".gitignore",
       "sha256": "cabca7ea3d148e5b2956dba9fd881e91048d6a19050c39636a7ce2b4e113c3f3",
       "size_bytes": 707
@@ -4679,6 +4686,13 @@
     },
     {
       "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/build_plugins.py",
+      "sha256": "daa400ef6b02f9c0568e8d2b2d55b54eddeeceaf052e74a17b646ee8477214b3",
+      "size_bytes": 10016
+    },
+    {
+      "kind": "file",
       "mode": "100755",
       "path": "tools/ci/capability_catalog.py",
       "sha256": "8aa0b4cddd27ff91a1591d97de7b2f1d847a0b1bf18267ff87feeb2e9d2ed5c3",
@@ -4751,8 +4765,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/update_source_manifest.py",
-      "sha256": "30e4dfa59ac5cc9965093f1cf540835957cdcebe63a5005b488b87dd38d774eb",
-      "size_bytes": 10729
+      "sha256": "f21b4a205cdec7dd4474a950ce4353b700f51ac2bcd6cfdb30267d3b06f59cfa",
+      "size_bytes": 10789
     },
     {
       "kind": "file",

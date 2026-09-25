@@ -128,6 +128,8 @@ def _collect(root: Path) -> dict[str, dict]:
                 raise ManifestUpdateError(f"Unexpected directory symlink: {relative}")
         directories[:] = [name for name in directories if name != ".git"]
         for filename in filenames:
+            if filename == ".git":
+                continue
             candidate = current_path / filename
             relative = candidate.relative_to(root).as_posix()
             if _is_ignored(relative, ignored):
