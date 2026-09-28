@@ -81,5 +81,76 @@
     "migrationSupported": false,
     "downgradeSupported": true,
     "retentionPolicyOnUninstall": "retain"
+  },
+  "profiles": [
+    "echo",
+    "all"
+  ],
+  "contributions": {
+    "nodes": [
+      {
+        "type": "connector.onebot_v11",
+        "version": "0.4.0",
+        "title": "OneBot v11 Connector",
+        "owner": "Cyrene-Echo",
+        "category": "Connector",
+        "description": "Inbound and outbound messaging bridge via OneBot v11 protocol.",
+        "color": "#3b82f6",
+        "inputs": [
+          {
+            "name": "inbound",
+            "label": "Inbound Message Stream",
+            "kind": "endpoint"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "outbound",
+            "label": "Outbound Message Stream",
+            "kind": "endpoint"
+          }
+        ],
+        "fields": [
+          {
+            "name": "transport",
+            "label": "Transport Mode",
+            "kind": "select",
+            "choices": [
+              "http_api",
+              "forward_websocket",
+              "reverse_websocket"
+            ],
+            "required": true
+          },
+          {
+            "name": "endpointUrl",
+            "label": "Endpoint URL",
+            "kind": "text",
+            "required": false
+          }
+        ],
+        "defaults": {
+          "transport": "forward_websocket",
+          "endpointUrl": "ws://127.0.0.1:6700"
+        },
+        "execution": {
+          "kind": "service",
+          "adapter": "cyrene.connectors.onebot-v11",
+          "mutableFields": [
+            "endpointUrl"
+          ],
+          "checkpoint": false
+        }
+      }
+    ],
+    "mcp_tools": [
+      "onebot_send_message",
+      "onebot_inbound_message",
+      "onebot_respond_request"
+    ],
+    "log_sources": [
+      "onebot.messages",
+      "onebot.events"
+    ]
   }
 }

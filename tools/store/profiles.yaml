@@ -1,0 +1,108 @@
+schema_version: cyrene.store-profiles.v1
+
+profiles:
+  reactor:
+    description: "Cyrene-Reactor service profile for training and model serving"
+    plugins:
+      - cyrene.training.llama-factory
+      - cyrene.serving.vllm-runtime
+      - cyrene.tools.dataset-preparation
+      - cyrene.tools.dataset-validator
+
+  echo:
+    description: "Cyrene-Echo service profile for IM and chat connectors"
+    plugins:
+      - cyrene.connectors.onebot-v11
+      - cyrene.connectors.im
+      - cyrene.connectors.wecom
+
+  yield:
+    description: "Cyrene-Yield service profile for model evaluation"
+    plugins:
+      - cyrene.evaluation.evaluator-pack
+      - cyrene.evaluation.exact-match
+      - cyrene.evaluation.llm-judge
+
+  catalyst:
+    description: "Cyrene-Catalyst service profile for provider connectors and models"
+    plugins:
+      - cyrene.providers.model-api-connector
+      - cyrene.models.hf-analyzer
+      - cyrene.policy.compat-rules
+
+  core:
+    description: "Cyrene-Core baseline profile with dataset validator and compat rules"
+    plugins:
+      - cyrene.tools.dataset-validator
+      - cyrene.policy.compat-rules
+
+  all:
+    description: "Full suite of all 14 official plugins"
+    plugins:
+      - cyrene.connectors.im
+      - cyrene.connectors.onebot-v11
+      - cyrene.connectors.wecom
+      - cyrene.evaluation.evaluator-pack
+      - cyrene.evaluation.exact-match
+      - cyrene.evaluation.llm-judge
+      - cyrene.models.hf-analyzer
+      - cyrene.policy.compat-rules
+      - cyrene.providers.model-api-connector
+      - cyrene.serving.vllm-runtime
+      - cyrene.tools.computer-runtime
+      - cyrene.tools.dataset-preparation
+      - cyrene.tools.dataset-validator
+      - cyrene.training.llama-factory
+
+  connector:
+    description: "Official messaging and chat connectors (IM, OneBot v11, WeCom)"
+    plugins:
+      - cyrene.connectors.im
+      - cyrene.connectors.onebot-v11
+      - cyrene.connectors.wecom
+
+  native-runtime:
+    description: "Native AOT and Rust binary runtimes"
+    plugins:
+      - cyrene.connectors.im
+      - cyrene.connectors.onebot-v11
+      - cyrene.tools.computer-runtime
+
+  evaluation:
+    description: "Model and agent evaluation plugins (Exact Match, LLM Judge, Evaluator Pack)"
+    plugins:
+      - cyrene.evaluation.exact-match
+      - cyrene.evaluation.llm-judge
+      - cyrene.evaluation.evaluator-pack
+
+  tools:
+    description: "Dataset preparation, validation, and computer runtime tools"
+    plugins:
+      - cyrene.tools.computer-runtime
+      - cyrene.tools.dataset-preparation
+      - cyrene.tools.dataset-validator
+
+  models:
+    description: "Model analysis, vLLM serving, and training plugins"
+    plugins:
+      - cyrene.models.hf-analyzer
+      - cyrene.serving.vllm-runtime
+      - cyrene.training.llama-factory
+
+  full:
+    description: "Full suite of all official plugins"
+    plugins:
+      - cyrene.connectors.im
+      - cyrene.connectors.onebot-v11
+      - cyrene.connectors.wecom
+      - cyrene.evaluation.evaluator-pack
+      - cyrene.evaluation.exact-match
+      - cyrene.evaluation.llm-judge
+      - cyrene.models.hf-analyzer
+      - cyrene.policy.compat-rules
+      - cyrene.providers.model-api-connector
+      - cyrene.serving.vllm-runtime
+      - cyrene.tools.computer-runtime
+      - cyrene.tools.dataset-preparation
+      - cyrene.tools.dataset-validator
+      - cyrene.training.llama-factory

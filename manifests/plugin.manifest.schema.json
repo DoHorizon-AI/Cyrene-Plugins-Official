@@ -236,6 +236,40 @@
           ]
         }
       }
+    },
+    "profiles": {
+      "type": "array",
+      "description": "Optional list of deployment/service profiles that bundle or enable this plugin (e.g. ['reactor', 'echo', 'yield', 'catalyst', 'core', 'all']).",
+      "items": {
+        "type": "string"
+      }
+    },
+    "contributions": {
+      "type": "object",
+      "description": "Optional studio, tool, and observability contributions provided by this plugin.",
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "description": "Studio workflow node contributions following the cyrene.studio.nodes.v1 specification.",
+          "items": {
+            "$ref": "#/$defs/studioNodeContribution"
+          }
+        },
+        "mcp_tools": {
+          "type": "array",
+          "description": "MCP tools exposed by this plugin.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "log_sources": {
+          "type": "array",
+          "description": "Log or telemetry sources emitted by this plugin.",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
     }
   },
   "$defs": {
@@ -270,6 +304,206 @@
             "null"
           ],
           "pattern": "^sha256:[0-9a-fA-F]{64}$"
+        }
+      }
+    },
+    "studioNodePort": {
+      "type": "object",
+      "description": "Input or output port definition for a Studio workflow node.",
+      "required": [
+        "name",
+        "label",
+        "kind"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,99}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "dataset",
+            "model",
+            "compute",
+            "evaluation",
+            "endpoint",
+            "agent-report"
+          ]
+        }
+      }
+    },
+    "studioNodeField": {
+      "type": "object",
+      "description": "Configurable field definition for a Studio workflow node.",
+      "required": [
+        "name",
+        "label",
+        "kind"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,99}$"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "number",
+            "select"
+          ]
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "minItems": 1,
+          "maxItems": 100
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "minimum": {
+          "type": "number"
+        },
+        "maximum": {
+          "type": "number"
+        },
+        "integer": {
+          "type": "boolean"
+        },
+        "maxLength": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      }
+    },
+    "studioNodeExecution": {
+      "type": "object",
+      "description": "Execution strategy and adapter binding for a Studio workflow node.",
+      "required": [
+        "kind",
+        "adapter"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "reference",
+            "task",
+            "service",
+            "external"
+          ]
+        },
+        "adapter": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,99}$"
+        },
+        "image": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$"
+        },
+        "mutableFields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 64
+        },
+        "checkpoint": {
+          "type": "boolean"
+        }
+      }
+    },
+    "studioNodeContribution": {
+      "type": "object",
+      "description": "Studio node contribution conforming to cyrene.studio.nodes.v1.",
+      "required": [
+        "type",
+        "version",
+        "title",
+        "owner",
+        "category",
+        "description",
+        "color",
+        "inputs",
+        "outputs",
+        "fields",
+        "defaults",
+        "execution"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9_.-]{0,99}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]{1,64}$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "owner": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 2000
+        },
+        "color": {
+          "type": "string",
+          "pattern": "^#[a-fA-F0-9]{6}$"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/studioNodePort"
+          },
+          "maxItems": 32
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/studioNodePort"
+          },
+          "maxItems": 32
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/studioNodeField"
+          },
+          "maxItems": 64
+        },
+        "defaults": {
+          "type": "object"
+        },
+        "execution": {
+          "$ref": "#/$defs/studioNodeExecution"
         }
       }
     }

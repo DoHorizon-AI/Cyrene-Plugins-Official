@@ -69,5 +69,89 @@
     "isStateful": false,
     "storageCategory": "stateless",
     "retentionPolicyOnUninstall": "retain"
+  },
+  "profiles": [
+    "reactor",
+    "all"
+  ],
+  "contributions": {
+    "nodes": [
+      {
+        "type": "serving.vllm.deploy",
+        "version": "0.1.0",
+        "title": "vLLM Model Serving",
+        "owner": "Cyrene-Reactor",
+        "category": "Serving",
+        "description": "Deploy and serve large language models with vLLM high-throughput engine.",
+        "color": "#10b981",
+        "inputs": [
+          {
+            "name": "model",
+            "label": "Trained Model",
+            "kind": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "endpoint",
+            "label": "Inference Endpoint",
+            "kind": "endpoint"
+          }
+        ],
+        "fields": [
+          {
+            "name": "modelPath",
+            "label": "Model Path / Repo",
+            "kind": "text",
+            "required": true
+          },
+          {
+            "name": "gpuCount",
+            "label": "GPU Count",
+            "kind": "number",
+            "integer": true,
+            "minimum": 1,
+            "maximum": 64,
+            "required": true
+          },
+          {
+            "name": "quantization",
+            "label": "Quantization",
+            "kind": "select",
+            "choices": [
+              "none",
+              "awq",
+              "gptq",
+              "fp8"
+            ],
+            "required": false
+          }
+        ],
+        "defaults": {
+          "modelPath": "/models/base",
+          "gpuCount": 1,
+          "quantization": "none"
+        },
+        "execution": {
+          "kind": "service",
+          "adapter": "cyrene.serving.vllm-runtime",
+          "mutableFields": [
+            "gpuCount",
+            "quantization"
+          ],
+          "checkpoint": false
+        }
+      }
+    ],
+    "mcp_tools": [
+      "vllm_import_model",
+      "vllm_start_service",
+      "vllm_inspect",
+      "vllm_diagnostics"
+    ],
+    "log_sources": [
+      "vllm.engine",
+      "vllm.access"
+    ]
   }
 }

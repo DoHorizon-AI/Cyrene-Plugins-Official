@@ -733,8 +733,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "manifests/plugin.manifest.schema.json",
-      "sha256": "46c50d12e8a6524eb59999c98d227e748273804971a97b992828fd7125516d5b",
-      "size_bytes": 6442
+      "sha256": "f4f92fff7d871f44b1186f48ea66266df02b67e4634fed595a8519e2a7178eb6",
+      "size_bytes": 12091
     },
     {
       "kind": "file",
@@ -1020,8 +1020,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/plugin.manifest.json",
-      "sha256": "81c7b370a6c95d41b6f24d5fad639efea0948a778077e26d57656f8866104f1a",
-      "size_bytes": 2131
+      "sha256": "71f7247c9b9106bb443177fcd4a9a4a0676d1aa810fb7c520d9c1c14c92a8480",
+      "size_bytes": 3865
     },
     {
       "kind": "file",
@@ -1566,8 +1566,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/plugin.manifest.json",
-      "sha256": "9c61ac356b4921d27ef276d39d13bee0f6d86b0fa38286206854adef6a8e10b1",
-      "size_bytes": 1968
+      "sha256": "3b5a6f3a3d76c86801c043bd002f70174f8f48b87de412536f92a3e472406069",
+      "size_bytes": 3954
     },
     {
       "kind": "file",
@@ -1671,8 +1671,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/plugin.manifest.json",
-      "sha256": "32a4c99a6dfb55e914ea6c88a8926fc75794f9a9880e491d72e74540828d0b54",
-      "size_bytes": 1332
+      "sha256": "f40b44a6da75616443da13cdaa8caf1960a289d3abe01f95a1786b04027bf97e",
+      "size_bytes": 3053
     },
     {
       "kind": "file",
@@ -1720,8 +1720,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/plugin.manifest.json",
-      "sha256": "df135030e30346d72f2822c21ecf8beafac5642394c7376c94714759dbab82d6",
-      "size_bytes": 1733
+      "sha256": "0d1bcc2109d8f5909c4afd606795b6071da0b68523fc3ace5615535a6c202fb3",
+      "size_bytes": 4213
     },
     {
       "kind": "file",
@@ -4560,6 +4560,55 @@
     },
     {
       "kind": "file",
+      "mode": "100644",
+      "path": "tests/conftest.py",
+      "sha256": "fd7ab9a51dd9382ce68027124870da674a95849cdb9f7d7605ddbb4ee054bf64",
+      "size_bytes": 438
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tests/store/__init__.py",
+      "sha256": "9eab2e405381c893fe198d865824da543c6c002a8299968352b836967ab38df4",
+      "size_bytes": 54
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tests/store/test_catalog.py",
+      "sha256": "ff0c68768725bb258a7bd6befeac0bf8533d93e66d6312ee1e4021b718753b47",
+      "size_bytes": 11257
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tests/store/test_cli.py",
+      "sha256": "95c18d9629ec7ad61e08dd6957ad6b18b053e9207d24ff6c8cda1925bef860b4",
+      "size_bytes": 22299
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tests/store/test_installer.py",
+      "sha256": "cd02048943c92a0366fe18e4f1b99ccd787e099c9e3951b7a15ce2a22968e7f6",
+      "size_bytes": 19128
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tests/store/test_profiles.py",
+      "sha256": "983f186d0d49c1addadb069af18bf8f38f99bcbcaf31f5c8a4183c66b479160d",
+      "size_bytes": 2659
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tests/store/test_supervisor.py",
+      "sha256": "6b37c1411257a11362afb8b6ad2a41b65f03fe7e0a01f192a970fe6442440813",
+      "size_bytes": 19312
+    },
+    {
+      "kind": "file",
       "mode": "100755",
       "path": "tools/check_dotnet_aot_rules.py",
       "sha256": "ade33d3bd53d2e5db3db0fbd26697d072811783fdc9a3147538772d883e09c5b",
@@ -4590,8 +4639,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/build_plugins.py",
-      "sha256": "daa400ef6b02f9c0568e8d2b2d55b54eddeeceaf052e74a17b646ee8477214b3",
-      "size_bytes": 10016
+      "sha256": "be4a0083dff76367d520baf8cec898dbd8096d9d7f20397f8aa318f2ccf9835f",
+      "size_bytes": 10716
     },
     {
       "kind": "file",
@@ -4683,6 +4732,69 @@
       "path": "tools/ci/verify_source_manifest.py",
       "sha256": "d1ada9d34d48a72afd8f0e4c6f8a21d051acf101edb5edf94af585dc71637c15",
       "size_bytes": 14723
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/store/__init__.py",
+      "sha256": "a424d1f162f070b108035d82120ac8bcf8e29b39f6f4cc172c9119d4d2f2c77e",
+      "size_bytes": 1391
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/store/catalog.py",
+      "sha256": "b83d75c907e72972ef25e86384c1956efbe3c1cb02fa748870045bcab906d6a7",
+      "size_bytes": 15470
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/store/cli.py",
+      "sha256": "3b96b0912cc309960b4c103c8cab2820d92ed8b639b73cfbd6ea705e7ede7230",
+      "size_bytes": 29994
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/store/cyrene_plugin_store.py",
+      "sha256": "95fafa3060f59c0f1bb161fbfb6afbff29815ec368754d998a29aa734034819e",
+      "size_bytes": 525
+    },
+    {
+      "kind": "file",
+      "mode": "100755",
+      "path": "tools/store/installer.py",
+      "sha256": "6a33827722a990ec99a7d5ceb3dd82a01202c18971776a926cf4dc4ff24cc873",
+      "size_bytes": 43897
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/store/profiles.json",
+      "sha256": "aba0c342f769f1ac86d493288e34fc8df735cf5a571984c8afe4f72c27cd450e",
+      "size_bytes": 3926
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/store/profiles.py",
+      "sha256": "bc2fc5050aec3274daa257106c06650f27f8a6b3639f97d9bcea0bf379ba0100",
+      "size_bytes": 5966
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/store/profiles.yaml",
+      "sha256": "42b4d634d821e282378795ab008c71193c5c5c84c0a7aeeb819bff62d6cb95aa",
+      "size_bytes": 3372
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/store/supervisor.py",
+      "sha256": "d5956417f926891797ba492ff4ad054344aace0663208fbaad40673824251791",
+      "size_bytes": 35387
     }
   ],
   "history_policy": "EMPTY_HISTORY_REQUIRED",

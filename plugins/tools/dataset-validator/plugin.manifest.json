@@ -45,5 +45,77 @@
     "isStateful": false,
     "storageCategory": "stateless",
     "retentionPolicyOnUninstall": "retain"
+  },
+  "profiles": [
+    "reactor",
+    "core",
+    "all"
+  ],
+  "contributions": {
+    "nodes": [
+      {
+        "type": "tool.dataset_validator",
+        "version": "0.2.0",
+        "title": "Dataset Deep Validator",
+        "owner": "Cyrene-Core",
+        "category": "Data",
+        "description": "Deep validation for training datasets checking token truncation, empty rates, and distributions.",
+        "color": "#f59e0b",
+        "inputs": [
+          {
+            "name": "dataset",
+            "label": "Raw Dataset",
+            "kind": "dataset"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "report",
+            "label": "Validation Report",
+            "kind": "evaluation"
+          }
+        ],
+        "fields": [
+          {
+            "name": "format",
+            "label": "Dataset Format",
+            "kind": "select",
+            "choices": [
+              "jsonl",
+              "json",
+              "csv"
+            ],
+            "required": true
+          },
+          {
+            "name": "maxTokenLength",
+            "label": "Max Token Length",
+            "kind": "number",
+            "integer": true,
+            "minimum": 1,
+            "maximum": 131072,
+            "required": true
+          }
+        ],
+        "defaults": {
+          "format": "jsonl",
+          "maxTokenLength": 4096
+        },
+        "execution": {
+          "kind": "task",
+          "adapter": "cyrene.tools.dataset-validator",
+          "mutableFields": [
+            "maxTokenLength"
+          ],
+          "checkpoint": false
+        }
+      }
+    ],
+    "mcp_tools": [
+      "dataset_validator_validate"
+    ],
+    "log_sources": [
+      "dataset.validation"
+    ]
   }
 }

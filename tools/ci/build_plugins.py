@@ -22,6 +22,9 @@ from pathlib import Path
 from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 
 
 @dataclass
@@ -283,6 +286,23 @@ def main():
 
     print(f"\n✅ All selected plugins processed!")
     print(f"   Published catalog index: {index_file}")
+
+    # Synchronously generate plugins-catalog.json
+    try:
+        from tools.store.catalog import build_catalog
+
+        catalog_file = out_dir / "plugins-catalog.json"
+        artifacts_by_plugin = {
+            entry["id"]: entry.get("artifacts", []) for entry in manifest_entries
+        }
+        build_catalog(
+            output_path=catalog_file,
+            root_dir=root,
+            artifacts_by_plugin=artifacts_by_plugin,
+        )
+        print(f"   Published unified catalog: {catalog_file}")
+    except Exception as e:
+        print(f"Warning: Failed to generate plugins-catalog.json: {e}", file=sys.stderr)
 
 
 if __name__ == "__main__":

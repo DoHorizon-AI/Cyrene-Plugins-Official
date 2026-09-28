@@ -56,5 +56,107 @@
     "isStateful": false,
     "storageCategory": "stateless",
     "retentionPolicyOnUninstall": "retain"
+  },
+  "profiles": [
+    "reactor",
+    "all"
+  ],
+  "contributions": {
+    "nodes": [
+      {
+        "type": "training.llama_factory",
+        "version": "0.1.0",
+        "title": "LLaMA-Factory Fine-Tuning",
+        "owner": "Cyrene-Reactor",
+        "category": "Training",
+        "description": "Fine-tune models using LLaMA-Factory with LoRA, QLoRA, or full-parameter tuning.",
+        "color": "#6366f1",
+        "inputs": [
+          {
+            "name": "dataset",
+            "label": "Training Dataset",
+            "kind": "dataset"
+          },
+          {
+            "name": "baseModel",
+            "label": "Base Model",
+            "kind": "model"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "trainedModel",
+            "label": "Fine-Tuned Model",
+            "kind": "model"
+          }
+        ],
+        "fields": [
+          {
+            "name": "stage",
+            "label": "Fine-Tuning Stage",
+            "kind": "select",
+            "choices": [
+              "sft",
+              "dpo",
+              "ppo",
+              "pt"
+            ],
+            "required": true
+          },
+          {
+            "name": "finetuningType",
+            "label": "Tuning Method",
+            "kind": "select",
+            "choices": [
+              "lora",
+              "full",
+              "freeze"
+            ],
+            "required": true
+          },
+          {
+            "name": "epochs",
+            "label": "Training Epochs",
+            "kind": "number",
+            "integer": true,
+            "minimum": 1,
+            "maximum": 100,
+            "required": true
+          },
+          {
+            "name": "learningRate",
+            "label": "Learning Rate",
+            "kind": "number",
+            "minimum": 0.000001,
+            "maximum": 0.1,
+            "required": false
+          }
+        ],
+        "defaults": {
+          "stage": "sft",
+          "finetuningType": "lora",
+          "epochs": 3,
+          "learningRate": 0.0002
+        },
+        "execution": {
+          "kind": "task",
+          "adapter": "cyrene.training.llama-factory",
+          "mutableFields": [
+            "epochs",
+            "learningRate"
+          ],
+          "checkpoint": true
+        }
+      }
+    ],
+    "mcp_tools": [
+      "llama_factory_compile",
+      "llama_factory_inspect",
+      "llama_factory_parse_event"
+    ],
+    "log_sources": [
+      "training.loss",
+      "training.progress"
+    ]
   }
 }
