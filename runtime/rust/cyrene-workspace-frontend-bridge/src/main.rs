@@ -22,7 +22,11 @@ use tracing::info;
 #[command(name = "cyrene-workspace-frontend-bridge")]
 #[command(about = "Standalone Workspace Frontend Bridge daemon for Platform BFF")]
 struct Args {
-    #[arg(long, env = "CYRENE_BRIDGE_UDS", default_value = "/tmp/cyrene-frontend-bridge.sock")]
+    #[arg(
+        long,
+        env = "CYRENE_BRIDGE_UDS",
+        default_value = "/tmp/cyrene-frontend-bridge.sock"
+    )]
     uds_path: PathBuf,
 
     #[arg(long, env = "CYRENE_BRIDGE_TCP")]
@@ -41,10 +45,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if let Some(tcp_addr) = args.tcp_addr {
         let addr = tcp_addr.parse()?;
         info!(addr = %addr, "Starting Frontend Bridge on TCP");
-        Server::builder()
-            .add_service(server)
-            .serve(addr)
-            .await?;
+        Server::builder().add_service(server).serve(addr).await?;
     } else {
         if args.uds_path.exists() {
             let _ = fs::remove_file(&args.uds_path);

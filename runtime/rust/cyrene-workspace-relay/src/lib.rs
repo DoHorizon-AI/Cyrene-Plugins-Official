@@ -148,7 +148,9 @@ mod tests {
     #[tokio::test]
     async fn test_relay_health_check() {
         let relay = WorkspaceRelay::new();
-        let ping = RelayPing { timestamp_ms: 12345 };
+        let ping = RelayPing {
+            timestamp_ms: 12345,
+        };
         let resp = relay.health_check(Request::new(ping)).await.unwrap();
         assert_eq!(resp.into_inner().timestamp_ms, 12345);
     }

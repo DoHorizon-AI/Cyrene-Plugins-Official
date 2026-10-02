@@ -44,7 +44,10 @@ impl AuthorityClient {
         let ep = Endpoint::from_shared(ep_str)
             .map_err(|e| ClientSdkError::InvalidEndpoint(e.to_string()))?
             .connect_timeout(Duration::from_secs(5));
-        let channel = ep.connect().await.map_err(|e| ClientSdkError::Transport(e.to_string()))?;
+        let channel = ep
+            .connect()
+            .await
+            .map_err(|e| ClientSdkError::Transport(e.to_string()))?;
         Ok(Self {
             inner: WorkspaceAuthorityServiceClient::new(channel),
         })
@@ -140,7 +143,10 @@ impl FrontendBridgeClient {
         let ep = Endpoint::from_shared(ep_str)
             .map_err(|e| ClientSdkError::InvalidEndpoint(e.to_string()))?
             .connect_timeout(Duration::from_secs(5));
-        let channel = ep.connect().await.map_err(|e| ClientSdkError::Transport(e.to_string()))?;
+        let channel = ep
+            .connect()
+            .await
+            .map_err(|e| ClientSdkError::Transport(e.to_string()))?;
         Ok(Self {
             inner: WorkspaceFrontendBridgeServiceClient::new(channel),
         })

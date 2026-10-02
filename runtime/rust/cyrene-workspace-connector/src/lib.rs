@@ -12,8 +12,8 @@
 use std::sync::Arc;
 
 pub use cyrene_plugin_contracts::workspace_authority_v1::{
-    AcknowledgeDeliveryRequest, ApprovedInvocation, ClaimInvocationsRequest, ExecutionOutcomeStatus,
-    SubmitInvocationResultRequest,
+    AcknowledgeDeliveryRequest, ApprovedInvocation, ClaimInvocationsRequest,
+    ExecutionOutcomeStatus, SubmitInvocationResultRequest,
 };
 pub use cyrene_plugin_contracts::workspace_product_v2::{
     ProductApiInvocationV2, ProductApiResponseV2,
@@ -89,7 +89,9 @@ impl WorkspaceConnectorWorker {
     ) -> Result<bool, ConnectorError> {
         let invocation_id = invocation.invocation_id.clone();
         let credential = invocation.credential.clone().ok_or_else(|| {
-            ConnectorError::Invocation("Missing DeliveryCredential on claimed invocation".to_string())
+            ConnectorError::Invocation(
+                "Missing DeliveryCredential on claimed invocation".to_string(),
+            )
         })?;
 
         // 1. Generate delivery receipt and acknowledge delivery
@@ -141,9 +143,11 @@ impl WorkspaceConnectorWorker {
                 };
                 (status, None, format!("NETWORK_FAILURE: {msg}"))
             }
-            Err(ProductAdapterError::InvalidUrl(msg)) => {
-                (ExecutionOutcomeStatus::Failed, None, format!("INVALID_URL: {msg}"))
-            }
+            Err(ProductAdapterError::InvalidUrl(msg)) => (
+                ExecutionOutcomeStatus::Failed,
+                None,
+                format!("INVALID_URL: {msg}"),
+            ),
         };
 
         let submit_req = SubmitInvocationResultRequest {

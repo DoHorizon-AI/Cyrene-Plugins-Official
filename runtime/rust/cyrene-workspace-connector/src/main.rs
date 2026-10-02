@@ -23,7 +23,11 @@ struct Args {
     #[arg(long, env = "CYRENE_WORKSPACE_ID", default_value = "workspace-default")]
     workspace_id: String,
 
-    #[arg(long, env = "CYRENE_AUTHORITY_ENDPOINT", default_value = "http://127.0.0.1:50051")]
+    #[arg(
+        long,
+        env = "CYRENE_AUTHORITY_ENDPOINT",
+        default_value = "http://127.0.0.1:50051"
+    )]
     authority_endpoint: String,
 
     #[arg(long, env = "CYRENE_AUTHORITY_UDS")]

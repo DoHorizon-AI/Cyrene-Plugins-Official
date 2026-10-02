@@ -53,7 +53,9 @@ impl WorkspaceFrontendBridgeService for WorkspaceFrontendBridgeServiceImpl {
             connection_endpoints: vec!["http://127.0.0.1:8080".to_string()],
         }];
 
-        Ok(Response::new(BridgeDiscoverWorkspacesResponse { workspaces }))
+        Ok(Response::new(BridgeDiscoverWorkspacesResponse {
+            workspaces,
+        }))
     }
 
     async fn execute_invocation(
@@ -61,9 +63,9 @@ impl WorkspaceFrontendBridgeService for WorkspaceFrontendBridgeServiceImpl {
         request: Request<BridgeExecuteInvocationRequest>,
     ) -> Result<Response<BridgeExecuteInvocationResponse>, Status> {
         let req = request.into_inner();
-        let approved = req.approved_invocation.ok_or_else(|| {
-            Status::invalid_argument("approved_invocation is required")
-        })?;
+        let approved = req
+            .approved_invocation
+            .ok_or_else(|| Status::invalid_argument("approved_invocation is required"))?;
 
         match self.http_adapter.dispatch(&approved).await {
             Ok(product_response) => Ok(Response::new(BridgeExecuteInvocationResponse {

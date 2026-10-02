@@ -3,23 +3,24 @@
 //! │  Test: Full integration between Connector and Authority RPC.       │
 //! └─────────────────────────────────────────────────────────────────────┘
 
-use std::sync::{Arc, Mutex};
-use tonic::{Request, Response, Status};
-use tonic::transport::Server;
 use cyrene_plugin_contracts::workspace_authority_v1::{
-    workspace_authority_service_server::{WorkspaceAuthorityService, WorkspaceAuthorityServiceServer},
-    AcknowledgeDeliveryRequest, AcknowledgeDeliveryResponse,
-    ApproveAndEnqueueInvocationRequest, ApproveAndEnqueueInvocationResponse,
-    ApprovedInvocation, ClaimInvocationsRequest, ClaimInvocationsResponse,
-    DeliveryCredential, DiscoverWorkspacesRequest, DiscoverWorkspacesResponse,
-    ExecutionOutcomeStatus, GetCatalogViewRequest, GetCatalogViewResponse,
-    SubmitInvocationResultRequest, SubmitInvocationResultResponse,
+    workspace_authority_service_server::{
+        WorkspaceAuthorityService, WorkspaceAuthorityServiceServer,
+    },
+    AcknowledgeDeliveryRequest, AcknowledgeDeliveryResponse, ApproveAndEnqueueInvocationRequest,
+    ApproveAndEnqueueInvocationResponse, ApprovedInvocation, ClaimInvocationsRequest,
+    ClaimInvocationsResponse, DeliveryCredential, DiscoverWorkspacesRequest,
+    DiscoverWorkspacesResponse, ExecutionOutcomeStatus, GetCatalogViewRequest,
+    GetCatalogViewResponse, SubmitInvocationResultRequest, SubmitInvocationResultResponse,
     VerifyIdentityRequest, VerifyIdentityResponse,
 };
 use cyrene_plugin_contracts::workspace_product_v2::ProductApiInvocationV2;
 use cyrene_workspace_client_sdk::AuthorityClient;
 use cyrene_workspace_connector::WorkspaceConnectorWorker;
 use cyrene_workspace_product_adapters::GenericProductHttpAdapter;
+use std::sync::{Arc, Mutex};
+use tonic::transport::Server;
+use tonic::{Request, Response, Status};
 
 #[derive(Default)]
 struct MockAuthorityState {
@@ -90,7 +91,9 @@ impl WorkspaceAuthorityService for MockAuthorityService {
     ) -> Result<Response<AcknowledgeDeliveryResponse>, Status> {
         let r = req.into_inner();
         let mut state = self.state.lock().unwrap();
-        state.acknowledged.push((r.invocation_id, r.delivery_receipt));
+        state
+            .acknowledged
+            .push((r.invocation_id, r.delivery_receipt));
         Ok(Response::new(AcknowledgeDeliveryResponse {
             acknowledged: true,
         }))
@@ -102,7 +105,8 @@ impl WorkspaceAuthorityService for MockAuthorityService {
     ) -> Result<Response<SubmitInvocationResultResponse>, Status> {
         let r = req.into_inner();
         let mut state = self.state.lock().unwrap();
-        let status = ExecutionOutcomeStatus::try_from(r.outcome_status).unwrap_or(ExecutionOutcomeStatus::Unspecified);
+        let status = ExecutionOutcomeStatus::try_from(r.outcome_status)
+            .unwrap_or(ExecutionOutcomeStatus::Unspecified);
         state.submitted_results.push((r.invocation_id, status));
         Ok(Response::new(SubmitInvocationResultResponse {
             accepted: true,
@@ -227,7 +231,10 @@ async fn test_connector_claims_and_executes_dynamic_product_operation() {
     // Outcome for non-idempotent: UNKNOWN_RESULT (forbids auto-replay)
     assert_eq!(
         state_guard.submitted_results[0],
-        ("inv-non-idemp-1".to_string(), ExecutionOutcomeStatus::UnknownResult)
+        (
+            "inv-non-idemp-1".to_string(),
+            ExecutionOutcomeStatus::UnknownResult
+        )
     );
 
     // Outcome for idempotent: FAILED (permitted to retry)

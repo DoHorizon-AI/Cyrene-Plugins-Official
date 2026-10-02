@@ -14,7 +14,8 @@ use prost::Message;
 fn delivery_credential_round_trips_deterministically() {
     let cred = DeliveryCredential {
         invocation_id: "inv-1001".to_string(),
-        request_digest_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_string(),
+        request_digest_sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+            .to_string(),
         target_component: "cyrene-workspace-connector".to_string(),
         workspace_id: "ws-alpha".to_string(),
         device_generation: 12,
@@ -69,10 +70,14 @@ fn approved_invocation_carries_opaque_delivery_contract() {
     };
 
     let encoded = approved.encode_to_vec();
-    let decoded = ApprovedInvocation::decode(encoded.as_slice()).expect("decode approved invocation");
+    let decoded =
+        ApprovedInvocation::decode(encoded.as_slice()).expect("decode approved invocation");
 
     assert_eq!(decoded.invocation_id, "inv-2002");
-    assert_eq!(decoded.resolved_target_url, "http://127.0.0.1:18014/api/v1/datasets");
+    assert_eq!(
+        decoded.resolved_target_url,
+        "http://127.0.0.1:18014/api/v1/datasets"
+    );
     assert_eq!(decoded.timeout_seconds, 30);
 
     let raw = decoded.raw_invocation.expect("raw_invocation must exist");

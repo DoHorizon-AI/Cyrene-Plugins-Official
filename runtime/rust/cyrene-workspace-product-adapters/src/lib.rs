@@ -54,11 +54,15 @@ impl GenericProductHttpAdapter {
         approved: &ApprovedInvocation,
     ) -> Result<ProductApiResponseV2, ProductAdapterError> {
         let raw = approved.raw_invocation.as_ref().ok_or_else(|| {
-            ProductAdapterError::InvalidUrl("Missing raw_invocation in ApprovedInvocation".to_string())
+            ProductAdapterError::InvalidUrl(
+                "Missing raw_invocation in ApprovedInvocation".to_string(),
+            )
         })?;
 
         let url = if approved.resolved_target_url.is_empty() {
-            return Err(ProductAdapterError::InvalidUrl("Empty resolved_target_url".to_string()));
+            return Err(ProductAdapterError::InvalidUrl(
+                "Empty resolved_target_url".to_string(),
+            ));
         } else {
             &approved.resolved_target_url
         };

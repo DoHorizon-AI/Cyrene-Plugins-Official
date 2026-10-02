@@ -15,10 +15,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         proto_root.join("cyrene/workspace/authority/v1/workspace_authority.proto");
     let workspace_bridge =
         proto_root.join("cyrene/workspace/bridge/v1/workspace_frontend_bridge.proto");
-    let workspace_sidecar =
-        proto_root.join("cyrene/workspace/local/v1/workspace_sidecar.proto");
-    let workspace_relay =
-        proto_root.join("cyrene/workspace/relay/v1/workspace_relay.proto");
+    let workspace_sidecar = proto_root.join("cyrene/workspace/local/v1/workspace_sidecar.proto");
+    let workspace_relay = proto_root.join("cyrene/workspace/relay/v1/workspace_relay.proto");
     let product_api = proto_root.join("cyrene/workspace/product/v2/product_api.proto");
     let google_status = proto_root.join("google/rpc/status.proto");
 

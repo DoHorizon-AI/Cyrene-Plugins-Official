@@ -11,13 +11,13 @@
 use std::path::PathBuf;
 use tonic::{Request, Response, Status};
 
+pub use cyrene_plugin_contracts::workspace_authority_v1 as authority;
+pub use cyrene_plugin_contracts::workspace_bridge_v1 as bridge;
 pub use cyrene_plugin_contracts::workspace_local_v1::{
     workspace_sidecar_service_server::{WorkspaceSidecarService, WorkspaceSidecarServiceServer},
     DiscoverWorkspacesRequest, DiscoverWorkspacesResponse, ExecuteRequest, ExecuteResponse,
     HealthRequest, HealthResponse, WorkspaceSummary,
 };
-pub use cyrene_plugin_contracts::workspace_authority_v1 as authority;
-pub use cyrene_plugin_contracts::workspace_bridge_v1 as bridge;
 pub use cyrene_plugin_contracts::workspace_product_v2 as product;
 use cyrene_workspace_client_sdk::{AuthorityClient, FrontendBridgeClient};
 
@@ -149,9 +149,9 @@ impl WorkspaceSidecarService for WorkspaceSidecarServiceImpl {
             }));
         }
 
-        let approved_inv = approve_resp.approved_invocation.ok_or_else(|| {
-            Status::internal("Authority response missing approved_invocation")
-        })?;
+        let approved_inv = approve_resp
+            .approved_invocation
+            .ok_or_else(|| Status::internal("Authority response missing approved_invocation"))?;
 
         let mut bridge = self.connect_bridge().await?;
         let bridge_req = bridge::BridgeExecuteInvocationRequest {
@@ -180,7 +180,10 @@ mod tests {
     #[tokio::test]
     async fn test_sidecar_health() {
         let service = WorkspaceSidecarServiceImpl::new(SidecarConfig::default());
-        let resp = service.health(Request::new(HealthRequest {})).await.unwrap();
+        let resp = service
+            .health(Request::new(HealthRequest {}))
+            .await
+            .unwrap();
         assert!(resp.into_inner().local_ready);
     }
 }
