@@ -1,0 +1,20 @@
+[package]
+name = "cyrene-workspace-client-sdk"
+version = "0.1.0"
+edition = "2021"
+description = "Lightweight Rust client SDK for Cyrene Workspace Authority, Relay, and Frontend Bridge."
+license = "Apache-2.0"
+
+[dependencies]
+async-trait = "0.1"
+cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contracts" }
+hyper-util = { version = "0.1", features = ["tokio"] }
+prost-types = "0.13"
+thiserror = "1.0"
+tokio = { version = "1.35", features = ["sync", "time", "macros", "net", "rt"] }
+tonic = { version = "0.12", default-features = false, features = ["channel", "tls", "codegen", "prost"] }
+tower = { version = "0.4", features = ["util"] }
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1.35", features = ["full"] }
