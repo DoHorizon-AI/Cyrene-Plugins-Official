@@ -4422,8 +4422,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/pyproject.toml",
-      "sha256": "3aa7ca3e31eb3e632faad70e76d979de820740ca65a8c99c0db779914dada982",
-      "size_bytes": 732
+      "sha256": "3340d4c222c4a5ebfee73d4cf39cced6eb20f60210f6c6c385af816873b0b54b",
+      "size_bytes": 736
     },
     {
       "kind": "file",
@@ -4543,6 +4543,13 @@
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_correlation_and_errors.py",
       "sha256": "06ff273b6a1e55054e63bda274b0be40dfcdb91f03fd438a36ae9adfbe2ebbe0",
       "size_bytes": 5991
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_dependency_bounds.py",
+      "sha256": "fb7420b1eb596b32ef8ff16be1e1cfe97aafc4232429076a463509adce03b715",
+      "size_bytes": 1216
     },
     {
       "kind": "file",

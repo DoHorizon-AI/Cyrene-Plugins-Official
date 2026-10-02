@@ -8,8 +8,8 @@ version = "0.2.0"
 description = "Plugin-owned direct data-plane runtime for one configured capability instance"
 requires-python = ">=3.11"
 dependencies = [
-    "grpcio>=1.62,<1.63",
-    "protobuf>=4.21,<5",
+    "grpcio>=1.62.3,<1.84",
+    "protobuf>=4.25.1,<8",
 ]
 
 [project.scripts]
