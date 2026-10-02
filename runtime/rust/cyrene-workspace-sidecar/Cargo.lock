@@ -267,6 +267,7 @@ dependencies = [
  "prost-types",
  "thiserror",
  "tokio",
+ "tokio-stream",
  "tonic",
  "tower 0.4.13",
  "tracing",
@@ -1293,6 +1294,7 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+ "tokio-util",
 ]
 
 [[package]]

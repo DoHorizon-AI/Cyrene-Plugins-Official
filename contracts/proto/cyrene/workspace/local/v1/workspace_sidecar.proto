@@ -3,25 +3,21 @@ syntax = "proto3";
 
 package cyrene.workspace.local.v1;
 
-option java_multiple_files = true;
-option java_package = "io.cyrene.proto.workspace.local.v1";
-
-import "cyrene/workspace/product/v2/product_api.proto";
+import "cyrene/workspace/v1/workspace_fabric.proto";
 
 message HealthRequest {}
 
 message HealthResponse {
+  // This reports only local process/config readiness, not Relay reachability.
   bool local_ready = 1;
 }
 
-message DiscoverWorkspacesRequest {
-  string caller_token = 1;
-}
+message DiscoverWorkspacesRequest {}
 
+// Deliberately omits private transport candidates from the local client view.
 message WorkspaceSummary {
   string workspace_id = 1;
   string display_name = 2;
-  repeated string endpoints = 3;
 }
 
 message DiscoverWorkspacesResponse {
@@ -29,17 +25,14 @@ message DiscoverWorkspacesResponse {
 }
 
 message ExecuteRequest {
-  string workspace_id = 1;
-  string caller_token = 2;
-  cyrene.workspace.product.v2.ProductApiInvocationV2 invocation = 3;
+  cyrene.workspace.v1.WorkspaceApiRequest workspace_request = 1;
 }
 
 message ExecuteResponse {
-  bool success = 1;
-  cyrene.workspace.product.v2.ProductApiResponseV2 product_response = 2;
-  string error_message = 3;
+  cyrene.workspace.v1.WorkspaceApiResponse workspace_response = 1;
 }
 
+// Loopback-only cross-language boundary; callers must send a local bearer token.
 service WorkspaceSidecarService {
   rpc Health(HealthRequest) returns (HealthResponse);
   rpc DiscoverWorkspaces(DiscoverWorkspacesRequest) returns (DiscoverWorkspacesResponse);

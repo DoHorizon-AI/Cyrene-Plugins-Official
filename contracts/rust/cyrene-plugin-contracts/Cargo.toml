@@ -10,7 +10,7 @@ name = "cyrene_plugin_contracts"
 path = "src/lib.rs"
 
 [features]
-default = ["server"]
+default = []
 server = ["tonic/server"]
 
 [dependencies]

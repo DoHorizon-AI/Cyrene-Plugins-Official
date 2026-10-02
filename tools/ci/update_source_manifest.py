@@ -99,7 +99,12 @@ def _is_ignored(relative: str, ignored: set[str]) -> bool:
         中文:返回某个路径是否处于被忽略的未跟踪子树中。
     """
 
-    return any(relative == item or relative.startswith(item + "/") for item in ignored)
+    candidate = relative
+    while candidate:
+        if candidate in ignored:
+            return True
+        candidate = os.path.dirname(candidate)
+    return False
 
 
 def _collect(root: Path) -> dict[str, dict]:

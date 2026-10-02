@@ -11,7 +11,8 @@ cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contra
 hyper-util = { version = "0.1", features = ["tokio"] }
 prost-types = "0.13"
 thiserror = "1.0"
-tokio = { version = "1.35", features = ["sync", "time", "macros", "net", "rt"] }
+tokio = { version = "1.35", features = ["sync", "time", "macros", "net", "rt", "io-util"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
 tonic = { version = "0.12", default-features = false, features = ["channel", "tls", "codegen", "prost"] }
 tower = { version = "0.4", features = ["util"] }
 tracing = "0.1"

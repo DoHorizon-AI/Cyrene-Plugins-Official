@@ -26,6 +26,11 @@ pub mod google {
 }
 
 pub mod cyrene {
+    pub mod semantic {
+        pub mod v1 {
+            tonic::include_proto!("cyrene.semantic.v1");
+        }
+    }
     pub mod plugin {
         pub mod runtime {
             pub mod v1 {
@@ -76,29 +81,50 @@ pub mod cyrene {
         }
     }
     pub mod workspace {
+        pub mod v1 {
+            tonic::include_proto!("cyrene.workspace.v1");
+        }
         pub mod product {
             pub mod v2 {
                 tonic::include_proto!("cyrene.workspace.product.v2");
             }
         }
         pub mod authority {
+            #[allow(clippy::result_large_err)]
             pub mod v1 {
                 tonic::include_proto!("cyrene.workspace.authority.v1");
             }
+            #[allow(clippy::result_large_err)]
+            pub mod v2 {
+                tonic::include_proto!("cyrene.workspace.authority.v2");
+            }
         }
         pub mod bridge {
+            #[allow(clippy::result_large_err)]
             pub mod v1 {
                 tonic::include_proto!("cyrene.workspace.bridge.v1");
             }
         }
         pub mod local {
+            #[allow(clippy::result_large_err)]
             pub mod v1 {
                 tonic::include_proto!("cyrene.workspace.local.v1");
             }
+            #[allow(clippy::result_large_err)]
+            pub mod v2 {
+                tonic::include_proto!("cyrene.workspace.local.v2");
+            }
         }
         pub mod relay {
+            #[allow(clippy::result_large_err)]
             pub mod v1 {
                 tonic::include_proto!("cyrene.workspace.relay.v1");
+            }
+        }
+        pub mod tunnel {
+            #[allow(clippy::result_large_err)]
+            pub mod v1 {
+                tonic::include_proto!("cyrene.workspace.tunnel.v1");
             }
         }
     }
@@ -113,8 +139,13 @@ pub use cyrene::model::provider::v1 as model_provider_v1;
 pub use cyrene::plugin::runtime::v1 as direct_plugin_runtime_v1;
 pub use cyrene::tool::provider::v1 as tool_provider_v1;
 pub use cyrene::workspace::authority::v1 as workspace_authority_v1;
+pub use cyrene::workspace::authority::v2 as workspace_authority_v2;
+pub use cyrene::workspace::v1 as workspace_v1;
 pub use cyrene::workspace::bridge::v1 as workspace_bridge_v1;
 pub use cyrene::workspace::local::v1 as workspace_local_v1;
+pub use cyrene::workspace::local::v2 as workspace_local_v2;
 pub use cyrene::workspace::product::v2 as workspace_product_v2;
 pub use cyrene::workspace::relay::v1 as workspace_relay_v1;
+/// Bounded end-to-end Authority byte tunnel messages and service.
+pub use cyrene::workspace::tunnel::v1 as workspace_tunnel_v1;
 pub use google::rpc as google_rpc;

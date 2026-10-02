@@ -10,7 +10,6 @@ async-trait = "0.1"
 clap = { version = "4", features = ["derive", "env"] }
 cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contracts", features = ["server"] }
 cyrene-workspace-client-sdk = { path = "../../../sdk/rust/cyrene-workspace-client-sdk" }
-cyrene-workspace-product-adapters = { path = "../cyrene-workspace-product-adapters" }
 hyper-util = { version = "0.1", features = ["tokio"] }
 prost-types = "0.13"
 serde = { version = "1.0", features = ["derive"] }

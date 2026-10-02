@@ -1,0 +1,22 @@
+FROM ubuntu:22.04
+ARG COMPONENT_ID=cy-workspace-connector
+ARG TARGET_ID=windows-10.0-x86_64-docker-linux
+ARG SOURCE_REPOSITORY=https://github.com/DoHorizon-AI/Cyrene-Plugins-Official
+ARG SOURCE_REVISION=unknown
+ARG COMPONENT_VERSION=unknown
+RUN apt-get update && apt-get install --yes --no-install-recommends ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --create-home cyrene \
+    && install -d -o 10001 -g 10001 -m 0700 /var/lib/cyrene/workspace-connector
+COPY --chown=10001:10001 cy-workspace-connector /usr/local/bin/cy-workspace-connector
+LABEL io.cyrene.component.id=${COMPONENT_ID} \
+      io.cyrene.component.target-id=${TARGET_ID} \
+      org.opencontainers.image.source=${SOURCE_REPOSITORY} \
+      org.opencontainers.image.revision=${SOURCE_REVISION} \
+      org.opencontainers.image.version=${COMPONENT_VERSION}
+ENV CYRENE_CONNECTOR_HEALTH_ADDR=127.0.0.1:18081
+USER 10001:10001
+EXPOSE 50054 50055 18081
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+    CMD curl --fail --silent --show-error http://127.0.0.1:18081/readyz || exit 1
+ENTRYPOINT ["/usr/local/bin/cy-workspace-connector"]
