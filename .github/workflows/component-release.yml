@@ -289,7 +289,6 @@ jobs:
       RELEASE_ID: ${{ (github.ref == 'refs/heads/develop' && 'preview-' || 'stable-') }}${{ matrix.component_id }}-${{ github.sha }}
       CATALOG_SHA256: ${{ needs.select-components.outputs.catalog_sha256 }}
       GH_TOKEN: ${{ github.token }}
-      CARGO_TARGET_DIR: ${{ runner.temp }}/connection-cargo-target
     steps:
       - uses: actions/checkout@v5
         with:
@@ -324,6 +323,8 @@ jobs:
                    "$RUNNER_TEMP/connection-native/$COMPONENT_ID/$TARGET_ID/stage/systemd" \
                    "$RUNNER_TEMP/connection-native/$COMPONENT_ID/$TARGET_ID/output"
       - name: Build and package the selected native component target
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/connection-cargo-target
         run: |
           set -euo pipefail
           manifest="runtime/rust/$PACKAGE/Cargo.toml"
