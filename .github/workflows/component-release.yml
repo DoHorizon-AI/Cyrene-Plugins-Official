@@ -712,6 +712,6 @@ jobs:
             --draft --target "$SOURCE_COMMIT" \
             --title "Cyrene component $COMPONENT_ID $RELEASE_ID" \
             --notes "Immutable component release from $SOURCE_REPOSITORY@$SOURCE_COMMIT ($SOURCE_REF)."
-          release_database_id="$(gh api "repos/$SOURCE_REPOSITORY/releases/tags/$RELEASE_ID" --jq .id)"
+          release_database_id="$(gh release view "$RELEASE_ID" --repo "$SOURCE_REPOSITORY" --json databaseId --jq .databaseId)"
           gh api --method PATCH "repos/$SOURCE_REPOSITORY/releases/$release_database_id" -F draft=false >/dev/null
           test "$(gh api "repos/$SOURCE_REPOSITORY/releases/tags/$RELEASE_ID" --jq .immutable)" = true
