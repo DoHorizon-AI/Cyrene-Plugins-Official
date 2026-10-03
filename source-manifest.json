@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/component-release.yml",
-      "sha256": "12f92dc67c4f3309a6c1fd6c0a1cdf18ed5cdfa5a9a6dc797ab141be42e4920f",
-      "size_bytes": 34984
+      "sha256": "41918e3beb44641a5ba229e08c42a14c0ec77d8ecd97aeffc8ae271bce52ba7e",
+      "size_bytes": 34990
     },
     {
       "kind": "file",
