@@ -140,7 +140,6 @@ pub use cyrene::plugin::runtime::v1 as direct_plugin_runtime_v1;
 pub use cyrene::tool::provider::v1 as tool_provider_v1;
 pub use cyrene::workspace::authority::v1 as workspace_authority_v1;
 pub use cyrene::workspace::authority::v2 as workspace_authority_v2;
-pub use cyrene::workspace::v1 as workspace_v1;
 pub use cyrene::workspace::bridge::v1 as workspace_bridge_v1;
 pub use cyrene::workspace::local::v1 as workspace_local_v1;
 pub use cyrene::workspace::local::v2 as workspace_local_v2;
@@ -148,4 +147,5 @@ pub use cyrene::workspace::product::v2 as workspace_product_v2;
 pub use cyrene::workspace::relay::v1 as workspace_relay_v1;
 /// Bounded end-to-end Authority byte tunnel messages and service.
 pub use cyrene::workspace::tunnel::v1 as workspace_tunnel_v1;
+pub use cyrene::workspace::v1 as workspace_v1;
 pub use google::rpc as google_rpc;

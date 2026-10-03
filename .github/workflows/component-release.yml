@@ -31,8 +31,8 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   RUST_TOOLCHAIN: "1.96.1"
-  CATALOG_COMMIT: "86932722960083f1d84a5e70bb0d6b9e3f31a0f6"
-  CATALOG_SHA256: "28fc1ef65a38658aeabb2bf23b7a35e91cb64774612f387936a971dfec2bd3dc"
+  CATALOG_COMMIT: "7e6d410017420de72d7688859ae81d675e4555ea"
+  CATALOG_SHA256: "f12f5cd1243d16b6ec6a5194efacbdf7a8bf9dffcf8d9525c35183c45a7c7816"
   SOURCE_COMMIT: ${{ github.sha }}
   SOURCE_REF: ${{ github.ref }}
   SOURCE_REPOSITORY: ${{ github.repository }}
@@ -451,7 +451,7 @@ jobs:
           retention-days: 30
 
   publish:
-    name: immutable component release / ${{ env.RELEASE_ID }}
+    name: immutable component release / ${{ github.sha }}
     if: github.event_name != 'pull_request'
     needs: [source-gates, release-preflight, build-native, build-windows-images]
     runs-on: ubuntu-22.04

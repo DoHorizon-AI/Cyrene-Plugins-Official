@@ -18,8 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let workspace_bridge =
         proto_root.join("cyrene/workspace/bridge/v1/workspace_frontend_bridge.proto");
     let workspace_sidecar = proto_root.join("cyrene/workspace/local/v1/workspace_sidecar.proto");
-    let workspace_sidecar_v2 =
-        proto_root.join("cyrene/workspace/local/v2/workspace_sidecar.proto");
+    let workspace_sidecar_v2 = proto_root.join("cyrene/workspace/local/v2/workspace_sidecar.proto");
     let workspace_relay = proto_root.join("cyrene/workspace/relay/v1/workspace_relay.proto");
     let workspace_tunnel = proto_root.join("cyrene/workspace/tunnel/v1/workspace_tunnel.proto");
     let workspace_fabric_legacy = proto_root.join("cyrene/workspace/v1/workspace_fabric.proto");
@@ -35,13 +34,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed={}", computer_runtime.display());
     println!("cargo:rerun-if-changed={}", tool_provider.display());
     println!("cargo:rerun-if-changed={}", workspace_authority.display());
-    println!("cargo:rerun-if-changed={}", workspace_authority_v2.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        workspace_authority_v2.display()
+    );
     println!("cargo:rerun-if-changed={}", workspace_bridge.display());
     println!("cargo:rerun-if-changed={}", workspace_sidecar.display());
     println!("cargo:rerun-if-changed={}", workspace_sidecar_v2.display());
     println!("cargo:rerun-if-changed={}", workspace_relay.display());
     println!("cargo:rerun-if-changed={}", workspace_tunnel.display());
-    println!("cargo:rerun-if-changed={}", workspace_fabric_legacy.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        workspace_fabric_legacy.display()
+    );
     println!("cargo:rerun-if-changed={}", semantic_identity.display());
     println!("cargo:rerun-if-changed={}", product_api.display());
     println!("cargo:rerun-if-changed={}", google_status.display());

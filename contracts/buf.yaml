@@ -15,9 +15,10 @@ lint:
     - RPC_RESPONSE_STANDARD_NAME
     - SERVICE_SUFFIX
   # This vendored Google compatibility proto keeps its upstream `google.rpc`
-  # package; changing it would break public type URLs in generated clients.
-  ignore:
-    - google/rpc/status.proto
+  # package; only the local package-version rule is inapplicable.
+  ignore_only:
+    PACKAGE_VERSION_SUFFIX:
+      - proto/google/rpc/status.proto
 
 breaking:
   use:

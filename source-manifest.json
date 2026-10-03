@@ -11,8 +11,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/component-release.yml",
-      "sha256": "1b4e455a537082f8cca61662526f026d320fcfbbf507a2e4ad8be4350c0ac1ab",
-      "size_bytes": 27111
+      "sha256": "22ceb70b1b4c37ee3fb9a354990ffb3974f2d97c35126f773aa5e590f9c4fd17",
+      "size_bytes": 27107
     },
     {
       "kind": "file",
@@ -102,8 +102,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/buf.yaml",
-      "sha256": "e37fae25a29818afa279be918602885f8d664d8ec1fbd3391ae6218186adb5bd",
-      "size_bytes": 636
+      "sha256": "70fad919f3cabb5416f53f8be7c21f216d237512d81795302295d20a76cbabd5",
+      "size_bytes": 667
     },
     {
       "kind": "file",
@@ -369,21 +369,21 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/workspace/authority/v1/workspace_authority.proto",
-      "sha256": "a581f11a77fab2a8a9927475f49be9c1762d5b252a500d80b15b2c43853164dd",
+      "sha256": "8b829b5a147530d97b73591ca5efcf885304393b8af03a219b38cc63d259b8d7",
       "size_bytes": 8210
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/workspace/authority/v2/workspace_authority.proto",
-      "sha256": "3f81dd6004a5c2747ff0a9140d6f1f5884cf3e36738fa9cea6f1233e46fb0349",
+      "sha256": "d8d1f7e9abff39877f55521a3a8f3fc56e950aca55472cc12a2b0fcbcd889d0b",
       "size_bytes": 9317
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/workspace/bridge/v1/workspace_frontend_bridge.proto",
-      "sha256": "1468d94ba579d890b4833864dc6a64af3b501970d4cd18669f08402cb98dab52",
+      "sha256": "f364b7748242fa1c798e5171ee2eb351e445627947f0a88304d0698e7ae35685",
       "size_bytes": 2090
     },
     {
@@ -397,7 +397,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/workspace/local/v2/workspace_sidecar.proto",
-      "sha256": "459bff8d375dd2a095387121479209f384db9ca6392adf5dbac8f8320085182f",
+      "sha256": "c8da97793c6aee44816202102c269b338701c7171b2298fc875859776c8c2036",
       "size_bytes": 2480
     },
     {
@@ -411,7 +411,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/workspace/relay/v1/workspace_relay.proto",
-      "sha256": "11aaf87a7b00b980d8ba6bdb20e2f05e4df94717d4134383e386cfd4693d08ee",
+      "sha256": "44057fdfa842f727d7abeb3e24d2bdea8f213f014489a21c79f1c73117778f62",
       "size_bytes": 1532
     },
     {
@@ -460,8 +460,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/build.rs",
-      "sha256": "00115ea6c1306b3e5c7738ae74d6a1d04d57eaeea75966cf1c525c749862d8c6",
-      "size_bytes": 4363
+      "sha256": "35bf7accc2e229ffbcf1376c92ba2fddc8b6313b94f78b0b351dcc5988e73b14",
+      "size_bytes": 4399
     },
     {
       "kind": "file",
@@ -488,7 +488,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/src/lib.rs",
-      "sha256": "60d61a1b44ff65cbb78f3b489be5bf8d5eec7429f5c18a25fa158f203ebd64cc",
+      "sha256": "83db1f8c0fdcdc9e1178df79b36594f9c873ceaca2e270db274cf4c6e334e32d",
       "size_bytes": 5323
     },
     {
@@ -810,7 +810,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/workspace-contract-digests.sha256",
-      "sha256": "7d87c7cfba774b748d48ad47f9d0cdb6f7a40cb103c9e6bc483c94d23cb448e4",
+      "sha256": "349df361fb9d6d48e72921212d6f7d6b13a96cc39f6e59f3dc13943e4fe76cfc",
       "size_bytes": 943
     },
     {
@@ -4982,8 +4982,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/capability_catalog.py",
-      "sha256": "8aa0b4cddd27ff91a1591d97de7b2f1d847a0b1bf18267ff87feeb2e9d2ed5c3",
-      "size_bytes": 29773
+      "sha256": "3da41189797a958e03947668f67ae076cbf5cf2ae533b6cfdb708840ee011b79",
+      "size_bytes": 34367
     },
     {
       "kind": "file",
