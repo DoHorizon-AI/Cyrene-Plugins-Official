@@ -30,6 +30,7 @@ fail-closed。
 - `contracts/capabilities.yaml`: the generated capability index covering contracts,
   implementations, TCK coverage, and maturity.
 - `docs/plans/`: reviewed implementation plans and their evidence.
+- [`docs/component-releases.md`](docs/component-releases.md): independent Workspace connection component selection and release assets.
 - Protected QQ-side interface research documents, not a bundled QQ runtime.
 - `manifests/`: the canonical Plugin manifest schema.
 
@@ -89,6 +90,7 @@ mvn --batch-mode --no-transfer-progress clean verify -f sdk/java/pom.xml
 - plugins/：涵盖 connector、评估、模型、策略和工具的官方 capability Plugin，也包括由本仓库维护的 OneBot v11 connector。
 - contracts/capabilities.yaml：生成的 capability 索引，涵盖契约、实现、TCK 覆盖和 maturity。
 - docs/plans/：经过审查的实现计划及其证据。
+- docs/component-releases.md：Workspace connection 组件的独立选择规则与发布资产。
 - 受保护的 QQ 侧接口研究文档；本仓库不包含 QQ runtime。
 - manifests/：规范 Plugin manifest schema。
 

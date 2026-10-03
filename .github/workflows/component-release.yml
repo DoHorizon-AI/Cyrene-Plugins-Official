@@ -1,43 +1,75 @@
-name: Immutable Workspace connection component release
+name: Immutable Workspace connection component releases
 
 on:
   push:
     branches: [develop, main, release]
     paths:
-      - "runtime/rust/cyrene-workspace-*"
-      - "runtime/systemd/**"
+      - "runtime/rust/cyrene-workspace-*/**"
+      - "runtime/rust/Dockerfile.workspace-*"
+      - "runtime/rust/Dockerfile.frontend-bridge"
+      - "runtime/rust/cyrene-workspace-product-adapters/**"
+      - "runtime/systemd/cy-workspace-*.service"
+      - "sdk/rust/cyrene-workspace-client-sdk/**"
+      - "contracts/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "tools/ci/connection_release.py"
       - "tools/ci/preflight_component_release.py"
+      - "tools/ci/select_connection_components.py"
       - "tools/ci/connection-release-requirements.txt"
       - ".github/workflows/component-release.yml"
   pull_request:
     branches: [develop, main, release]
     paths:
-      - "runtime/rust/cyrene-workspace-*"
-      - "runtime/systemd/**"
+      - "runtime/rust/cyrene-workspace-*/**"
+      - "runtime/rust/Dockerfile.workspace-*"
+      - "runtime/rust/Dockerfile.frontend-bridge"
+      - "runtime/rust/cyrene-workspace-product-adapters/**"
+      - "runtime/systemd/cy-workspace-*.service"
+      - "sdk/rust/cyrene-workspace-client-sdk/**"
+      - "contracts/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "tools/ci/connection_release.py"
       - "tools/ci/preflight_component_release.py"
+      - "tools/ci/select_connection_components.py"
       - "tools/ci/connection-release-requirements.txt"
       - ".github/workflows/component-release.yml"
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Component to publish, or all four components
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - cy-workspace-relay
+          - cy-workspace-connector
+          - cy-workspace-sidecar
+          - cy-workspace-frontend-bridge
+      catalog_release_id:
+        description: Exact verified catalog release tag; blank selects the latest trusted release in this channel
+        required: false
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: connection-component-release-${{ github.repository }}-${{ github.sha }}
+  group: connection-component-release-${{ github.repository }}-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: "0"
   RUST_TOOLCHAIN: "1.96.1"
-  CATALOG_COMMIT: "7e6d410017420de72d7688859ae81d675e4555ea"
-  CATALOG_SHA256: "f12f5cd1243d16b6ec6a5194efacbdf7a8bf9dffcf8d9525c35183c45a7c7816"
-  SOURCE_COMMIT: ${{ github.sha }}
+  SOURCE_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
   SOURCE_REF: ${{ github.ref }}
   SOURCE_REPOSITORY: ${{ github.repository }}
-  RELEASE_CHANNEL: ${{ github.ref == 'refs/heads/develop' && 'preview' || 'stable' }}
-  RELEASE_ID: ${{ (github.ref == 'refs/heads/develop' && 'preview-' || 'stable-') }}${{ github.sha }}
+  CHANNEL: ${{ github.ref == 'refs/heads/develop' && 'preview' || 'stable' }}
+  CATALOG_HELPER_SOURCE_COMMIT: "87b8e676300eb2a9041740e651773cb01a2a7724"
+  CATALOG_RELEASE_ID: ${{ inputs.catalog_release_id || (github.ref == 'refs/heads/develop' && vars.CYRENE_PREVIEW_COMPONENT_CATALOG_RELEASE_ID) || (github.ref != 'refs/heads/develop' && vars.CYRENE_STABLE_COMPONENT_CATALOG_RELEASE_ID) }}
 
 jobs:
   source-gates:
@@ -48,7 +80,8 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ env.SOURCE_COMMIT }}
+          fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.96.1
         with:
@@ -56,25 +89,161 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Install pinned release metadata tools
+      - name: Install release metadata dependencies
         run: python -m pip install --disable-pip-version-check -r tools/ci/connection-release-requirements.txt
-      - name: Run connection runtime test gates
+      - name: Run connection runtime source gates
         run: |
           set -euo pipefail
           for crate in relay connector sidecar frontend-bridge; do
             cargo test --locked --manifest-path "runtime/rust/cyrene-workspace-$crate/Cargo.toml"
           done
       - name: Validate release tool syntax
-        run: python -m compileall -q tools/ci/connection_release.py tools/ci/preflight_component_release.py
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            tools/ci/connection_release.py \
+            tools/ci/preflight_component_release.py \
+            tools/ci/select_connection_components.py
+          python tools/ci/connection_release.py --help >/dev/null
+          python tools/ci/preflight_component_release.py --help >/dev/null
+          python tools/ci/select_connection_components.py --help >/dev/null
 
-  release-preflight:
-    name: immutable release preflight
+  select-components:
+    name: verify catalog and select affected components
     if: github.event_name != 'pull_request'
     needs: [source-gates]
     runs-on: ubuntu-22.04
     permissions:
       contents: read
+      attestations: read
+    outputs:
+      component_ids: ${{ steps.select.outputs.component_ids }}
+      component_matrix: ${{ steps.select.outputs.component_matrix }}
+      component_count: ${{ steps.select.outputs.component_count }}
+      native_matrix: ${{ steps.select.outputs.native_matrix }}
+      native_count: ${{ steps.select.outputs.native_count }}
+      oci_matrix: ${{ steps.select.outputs.oci_matrix }}
+      oci_count: ${{ steps.select.outputs.oci_count }}
+      catalog_sha256: ${{ steps.fetch.outputs.catalog_sha256 }}
+      catalog_release_id: ${{ steps.fetch.outputs.catalog_release_id }}
     env:
+      CHANGE_BASE: ${{ github.event.before || '' }}
+      COMPONENT_SELECTION: ${{ inputs.component || 'all' }}
+      CHANGE_EVENT: ${{ github.event_name }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Check out the fixed catalog verifier and its schemas
+        uses: actions/checkout@v5
+        with:
+          repository: DoHorizon-AI/Cyrene-Workspace
+          ref: ${{ env.CATALOG_HELPER_SOURCE_COMMIT }}
+          path: catalog-helper
+          fetch-depth: 0
+          persist-credentials: false
+          sparse-checkout: |
+            packaging/fetch_component_catalog.py
+            packaging/catalog_metadata.py
+            packaging/component_updates.py
+            governance/component-catalog-v1.json
+            governance/component-catalog-v1.schema.json
+            governance/component-release-manifest-v1.schema.json
+            governance/component-release-manifest-v2.schema.json
+            governance/component-release-index-v1.schema.json
+          sparse-checkout-cone-mode: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install pinned catalog verifier dependencies
+        run: python -m pip install --disable-pip-version-check jsonschema==4.26.0
+      - name: Fetch and verify one immutable catalog release
+        id: fetch
+        env:
+          CATALOG_RELEASE_ID: ${{ env.CATALOG_RELEASE_ID }}
+        run: |
+          set -euo pipefail
+          mkdir -p workspace-catalog/governance
+          for schema in \
+            component-catalog-v1.schema.json \
+            component-release-manifest-v1.schema.json \
+            component-release-manifest-v2.schema.json \
+            component-release-index-v1.schema.json; do
+            cp "catalog-helper/governance/$schema" workspace-catalog/governance/
+          done
+          args=(--output workspace-catalog/governance/component-catalog-v1.json \
+            --metadata-output workspace-catalog/component-catalog-release.json \
+            --schema-root catalog-helper/governance)
+          if [[ -n "$CATALOG_RELEASE_ID" ]]; then
+            args+=(--release-id "$CATALOG_RELEASE_ID")
+          else
+            args+=(--latest-channel "$CHANNEL")
+          fi
+          python catalog-helper/packaging/fetch_component_catalog.py "${args[@]}"
+          catalog_sha256="$(python - workspace-catalog/component-catalog-release.json <<'PY'
+          import json, os, re, sys
+          value = json.load(open(sys.argv[1], encoding="utf-8"))
+          digest = value.get("catalogSha256")
+          if not isinstance(digest, str) or not digest.startswith("sha256:"):
+              raise SystemExit("verified catalog metadata has no SHA-256 digest")
+          channel = os.environ["CHANNEL"]
+          commit = value.get("sourceCommit")
+          allowed_refs = {"preview": {"refs/heads/develop"}, "stable": {"refs/heads/main", "refs/heads/release"}}
+          if value.get("repository") != "DoHorizon-AI/Cyrene-Workspace" or value.get("workflow") != "DoHorizon-AI/Cyrene-Workspace/.github/workflows/component-catalog-release.yml":
+              raise SystemExit("verified metadata does not identify the trusted catalog publisher")
+          if value.get("channel") != channel or not isinstance(commit, str) or not re.fullmatch(r"[0-9a-f]{40}", commit):
+              raise SystemExit("verified catalog release channel or source commit differs from this publisher")
+          if value.get("releaseId") != f"catalog-{channel}-{commit}" or value.get("sourceRef") not in allowed_refs[channel]:
+              raise SystemExit("verified catalog release tag or source ref does not match its channel")
+          if not isinstance(value.get("generation"), int) or isinstance(value.get("generation"), bool):
+              raise SystemExit("verified catalog generation is not an integer")
+          print(digest.removeprefix("sha256:"))
+          PY
+          )"
+          actual="$(sha256sum workspace-catalog/governance/component-catalog-v1.json | cut -d ' ' -f 1)"
+          test "$actual" = "$catalog_sha256"
+          catalog_release_id="$(python - workspace-catalog/component-catalog-release.json <<'PY'
+          import json, sys
+          print(json.load(open(sys.argv[1], encoding="utf-8"))["releaseId"])
+          PY
+          )"
+          echo "catalog_sha256=$catalog_sha256" >> "$GITHUB_OUTPUT"
+          echo "catalog_release_id=$catalog_release_id" >> "$GITHUB_OUTPUT"
+      - name: Select affected component and target matrices
+        id: select
+        run: |
+          set -euo pipefail
+          args=(--catalog workspace-catalog/governance/component-catalog-v1.json \
+            --catalog-sha256 "${{ steps.fetch.outputs.catalog_sha256 }}" \
+            --root . --github-output "$GITHUB_OUTPUT")
+          if [[ "$CHANGE_EVENT" == workflow_dispatch ]]; then
+            args+=(--component "$COMPONENT_SELECTION")
+          else
+            args+=(--base "$CHANGE_BASE" --head "$SOURCE_COMMIT")
+          fi
+          python tools/ci/select_connection_components.py "${args[@]}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: connection-release-selection
+          path: workspace-catalog
+          if-no-files-found: error
+          retention-days: 30
+
+  component-preflight:
+    name: immutable release preflight / ${{ matrix.component_id }}
+    if: needs.select-components.outputs.component_count != '0'
+    needs: [source-gates, select-components]
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select-components.outputs.component_matrix) }}
+    permissions:
+      contents: read
+    env:
+      RELEASE_ID: ${{ (github.ref == 'refs/heads/develop' && 'preview-' || 'stable-') }}${{ matrix.component_id }}-${{ github.sha }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
@@ -85,7 +254,7 @@ jobs:
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Verify immutable release is enabled and unused before OCI pushes
+      - name: Prove immutable release is enabled and component tag is unused
         env:
           CYRENE_IMMUTABLE_RELEASES_READ_TOKEN: ${{ secrets.CYRENE_IMMUTABLE_RELEASES_READ_TOKEN }}
         run: |
@@ -94,437 +263,412 @@ jobs:
           python tools/ci/preflight_component_release.py \
             --repository "$SOURCE_REPOSITORY" \
             --release-id "$RELEASE_ID" \
-            --channel "$RELEASE_CHANNEL" \
+            --component-id "${{ matrix.component_id }}" \
+            --channel "$CHANNEL" \
             --ref "$SOURCE_REF" \
             --commit "$SOURCE_COMMIT" \
             --root .
 
   build-native:
-    name: build / ${{ matrix.target_id }}
-    if: github.event_name != 'pull_request'
-    needs: [source-gates, release-preflight]
+    name: native / ${{ matrix.component_id }} / ${{ matrix.target_id }}
+    if: needs.select-components.outputs.native_count != '0'
+    needs: [source-gates, select-components, component-preflight]
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - runner: ubuntu-22.04
-            target_id: linux-ubuntu-22.04-x86_64-systemd
-          - runner: ubuntu-24.04
-            target_id: linux-ubuntu-24.04-x86_64-systemd
+      matrix: ${{ fromJSON(needs.select-components.outputs.native_matrix) }}
     runs-on: ${{ matrix.runner }}
-    env:
-      TARGET_ID: ${{ matrix.target_id }}
     permissions:
       contents: read
       id-token: write
       attestations: write
+    env:
+      COMPONENT_ID: ${{ matrix.component_id }}
+      PACKAGE: ${{ matrix.package }}
+      BINARY: ${{ matrix.binary }}
+      TARGET_ID: ${{ matrix.target_id }}
+      RELEASE_ID: ${{ (github.ref == 'refs/heads/develop' && 'preview-' || 'stable-') }}${{ matrix.component_id }}-${{ github.sha }}
+      CATALOG_SHA256: ${{ needs.select-components.outputs.catalog_sha256 }}
+      GH_TOKEN: ${{ github.token }}
+      CARGO_TARGET_DIR: ${{ runner.temp }}/connection-cargo-target
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ env.SOURCE_COMMIT }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Check out the pinned component catalog
-        uses: actions/checkout@v5
+      - uses: actions/download-artifact@v4
         with:
-          repository: DoHorizon-AI/Cyrene-Workspace
-          ref: ${{ env.CATALOG_COMMIT }}
-          path: workspace-catalog
-          fetch-depth: 0
-          persist-credentials: false
+          name: connection-release-selection
+          path: ${{ runner.temp }}/workspace-catalog
       - uses: dtolnay/rust-toolchain@1.96.1
         with:
           components: rustfmt, clippy
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Install release metadata tools and verify immutable inputs
+      - name: Install release metadata dependencies and verify catalog artifact
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check -r tools/ci/connection-release-requirements.txt
+          python - "$RUNNER_TEMP/workspace-catalog/component-catalog-release.json" \
+            "$RUNNER_TEMP/workspace-catalog/governance/component-catalog-v1.json" "$CATALOG_SHA256" <<'PY'
+          import hashlib, json, sys
+          metadata = json.load(open(sys.argv[1], encoding="utf-8"))
+          raw = open(sys.argv[2], "rb").read()
+          actual = hashlib.sha256(raw).hexdigest()
+          if metadata.get("catalogSha256") != f"sha256:{actual}" or actual != sys.argv[3]:
+              raise SystemExit("downloaded catalog bytes differ from verified release metadata")
+          PY
           test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
-          case "$RELEASE_CHANNEL:$SOURCE_REF" in
-            stable:refs/heads/main|stable:refs/heads/release|preview:refs/heads/develop) ;;
-            *) echo "channel does not match exact source ref" >&2; exit 2 ;;
-          esac
-          actual="$(sha256sum workspace-catalog/governance/component-catalog-v1.json | cut -d ' ' -f 1)"
-          test "$actual" = "$CATALOG_SHA256"
-          mkdir -p "$RUNNER_TEMP/component-release"
-      - name: Build and package independent native components
+          mkdir -p "$RUNNER_TEMP/connection-native/$COMPONENT_ID/$TARGET_ID/stage/bin" \
+                   "$RUNNER_TEMP/connection-native/$COMPONENT_ID/$TARGET_ID/stage/systemd" \
+                   "$RUNNER_TEMP/connection-native/$COMPONENT_ID/$TARGET_ID/output"
+      - name: Build and package the selected native component target
         run: |
           set -euo pipefail
-          export CARGO_TARGET_DIR="$RUNNER_TEMP/cargo-target"
-          root="$RUNNER_TEMP/component-release"
-          for row in \
-            'cy-workspace-relay cyrene-workspace-relay cy-workspace-relay' \
-            'cy-workspace-connector cyrene-workspace-connector cy-workspace-connector' \
-            'cy-workspace-sidecar cyrene-workspace-sidecar cy-workspace-sidecar' \
-            'cy-workspace-frontend-bridge cyrene-workspace-frontend-bridge cyrene-workspace-frontend-bridge'; do
-            read -r component package binary <<< "$row"
-            manifest="runtime/rust/$package/Cargo.toml"
-            cargo build --locked --release --manifest-path "$manifest" --bin "$binary"
-            version="$(python - "$manifest" <<'PY'
+          manifest="runtime/rust/$PACKAGE/Cargo.toml"
+          cargo build --locked --release --manifest-path "$manifest" --bin "$BINARY"
+          version="$(python - "$manifest" <<'PY'
           import sys, tomllib
           with open(sys.argv[1], "rb") as source:
               print(tomllib.load(source)["package"]["version"])
           PY
           )"
-            stage="$root/stage/$component"
-            mkdir -p "$stage/bin" "$stage/systemd"
-            install -m 0755 "$CARGO_TARGET_DIR/release/$binary" "$stage/bin/$binary"
-            install -m 0644 "runtime/systemd/$component.service" "$stage/systemd/$component.service"
-            target_file="$root/target-$component.json"
-            python - "$CATALOG_SHA256" "$TARGET_ID" "$target_file" <<'PY'
-          import hashlib, json, os, sys
+          root="$RUNNER_TEMP/connection-native/$COMPONENT_ID/$TARGET_ID"
+          install -m 0755 "$CARGO_TARGET_DIR/release/$BINARY" "$root/stage/bin/$BINARY"
+          install -m 0644 "runtime/systemd/$COMPONENT_ID.service" "$root/stage/systemd/$COMPONENT_ID.service"
+          python - "$RUNNER_TEMP/workspace-catalog/governance/component-catalog-v1.json" \
+            "$TARGET_ID" "$root/target.json" <<'PY'
+          import json, sys
           from pathlib import Path
-          catalog_path = Path("workspace-catalog/governance/component-catalog-v1.json")
-          raw = catalog_path.read_bytes()
-          if hashlib.sha256(raw).hexdigest() != sys.argv[1]:
-              raise SystemExit("catalog pin digest mismatch")
-          catalog = json.loads(raw)
+          catalog = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
           target = next(row["target"] for row in catalog["targets"] if row["id"] == sys.argv[2])
           Path(sys.argv[3]).write_text(json.dumps(target) + "\n", encoding="utf-8")
           PY
-            output="$root/$component"
-            mkdir -p "$output"
-            python tools/ci/connection_release.py package \
-              --component-id "$component" \
-              --release-id "$RELEASE_ID" \
-              --target-id "$TARGET_ID" \
-              --payload "$stage" \
-              --output "$output" \
-              --entrypoint "bin/$binary" \
-              --repository "$SOURCE_REPOSITORY" \
-              --source-ref "$SOURCE_REF" \
-              --source-commit "$SOURCE_COMMIT" \
-              --channel "$RELEASE_CHANNEL" \
-              --run-id "$GITHUB_RUN_ID" \
-              --run-attempt "$GITHUB_RUN_ATTEMPT" \
-              --version "$version" \
-              --target "$target_file" \
-              --catalog workspace-catalog/governance/component-catalog-v1.json \
-              --catalog-sha256 "$CATALOG_SHA256"
-          done
-      - name: Attest every native payload archive
+          python tools/ci/connection_release.py package \
+            --component-id "$COMPONENT_ID" --component-release \
+            --release-id "$RELEASE_ID" \
+            --target-id "$TARGET_ID" \
+            --payload "$root/stage" \
+            --output "$root/output" \
+            --entrypoint "bin/$BINARY" \
+            --repository "$SOURCE_REPOSITORY" \
+            --source-ref "$SOURCE_REF" \
+            --source-commit "$SOURCE_COMMIT" \
+            --channel "$CHANNEL" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT" \
+            --version "$version" \
+            --target "$root/target.json" \
+            --catalog "$RUNNER_TEMP/workspace-catalog/governance/component-catalog-v1.json" \
+            --catalog-sha256 "$CATALOG_SHA256"
+      - name: Attest native payload archive and manifest
         uses: actions/attest@v4
         with:
-          subject-path: ${{ runner.temp }}/component-release/**/*.tar.gz
-      - name: Attest every native release manifest
+          subject-path: ${{ runner.temp }}/connection-native/${{ matrix.component_id }}/${{ matrix.target_id }}/output/artifacts/*.tar.gz
+      - name: Attest native manifest
         uses: actions/attest@v4
         with:
-          subject-path: ${{ runner.temp }}/component-release/**/manifests/*.manifest.json
-      - name: Save detached attestations with durable release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
+          subject-path: ${{ runner.temp }}/connection-native/${{ matrix.component_id }}/${{ matrix.target_id }}/output/manifests/*.manifest.json
+      - name: Save detached native attestations
         run: |
           set -euo pipefail
-          root="$RUNNER_TEMP/component-release"
+          root="$RUNNER_TEMP/connection-native/$COMPONENT_ID/$TARGET_ID/output"
           while IFS= read -r -d '' subject; do
             gh attestation download "$subject" --repo "$SOURCE_REPOSITORY"
-            digest="$(sha256sum "$subject" | cut -d ' ' -f 1)"
-            bundle="sha256:$digest.jsonl"
-            test -s "$bundle"
-            mv "$bundle" "$subject.attestation.jsonl"
+            digest="sha256:$(sha256sum "$subject" | cut -d ' ' -f 1)"
+            test -s "$digest.jsonl"
+            mv "$digest.jsonl" "$subject.attestation.jsonl"
           done < <(find "$root" -type f \( -name '*.tar.gz' -o -name '*.manifest.json' \) -print0)
       - uses: actions/upload-artifact@v4
         with:
-          name: connection-native-${{ matrix.target_id }}
-          path: ${{ runner.temp }}/component-release
+          name: connection-native-${{ matrix.component_id }}-${{ matrix.target_id }}
+          path: ${{ runner.temp }}/connection-native/${{ matrix.component_id }}/${{ matrix.target_id }}/output/
           if-no-files-found: error
           retention-days: 30
 
-  build-windows-images:
-    name: build / Windows Docker Desktop images
-    if: github.event_name != 'pull_request'
-    needs: [source-gates, release-preflight, build-native]
+  build-oci:
+    name: OCI / ${{ matrix.component_id }} / ${{ matrix.target_id }}
+    if: needs.select-components.outputs.oci_count != '0'
+    needs: [source-gates, select-components, component-preflight, build-native]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select-components.outputs.oci_matrix) }}
     runs-on: ubuntu-22.04
     permissions:
       contents: read
       packages: write
       id-token: write
       attestations: write
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          ref: ${{ env.SOURCE_COMMIT }}
-          persist-credentials: false
-      - name: Check out the pinned component catalog
-        uses: actions/checkout@v5
-        with:
-          repository: DoHorizon-AI/Cyrene-Workspace
-          ref: ${{ env.CATALOG_COMMIT }}
-          path: workspace-catalog
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: connection-native-linux-ubuntu-22.04-x86_64-systemd
-          path: ${{ runner.temp }}/native-22
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-      - name: Prepare exact Ubuntu 22.04 binary contexts and read catalog routes
-        id: routes
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/component-oci/manifests"
-          for row in \
-            'cy-workspace-relay cy-workspace-relay' \
-            'cy-workspace-connector cy-workspace-connector' \
-            'cy-workspace-frontend-bridge cyrene-workspace-frontend-bridge'; do
-            read -r component binary <<< "$row"
-            archive="$RUNNER_TEMP/native-22/$component/artifacts/$component-linux-ubuntu-22.04-x86_64-systemd.tar.gz"
-            context="$RUNNER_TEMP/oci-context-$component"
-            mkdir -p "$context"
-            tar -xzf "$archive" -C "$context"
-            cp "$context/bin/$binary" "$context/$binary"
-            rm -rf "$context/bin" "$context/systemd"
-          done
-          python - "$GITHUB_OUTPUT" <<'PY'
-          import json, sys, tomllib
-          from pathlib import Path
-          catalog = json.loads(Path("workspace-catalog/governance/component-catalog-v1.json").read_text(encoding="utf-8"))
-          components = {item["componentId"]: item for item in catalog["components"]}
-          ids = ("cy-workspace-relay", "cy-workspace-connector", "cy-workspace-frontend-bridge")
-          packages = ("cyrene-workspace-relay", "cyrene-workspace-connector", "cyrene-workspace-frontend-bridge")
-          with open(sys.argv[1], "a", encoding="utf-8") as output:
-              for component_id, package, key in zip(ids, packages, ("relay", "connector", "bridge"), strict=True):
-                  repository = components[component_id].get("ociImageRepository")
-                  if not isinstance(repository, str) or not repository:
-                      raise SystemExit(f"catalog lacks OCI repository for {component_id}")
-                  output.write(f"{key}={repository}\n")
-                  manifest = Path("runtime/rust") / package / "Cargo.toml"
-                  version = tomllib.loads(manifest.read_text(encoding="utf-8"))["package"]["version"]
-                  output.write(f"{key}_version={version}\n")
-          PY
-      - uses: docker/build-push-action@v6
-        id: relay-image
-        with:
-          context: ${{ runner.temp }}/oci-context-cy-workspace-relay
-          file: runtime/rust/Dockerfile.workspace-relay
-          push: true
-          tags: ${{ steps.routes.outputs.relay }}:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          labels: |
-            io.cyrene.component.id=cy-workspace-relay
-            io.cyrene.component.target-id=windows-10.0-x86_64-docker-linux
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.routes.outputs.relay_version }}
-          build-args: |
-            SOURCE_REVISION=${{ github.sha }}
-            COMPONENT_VERSION=${{ steps.routes.outputs.relay_version }}
-          provenance: mode=max
-          sbom: true
-      - uses: docker/build-push-action@v6
-        id: connector-image
-        with:
-          context: ${{ runner.temp }}/oci-context-cy-workspace-connector
-          file: runtime/rust/Dockerfile.workspace-connector
-          push: true
-          tags: ${{ steps.routes.outputs.connector }}:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          labels: |
-            io.cyrene.component.id=cy-workspace-connector
-            io.cyrene.component.target-id=windows-10.0-x86_64-docker-linux
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.routes.outputs.connector_version }}
-          build-args: |
-            SOURCE_REVISION=${{ github.sha }}
-            COMPONENT_VERSION=${{ steps.routes.outputs.connector_version }}
-          provenance: mode=max
-          sbom: true
-      - uses: docker/build-push-action@v6
-        id: bridge-image
-        with:
-          context: ${{ runner.temp }}/oci-context-cy-workspace-frontend-bridge
-          file: runtime/rust/Dockerfile.frontend-bridge
-          push: true
-          tags: ${{ steps.routes.outputs.bridge }}:${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
-          labels: |
-            io.cyrene.component.id=cy-workspace-frontend-bridge
-            io.cyrene.component.target-id=windows-10.0-x86_64-docker-linux
-            org.opencontainers.image.source=https://github.com/${{ github.repository }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.version=${{ steps.routes.outputs.bridge_version }}
-          build-args: |
-            SOURCE_REVISION=${{ github.sha }}
-            COMPONENT_VERSION=${{ steps.routes.outputs.bridge_version }}
-          provenance: mode=max
-          sbom: true
-      - name: Attest Relay OCI image
-        uses: actions/attest@v4
-        with:
-          subject-name: ${{ steps.routes.outputs.relay }}
-          subject-digest: ${{ steps.relay-image.outputs.digest }}
-          push-to-registry: true
-      - name: Attest Connector OCI image
-        uses: actions/attest@v4
-        with:
-          subject-name: ${{ steps.routes.outputs.connector }}
-          subject-digest: ${{ steps.connector-image.outputs.digest }}
-          push-to-registry: true
-      - name: Attest Frontend Bridge OCI image
-        uses: actions/attest@v4
-        with:
-          subject-name: ${{ steps.routes.outputs.bridge }}
-          subject-digest: ${{ steps.bridge-image.outputs.digest }}
-          push-to-registry: true
-      - name: Create target-bound OCI manifests
-        env:
-          RELAY_IMAGE: ${{ steps.routes.outputs.relay }}
-          RELAY_DIGEST: ${{ steps.relay-image.outputs.digest }}
-          CONNECTOR_IMAGE: ${{ steps.routes.outputs.connector }}
-          CONNECTOR_DIGEST: ${{ steps.connector-image.outputs.digest }}
-          BRIDGE_IMAGE: ${{ steps.routes.outputs.bridge }}
-          BRIDGE_DIGEST: ${{ steps.bridge-image.outputs.digest }}
-        run: |
-          set -euo pipefail
-          python - "$RUNNER_TEMP/component-oci/manifests" <<'PY'
-          import hashlib, json, os, sys, tomllib
-          from pathlib import Path
-          catalog_path = Path("workspace-catalog/governance/component-catalog-v1.json")
-          raw = catalog_path.read_bytes()
-          if hashlib.sha256(raw).hexdigest() != os.environ["CATALOG_SHA256"]:
-              raise SystemExit("catalog pin digest mismatch")
-          catalog = json.loads(raw)
-          specs = [
-              ("cy-workspace-relay", "cyrene-workspace-relay", "RELAY_IMAGE", "RELAY_DIGEST"),
-              ("cy-workspace-connector", "cyrene-workspace-connector", "CONNECTOR_IMAGE", "CONNECTOR_DIGEST"),
-              ("cy-workspace-frontend-bridge", "cyrene-workspace-frontend-bridge", "BRIDGE_IMAGE", "BRIDGE_DIGEST"),
-          ]
-          target = next(item["target"] for item in catalog["targets"] if item["id"] == "windows-10.0-x86_64-docker-linux")
-          dest = Path(sys.argv[1])
-          for component_id, package, image_key, digest_key in specs:
-              component = next(row for row in catalog["components"] if row["componentId"] == component_id)
-              image, digest = os.environ[image_key], os.environ[digest_key]
-              if image != component.get("ociImageRepository") or not digest.startswith("sha256:"):
-                  raise SystemExit(f"OCI route or digest differs from catalog: {component_id}")
-              artifact = {"kind":"oci-image", "repository":image, "digest":digest, "platform":{"os":"linux", "architecture":"amd64"}}
-              descriptor = {"componentId":component_id, "contentDigest":digest, "artifact":artifact, "attestationSubject":image}
-              metadata = dest / f"{component_id}.metadata.json"
-              target_path = dest / f"{component_id}.target.json"
-              metadata.write_text(json.dumps(descriptor) + "\n", encoding="utf-8")
-              target_path.write_text(json.dumps(target) + "\n", encoding="utf-8")
-              version = tomllib.loads((Path("runtime/rust") / package / "Cargo.toml").read_text(encoding="utf-8"))["package"]["version"]
-              import subprocess
-              subprocess.run([
-                  sys.executable, "tools/ci/connection_release.py", "manifest",
-                  "--output", str(dest / f"{component_id}-windows-10.0-x86_64-docker-linux.manifest.json"),
-                  "--metadata", str(metadata), "--repository", os.environ["SOURCE_REPOSITORY"],
-                  "--source-ref", os.environ["SOURCE_REF"], "--source-commit", os.environ["SOURCE_COMMIT"],
-                  "--channel", os.environ["RELEASE_CHANNEL"], "--run-id", os.environ["GITHUB_RUN_ID"],
-                  "--run-attempt", os.environ["GITHUB_RUN_ATTEMPT"], "--version", version,
-                  "--target", str(target_path), "--target-id", "windows-10.0-x86_64-docker-linux",
-                  "--catalog", str(catalog_path), "--catalog-sha256", os.environ["CATALOG_SHA256"],
-              ], check=True)
-          PY
-      - name: Attest OCI manifests
-        uses: actions/attest@v4
-        with:
-          subject-path: ${{ runner.temp }}/component-oci/manifests/*.manifest.json
-      - name: Attest OCI manifests and retrieve offline image proofs
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          out="$RUNNER_TEMP/component-oci"
-          for row in \
-            'cy-workspace-relay ${{ steps.routes.outputs.relay }} ${{ steps.relay-image.outputs.digest }}' \
-            'cy-workspace-connector ${{ steps.routes.outputs.connector }} ${{ steps.connector-image.outputs.digest }}' \
-            'cy-workspace-frontend-bridge ${{ steps.routes.outputs.bridge }} ${{ steps.bridge-image.outputs.digest }}'; do
-            read -r component image digest <<< "$row"
-            manifest="$out/manifests/$component-windows-10.0-x86_64-docker-linux.manifest.json"
-            gh attestation download "oci://$image@$digest" --repo "$SOURCE_REPOSITORY" --predicate-type https://slsa.dev/provenance/v1
-            mv "$digest.jsonl" "$out/manifests/$component-image.attestation.jsonl"
-            gh attestation download "$manifest" --repo "$SOURCE_REPOSITORY" --predicate-type https://slsa.dev/provenance/v1
-            manifest_digest="sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)"
-            mv "$manifest_digest.jsonl" "$manifest.attestation.jsonl"
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: connection-windows-images
-          path: ${{ runner.temp }}/component-oci
-          if-no-files-found: error
-          retention-days: 30
-
-  publish:
-    name: immutable component release / ${{ github.sha }}
-    if: github.event_name != 'pull_request'
-    needs: [source-gates, release-preflight, build-native, build-windows-images]
-    runs-on: ubuntu-22.04
-    permissions:
-      actions: read
-      contents: write
-      id-token: write
-      attestations: write
-      packages: read
     env:
+      COMPONENT_ID: ${{ matrix.component_id }}
+      PACKAGE: ${{ matrix.package }}
+      BINARY: ${{ matrix.binary }}
+      TARGET_ID: ${{ matrix.target_id }}
+      IMAGE_REPOSITORY: ${{ matrix.image_repository }}
+      DOCKERFILE: ${{ matrix.dockerfile }}
+      RELEASE_ID: ${{ (github.ref == 'refs/heads/develop' && 'preview-' || 'stable-') }}${{ matrix.component_id }}-${{ github.sha }}
+      CATALOG_SHA256: ${{ needs.select-components.outputs.catalog_sha256 }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v5
         with:
           ref: ${{ env.SOURCE_COMMIT }}
           fetch-depth: 0
-      - name: Check out the pinned component catalog
-        uses: actions/checkout@v5
-        with:
-          repository: DoHorizon-AI/Cyrene-Workspace
-          ref: ${{ env.CATALOG_COMMIT }}
-          path: workspace-catalog
-          fetch-depth: 0
           persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: connection-release-selection
+          path: ${{ runner.temp }}/workspace-catalog
+      - uses: actions/download-artifact@v4
+        with:
+          name: connection-native-${{ matrix.component_id }}-linux-ubuntu-22.04-x86_64-systemd
+          path: ${{ runner.temp }}/native-ubuntu-22.04
       - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
-      - name: Install release metadata tools and verify immutable publication is allowed
-        env:
-          CYRENE_IMMUTABLE_RELEASES_READ_TOKEN: ${{ secrets.CYRENE_IMMUTABLE_RELEASES_READ_TOKEN }}
+      - name: Install release metadata dependencies and verify native source
+        id: source
         run: |
           set -euo pipefail
           python -m pip install --disable-pip-version-check -r tools/ci/connection-release-requirements.txt
-          python tools/ci/preflight_component_release.py \
-            --repository "$SOURCE_REPOSITORY" \
-            --release-id "$RELEASE_ID" \
-            --channel "$RELEASE_CHANNEL" \
-            --ref "$SOURCE_REF" \
-            --commit "$SOURCE_COMMIT" \
-            --root .
-          actual="$(sha256sum workspace-catalog/governance/component-catalog-v1.json | cut -d ' ' -f 1)"
-          test "$actual" = "$CATALOG_SHA256"
-      - uses: actions/download-artifact@v4
+          python - "$RUNNER_TEMP/workspace-catalog/component-catalog-release.json" \
+            "$RUNNER_TEMP/workspace-catalog/governance/component-catalog-v1.json" "$CATALOG_SHA256" <<'PY'
+          import hashlib, json, sys
+          metadata = json.load(open(sys.argv[1], encoding="utf-8"))
+          raw = open(sys.argv[2], "rb").read()
+          actual = hashlib.sha256(raw).hexdigest()
+          if metadata.get("catalogSha256") != f"sha256:{actual}" or actual != sys.argv[3]:
+              raise SystemExit("downloaded catalog bytes differ from verified release metadata")
+          PY
+          archive="$(find "$RUNNER_TEMP/native-ubuntu-22.04/artifacts" -maxdepth 1 -type f -name "$COMPONENT_ID-*.tar.gz" -print -quit)"
+          test -n "$archive"
+          context="$RUNNER_TEMP/oci-context"
+          mkdir -p "$context" "$RUNNER_TEMP/connection-oci/manifests"
+          tar -xzf "$archive" -C "$context"
+          install -m 0755 "$context/bin/$BINARY" "$context/$BINARY"
+          rm -rf "$context/bin" "$context/systemd"
+          version="$(python - "runtime/rust/$PACKAGE/Cargo.toml" <<'PY'
+          import sys, tomllib
+          with open(sys.argv[1], "rb") as source:
+              print(tomllib.load(source)["package"]["version"])
+          PY
+          )"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
-          pattern: connection-native-*
-          path: release-dist/native
-          merge-multiple: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: connection-windows-images
-          path: release-dist/oci
-      - name: Assemble and validate the repository-scoped release index
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Confirm the component OCI tag is unused
         run: |
           set -euo pipefail
-          mkdir -p release-dist/all
-          while IFS= read -r -d '' path; do cp "$path" release-dist/all/; done \
-            < <(find release-dist/native release-dist/oci -type f \( -name '*.tar.gz' -o -name '*.manifest.json' -o -name '*.jsonl' \) -print0)
+          OCI_IMAGE_TAG="$RELEASE_ID-$TARGET_ID"
+          if docker buildx imagetools inspect "$IMAGE_REPOSITORY:$OCI_IMAGE_TAG" >/dev/null 2>&1; then
+            echo "OCI image tag already exists: $IMAGE_REPOSITORY:$OCI_IMAGE_TAG" >&2
+            exit 2
+          fi
+          echo "OCI_IMAGE_TAG=$OCI_IMAGE_TAG" >> "$GITHUB_ENV"
+      - name: Build and push the immutable component image
+        id: image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ runner.temp }}/oci-context
+          file: ${{ github.workspace }}/${{ matrix.dockerfile }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ matrix.image_repository }}:${{ env.RELEASE_ID }}-${{ matrix.target_id }}
+          labels: |
+            io.cyrene.component.id=${{ matrix.component_id }}
+            io.cyrene.component.target-id=${{ matrix.target_id }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.source.outputs.version }}
+          build-args: |
+            COMPONENT_ID=${{ matrix.component_id }}
+            TARGET_ID=${{ matrix.target_id }}
+            SOURCE_REPOSITORY=https://github.com/${{ github.repository }}
+            SOURCE_REVISION=${{ github.sha }}
+            COMPONENT_VERSION=${{ steps.source.outputs.version }}
+          provenance: mode=max
+          sbom: true
+      - name: Attest the component OCI image
+        uses: actions/attest@v4
+        with:
+          subject-name: ${{ matrix.image_repository }}
+          subject-digest: ${{ steps.image.outputs.digest }}
+          push-to-registry: true
+          github-token: ${{ github.token }}
+      - name: Create the component and target bound OCI manifest
+        env:
+          IMAGE_DIGEST: ${{ steps.image.outputs.digest }}
+          COMPONENT_VERSION: ${{ steps.source.outputs.version }}
+        run: |
+          set -euo pipefail
+          python - "$RUNNER_TEMP/workspace-catalog/governance/component-catalog-v1.json" \
+            "$RUNNER_TEMP/connection-oci/manifests" <<'PY'
+          import json, os, subprocess, sys
+          from pathlib import Path
+          catalog_path = Path(sys.argv[1])
+          catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
+          component_id = os.environ["COMPONENT_ID"]
+          component = next(row for row in catalog["components"] if row["componentId"] == component_id)
+          target_id = os.environ["TARGET_ID"]
+          supported = any(row.get("targetId") == target_id and row.get("artifactKind") == "oci-image" and row.get("support") == "supported" for row in component.get("targets", []))
+          if not supported or component.get("ociImageRepository") != os.environ["IMAGE_REPOSITORY"]:
+              raise SystemExit("verified catalog does not authorize this OCI target and repository")
+          target = next(row["target"] for row in catalog["targets"] if row["id"] == target_id)
+          image = os.environ["IMAGE_REPOSITORY"]
+          digest = os.environ["IMAGE_DIGEST"]
+          if not digest.startswith("sha256:"):
+              raise SystemExit("OCI builder returned an invalid manifest digest")
+          metadata = {
+              "componentId": component_id,
+              "contentDigest": digest,
+              "artifact": {"kind": "oci-image", "repository": image, "digest": digest, "platform": {"os": "linux", "architecture": "amd64"}},
+              "attestationSubject": image,
+          }
+          output = Path(sys.argv[2])
+          metadata_path = output / f"{component_id}-{target_id}.metadata.json"
+          target_path = output / f"{component_id}-{target_id}.target.json"
+          manifest_path = output / f"{component_id}-{target_id}.manifest.json"
+          metadata_path.write_text(json.dumps(metadata) + "\n", encoding="utf-8")
+          target_path.write_text(json.dumps(target) + "\n", encoding="utf-8")
+          subprocess.run([
+              sys.executable, "tools/ci/connection_release.py", "manifest",
+              "--output", str(manifest_path), "--metadata", str(metadata_path),
+              "--component-id", component_id, "--component-release",
+              "--repository", os.environ["SOURCE_REPOSITORY"],
+              "--source-ref", os.environ["SOURCE_REF"], "--source-commit", os.environ["SOURCE_COMMIT"],
+              "--channel", os.environ["CHANNEL"], "--release-id", os.environ["RELEASE_ID"],
+              "--run-id", os.environ["GITHUB_RUN_ID"], "--run-attempt", os.environ["GITHUB_RUN_ATTEMPT"],
+              "--version", os.environ["COMPONENT_VERSION"], "--target", str(target_path), "--target-id", target_id,
+              "--catalog", str(catalog_path), "--catalog-sha256", os.environ["CATALOG_SHA256"],
+          ], check=True)
+          PY
+      - name: Attest the component OCI manifest
+        uses: actions/attest@v4
+        with:
+          subject-path: ${{ runner.temp }}/connection-oci/manifests/*.manifest.json
+      - name: Save detached OCI image and manifest attestations
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/connection-oci/manifests"
+          gh attestation download "oci://$IMAGE_REPOSITORY@${{ steps.image.outputs.digest }}" \
+            --repo "$SOURCE_REPOSITORY" --predicate-type https://slsa.dev/provenance/v1
+          mv "${{ steps.image.outputs.digest }}.jsonl" "$out/$COMPONENT_ID-$TARGET_ID-image.attestation.jsonl"
+          manifest="$out/$COMPONENT_ID-$TARGET_ID.manifest.json"
+          gh attestation download "$manifest" --repo "$SOURCE_REPOSITORY" \
+            --predicate-type https://slsa.dev/provenance/v1
+          manifest_digest="sha256:$(sha256sum "$manifest" | cut -d ' ' -f 1)"
+          mv "$manifest_digest.jsonl" "$manifest.attestation.jsonl"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: connection-oci-${{ matrix.component_id }}-${{ matrix.target_id }}
+          path: ${{ runner.temp }}/connection-oci
+          if-no-files-found: error
+          retention-days: 30
+
+  publish-component:
+    name: immutable component release / ${{ matrix.component_id }}
+    if: >-
+      always() && needs.select-components.outputs.component_count != '0' &&
+      needs.source-gates.result == 'success' && needs.select-components.result == 'success' &&
+      needs.component-preflight.result == 'success' && needs.build-native.result == 'success' &&
+      (needs.build-oci.result == 'success' || needs.build-oci.result == 'skipped')
+    needs: [source-gates, select-components, component-preflight, build-native, build-oci]
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.select-components.outputs.component_matrix) }}
+    permissions:
+      actions: read
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      COMPONENT_ID: ${{ matrix.component_id }}
+      SOURCE_REPOSITORY: ${{ github.repository }}
+      RELEASE_ID: ${{ (github.ref == 'refs/heads/develop' && 'preview-' || 'stable-') }}${{ matrix.component_id }}-${{ github.sha }}
+      CATALOG_SHA256: ${{ needs.select-components.outputs.catalog_sha256 }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ env.SOURCE_COMMIT }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: connection-release-selection
+          path: ${{ runner.temp }}/workspace-catalog
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: connection-native-${{ matrix.component_id }}-*
+          path: release-dist/native
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        if: matrix.has_oci
+        with:
+          pattern: connection-oci-${{ matrix.component_id }}-*
+          path: release-dist/oci
+          merge-multiple: true
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install release metadata dependencies and verify catalog artifact
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check -r tools/ci/connection-release-requirements.txt
+          python - "$RUNNER_TEMP/workspace-catalog/component-catalog-release.json" \
+            "$RUNNER_TEMP/workspace-catalog/governance/component-catalog-v1.json" "$CATALOG_SHA256" <<'PY'
+          import hashlib, json, sys
+          metadata = json.load(open(sys.argv[1], encoding="utf-8"))
+          raw = open(sys.argv[2], "rb").read()
+          actual = hashlib.sha256(raw).hexdigest()
+          if metadata.get("catalogSha256") != f"sha256:{actual}" or actual != sys.argv[3]:
+              raise SystemExit("downloaded catalog bytes differ from verified release metadata")
+          PY
+      - name: Assemble this component release and validate its index
+        run: |
+          set -euo pipefail
+          mkdir -p release-dist/component/manifests release-dist/component/assets
+          for source in release-dist/native release-dist/oci; do
+            [[ -d "$source" ]] || continue
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                */manifests/*.manifest.json)
+                  manifest_component="$(python -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["componentId"])' "$path")"
+                  [[ "$manifest_component" == "$COMPONENT_ID" ]] || continue
+                  cp "$path" release-dist/component/manifests/
+                  cp "$path" release-dist/component/assets/
+                  ;;
+                *.tar.gz|*.attestation.jsonl)
+                  cp "$path" release-dist/component/assets/
+                  ;;
+              esac
+            done < <(find "$source" -type f -print0)
+          done
           python tools/ci/connection_release.py index \
             --repository "$SOURCE_REPOSITORY" \
             --release-id "$RELEASE_ID" \
-            --channel "$RELEASE_CHANNEL" \
+            --component-id "$COMPONENT_ID" \
+            --channel "$CHANNEL" \
             --source-ref "$SOURCE_REF" \
             --source-commit "$SOURCE_COMMIT" \
             --run-id "$GITHUB_RUN_ID" \
             --run-attempt "$GITHUB_RUN_ATTEMPT" \
-            --manifests release-dist/all \
-            --output release-dist/all/component-release-index-v1.json
+            --manifests release-dist/component/manifests \
+            --output release-dist/component/assets/component-release-index-v1.json
           python - <<'PY'
-          import json
+          import json, os
           from pathlib import Path
           from jsonschema import Draft202012Validator
           from referencing import Registry, Resource
-          root = Path("workspace-catalog/governance")
+          root = Path(os.environ["RUNNER_TEMP"]) / "workspace-catalog/governance"
+          component_id = os.environ["COMPONENT_ID"]
+          release_id = os.environ["RELEASE_ID"]
           manifest_schema = json.loads((root / "component-release-manifest-v2.schema.json").read_text(encoding="utf-8"))
           index_schema = json.loads((root / "component-release-index-v1.schema.json").read_text(encoding="utf-8"))
           common_schema = json.loads((root / "component-release-manifest-v1.schema.json").read_text(encoding="utf-8"))
@@ -533,32 +677,40 @@ jobs:
               (index_schema["$id"], Resource.from_contents(index_schema)),
               (common_schema["$id"], Resource.from_contents(common_schema)),
           ))
-          for path in sorted(Path("release-dist").rglob("*.manifest.json")):
-              Draft202012Validator(manifest_schema, registry=registry).validate(json.loads(path.read_text(encoding="utf-8")))
-          Draft202012Validator(index_schema, registry=registry).validate(json.loads(Path("release-dist/all/component-release-index-v1.json").read_text(encoding="utf-8")))
+          manifests = sorted(Path("release-dist/component/manifests").glob("*.manifest.json"))
+          if not manifests:
+              raise SystemExit("component release has no manifests")
+          for path in manifests:
+              document = json.loads(path.read_text(encoding="utf-8"))
+              if document.get("componentId") != component_id or document.get("releaseId") != release_id:
+                  raise SystemExit(f"manifest identity does not match release: {path.name}")
+              Draft202012Validator(manifest_schema, registry=registry).validate(document)
+          index = Path("release-dist/component/assets/component-release-index-v1.json")
+          Draft202012Validator(index_schema, registry=registry).validate(json.loads(index.read_text(encoding="utf-8")))
           PY
-      - name: Attest the publisher index
+      - name: Attest the component release index
         uses: actions/attest@v4
         with:
-          subject-path: release-dist/all/component-release-index-v1.json
-      - name: Include detached index attestation for offline verification
+          subject-path: release-dist/component/assets/component-release-index-v1.json
+      - name: Save detached component index attestation
         run: |
           set -euo pipefail
-          cd release-dist/all
+          cd release-dist/component/assets
           index=component-release-index-v1.json
           digest="sha256:$(sha256sum "$index" | cut -d ' ' -f 1)"
-          gh attestation download "$index" --repo "$SOURCE_REPOSITORY"
+          gh attestation download "$index" --repo "$SOURCE_REPOSITORY" \
+            --predicate-type https://slsa.dev/provenance/v1
           mv "$digest.jsonl" "$index.attestation.jsonl"
-      - name: Publish the immutable release assets
+      - name: Publish the immutable component release
         run: |
           set -euo pipefail
-          mapfile -d '' assets < <(find release-dist -type f \( -name '*.tar.gz' -o -name '*.manifest.json' -o -name 'component-release-index-v1.json' -o -name '*.jsonl' -o -name '*.digest' \) -print0 | sort -z)
+          cd release-dist/component/assets
+          mapfile -d '' assets < <(find . -maxdepth 1 -type f -print0 | sort -z)
           test "${#assets[@]}" -gt 0
           gh release create "$RELEASE_ID" "${assets[@]}" \
             --draft --target "$SOURCE_COMMIT" \
-            --title "Cyrene connection component release $RELEASE_ID" \
-            --notes "Publisher-scoped immutable artifacts from $SOURCE_REPOSITORY@$SOURCE_COMMIT ($SOURCE_REF)."
+            --title "Cyrene component $COMPONENT_ID $RELEASE_ID" \
+            --notes "Immutable component release from $SOURCE_REPOSITORY@$SOURCE_COMMIT ($SOURCE_REF)."
           release_database_id="$(gh api "repos/$SOURCE_REPOSITORY/releases/tags/$RELEASE_ID" --jq .id)"
           gh api --method PATCH "repos/$SOURCE_REPOSITORY/releases/$release_database_id" -F draft=false >/dev/null
-          immutable="$(gh api "repos/$SOURCE_REPOSITORY/releases/tags/$RELEASE_ID" --jq .immutable)"
-          test "$immutable" = true
+          test "$(gh api "repos/$SOURCE_REPOSITORY/releases/tags/$RELEASE_ID" --jq .immutable)" = true
