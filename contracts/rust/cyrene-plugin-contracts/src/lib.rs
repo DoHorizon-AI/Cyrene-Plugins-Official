@@ -33,6 +33,10 @@ pub mod cyrene {
     }
     pub mod plugin {
         pub mod runtime {
+            // Tonic-generated RPC methods return `tonic::Status`; keep this lint exception
+            // scoped to the generated runtime v1 module.
+            // 中文：tonic 生成的 RPC 使用 `tonic::Status`，此例外仅作用于 runtime v1。
+            #[allow(clippy::result_large_err)]
             pub mod v1 {
                 tonic::include_proto!("cyrene.plugin.runtime.v1");
             }
