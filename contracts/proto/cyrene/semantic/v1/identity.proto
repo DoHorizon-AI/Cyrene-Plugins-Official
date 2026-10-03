@@ -1,0 +1,16 @@
+// ┌─────────────────────────────────────────────────────────────────────┐
+// │  📄 identity.proto                                                  │
+// │  Package: cyrene.semantic.v1                                        │
+// │  Role: Minimal legacy identity projection required by Workspace v1.│
+// │                                                                     │
+// │  协议职责：保留 local.v1 Workspace API 中既有 Identity 字段形状。       │
+// └─────────────────────────────────────────────────────────────────────┘
+// SPDX-License-Identifier: Apache-2.0
+syntax = "proto3";
+
+package cyrene.semantic.v1;
+
+message Identity {
+  string id = 1;
+  uint64 generation = 2;
+}

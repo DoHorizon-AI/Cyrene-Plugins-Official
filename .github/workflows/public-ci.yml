@@ -412,6 +412,8 @@ jobs:
           buf lint
           buf format --diff --exit-code
           buf build
+      - name: Verify shared Workspace contract fingerprints
+        run: bash contracts/check-workspace-contract-digests.sh
 
   rust-native:
     name: public-ci / rust-native

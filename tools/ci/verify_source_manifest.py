@@ -124,7 +124,12 @@ def _is_ignored(relative: str, ignored: set[str]) -> bool:
         中文:返回某个路径是否位于被忽略的未跟踪子树中。
     """
 
-    return any(relative == item or relative.startswith(item + "/") for item in ignored)
+    candidate = relative
+    while candidate:
+        if candidate in ignored:
+            return True
+        candidate = posixpath.dirname(candidate)
+    return False
 
 
 def _walk_payload(

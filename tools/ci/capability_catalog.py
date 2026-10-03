@@ -3,9 +3,11 @@
 
 The index merges four artifact sources:
 
-- contracts/proto/cyrene/**/*.proto: shared payload contracts. Each contract
-  file carries a "Direct plugin invocation identifiers" comment block naming
-  the capability ID, interface versions, and methods.
+- contracts/proto/cyrene/**/*.proto: shared payload contracts. Capability
+  contracts carry a "Direct plugin invocation identifiers" comment block
+  naming the capability ID, interface versions, and methods. The explicitly
+  listed Workspace system/support projections are validated as such and are
+  not treated as plugin capabilities.
 - plugins/**/plugin.manifest.json: published Plugin implementations.
 - contracts/runtime-implementations.json: runtime packages that serve
   capabilities without publishing a Plugin manifest package.
@@ -16,7 +18,7 @@ Run without arguments to rewrite the index; run with --check to fail when the
 committed index drifts from these sources.
 
 中文:生成并校验能力索引 `contracts/capabilities.yaml`。该索引合并四种制品来源:
-- `contracts/proto/cyrene/**/*.proto`:共享负载契约。每个契约文件都包含名为 “Direct plugin invocation identifiers” 的注释块,列出 capability ID、接口版本和方法。
+- `contracts/proto/cyrene/**/*.proto`:共享负载契约。Capability 契约文件包含名为 “Direct plugin invocation identifiers” 的注释块,列出 capability ID、接口版本和方法；明确列出的 Workspace 系统/支持投影会按其类型校验,不会误当成 Plugin capability。
 - `plugins/**/plugin.manifest.json`:已发布的 Plugin 实现。
 - `contracts/runtime-implementations.json`:提供 capability、但没有发布 Plugin manifest package 的 Runtime package。
 - `contracts/tck/*`:按 capability 分目录的 owner-scoped 一致性测试套件(目录名中的连字符会映射为点,例如 message-connector-v1)。
@@ -46,6 +48,48 @@ import validate_manifests
 INDEX_PATH = "contracts/capabilities.yaml"
 PROTO_ROOT = "contracts/proto/cyrene"
 TRANSPORT_PROTO_PREFIX = "contracts/proto/cyrene/plugin/"
+WORKSPACE_SUPPORT_PROTO_DECLARATIONS = {
+    "contracts/proto/cyrene/semantic/v1/identity.proto": (
+        "cyrene.semantic.v1",
+        {"Identity"},
+    ),
+    "contracts/proto/cyrene/workspace/v1/workspace_fabric.proto": (
+        "cyrene.workspace.v1",
+        {"WorkspaceApiRequest", "WorkspaceApiResponse"},
+    ),
+    "contracts/proto/cyrene/workspace/authority/v1/workspace_authority.proto": (
+        "cyrene.workspace.authority.v1",
+        {"WorkspaceAuthorityService"},
+    ),
+    "contracts/proto/cyrene/workspace/authority/v2/workspace_authority.proto": (
+        "cyrene.workspace.authority.v2",
+        {"WorkspaceAuthorityService"},
+    ),
+    "contracts/proto/cyrene/workspace/local/v1/workspace_sidecar.proto": (
+        "cyrene.workspace.local.v1",
+        {"WorkspaceSidecarService"},
+    ),
+    "contracts/proto/cyrene/workspace/local/v2/workspace_sidecar.proto": (
+        "cyrene.workspace.local.v2",
+        {"WorkspaceSidecarService"},
+    ),
+    "contracts/proto/cyrene/workspace/product/v2/product_api.proto": (
+        "cyrene.workspace.product.v2",
+        {"ProductApiInvocationV2", "ProductApiResponseV2"},
+    ),
+    "contracts/proto/cyrene/workspace/bridge/v1/workspace_frontend_bridge.proto": (
+        "cyrene.workspace.bridge.v1",
+        {"WorkspaceFrontendBridgeService"},
+    ),
+    "contracts/proto/cyrene/workspace/relay/v1/workspace_relay.proto": (
+        "cyrene.workspace.relay.v1",
+        {"WorkspaceRelayService"},
+    ),
+    "contracts/proto/cyrene/workspace/tunnel/v1/workspace_tunnel.proto": (
+        "cyrene.workspace.tunnel.v1",
+        {"WorkspaceTunnelService"},
+    ),
+}
 REGISTRY_PATH = "contracts/runtime-implementations.json"
 VERIFICATION_PATH = "contracts/capability-verification.json"
 MANIFEST_GLOB = "plugins/*/*/plugin.manifest.json"
@@ -159,7 +203,11 @@ def _collect_contracts(root: Path) -> dict[str, dict]:
         relative = proto.relative_to(root).as_posix()
         if relative.startswith(TRANSPORT_PROTO_PREFIX):
             continue
-        parsed = _parse_identifiers(proto.read_text(encoding="utf-8"), relative)
+        text = proto.read_text(encoding="utf-8")
+        if relative in WORKSPACE_SUPPORT_PROTO_DECLARATIONS:
+            _validate_workspace_support_proto(text, relative)
+            continue
+        parsed = _parse_identifiers(text, relative)
         if parsed["id"] in contracts:
             raise CatalogError(
                 f"Duplicate proto contract for {parsed['id']}: {relative}"
@@ -171,6 +219,62 @@ def _collect_contracts(root: Path) -> dict[str, dict]:
             "methods": parsed["methods"],
         }
     return contracts
+
+
+def _validate_workspace_support_proto(text: str, path: str) -> None:
+    """Validate an explicitly listed system/support proto outside the capability index.
+
+    Workspace RPC and compatibility projections do not represent plugin
+    capabilities. This check keeps their package and required public declarations
+    explicit while all unlisted protos still require the capability identifier block.
+
+    校验明确列出的 Workspace 系统/支持 proto。它们不表示 Plugin capability，
+    此检查仍固定校验包名与必需公开声明；未列出的 proto 仍必须提供 capability 标识块。
+    """
+
+    expected_package, expected_declarations = WORKSPACE_SUPPORT_PROTO_DECLARATIONS[path]
+    package_match = re.search(r"^package\s+([A-Za-z0-9_.]+)\s*;", text, re.MULTILINE)
+    if package_match is None or package_match.group(1) != expected_package:
+        actual_package = package_match.group(1) if package_match else "<missing>"
+        raise CatalogError(
+            f"{path}: expected package {expected_package}, found {actual_package}"
+        )
+
+    declarations = set(
+        re.findall(
+            r"^(?:service|message)\s+([A-Za-z_][A-Za-z0-9_]*)\b", text, re.MULTILINE
+        )
+    )
+    missing = sorted(expected_declarations - declarations)
+    if missing:
+        raise CatalogError(
+            f"{path}: missing required Workspace support declarations: {', '.join(missing)}"
+        )
+
+    if path == "contracts/proto/cyrene/semantic/v1/identity.proto":
+        identity_match = re.search(
+            r"^message\s+Identity\s*\{([^}]*)\}", text, re.MULTILINE | re.DOTALL
+        )
+        if identity_match is None:
+            raise CatalogError(f"{path}: missing Identity message body")
+        fields: list[tuple[str, str, str]] = []
+        for line in identity_match.group(1).splitlines():
+            declaration = line.split("//", 1)[0].strip()
+            if not declaration:
+                continue
+            field_match = re.fullmatch(
+                r"([A-Za-z_][A-Za-z0-9_.]*)\s+([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(\d+)\s*;",
+                declaration,
+            )
+            if field_match is None:
+                raise CatalogError(
+                    f"{path}: unsupported Identity field declaration: {declaration}"
+                )
+            fields.append(field_match.groups())
+        if fields != [("string", "id", "1"), ("uint64", "generation", "2")]:
+            raise CatalogError(
+                f"{path}: Identity must preserve the Workspace v1 fields id=1 and generation=2"
+            )
 
 
 def _schema_paths(manifest_dir: Path, manifest: dict) -> list[Path]:

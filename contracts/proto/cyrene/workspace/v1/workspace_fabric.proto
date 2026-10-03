@@ -1,0 +1,122 @@
+// ┌─────────────────────────────────────────────────────────────────────┐
+// │  📄 workspace_fabric.proto                                          │
+// │  Package: cyrene.workspace.v1                                       │
+// │  Role: Legacy Workspace API projection retained by local.v1.        │
+// │                                                                     │
+// │  协议职责：仅投影 local.v1 Execute 字段传递图；新调用使用 local.v2。    │
+// └─────────────────────────────────────────────────────────────────────┘
+// SPDX-License-Identifier: Apache-2.0
+syntax = "proto3";
+
+package cyrene.workspace.v1;
+
+import "cyrene/semantic/v1/identity.proto";
+import "cyrene/workspace/product/v2/product_api.proto";
+import "google/rpc/status.proto";
+
+message StartWorkspaceOperationRequest {
+  cyrene.semantic.v1.Identity operation = 1;
+  repeated string input_artifact_uris = 2;
+}
+
+message GetWorkspaceOperationRequest {
+  cyrene.semantic.v1.Identity operation = 1;
+}
+
+enum WorkspaceProductApiOwner {
+  WORKSPACE_PRODUCT_API_OWNER_UNSPECIFIED = 0;
+  WORKSPACE_PRODUCT_API_OWNER_CATALYST = 1;
+  WORKSPACE_PRODUCT_API_OWNER_YIELD = 2;
+  WORKSPACE_PRODUCT_API_OWNER_REACTOR = 3;
+  WORKSPACE_PRODUCT_API_OWNER_EXCHANGE = 4;
+  WORKSPACE_PRODUCT_API_OWNER_ECHO = 5;
+  WORKSPACE_PRODUCT_API_OWNER_NAVIGATOR = 6;
+}
+
+enum WorkspaceProductApiOperation {
+  WORKSPACE_PRODUCT_API_OPERATION_UNSPECIFIED = 0;
+  WORKSPACE_PRODUCT_API_OPERATION_01 = 1;
+  WORKSPACE_PRODUCT_API_OPERATION_02 = 2;
+  WORKSPACE_PRODUCT_API_OPERATION_03 = 3;
+  WORKSPACE_PRODUCT_API_OPERATION_04 = 4;
+  WORKSPACE_PRODUCT_API_OPERATION_05 = 5;
+  WORKSPACE_PRODUCT_API_OPERATION_06 = 6;
+  WORKSPACE_PRODUCT_API_OPERATION_07 = 7;
+  WORKSPACE_PRODUCT_API_OPERATION_08 = 8;
+  WORKSPACE_PRODUCT_API_OPERATION_09 = 9;
+  WORKSPACE_PRODUCT_API_OPERATION_10 = 10;
+  WORKSPACE_PRODUCT_API_OPERATION_11 = 11;
+  WORKSPACE_PRODUCT_API_OPERATION_12 = 12;
+  WORKSPACE_PRODUCT_API_OPERATION_13 = 13;
+}
+
+enum WorkspaceProductApiRequestKind {
+  WORKSPACE_PRODUCT_API_REQUEST_KIND_UNSPECIFIED = 0;
+  WORKSPACE_PRODUCT_API_REQUEST_KIND_READ = 1;
+  WORKSPACE_PRODUCT_API_REQUEST_KIND_COMMAND = 2;
+}
+
+message WorkspaceProductApiRequest {
+  WorkspaceProductApiOwner owner = 1;
+  WorkspaceProductApiOperation operation = 2;
+  WorkspaceProductApiRequestKind kind = 3;
+  string resource_id = 4;
+  bytes json_body = 5;
+  string idempotency_key = 6;
+}
+
+enum WorkspaceProductApiContentType {
+  WORKSPACE_PRODUCT_API_CONTENT_TYPE_UNSPECIFIED = 0;
+  WORKSPACE_PRODUCT_API_CONTENT_TYPE_APPLICATION_JSON = 1;
+  WORKSPACE_PRODUCT_API_CONTENT_TYPE_APPLICATION_PROBLEM_JSON = 2;
+}
+
+message WorkspaceProductApiResponse {
+  uint32 status_code = 1;
+  bytes json_body = 2;
+  WorkspaceProductApiContentType content_type = 3;
+}
+
+message WorkspaceApiRequest {
+  string request_id = 1;
+  string workspace_id = 2;
+  string traceparent = 3;
+  oneof request {
+    StartWorkspaceOperationRequest start_operation = 10;
+    GetWorkspaceOperationRequest get_operation = 11;
+    WorkspaceProductApiRequest product_api = 12;
+    cyrene.workspace.product.v2.ProductApiInvocationV2 product_api_v2 = 13;
+  }
+}
+
+enum WorkspaceOperationState {
+  WORKSPACE_OPERATION_STATE_UNSPECIFIED = 0;
+  WORKSPACE_OPERATION_STATE_PENDING = 1;
+  WORKSPACE_OPERATION_STATE_SCHEDULED = 2;
+  WORKSPACE_OPERATION_STATE_RUNNING = 3;
+  WORKSPACE_OPERATION_STATE_SUCCEEDED = 4;
+  WORKSPACE_OPERATION_STATE_FAILED = 5;
+  WORKSPACE_OPERATION_STATE_LOST = 6;
+}
+
+message WorkspaceOperationView {
+  cyrene.semantic.v1.Identity operation = 1;
+  WorkspaceOperationState state = 2;
+  uint64 completed_units = 3;
+  uint64 total_units = 4;
+  string unit = 5;
+  repeated string artifact_uris = 6;
+  repeated string resource_references = 7;
+  string status_reason = 8;
+  string authority_instance_id = 9;
+}
+
+message WorkspaceApiResponse {
+  string request_id = 1;
+  oneof outcome {
+    WorkspaceOperationView operation = 10;
+    google.rpc.Status error = 11;
+    WorkspaceProductApiResponse product_api = 12;
+    cyrene.workspace.product.v2.ProductApiResponseV2 product_api_v2 = 13;
+  }
+}

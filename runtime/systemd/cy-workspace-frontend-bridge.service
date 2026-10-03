@@ -1,0 +1,26 @@
+[Unit]
+Description=Cyrene Workspace Frontend Bridge
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=cyrene
+Group=cyrene
+EnvironmentFile=/etc/cyrene/workspace-frontend-bridge.env
+ExecStart=/usr/lib/cyrene/components/cyrene-workspace-frontend-bridge
+Restart=on-failure
+RestartSec=2s
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/cyrene-frontend-bridge
+RuntimeDirectory=cyrene-frontend-bridge
+RuntimeDirectoryMode=0700
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+CapabilityBoundingSet=
+
+[Install]
+WantedBy=multi-user.target
