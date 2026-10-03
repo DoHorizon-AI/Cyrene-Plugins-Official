@@ -2756,22 +2756,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.lock",
-      "sha256": "1e87088f706f3110c96c8a6a0f4d062679188638450bf803051304eb1071cd06",
-      "size_bytes": 38088
+      "sha256": "3161d3977bdba887c7348bcd4842565b6305cdcf926671129b685443b37dbfd9",
+      "size_bytes": 39777
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.toml",
-      "sha256": "946adee0d15f9119d52af13a99eca39d37e3237b7095d1e773e2756057d86785",
+      "sha256": "a368cbe71aad03bf5c39a154a3ada6a324507ac8f6d1cc6f9c84e7c432a6cc2a",
       "size_bytes": 984
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/build.rs",
-      "sha256": "1c9fec1b143d27268b51de38f5aea4b5f3d605846c9eab3c1ca45aac48262d0a",
-      "size_bytes": 721
+      "sha256": "9d3f404c77c781e8edb150cc7c334c2d784ace413e8d8dbefc0ce8d4823ffe61",
+      "size_bytes": 728
     },
     {
       "kind": "file",
