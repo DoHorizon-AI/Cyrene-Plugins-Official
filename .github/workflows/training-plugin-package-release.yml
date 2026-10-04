@@ -38,14 +38,19 @@ jobs:
     name: build and verify training.llama-factory.v1 package
     runs-on: ubuntu-22.04
     timeout-minutes: 20
-    env:
-      PUBLISH_DIR: ${{ runner.temp }}/training-plugin-release-build
     steps:
       - name: Check out the exact source commit
         uses: actions/checkout@v5
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
+
+      - name: Initialize package release staging directory
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/training-plugin-release-build"
+          mkdir -p "$PUBLISH_DIR"
+          echo "PUBLISH_DIR=$PUBLISH_DIR" >> "$GITHUB_ENV"
 
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
@@ -77,7 +82,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: training-plugin-release-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ env.PUBLISH_DIR }}/*
+          path: ${{ runner.temp }}/training-plugin-release-build/*
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
@@ -88,8 +93,6 @@ jobs:
     needs: [build-and-verify]
     runs-on: ubuntu-22.04
     timeout-minutes: 20
-    env:
-      PUBLISH_DIR: ${{ runner.temp }}/training-plugin-release
     permissions:
       contents: write
       attestations: write
@@ -101,6 +104,13 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
+      - name: Initialize package release staging directory
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/training-plugin-release"
+          mkdir -p "$PUBLISH_DIR"
+          echo "PUBLISH_DIR=$PUBLISH_DIR" >> "$GITHUB_ENV"
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v6
         with:
@@ -110,7 +120,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: training-plugin-release-${{ github.sha }}-${{ github.run_id }}
-          path: ${{ env.PUBLISH_DIR }}
+          path: ${{ runner.temp }}/training-plugin-release
 
       - name: Verify source, target, Package Spec, lock, and payload digests
         run: |
