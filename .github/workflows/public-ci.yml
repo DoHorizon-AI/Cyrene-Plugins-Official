@@ -95,7 +95,7 @@ jobs:
           compression-level: 0
       - name: Install Python runtime test dependencies
         run: |
-          python3 -m pip install --disable-pip-version-check pytest ruff jsonschema==4.23.0
+          python3 -m pip install --disable-pip-version-check pytest ruff jsonschema==4.23.0 PyYAML
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_plugin_runtime \
@@ -160,7 +160,9 @@ jobs:
             plugins/serving/vllm-runtime/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests \
-            plugins/training/llama-factory/tests
+            plugins/training/llama-factory/tests \
+            tests/store/test_catalog.py \
+            tests/store/test_cli.py
       - name: Verify Python/native behavior matrix
         run: python3 plugins/connectors/im/tools/verify_behavior_matrix.py
 
