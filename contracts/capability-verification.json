@@ -269,6 +269,21 @@
       ]
     },
     {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.connectors.wecom",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-10-04",
+          "environment": "linux / python 3.12 / real wecom-cli 1.3.4 binary and scripted tool provider tests",
+          "command": "python3 -m pytest -q plugins/connectors/wecom/tests",
+          "result": "36 passed; list_tools, call_tool, auth status probe, schema discovery, contact search, calendar list/create, todo list/create/finish, and live smoke test verified",
+          "notes": "Wraps official @wecom/cli with structured JSON parsing and tool provider protocol dispatch."
+        }
+      ]
+    },
+    {
       "capability": "message.connector.v1",
       "implementation": "cyrene.connectors.im",
       "verification_level": "IMPLEMENTATION_VERIFIED",

@@ -1,15 +1,36 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.cyrene.io/message.connector.v1.wecom/configuration.schema.json",
-  "title": "wecom.app connector activation configuration",
+  "title": "wecom connector activation configuration",
   "type": "object",
-  "required": ["corp_id", "corp_secret", "agent_id"],
   "properties": {
     "binding_id": {"type": "string", "minLength": 1},
+    "mode": {
+      "type": "string",
+      "enum": ["app", "bot", "hybrid"],
+      "default": "app"
+    },
     "corp_id": {"type": "string", "minLength": 1},
     "corp_secret": {"type": "string", "minLength": 1},
     "agent_id": {"type": "integer", "minimum": 1},
-    "base_url": {"type": "string", "pattern": "^https://"},
+    "base_url": {"type": "string", "pattern": "^https?://"},
+    "bot_id": {"type": "string", "minLength": 1},
+    "bot_secret": {"type": "string", "minLength": 1},
+    "websocket_url": {"type": "string", "pattern": "^wss?://"},
+    "home_channel": {"type": "string"},
+    "allowed_users": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "cli": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "executable_path": {"type": "string"},
+        "config_dir": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
     "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
     "token_refresh_skew_seconds": {"type": "number", "minimum": 0}
   },

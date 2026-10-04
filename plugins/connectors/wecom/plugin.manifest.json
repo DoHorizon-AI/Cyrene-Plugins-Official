@@ -1,12 +1,13 @@
 {
   "schemaVersion": 1,
   "id": "cyrene.connectors.wecom",
-  "name": "Official WeCom Application Connector",
-  "version": "0.1.0",
-  "description": "WeCom application-message connector implementing message.connector.v1 send_message with access-token caching and deterministic delivery status mapping.",
+  "name": "Official WeCom Unified Connector",
+  "version": "0.2.0",
+  "description": "WeCom unified message and tools connector implementing message.connector.v1 (application and OpenWS bot WebSocket) and tool.provider.v1 (@wecom/cli tools).",
   "kind": "capability-plugin",
   "capabilities": [
-    "message.connector.v1"
+    "message.connector.v1",
+    "tool.provider.v1"
   ],
   "supportedServices": [
     "Cyrene-Exchange",
@@ -14,7 +15,20 @@
   ],
   "methods": [
     {
+      "capability": "message.connector.v1",
       "name": "send_message",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "capability": "tool.provider.v1",
+      "name": "list_tools",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "capability": "tool.provider.v1",
+      "name": "call_tool",
       "interfaceVersion": "1",
       "executionMode": "service"
     }
@@ -41,8 +55,9 @@
     "schemaRef": "configuration.schema.json"
   },
   "secrets": {
-    "requiredSecretRefs": [
-      "WECOM_CORP_SECRET"
+    "optionalSecretRefs": [
+      "WECOM_CORP_SECRET",
+      "WECOM_BOT_SECRET"
     ]
   },
   "state": {
