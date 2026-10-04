@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import select
@@ -16,10 +17,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-import package_service_adapter as adapter
-
 TOKEN = "adapter-test-serving-token-0123456789"
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
+adapter = importlib.import_module("package_service_adapter")
 
 
 def _model_directory(root: Path) -> Path:

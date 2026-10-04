@@ -1713,8 +1713,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/tests/test_package_service_adapter.py",
-      "sha256": "d5dca3cc2abb5ca06dcb5dd656f648699081c410f8838bc4a2281ec4fb4bb243",
-      "size_bytes": 10246
+      "sha256": "f8e76574a8fdabee0693592e289162085f611644199efbfc0d857a04357df3d7",
+      "size_bytes": 10361
     },
     {
       "kind": "file",
