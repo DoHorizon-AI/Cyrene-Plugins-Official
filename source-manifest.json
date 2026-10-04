@@ -845,8 +845,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "manifests/plugin.manifest.schema.json",
-      "sha256": "f4f92fff7d871f44b1186f48ea66266df02b67e4634fed595a8519e2a7178eb6",
-      "size_bytes": 12091
+      "sha256": "981082daa9af398fb5e416de3ccf38980476593a9efc37a3aaea8189140c56db",
+      "size_bytes": 12557
     },
     {
       "kind": "file",
@@ -929,8 +929,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/plugin.manifest.json",
-      "sha256": "0b4da7546a2aacc146a2a723dd7fec1e69447cf0a3400c320e60f0b6ea0022b6",
-      "size_bytes": 27112
+      "sha256": "bf28607e3c04df923430b392fd9397a175184b9c54337680525ab488cf50bea8",
+      "size_bytes": 27188
     },
     {
       "kind": "file",
@@ -1132,8 +1132,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/onebot-v11/plugin.manifest.json",
-      "sha256": "71f7247c9b9106bb443177fcd4a9a4a0676d1aa810fb7c520d9c1c14c92a8480",
-      "size_bytes": 3865
+      "sha256": "f4f96c2edaed331e5fa57f4c0ee0e8f0dfa227f4a9b26169b9f95860d10da2fd",
+      "size_bytes": 3941
     },
     {
       "kind": "file",
@@ -1328,8 +1328,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/plugin.manifest.json",
-      "sha256": "9777664cbb4d780029815a0360377e3f7a5e548c79cfc22ef37649bf5498c648",
-      "size_bytes": 1254
+      "sha256": "16247935547f827706f6593790d64fdafe494e32efda52fc7e1d14c17ec5089a",
+      "size_bytes": 1330
     },
     {
       "kind": "file",
@@ -1405,8 +1405,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/evaluator-pack/plugin.manifest.json",
-      "sha256": "cff265b365dd336213be3fa7e0ee61bd61338f8d9296e50ad8ed33c6d6d56e24",
-      "size_bytes": 1322
+      "sha256": "3bc5b1d8f8c02526dbbc96f7acdfeef04c3e9bfec29ad837fbc62e929eef5cd4",
+      "size_bytes": 1370
     },
     {
       "kind": "file",
@@ -1447,8 +1447,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/exact-match/plugin.manifest.json",
-      "sha256": "c3822e150e19b5e8f59c98f5dbbbe554f6aa5981b7046182a45474bb85ad542b",
-      "size_bytes": 1280
+      "sha256": "67396b0d41006e9140cfe60036b91cb6e46670acac233ca37b88f0f7c7db65b5",
+      "size_bytes": 1328
     },
     {
       "kind": "file",
@@ -1489,8 +1489,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/llm-judge/plugin.manifest.json",
-      "sha256": "7e62ef5e5b5f7abb7432da535830a0c0d8205260fd43f5675285b3a22e4c7084",
-      "size_bytes": 1287
+      "sha256": "580db0e5d04a638620fd32535a7829d0fedd195792326629558e8f1167a89095",
+      "size_bytes": 1335
     },
     {
       "kind": "file",
@@ -1531,8 +1531,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/models/hf-model-analyzer/plugin.manifest.json",
-      "sha256": "9ecac2df193547d638b7de370cfa55af25f0dae853a757b2755510b9afbb7294",
-      "size_bytes": 1866
+      "sha256": "91fc1aee6e6728d1be66556e87bbe9a7f92fba97d69560524c60ad0bf6620870",
+      "size_bytes": 1937
     },
     {
       "kind": "file",
@@ -1566,8 +1566,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/policy/compat-rules/plugin.manifest.json",
-      "sha256": "b55d597072c943e807370a7db039d7d9cda7f79a5f87855025af1dd36d3125bf",
-      "size_bytes": 1238
+      "sha256": "0093f94e7a9ed39fdb6a7862620954d0c5de9206ad7d96faf38652eef6c46537",
+      "size_bytes": 1309
     },
     {
       "kind": "file",
@@ -1594,8 +1594,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/plugin.manifest.json",
-      "sha256": "dfff86f742dbbf4032abd0b06e2208910febfdd36b08ee11bedceb0bb7460353",
-      "size_bytes": 1404
+      "sha256": "82564aa0372c44f408645b868e2f6368648b36ebe18c5db9fa4c68e447c3bd3e",
+      "size_bytes": 1480
     },
     {
       "kind": "file",
@@ -1678,8 +1678,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/plugin.manifest.json",
-      "sha256": "3b5a6f3a3d76c86801c043bd002f70174f8f48b87de412536f92a3e472406069",
-      "size_bytes": 3954
+      "sha256": "7e391b6a71ae75bc316ccb54a643f12bc702fce4424bfc378a42193d8da416e2",
+      "size_bytes": 4005
     },
     {
       "kind": "file",
@@ -1713,8 +1713,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/computer-runtime/plugin.manifest.json",
-      "sha256": "505fb457cbabb2d796ee774f674e7cd93d74b76466f90b2a4adf5c8c06d309b3",
-      "size_bytes": 1680
+      "sha256": "ac6ae7d6979470042026c8e267baa0d596b2af88a3ced3487d5a7cc38d74076f",
+      "size_bytes": 1733
     },
     {
       "kind": "file",
@@ -1741,8 +1741,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/plugin.manifest.json",
-      "sha256": "e0a66e41cb657ce2a69827af8be470fd39275bdf47ab4c9dd1b10b62104bf649",
-      "size_bytes": 1764
+      "sha256": "8f475ec36feaa7cfd70798f0ff58bb654c50cf2e2a2c24e63edad403b1a345dc",
+      "size_bytes": 1816
     },
     {
       "kind": "file",
@@ -1783,8 +1783,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/plugin.manifest.json",
-      "sha256": "f40b44a6da75616443da13cdaa8caf1960a289d3abe01f95a1786b04027bf97e",
-      "size_bytes": 3053
+      "sha256": "2afadccf27a35e096423e197744d5a7c3b2af74391e044927bac8cc1dc0c2bc4",
+      "size_bytes": 3105
     },
     {
       "kind": "file",
@@ -1832,8 +1832,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/plugin.manifest.json",
-      "sha256": "0d1bcc2109d8f5909c4afd606795b6071da0b68523fc3ace5615535a6c202fb3",
-      "size_bytes": 4213
+      "sha256": "2d584706fd4a8b802996f0bca941c3f1f3483dec534450ca0ed76d0f7ec9ca1a",
+      "size_bytes": 4262
     },
     {
       "kind": "file",
@@ -4919,15 +4919,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "ff0c68768725bb258a7bd6befeac0bf8533d93e66d6312ee1e4021b718753b47",
-      "size_bytes": 11257
+      "sha256": "12da8ec2919726166d16b3709540677152f764dd0c1954c5070209dad4ef856a",
+      "size_bytes": 13673
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "95c18d9629ec7ad61e08dd6957ad6b18b053e9207d24ff6c8cda1925bef860b4",
-      "size_bytes": 22299
+      "sha256": "21dd82676b7f3f63907b304fe251de7a66e723254252771c658a764726da433f",
+      "size_bytes": 23726
     },
     {
       "kind": "file",
@@ -5115,15 +5115,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/store/catalog.py",
-      "sha256": "b83d75c907e72972ef25e86384c1956efbe3c1cb02fa748870045bcab906d6a7",
-      "size_bytes": 15470
+      "sha256": "9de89154e82d4009ce2c1bcb404a14ad7ae11c57113eeaf31b0390c27cc05ed9",
+      "size_bytes": 17662
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tools/store/cli.py",
-      "sha256": "3b96b0912cc309960b4c103c8cab2820d92ed8b639b73cfbd6ea705e7ede7230",
-      "size_bytes": 29994
+      "sha256": "c056afc35032942c1135ba87e6c06d41c3ac1553ceee0e49365c62b08eb430f0",
+      "size_bytes": 30493
     },
     {
       "kind": "file",
