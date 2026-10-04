@@ -8,6 +8,10 @@
   "capabilities": [
     "message.connector.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Exchange",
+    "Cyrene-Navigator"
+  ],
   "methods": [
     {
       "name": "send_message",

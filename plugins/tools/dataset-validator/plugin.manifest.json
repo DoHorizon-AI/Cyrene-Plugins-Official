@@ -8,6 +8,9 @@
   "capabilities": [
     "tool.dataset.validator.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Catalyst"
+  ],
   "methods": [
     {
       "name": "validate",

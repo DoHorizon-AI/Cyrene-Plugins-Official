@@ -8,6 +8,10 @@
   "capabilities": [
     "compatibility.evaluator.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Reactor",
+    "Cyrene-Yield"
+  ],
   "methods": [
     {
       "name": "evaluate",

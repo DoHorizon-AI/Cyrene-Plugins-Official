@@ -8,6 +8,9 @@
   "capabilities": [
     "evaluation.runner.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Echo"
+  ],
   "methods": [
     {
       "name": "evaluate",

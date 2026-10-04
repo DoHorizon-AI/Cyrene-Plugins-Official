@@ -8,6 +8,9 @@
   "capabilities": [
     "training.llama-factory.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Yield"
+  ],
   "methods": [
     {
       "name": "inspect",

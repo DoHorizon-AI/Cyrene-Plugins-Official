@@ -8,6 +8,9 @@
   "capabilities": [
     "computer.runtime.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Navigator"
+  ],
   "methods": [
     {
       "name": "ExecuteCommand",

@@ -244,6 +244,23 @@
         "type": "string"
       }
     },
+    "supportedServices": {
+      "type": "array",
+      "description": "Official Cyrene services that default-support installing and executing this plugin.",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Cyrene-Exchange",
+          "Cyrene-Navigator",
+          "Cyrene-Reactor",
+          "Cyrene-Yield",
+          "Cyrene-Echo",
+          "Cyrene-Catalyst",
+          "Cyrene-Platform"
+        ]
+      },
+      "uniqueItems": true
+    },
     "contributions": {
       "type": "object",
       "description": "Optional studio, tool, and observability contributions provided by this plugin.",

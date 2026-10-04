@@ -109,6 +109,7 @@ def handle_catalog_list(args: argparse.Namespace) -> int:
     try:
         plugins_list = catalog.list_plugins(
             profile=args.profile,
+            service=getattr(args, "service", None),
             language=args.language,
             keyword=args.keyword,
         )
@@ -126,15 +127,15 @@ def handle_catalog_list(args: argparse.Namespace) -> int:
 
     # Display human-readable table
     print(f"\nCyrene Plugin Catalog ({len(plugins_list)} plugins):")
-    print(f"{'ID':<38} {'VERSION':<10} {'LANGUAGE':<10} {'KIND':<18} {'CAPABILITIES'}")
-    print("-" * 105)
+    print(f"{'ID':<38} {'VERSION':<10} {'LANGUAGE':<10} {'SERVICES':<36} {'CAPABILITIES'}")
+    print("-" * 120)
     for p in plugins_list:
         p_id = p.get("id", "")
         p_ver = p.get("version", "")
         p_lang = p.get("language", "")
-        p_kind = p.get("kind", "")
+        services = ", ".join(p.get("supportedServices", []) or p.get("supported_services", []))
         caps = ", ".join(p.get("capabilities", []))
-        print(f"{p_id:<38} {p_ver:<10} {p_lang:<10} {p_kind:<18} {caps}")
+        print(f"{p_id:<38} {p_ver:<10} {p_lang:<10} {services:<36} {caps}")
     print()
     return 0
 
@@ -165,6 +166,8 @@ def handle_catalog_show(args: argparse.Namespace) -> int:
     print(f"  Kind:         {plugin_info.get('kind')}")
     print(f"  Language:     {plugin_info.get('language')}")
     print(f"  Description:  {plugin_info.get('description')}")
+    services = ", ".join(plugin_info.get("supportedServices", []) or plugin_info.get("supported_services", []))
+    print(f"  Supported Services: {services}")
     print(f"  Capabilities: {', '.join(plugin_info.get('capabilities', []))}")
     print(f"  Profiles:     {', '.join(plugin_info.get('profiles', []))}")
     if plugin_info.get("runtime"):
@@ -582,6 +585,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Filter plugins by service profile name (e.g. reactor, echo, yield, catalyst, core, all)",
+    )
+    cat_list.add_argument(
+        "--service",
+        "-s",
+        type=str,
+        default=None,
+        help="Filter plugins by official service name (e.g. Cyrene-Navigator, Cyrene-Exchange, Cyrene-Reactor)",
     )
     cat_list.add_argument(
         "--language",

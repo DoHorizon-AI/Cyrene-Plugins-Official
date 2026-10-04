@@ -69,6 +69,7 @@ class TestParserAndHelp:
         args = parser.parse_args([
             "catalog", "list",
             "--profile", "reactor",
+            "--service", "Cyrene-Navigator",
             "--language", "python",
             "--keyword", "vllm",
             "--json",
@@ -76,6 +77,7 @@ class TestParserAndHelp:
         assert args.subcommand == "catalog"
         assert args.catalog_subcommand == "list"
         assert args.profile == "reactor"
+        assert args.service == "Cyrene-Navigator"
         assert args.language == "python"
         assert args.keyword == "vllm"
         assert args.json is True
@@ -206,6 +208,27 @@ class TestCatalogCliExecution:
         assert "cyrene.tools.dataset-preparation" in captured.out
         assert "cyrene.tools.dataset-validator" in captured.out
 
+    def test_catalog_list_service_filter(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test `catalog list --service Cyrene-Navigator` filters to 5 plugins."""
+        rc = main(["catalog", "list", "--service", "Cyrene-Navigator"])
+        assert rc == 0
+        captured = capsys.readouterr()
+        assert "Cyrene Plugin Catalog (5 plugins):" in captured.out
+        assert "cyrene.connectors.im" in captured.out
+        assert "cyrene.connectors.onebot-v11" in captured.out
+        assert "cyrene.connectors.wecom" in captured.out
+        assert "cyrene.providers.model-api-connector" in captured.out
+        assert "cyrene.tools.computer-runtime" in captured.out
+
+        # Short flag -s with Cyrene-Echo
+        rc_echo = main(["catalog", "list", "-s", "Cyrene-Echo"])
+        assert rc_echo == 0
+        captured_echo = capsys.readouterr()
+        assert "Cyrene Plugin Catalog (3 plugins):" in captured_echo.out
+        assert "cyrene.evaluation.evaluator-pack" in captured_echo.out
+        assert "cyrene.evaluation.exact-match" in captured_echo.out
+        assert "cyrene.evaluation.llm-judge" in captured_echo.out
+
     def test_catalog_list_json_format(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test `catalog list --json` outputs valid JSON array."""
         rc = main(["catalog", "list", "--json"])
@@ -225,6 +248,7 @@ class TestCatalogCliExecution:
         assert "Plugin Information: cyrene.connectors.im" in captured.out
         assert "Official QQ/IM Connector" in captured.out
         assert "Language:     csharp" in captured.out
+        assert "Supported Services: Cyrene-Exchange, Cyrene-Navigator" in captured.out
 
     def test_catalog_show_json_format(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test `catalog show <id> --json` outputs valid JSON plugin dictionary."""
@@ -235,6 +259,8 @@ class TestCatalogCliExecution:
         assert data["id"] == "cyrene.training.llama-factory"
         assert "capabilities" in data
         assert "profiles" in data
+        assert "supportedServices" in data
+        assert data["supportedServices"] == ["Cyrene-Yield"]
 
     def test_catalog_show_nonexistent(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test `catalog show <invalid_id>` returns exit code 1 with error."""

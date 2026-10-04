@@ -8,6 +8,10 @@
   "capabilities": [
     "model.provider.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Exchange",
+    "Cyrene-Navigator"
+  ],
   "methods": [
     {
       "name": "chat_completion",

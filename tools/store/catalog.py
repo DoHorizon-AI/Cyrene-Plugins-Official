@@ -29,6 +29,16 @@ SCHEMA_VERSION = "cyrene.plugins.catalog.v1"
 DEFAULT_CATALOG_REL_PATH = Path("dist/plugins/plugins-catalog.json")
 MANIFEST_GLOB_PATTERN = "plugins/*/*/plugin.manifest.json"
 
+CANONICAL_SERVICES: tuple[str, ...] = (
+    "Cyrene-Exchange",
+    "Cyrene-Navigator",
+    "Cyrene-Reactor",
+    "Cyrene-Yield",
+    "Cyrene-Echo",
+    "Cyrene-Catalyst",
+    "Cyrene-Platform",
+)
+
 LANGUAGE_CANONICAL_MAP = {
     "python": "python",
     "py": "python",
@@ -144,6 +154,8 @@ def parse_plugin_manifest(
         rel_path = str(manifest_path.parent)
         rel_manifest = str(manifest_path)
 
+    supported_services = list(data.get("supportedServices", []))
+
     metadata: dict[str, Any] = {
         "id": plugin_id,
         "name": data.get("name", ""),
@@ -152,6 +164,8 @@ def parse_plugin_manifest(
         "language": language,
         "kind": data.get("kind", "capability-plugin"),
         "capabilities": list(data.get("capabilities", [])),
+        "supportedServices": supported_services,
+        "supported_services": supported_services,
         "profiles": sorted(associated_profiles),
         "runtime": runtime,
         "contributions": contributions,
@@ -214,6 +228,14 @@ def build_catalog(
     # Sort plugins by ID for deterministic output
     plugins.sort(key=lambda x: x["id"])
 
+    # Build by_service index
+    by_service: dict[str, list[str]] = {s: [] for s in CANONICAL_SERVICES}
+    for p in plugins:
+        for s in p.get("supportedServices", []):
+            by_service.setdefault(s, []).append(p["id"])
+    for s in by_service:
+        by_service[s] = sorted(set(by_service[s]))
+
     iso_timestamp = datetime.now(timezone.utc).isoformat()
     catalog: dict[str, Any] = {
         "schemaVersion": SCHEMA_VERSION,
@@ -223,6 +245,10 @@ def build_catalog(
         "totalPlugins": len(plugins),
         "total_plugins": len(plugins),
         "profiles": profiles_dict,
+        "indexes": {
+            "by_service": by_service,
+        },
+        "by_service": by_service,
         "plugins": plugins,
     }
 
@@ -259,20 +285,22 @@ def load_catalog(
 
 def list_plugins(
     profile: str | None = None,
+    service: str | None = None,
     language: str | None = None,
     keyword: str | None = None,
     catalog_path: str | Path | None = None,
     catalog: dict[str, Any] | None = None,
     root_dir: str | Path | None = None,
 ) -> list[dict[str, Any]]:
-    """Filter and query plugins by profile, language, or search keyword.
+    """Filter and query plugins by profile, service, language, or search keyword.
 
     Parameters:
     - profile: Filter by service profile name (e.g. 'reactor', 'echo', 'yield')
+    - service: Filter by official service name (e.g. 'Cyrene-Navigator', 'Cyrene-Exchange', or short 'navigator')
     - language: Filter by language (e.g. 'python', 'rust', 'csharp')
     - keyword: Substring search across id, name, description, capabilities, kind
 
-    中文: 根据服务画像、编程语言或关键词过滤检索插件列表。
+    中文: 根据服务画像、官方服务名、编程语言或关键词过滤检索插件列表。
     """
     if catalog is None:
         catalog = load_catalog(catalog_path=catalog_path, root_dir=root_dir)
@@ -285,6 +313,19 @@ def list_plugins(
             item
             for item in items
             if any(p.lower() == p_target for p in item.get("profiles", []))
+        ]
+
+    if service is not None:
+        s_target = service.strip().lower()
+
+        def _match_service(s_item: str) -> bool:
+            s_clean = s_item.strip().lower()
+            return s_clean == s_target or s_clean.removeprefix("cyrene-") == s_target
+
+        items = [
+            item
+            for item in items
+            if any(_match_service(s) for s in (item.get("supportedServices") or item.get("supported_services") or []))
         ]
 
     if language is not None:
@@ -354,6 +395,24 @@ def get_profile_plugins(
     )
 
 
+def get_service_plugins(
+    service_name: str,
+    catalog_path: str | Path | None = None,
+    catalog: dict[str, Any] | None = None,
+    root_dir: str | Path | None = None,
+) -> list[dict[str, Any]]:
+    """Return all plugins associated with the given official service name.
+
+    中文: 查询指定官方服务支持的所有插件元数据对象列表。
+    """
+    return list_plugins(
+        service=service_name,
+        catalog_path=catalog_path,
+        catalog=catalog,
+        root_dir=root_dir,
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entrypoint for catalog build, inspect, and query.
 
@@ -370,6 +429,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--build", action="store_true", help="Build unified catalog and write to output")
     parser.add_argument("--list", action="store_true", help="List plugins in table format")
     parser.add_argument("--profile", type=str, help="Filter by service profile (e.g. reactor, echo)")
+    parser.add_argument(
+        "--service",
+        "-s",
+        type=str,
+        help="Filter by official service (e.g. Cyrene-Navigator, Cyrene-Reactor, Cyrene-Exchange)",
+    )
     parser.add_argument("--language", type=str, help="Filter by language (e.g. python, rust, csharp)")
     parser.add_argument("--keyword", type=str, help="Search keyword in ID, name, description, capabilities")
     parser.add_argument("--get", type=str, help="Lookup plugin by ID")
@@ -392,9 +457,10 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(item, indent=2, ensure_ascii=False))
         return 0
 
-    if args.list or args.profile or args.language or args.keyword:
+    if args.list or args.profile or args.service or args.language or args.keyword:
         plugins = list_plugins(
             profile=args.profile,
+            service=args.service,
             language=args.language,
             keyword=args.keyword,
             root_dir=root,
@@ -404,11 +470,11 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         print(f"\nFound {len(plugins)} plugins:")
-        print(f"{'ID':<38} {'Version':<9} {'Language':<9} {'Kind':<20} {'Profiles'}")
-        print("-" * 100)
+        print(f"{'ID':<38} {'Version':<9} {'Language':<9} {'Kind':<20} {'Services'}")
+        print("-" * 115)
         for p in plugins:
-            profiles_str = ", ".join(p.get("profiles", []))
-            print(f"{p['id']:<38} {p['version']:<9} {p['language']:<9} {p['kind']:<20} {profiles_str}")
+            services_str = ", ".join(p.get("supportedServices", []) or p.get("supported_services", []))
+            print(f"{p['id']:<38} {p['version']:<9} {p['language']:<9} {p['kind']:<20} {services_str}")
         return 0
 
     # Default: build in-memory and print summary

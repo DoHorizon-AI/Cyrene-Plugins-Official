@@ -16,11 +16,13 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tools.store.catalog import (
+    CANONICAL_SERVICES,
     SCHEMA_VERSION,
     build_catalog,
     discover_plugin_manifests,
     get_plugin,
     get_profile_plugins,
+    get_service_plugins,
     list_plugins,
     load_catalog,
     parse_plugin_manifest,
@@ -42,6 +44,7 @@ class PluginCatalogTest(unittest.TestCase):
         "language",
         "kind",
         "capabilities",
+        "supportedServices",
         "profiles",
         "runtime",
         "contributions",
@@ -264,6 +267,51 @@ class PluginCatalogTest(unittest.TestCase):
         for p in reactor_python:
             self.assertEqual(p["language"], "python")
             self.assertIn("reactor", p["profiles"])
+
+    def test_supported_services_indexing_and_filtering(self) -> None:
+        """6. Test supportedServices metadata extraction, by_service index, and service query filtering."""
+        # 1. Verify by_service index in catalog
+        self.assertIn("indexes", self.catalog)
+        self.assertIn("by_service", self.catalog["indexes"])
+        by_service = self.catalog["indexes"]["by_service"]
+
+        for s in CANONICAL_SERVICES:
+            self.assertIn(s, by_service)
+
+        # 2. Check canonical counts per service
+        self.assertEqual(len(by_service["Cyrene-Navigator"]), 5)
+        self.assertEqual(len(by_service["Cyrene-Echo"]), 3)
+        self.assertEqual(len(by_service["Cyrene-Reactor"]), 3)
+        self.assertEqual(len(by_service["Cyrene-Yield"]), 3)
+        self.assertEqual(len(by_service["Cyrene-Exchange"]), 4)
+        self.assertEqual(len(by_service["Cyrene-Catalyst"]), 2)
+        self.assertEqual(len(by_service["Cyrene-Platform"]), 0)
+
+        # 3. Check specific plugins under Cyrene-Navigator
+        navigator_plugins = list_plugins(service="Cyrene-Navigator", catalog=self.catalog)
+        self.assertEqual(len(navigator_plugins), 5)
+        navigator_ids = {p["id"] for p in navigator_plugins}
+        expected_navigator_ids = {
+            "cyrene.connectors.im",
+            "cyrene.connectors.onebot-v11",
+            "cyrene.connectors.wecom",
+            "cyrene.providers.model-api-connector",
+            "cyrene.tools.computer-runtime",
+        }
+        self.assertEqual(navigator_ids, expected_navigator_ids)
+
+        # Parity with get_service_plugins
+        api_navigator = get_service_plugins("Cyrene-Navigator", catalog=self.catalog)
+        self.assertEqual({p["id"] for p in api_navigator}, expected_navigator_ids)
+
+        # 4. Check case-insensitivity and prefix stripping
+        self.assertEqual(len(list_plugins(service="cyrene-navigator", catalog=self.catalog)), 5)
+        self.assertEqual(len(list_plugins(service="navigator", catalog=self.catalog)), 5)
+        self.assertEqual(len(list_plugins(service="echo", catalog=self.catalog)), 3)
+        self.assertEqual(len(list_plugins(service="CYRENE-ECHO", catalog=self.catalog)), 3)
+
+        # 5. Non-existent service returns empty list
+        self.assertEqual(len(list_plugins(service="unknown-service", catalog=self.catalog)), 0)
 
 
 if __name__ == "__main__":

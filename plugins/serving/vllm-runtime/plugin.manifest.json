@@ -8,6 +8,9 @@
   "capabilities": [
     "execution.engine.v1"
   ],
+  "supportedServices": [
+    "Cyrene-Reactor"
+  ],
   "methods": [
     {
       "name": "import_model",
