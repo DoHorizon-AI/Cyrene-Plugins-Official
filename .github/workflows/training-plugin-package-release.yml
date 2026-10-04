@@ -1,0 +1,225 @@
+name: training Plugin immutable package release
+
+on:
+  push:
+    branches: [develop, main, release]
+    paths:
+      - "LICENSE"
+      - "plugins/training/llama-factory/**"
+      - "sdk/python/cyrene_plugin_runtime/**"
+      - "tooling/release/**"
+      - "tests/release/test_training_llama_factory_package.py"
+      - ".github/workflows/training-plugin-package-release.yml"
+  pull_request:
+    branches: [develop, main, release]
+    paths:
+      - "LICENSE"
+      - "plugins/training/llama-factory/**"
+      - "sdk/python/cyrene_plugin_runtime/**"
+      - "tooling/release/**"
+      - "tests/release/test_training_llama_factory_package.py"
+      - ".github/workflows/training-plugin-package-release.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: training-plugin-package-release-${{ github.repository }}-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  REPOSITORY: DoHorizon-AI/Cyrene-Plugins-Official
+  SOURCE_SHA: ${{ github.sha }}
+  SOURCE_REF: ${{ github.ref }}
+  CHANNEL: ${{ github.event_name == 'pull_request' && 'candidate' || github.ref == 'refs/heads/develop' && 'preview' || 'stable' }}
+
+jobs:
+  build-and-verify:
+    name: build and verify training.llama-factory.v1 package
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Initialize package release staging directory
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/training-plugin-release-build"
+          mkdir -p "$PUBLISH_DIR"
+          echo "PUBLISH_DIR=$PUBLISH_DIR" >> "$GITHUB_ENV"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned wheel build tooling
+        run: python -m pip install --disable-pip-version-check --requirement tooling/release/build-requirements.lock
+
+      - name: Run independent package release tests
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            tooling/release/training_llama_factory_package.py \
+            tests/release/test_training_llama_factory_package.py
+          python -m unittest discover -s tests/release -v
+
+      - name: Build the exact source-bound package bundle
+        run: |
+          set -euo pipefail
+          python tooling/release/training_llama_factory_package.py build \
+            --output-dir "$PUBLISH_DIR" \
+            --source-ref "$SOURCE_REF" \
+            --channel "$CHANNEL" \
+            --target linux-x86_64 \
+            --github-sha "$SOURCE_SHA"
+
+      - name: Upload the verified candidate or release inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-plugin-release-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/training-plugin-release-build/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  publish:
+    name: attest and publish immutable release
+    if: github.event_name == 'push' && github.repository == 'DoHorizon-AI/Cyrene-Plugins-Official'
+    needs: [build-and-verify]
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Initialize package release staging directory
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/training-plugin-release"
+          mkdir -p "$PUBLISH_DIR"
+          echo "PUBLISH_DIR=$PUBLISH_DIR" >> "$GITHUB_ENV"
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Download the source-gated package bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: training-plugin-release-${{ github.sha }}-${{ github.run_id }}
+          path: ${{ runner.temp }}/training-plugin-release
+
+      - name: Verify source, target, Package Spec, lock, and payload digests
+        run: |
+          set -euo pipefail
+          python tooling/release/training_llama_factory_package.py verify \
+            --output-dir "$PUBLISH_DIR" \
+            --source-ref "$SOURCE_REF" \
+            --channel "$CHANNEL" \
+            --target linux-x86_64 \
+            --github-sha "$SOURCE_SHA" \
+            --subject-checksums
+
+      - name: Create GitHub artifact attestations for every release asset
+        uses: actions/attest@v4
+        with:
+          subject-checksums: ${{ env.PUBLISH_DIR }}/attestation-subjects.sha256
+
+      - name: Save and verify detached GitHub attestation bundles
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          workflow="$REPOSITORY/.github/workflows/training-plugin-package-release.yml"
+          assets=(
+            "cyrene.training.llama-factory-0.1.0-linux-x86_64.zip"
+            "cyrene.training.llama-factory-0.1.0-package-descriptor.json"
+            "cyrene.training.llama-factory-0.1.0-requirements.lock"
+            "cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
+            "cyrene.training.llama-factory-0.1.0-package-release.json"
+          )
+          for asset in "${assets[@]}"; do
+            subject="$PUBLISH_DIR/$asset"
+            digest="$(sha256sum "$subject" | cut -d ' ' -f 1)"
+            (
+              cd "$PUBLISH_DIR"
+              gh attestation download "$subject" \
+                --repo "$REPOSITORY" \
+                --predicate-type https://slsa.dev/provenance/v1
+            )
+            bundle="$PUBLISH_DIR/sha256:$digest.jsonl"
+            test -f "$bundle"
+            mv "$bundle" "$subject.attestation.jsonl"
+            gh attestation verify "$subject" \
+              --bundle "$subject.attestation.jsonl" \
+              --repo "$REPOSITORY" \
+              --signer-workflow "$workflow" \
+              --source-ref "$SOURCE_REF" \
+              --source-digest "$SOURCE_SHA" \
+              --predicate-type https://slsa.dev/provenance/v1
+          done
+
+      - name: Refuse reuse of an immutable release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          release_tag="${CHANNEL}-cyrene.training.llama-factory-0.1.0-${SOURCE_SHA}"
+          if gh api "repos/$REPOSITORY/git/ref/tags/$release_tag" >/dev/null 2>&1; then
+            echo "immutable release tag already exists: $release_tag" >&2
+            exit 1
+          fi
+          echo "release_tag=$release_tag" >> "$GITHUB_ENV"
+
+      - name: Publish the immutable package and preparer assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/training-plugin-release-notes.md"
+          cat > "$notes" <<EOF
+          Immutable package release for \`training.llama-factory.v1\`.
+
+          Source commit: \`$SOURCE_SHA\`
+          Target: \`linux-x86_64\`
+          The release includes the package archive, Package Spec descriptor, exact runtime lock, Python preparer wheel, source-bound release metadata, and detached GitHub artifact attestations.
+          EOF
+          assets=(
+            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-linux-x86_64.zip"
+            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-package-descriptor.json"
+            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-requirements.lock"
+            "$PUBLISH_DIR/cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
+            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-package-release.json"
+          )
+          for asset in \
+            "${assets[0]}" "${assets[1]}" "${assets[2]}" "${assets[3]}" "${assets[4]}"; do
+            assets+=("$asset.attestation.jsonl")
+          done
+          args=("$release_tag" "${assets[@]}" \
+            --repo "$REPOSITORY" \
+            --draft \
+            --target "$SOURCE_SHA" \
+            --title "training.llama-factory.v1 $SOURCE_SHA" \
+            --notes-file "$notes" \
+            --latest=false)
+          if [[ "$CHANNEL" == "preview" ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}"
+          release_database_id="$(gh api "repos/$REPOSITORY/releases/tags/$release_tag" --jq .id)"
+          gh api --method PATCH "repos/$REPOSITORY/releases/$release_database_id" \
+            -F draft=false >/dev/null
+          test "$(gh api "repos/$REPOSITORY/releases/tags/$release_tag" --jq .immutable)" = true

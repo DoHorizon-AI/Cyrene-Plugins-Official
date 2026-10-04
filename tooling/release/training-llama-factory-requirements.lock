@@ -1,0 +1,3 @@
+# Exact runtime dependencies for the Python DirectPluginRuntime package.
+grpcio==1.62.3
+protobuf==4.25.9

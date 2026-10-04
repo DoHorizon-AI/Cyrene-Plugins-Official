@@ -31,6 +31,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": ".github/workflows/training-plugin-package-release.yml",
+      "sha256": "caa2cd627d9833c09a40b6ed1583c7c0d82479c6088d5d413a938986a49db1f7",
+      "size_bytes": 8689
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": ".gitignore",
       "sha256": "cabca7ea3d148e5b2956dba9fd881e91048d6a19050c39636a7ce2b4e113c3f3",
       "size_bytes": 707
@@ -4911,6 +4918,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tests/release/test_training_llama_factory_package.py",
+      "sha256": "6ec840b5b9135c654f58c4b025d8412df3320c5e8a62a1ed48e8620a959e3fea",
+      "size_bytes": 9935
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tests/store/__init__.py",
       "sha256": "9eab2e405381c893fe198d865824da543c6c002a8299968352b836967ab38df4",
       "size_bytes": 54
@@ -4949,6 +4963,27 @@
       "path": "tests/store/test_supervisor.py",
       "sha256": "6b37c1411257a11362afb8b6ad2a41b65f03fe7e0a01f192a970fe6442440813",
       "size_bytes": 19312
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/build-requirements.lock",
+      "sha256": "7157ec7e22bf1bb5eb5d59763ed4a0fd8c32bf14ed8c9c4a1f978e52d43bc90d",
+      "size_bytes": 143
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/training-llama-factory-requirements.lock",
+      "sha256": "a1f834d78cc0f884ddcf5c77c272c8cd16c98edf9c5599fc42d213f0d8a435db",
+      "size_bytes": 105
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/training_llama_factory_package.py",
+      "sha256": "0d35148b58d752a2c057d615a5f1ef9c2c9fa71c611d72861832d8b553720324",
+      "size_bytes": 40828
     },
     {
       "kind": "file",
