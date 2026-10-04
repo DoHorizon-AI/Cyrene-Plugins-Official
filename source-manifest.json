@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/training-plugin-package-release.yml",
-      "sha256": "caa2cd627d9833c09a40b6ed1583c7c0d82479c6088d5d413a938986a49db1f7",
-      "size_bytes": 8689
+      "sha256": "0b514929b5cef2e210cf4e9ba5cf198391051b9f423ad7babb8ac1ebda306368",
+      "size_bytes": 15703
     },
     {
       "kind": "file",

@@ -208,18 +208,133 @@ jobs:
             "${assets[0]}" "${assets[1]}" "${assets[2]}" "${assets[3]}" "${assets[4]}"; do
             assets+=("$asset.attestation.jsonl")
           done
-          args=("$release_tag" "${assets[@]}" \
-            --repo "$REPOSITORY" \
-            --draft \
-            --target "$SOURCE_SHA" \
-            --title "training.llama-factory.v1 $SOURCE_SHA" \
-            --notes-file "$notes" \
-            --latest=false)
-          if [[ "$CHANNEL" == "preview" ]]; then
-            args+=(--prerelease)
-          fi
-          gh release create "${args[@]}"
-          release_database_id="$(gh api "repos/$REPOSITORY/releases/tags/$release_tag" --jq .id)"
+          request="$RUNNER_TEMP/training-plugin-release-request.json"
+          response="$RUNNER_TEMP/training-plugin-release-created.json"
+          python3 - "$release_tag" "$SOURCE_SHA" "$CHANNEL" "$notes" "$request" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          release_tag, source_sha, channel, notes_path, request_path = sys.argv[1:]
+          payload = {
+              "tag_name": release_tag,
+              "target_commitish": source_sha,
+              "name": f"training.llama-factory.v1 {source_sha}",
+              "body": pathlib.Path(notes_path).read_text(encoding="utf-8"),
+              "draft": True,
+              "prerelease": channel == "preview",
+              "make_latest": "false",
+          }
+          pathlib.Path(request_path).write_text(
+              json.dumps(payload, ensure_ascii=False), encoding="utf-8"
+          )
+          PY
+          gh api --method POST "repos/$REPOSITORY/releases" \
+            --input "$request" > "$response"
+          release_database_id="$(jq -er '.id | select(type == "number")' "$response")"
+          test "$(jq -er '.tag_name' "$response")" = "$release_tag"
+          test "$(jq -er '.draft' "$response")" = true
+          upload_url="$(python3 - "$response" "$release_database_id" <<'PY'
+          import json
+          import sys
+          from urllib.parse import urlsplit, urlunsplit
+
+          response_path, release_id = sys.argv[1:]
+          release = json.load(open(response_path, encoding="utf-8"))
+          template = release.get("upload_url")
+          if not isinstance(template, str):
+              raise SystemExit("create-release response has no asset upload URL")
+          parsed = urlsplit(template.split("{", 1)[0])
+          expected_path = f"/repos/DoHorizon-AI/Cyrene-Plugins-Official/releases/{release_id}/assets"
+          if (
+              parsed.scheme != "https"
+              or parsed.hostname != "uploads.github.com"
+              or parsed.path.lower() != expected_path.lower()
+          ):
+              raise SystemExit("create-release upload URL does not match the returned release ID")
+          print(urlunsplit((parsed.scheme, parsed.netloc, parsed.path, "", "")))
+          PY
+          )"
+          for asset in "${assets[@]}"; do
+            asset_name="$(basename "$asset")"
+            encoded_name="$(python3 -c 'import sys; from urllib.parse import quote; print(quote(sys.argv[1], safe=""))' "$asset_name")"
+            uploaded_asset="$RUNNER_TEMP/training-plugin-upload-$asset_name.json"
+            curl --fail-with-body --silent --show-error \
+              --request POST \
+              --header "Authorization: Bearer $GH_TOKEN" \
+              --header "Accept: application/vnd.github+json" \
+              --header "X-GitHub-Api-Version: 2022-11-28" \
+              --header "Content-Type: application/octet-stream" \
+              --data-binary "@$asset" \
+              "$upload_url?name=$encoded_name" > "$uploaded_asset"
+            jq -e --arg name "$asset_name" \
+              '.name == $name and .state == "uploaded"' "$uploaded_asset" >/dev/null
+          done
+          staged="$RUNNER_TEMP/training-plugin-release-staged.json"
+          gh api "repos/$REPOSITORY/releases/$release_database_id" > "$staged"
+          python3 - "$staged" "$release_tag" "$release_database_id" "$CHANNEL" "${assets[@]}" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          release_path, release_tag, release_id, channel, *asset_paths = sys.argv[1:]
+          release = json.load(open(release_path, encoding="utf-8"))
+          expected = {pathlib.Path(path).name: pathlib.Path(path) for path in asset_paths}
+          actual = {asset.get("name"): asset for asset in release.get("assets", [])}
+          if len(expected) != 10 or set(actual) != set(expected) or len(actual) != len(expected):
+              raise SystemExit("draft release does not contain exactly the ten expected assets")
+          if release.get("id") != int(release_id) or release.get("tag_name") != release_tag or release.get("draft") is not True:
+              raise SystemExit("draft release ID, tag, or state differs from the create response")
+          if release.get("prerelease") is not (channel == "preview"):
+              raise SystemExit("draft release channel does not match the source branch")
+          for name, path in expected.items():
+              asset = actual[name]
+              digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+              if asset.get("state") != "uploaded" or asset.get("size") != path.stat().st_size or asset.get("digest") != digest:
+                  raise SystemExit(f"draft release asset bytes differ from local input: {name}")
+          PY
+          expected_prerelease=false
+          [[ "$CHANNEL" == "preview" ]] && expected_prerelease=true
           gh api --method PATCH "repos/$REPOSITORY/releases/$release_database_id" \
-            -F draft=false >/dev/null
-          test "$(gh api "repos/$REPOSITORY/releases/tags/$release_tag" --jq .immutable)" = true
+            -F draft=false -F prerelease="$expected_prerelease" -f make_latest=false >/dev/null
+          published_by_id="$RUNNER_TEMP/training-plugin-release-published-by-id.json"
+          published_by_tag="$RUNNER_TEMP/training-plugin-release-published-by-tag.json"
+          tag_ref="$RUNNER_TEMP/training-plugin-release-tag-ref.json"
+          gh api "repos/$REPOSITORY/releases/$release_database_id" > "$published_by_id"
+          gh api "repos/$REPOSITORY/releases/tags/$release_tag" > "$published_by_tag"
+          gh api "repos/$REPOSITORY/git/ref/tags/$release_tag" > "$tag_ref"
+          python3 - "$published_by_id" "$published_by_tag" "$tag_ref" \
+            "$release_tag" "$release_database_id" "$CHANNEL" "$SOURCE_SHA" "${assets[@]}" <<'PY'
+          import hashlib
+          import json
+          import pathlib
+          import sys
+
+          by_id_path, by_tag_path, tag_ref_path, release_tag, release_id, channel, source_sha, *asset_paths = sys.argv[1:]
+          by_id = json.load(open(by_id_path, encoding="utf-8"))
+          by_tag = json.load(open(by_tag_path, encoding="utf-8"))
+          tag_ref = json.load(open(tag_ref_path, encoding="utf-8"))
+          expected = {pathlib.Path(path).name: pathlib.Path(path) for path in asset_paths}
+          for release in (by_id, by_tag):
+              actual = {asset.get("name"): asset for asset in release.get("assets", [])}
+              if (
+                  release.get("id") != int(release_id)
+                  or release.get("tag_name") != release_tag
+                  or release.get("draft") is not False
+                  or release.get("immutable") is not True
+                  or release.get("prerelease") is not (channel == "preview")
+                  or len(actual) != 10
+                  or set(actual) != set(expected)
+              ):
+                  raise SystemExit("published release readback failed ID, tag, channel, immutability, or asset-set checks")
+              for name, path in expected.items():
+                  asset = actual[name]
+                  digest = "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+                  if asset.get("state") != "uploaded" or asset.get("size") != path.stat().st_size or asset.get("digest") != digest:
+                      raise SystemExit(f"published release asset bytes differ from local input: {name}")
+          tag_object = tag_ref.get("object", {})
+          if tag_ref.get("ref") != f"refs/tags/{release_tag}" or tag_object.get("type") != "commit" or tag_object.get("sha") != source_sha:
+              raise SystemExit("published source tag does not resolve to the expected commit")
+          print(f"Published immutable release {release_tag} using release database ID {release_id}")
+          PY
