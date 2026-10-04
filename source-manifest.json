@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "5b4d660770c96531951123a0d0a4c598a61fe36bdfd71a39d697e5a71819acae",
-      "size_bytes": 37284
+      "sha256": "140e0d9591faedd6d917efbaf02f64ff8b83fe155744aa8adcd203b613676eb4",
+      "size_bytes": 37371
     },
     {
       "kind": "file",
