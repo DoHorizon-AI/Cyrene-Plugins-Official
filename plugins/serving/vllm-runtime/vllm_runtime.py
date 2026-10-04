@@ -803,6 +803,7 @@ class RuntimeHandler(BaseHTTPRequestHandler):
 
     runtime: ServingRuntime
     token: str
+    package_metadata: dict[str, str] | None = None
     upstream_timeout = 600.0
 
     protocol_version = "HTTP/1.1"
@@ -845,6 +846,16 @@ class RuntimeHandler(BaseHTTPRequestHandler):
                 "SERVING_BINDING_PERMISSION_DENIED",
                 "The binding credential is missing or invalid.",
             )
+            return
+        if self.path == "/metadata":
+            if self.package_metadata is None:
+                self._refuse(
+                    503,
+                    "SERVING_PACKAGE_METADATA_UNAVAILABLE",
+                    "The installed package metadata is unavailable.",
+                )
+                return
+            self._send(200, self.package_metadata)
             return
         parsed = urlsplit(self.path)
         parts = parsed.path.strip("/").split("/")

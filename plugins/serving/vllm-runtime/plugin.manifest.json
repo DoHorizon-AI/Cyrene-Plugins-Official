@@ -47,14 +47,15 @@
   ],
   "runtime": {
     "language": "python",
-    "entrypoint": "vllm_runtime:main",
+    "entrypoint": "package_service_adapter:main",
     "protocol": "cyrene.serving.runtime.http.v1",
+    "transport": "http",
+    "connectionRefScheme": "cyrene-http-v1",
     "launch": {
       "executable": "prepared-runtime",
       "args": [
         "-B",
-        "vllm_runtime.py",
-        "serve"
+        "package_service_adapter.py"
       ]
     }
   },
