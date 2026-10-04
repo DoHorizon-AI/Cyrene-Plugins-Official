@@ -22,7 +22,7 @@ from wecom_connector import (
 class _FakeWeComApi(BaseHTTPRequestHandler):
     """Minimal WeCom REST surface: media fetch, token, upload, and send.
 
-        中文:最小 WeCom REST 接口:媒体获取、令牌、上传和发送。"""
+    中文:最小 WeCom REST 接口:媒体获取、令牌、上传和发送。"""
 
     token_requests: list[dict[str, list[str]]] = []
     upload_requests: list[dict[str, Any]] = []

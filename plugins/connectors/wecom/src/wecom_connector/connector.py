@@ -2,17 +2,21 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  📄 connector.py                                                    │
 │  Package: wecom_connector                                           │
-│  Role: WeCom application-message implementation of message.connector.v1.│
+│  Role: Unified WeCom application, bot WebSocket, and CLI connector. │
 │                                                                     │
-│  模块职责：企业微信应用消息的出站连接器实现（send_message）。            │
-│  · 只做厂商 wire translation：token 获取/缓存、message/send 调用与      │
-│    错误码到 DeliveryStatus 的确定性映射。                              │
-│  · 入站回调（URL 验证、AES 解密、消息接收）不在 v1 范围，见 README。     │
+│  模块职责：企业微信应用消息、智能机器人长连接与官方 CLI 工具连接器。     │
+│  · message.connector.v1：                                           │
+│    - app 模式：厂商 wire translation、token 缓存与确定性状态映射。     │
+│    - bot 模式：OpenWS WebSocket 智能机器人长连接收发与流式响应。       │
+│    - hybrid 模式：根据 account_id 或会话类型自适应路由。             │
+│  · tool.provider.v1：                                               │
+│    - 暴露官方 @wecom/cli 结构化工具目录与安全执行调用。             │
 └─────────────────────────────────────────────────────────────────────┘
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import mimetypes
 import secrets
@@ -29,6 +33,22 @@ from typing import Any, Protocol
 from google.protobuf.message import DecodeError
 
 from ._generated import message_connector_pb2 as message_contract
+from .bot_client import (
+    DEFAULT_WS_URL,
+    WeComBotClient,
+    WeComWsTransport,
+)
+from .cli import WeComCliClient
+from .tool_provider import (
+    CALL_TOOL_METHOD,
+    CALL_TOOL_REQUEST_TYPE_URL,
+    CALL_TOOL_RESPONSE_TYPE_URL,
+    LIST_TOOLS_METHOD,
+    LIST_TOOLS_REQUEST_TYPE_URL,
+    LIST_TOOLS_RESPONSE_TYPE_URL,
+    TOOL_PROVIDER_CAPABILITY_ID,
+    WeComToolProvider,
+)
 
 CAPABILITY_ID = "message.connector.v1"
 SEND_MESSAGE_METHOD = "send_message"
@@ -60,7 +80,7 @@ _TARGET_KEYS = {"private": "touser", "group": "toparty"}
 class ConnectorError(RuntimeError):
     """Typed connector failure carried to DirectPluginRuntime.
 
-        中文:通过 DirectPluginRuntime 传递的类型化 connector 故障。
+    中文:通过 DirectPluginRuntime 传递的类型化 connector 故障。
     """
 
     def __init__(self, code: str, message: str) -> None:
@@ -72,7 +92,7 @@ class ConnectorError(RuntimeError):
 class CancellationToken(Protocol):
     """Minimal cooperative cancellation surface.
 
-        中文:精简的协作式取消接口。
+    中文:精简的协作式取消接口。
     """
 
     def is_cancelled(self) -> bool: ...
@@ -81,7 +101,7 @@ class CancellationToken(Protocol):
 class WeComTransport(Protocol):
     """Injectable transport for token, upload, and message REST calls.
 
-        中文:可注入的 REST 传输,用于 token、文件上传和消息发送请求。
+    中文:可注入的 REST 传输,用于 token、文件上传和消息发送请求。
     """
 
     def get_token(
@@ -115,47 +135,94 @@ class WeComTransport(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class WeComInstanceConfig:
-    """One configured WeCom application binding.
+    """One configured WeCom binding supporting App, Bot, or Hybrid modes.
 
-        中文:一个已配置的 WeCom 应用 binding。
+    中文:一个已配置的 WeCom binding,支持应用模式、机器人长连接模式或混合模式。
     """
 
     binding_id: str
-    corp_id: str
-    corp_secret: str
-    agent_id: int
+    corp_id: str | None = None
+    corp_secret: str | None = None
+    agent_id: int | None = None
     base_url: str = DEFAULT_BASE_URL
     timeout_seconds: float = 10.0
     token_refresh_skew_seconds: float = 60.0
+    mode: str = "app"  # "app" | "bot" | "hybrid"
+    bot_id: str | None = None
+    bot_secret: str | None = None
+    websocket_url: str = DEFAULT_WS_URL
+    home_channel: str | None = None
+    allowed_users: tuple[str, ...] = ()
+    cli_enabled: bool = False
+    cli_path: str | None = None
+    cli_config_dir: str | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> WeComInstanceConfig:
         """Validate one configuration mapping.
 
-            中文:校验一份配置映射。
+        中文:校验一份配置映射。
         """
 
         binding_id = _required_text(value.get("binding_id"), "binding_id")
-        corp_id = _required_text(value.get("corp_id"), "corp_id")
-        corp_secret = _required_text(value.get("corp_secret"), "corp_secret")
-        agent_id = value.get("agent_id")
-        if isinstance(agent_id, bool) or not isinstance(agent_id, int) or agent_id <= 0:
-            raise ConnectorError(
-                "INVALID_REQUEST", "agent_id must be a positive integer"
-            )
+
+        # Mode resolution: explicit mode or inferred from present keys
+        explicit_mode = value.get("mode")
+        if explicit_mode:
+            if explicit_mode not in {"app", "bot", "hybrid"}:
+                raise ConnectorError(
+                    "INVALID_REQUEST",
+                    f"mode must be 'app', 'bot', or 'hybrid'; got {explicit_mode!r}",
+                )
+            mode = explicit_mode
+        else:
+            has_bot = bool(value.get("bot_id"))
+            has_app = bool(value.get("corp_id"))
+            if has_bot and has_app:
+                mode = "hybrid"
+            elif has_bot:
+                mode = "bot"
+            else:
+                mode = "app"
+
+        corp_id: str | None = None
+        corp_secret: str | None = None
+        agent_id: int | None = None
+        if mode in {"app", "hybrid"}:
+            corp_id = _required_text(value.get("corp_id"), "corp_id")
+            corp_secret = _required_text(value.get("corp_secret"), "corp_secret")
+            raw_agent_id = value.get("agent_id")
+            if (
+                isinstance(raw_agent_id, bool)
+                or not isinstance(raw_agent_id, int)
+                or raw_agent_id <= 0
+            ):
+                raise ConnectorError(
+                    "INVALID_REQUEST", "agent_id must be a positive integer"
+                )
+            agent_id = raw_agent_id
+
+        bot_id: str | None = None
+        bot_secret: str | None = None
+        websocket_url = str(value.get("websocket_url", DEFAULT_WS_URL))
+        if mode in {"bot", "hybrid"}:
+            bot_id = _required_text(value.get("bot_id"), "bot_id")
+            bot_secret = _required_text(value.get("bot_secret"), "bot_secret")
+
         base_url = value.get("base_url", DEFAULT_BASE_URL)
         if not isinstance(base_url, str):
             raise ConnectorError("INVALID_REQUEST", "base_url must be a string")
         parsed = urllib.parse.urlsplit(base_url)
-        if parsed.scheme == "https":
-            pass
-        elif parsed.scheme == "http" and parsed.hostname in (
-            "127.0.0.1",
-            "::1",
-            "localhost",
+        if (
+            parsed.scheme == "https"
+            or parsed.scheme == "http"
+            and parsed.hostname
+            in (
+                "127.0.0.1",
+                "::1",
+                "localhost",
+            )
         ):
-            # Plain HTTP is tolerated only for loopback test endpoints.
-            # 中文:# 中文:仅容忍 loopback 测试 Endpoint 使用普通 HTTP。
             pass
         else:
             raise ConnectorError(
@@ -165,6 +232,7 @@ class WeComInstanceConfig:
             )
         if not parsed.hostname:
             raise ConnectorError("INVALID_REQUEST", "base_url must contain a host")
+
         timeout = value.get("timeout_seconds", 10.0)
         if (
             isinstance(timeout, bool)
@@ -174,12 +242,37 @@ class WeComInstanceConfig:
             raise ConnectorError(
                 "INVALID_REQUEST", "timeout_seconds must be a positive number"
             )
+
         skew = value.get("token_refresh_skew_seconds", 60.0)
         if isinstance(skew, bool) or not isinstance(skew, (int, float)) or skew < 0:
             raise ConnectorError(
                 "INVALID_REQUEST",
                 "token_refresh_skew_seconds must be a non-negative number",
             )
+
+        home_channel = value.get("home_channel")
+        raw_allowed = value.get("allowed_users", ())
+        if isinstance(raw_allowed, str):
+            allowed_users = tuple(
+                u.strip() for u in raw_allowed.split(",") if u.strip()
+            )
+        elif isinstance(raw_allowed, (list, tuple, set)):
+            allowed_users = tuple(str(u).strip() for u in raw_allowed if str(u).strip())
+        else:
+            allowed_users = ()
+
+        cli_obj = value.get("cli", {})
+        cli_enabled = bool(
+            value.get("cli_enabled")
+            or (isinstance(cli_obj, Mapping) and cli_obj.get("enabled"))
+        )
+        cli_path = value.get("cli_path")
+        if cli_path is None and isinstance(cli_obj, Mapping):
+            cli_path = cli_obj.get("executable_path")
+        cli_config_dir = value.get("cli_config_dir")
+        if cli_config_dir is None and isinstance(cli_obj, Mapping):
+            cli_config_dir = cli_obj.get("config_dir")
+
         return cls(
             binding_id=binding_id,
             corp_id=corp_id,
@@ -188,13 +281,22 @@ class WeComInstanceConfig:
             base_url=base_url.rstrip("/"),
             timeout_seconds=float(timeout),
             token_refresh_skew_seconds=float(skew),
+            mode=mode,
+            bot_id=bot_id,
+            bot_secret=bot_secret,
+            websocket_url=websocket_url,
+            home_channel=str(home_channel) if home_channel else None,
+            allowed_users=allowed_users,
+            cli_enabled=cli_enabled,
+            cli_path=str(cli_path) if cli_path else None,
+            cli_config_dir=str(cli_config_dir) if cli_config_dir else None,
         )
 
     @classmethod
     def from_settings(cls, settings: Mapping[str, str]) -> WeComInstanceConfig:
         """Build configuration from the standard plugin activation environment.
 
-            中文:根据标准 Plugin activation 环境构造配置。
+        中文:根据标准 Plugin activation 环境构造配置。
         """
 
         encoded = settings.get("config") or "{}"
@@ -214,9 +316,9 @@ class WeComInstanceConfig:
 
 
 class UrllibWeComTransport:
-    """Small urllib transport; the only network surface this connector owns.
+    """Small urllib transport; the standard REST network surface for WeCom App API.
 
-        中文:精简的 urllib 传输;这是此 connector 唯一拥有的网络接口。
+    中文:精简的 urllib 传输;这是此 connector 针对应用消息 API 的标准 REST 接口。
     """
 
     def get_token(
@@ -228,9 +330,8 @@ class UrllibWeComTransport:
         query = urllib.parse.urlencode(
             {"corpid": config.corp_id, "corpsecret": config.corp_secret}
         )
-        return self._json_request(
-            f"{config.base_url}/cgi-bin/gettoken?{query}", None, config, cancellation
-        )
+        url = f"{config.base_url}/cgi-bin/gettoken?{query}"
+        return self._json_request(url, None, config, cancellation)
 
     def send_agent_message(
         self,
@@ -240,14 +341,13 @@ class UrllibWeComTransport:
         *,
         cancellation: CancellationToken | None = None,
     ) -> Mapping[str, Any]:
-        query = urllib.parse.urlencode({"access_token": token})
-        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        url = (
+            f"{config.base_url}/cgi-bin/message/send?"
+            f"{urllib.parse.urlencode({'access_token': token})}"
+        )
+        body = json.dumps(payload).encode("utf-8")
         return self._json_request(
-            f"{config.base_url}/cgi-bin/message/send?{query}",
-            body,
-            config,
-            cancellation,
-            content_type="application/json; charset=utf-8",
+            url, body, config, cancellation, content_type="application/json"
         )
 
     def upload_media(
@@ -261,82 +361,56 @@ class UrllibWeComTransport:
         *,
         cancellation: CancellationToken | None = None,
     ) -> Mapping[str, Any]:
-        """Fetch one canonical remote attachment and upload it as temporary media.
-
-            中文:获取一个规范的远程附件,并将其上传为临时媒体文件。
-        """
-
-        content, resolved_name, resolved_mime = self._download_media(
-            remote_uri,
-            media_type,
-            file_name,
-            mime_type,
-            config,
-            cancellation,
+        raw_bytes, resolved_name, resolved_mime = self._fetch_remote_bytes(
+            remote_uri, file_name, mime_type, media_type, config, cancellation
         )
         boundary = f"cyrene-{secrets.token_hex(16)}"
-        disposition_name = _multipart_filename(resolved_name)
-        prefix = (
-            f"--{boundary}\r\n"
-            'Content-Disposition: form-data; name="media"; '
-            f'filename="{disposition_name}"; filelength={len(content)}\r\n'
+        disposition = (
+            f'form-data; name="media"; filename="{_multipart_filename(resolved_name)}"'
+        )
+        content_header = (
+            f"Content-Disposition: {disposition}\r\n"
             f"Content-Type: {resolved_mime}\r\n\r\n"
-        ).encode()
-        body = prefix + content + f"\r\n--{boundary}--\r\n".encode()
-        query = urllib.parse.urlencode({"access_token": token, "type": media_type})
+        )
+        parts = [
+            f"--{boundary}\r\n".encode(),
+            content_header.encode(),
+            raw_bytes,
+            f"\r\n--{boundary}--\r\n".encode(),
+        ]
+        body = b"".join(parts)
+        url = (
+            f"{config.base_url}/cgi-bin/media/upload?"
+            f"{urllib.parse.urlencode({'access_token': token, 'type': media_type})}"
+        )
+        content_type = f"multipart/form-data; boundary={boundary}"
         return self._json_request(
-            f"{config.base_url}/cgi-bin/media/upload?{query}",
-            body,
-            config,
-            cancellation,
-            content_type=f"multipart/form-data; boundary={boundary}",
+            url, body, config, cancellation, content_type=content_type
         )
 
-    def _download_media(
+    def _fetch_remote_bytes(
         self,
         remote_uri: str,
-        media_type: str,
         file_name: str,
         mime_type: str,
+        media_type: str,
         config: WeComInstanceConfig,
         cancellation: CancellationToken | None,
     ) -> tuple[bytes, str, str]:
         _raise_if_cancelled(cancellation)
-        request = urllib.request.Request(remote_uri, headers={"Accept": "*/*"})
         limit = MAX_IMAGE_BYTES if media_type == "image" else MAX_FILE_BYTES
         try:
-            with urllib.request.urlopen(
-                request, timeout=config.timeout_seconds
-            ) as response:
-                final_url = urllib.parse.urlsplit(response.geturl())
-                if final_url.scheme not in {"http", "https"}:
-                    raise ConnectorError(
-                        "INVALID_REQUEST", "media redirect must remain http(s)"
-                    )
-                declared_length = response.headers.get("Content-Length")
-                if declared_length is not None:
-                    try:
-                        declared_size = int(declared_length)
-                    except ValueError as exc:
-                        raise ConnectorError(
-                            "UNAVAILABLE",
-                            "media response has an invalid Content-Length",
-                        ) from exc
-                    if declared_size > limit:
-                        raise ConnectorError(
-                            "INVALID_REQUEST",
-                            f"{media_type} exceeds the {limit}-byte upload limit",
-                        )
-                content = response.read(limit + 1)
-                response_mime = response.headers.get_content_type()
-        except ConnectorError:
-            raise
+            req = urllib.request.Request(
+                remote_uri, headers={"User-Agent": "Cyrene/1.0"}
+            )
+            with urllib.request.urlopen(req, timeout=config.timeout_seconds) as resp:
+                content = resp.read(limit + 1)
+                response_mime = resp.headers.get_content_type()
         except (TimeoutError, urllib.error.URLError, OSError) as exc:
             raise ConnectorError(
-                "UNAVAILABLE",
-                f"media download failed: {type(exc).__name__}: {exc}",
+                "UNAVAILABLE", f"failed to fetch remote media {remote_uri!r}: {exc}"
             ) from exc
-        _raise_if_cancelled(cancellation)
+
         if len(content) < MIN_MEDIA_BYTES:
             raise ConnectorError(
                 "INVALID_REQUEST",
@@ -397,62 +471,106 @@ class UrllibWeComTransport:
 
 
 class WeComConnector:
-    """WeCom application-message connector for one configured binding.
+    """Unified WeCom connector for application messages, WebSocket bot, and CLI tools.
 
-        中文:供单个已配置 binding 使用的 WeCom 应用消息 connector。
+    中文:统一的企业微信连接器,集成应用消息、WebSocket 智能机器人和 CLI 工具能力。
     """
 
     plugin_id = "cyrene.connectors.wecom"
-    version = "0.1.0"
-    capabilities = (CAPABILITY_ID,)
+    version = "0.2.0"
+    capabilities = (CAPABILITY_ID, TOOL_PROVIDER_CAPABILITY_ID)
 
     def __init__(
         self,
         config: WeComInstanceConfig | None = None,
         transport: WeComTransport | None = None,
+        *,
+        ws_transport: WeComWsTransport | None = None,
+        cli_client: WeComCliClient | None = None,
     ) -> None:
         self._config: WeComInstanceConfig | None = None
         self._transport: WeComTransport | None = None
         self._token: str | None = None
         self._token_expires_at = 0.0
         self._token_lock = threading.Lock()
+
+        self._ws_transport = ws_transport
+        self._bot_client: WeComBotClient | None = None
+        self._cli_client: WeComCliClient = cli_client or WeComCliClient()
+        self._tool_provider: WeComToolProvider = WeComToolProvider(
+            cli_client=self._cli_client
+        )
+
         if config is not None:
-            self.configure(config, transport=transport)
+            self.configure(
+                config,
+                transport=transport,
+                ws_transport=ws_transport,
+                cli_client=cli_client,
+            )
         else:
             settings = _environment_settings()
             if settings is not None:
                 self.configure(WeComInstanceConfig.from_settings(settings))
 
-    # ── configuration ──────────────────────────────────────────────────
-    # 中文:# 中文:配置。
-
     @property
     def configured_binding_id(self) -> str | None:
-        """Return the configured binding identity.
-
-            中文:返回已配置的 binding 身份。
-        """
-
+        """Return the configured binding identity."""
         return self._config.binding_id if self._config is not None else None
+
+    @property
+    def bot_client(self) -> WeComBotClient | None:
+        """Return the initialized WeComBotClient if configured."""
+        return self._bot_client
+
+    @property
+    def tool_provider(self) -> WeComToolProvider:
+        """Return the tool.provider.v1 provider."""
+        return self._tool_provider
+
+    @property
+    def cli_client(self) -> WeComCliClient:
+        """Return the underlying CLI client."""
+        return self._cli_client
 
     def configure(
         self,
         config: WeComInstanceConfig,
         *,
         transport: WeComTransport | None = None,
+        ws_transport: WeComWsTransport | None = None,
+        cli_client: WeComCliClient | None = None,
     ) -> None:
-        """Bind one configuration; an explicit transport is used when given.
-
-            中文:绑定一份配置;如果显式提供了 transport,则使用该实例。
-        """
-
+        """Bind one configuration."""
         self._config = config
         self._transport = transport
         self._token = None
         self._token_expires_at = 0.0
 
-    # ── canonical method ───────────────────────────────────────────────
-    # 中文:# 中文:规范方法。
+        if ws_transport is not None:
+            self._ws_transport = ws_transport
+        if cli_client is not None:
+            self._cli_client = cli_client
+        elif config.cli_path or config.cli_config_dir:
+            self._cli_client = WeComCliClient(
+                executable_path=config.cli_path,
+                config_dir=config.cli_config_dir,
+            )
+
+        self._tool_provider = WeComToolProvider(
+            binding_id=config.binding_id,
+            cli_client=self._cli_client,
+        )
+
+        if config.mode in {"bot", "hybrid"} and config.bot_id and config.bot_secret:
+            self._bot_client = WeComBotClient(
+                bot_id=config.bot_id,
+                bot_secret=config.bot_secret,
+                websocket_url=config.websocket_url,
+                transport=self._ws_transport,
+            )
+        else:
+            self._bot_client = None
 
     def send_message(
         self,
@@ -460,11 +578,7 @@ class WeComConnector:
         *,
         cancellation: CancellationToken | None = None,
     ) -> dict[str, Any]:
-        """Invoke canonical ``message.connector.v1/send_message``.
-
-            中文:调用规范的 `message.connector.v1/send_message`。
-        """
-
+        """Invoke canonical ``message.connector.v1/send_message``."""
         config = self._require_configured()
         if not isinstance(request, Mapping):
             raise ConnectorError(
@@ -479,7 +593,19 @@ class WeComConnector:
         _raise_if_cancelled(cancellation)
 
         conversation = _conversation_for_send(request, config)
+        account_id = conversation["account_id"]
         kind = conversation["kind"]
+
+        # Routing decision based on configuration mode & conversation
+        use_bot = config.mode == "bot" or (
+            config.mode == "hybrid"
+            and (account_id.startswith("bot:") or kind == "channel")
+        )
+
+        if use_bot:
+            return self._send_via_bot(request, conversation, config, cancellation)
+
+        # Standard application-message REST route
         if kind not in _TARGET_KEYS:
             return {
                 "status": "rejected",
@@ -501,8 +627,74 @@ class WeComConnector:
         response = self._send_with_token_retry(body, config, cancellation)
         return _delivery_result(response, conversation.get("reply_message_id"))
 
+    def _send_via_bot(
+        self,
+        request: Mapping[str, Any],
+        conversation: Mapping[str, Any],
+        config: WeComInstanceConfig,
+        cancellation: CancellationToken | None,
+    ) -> dict[str, Any]:
+        """Dispatch message via WeCom smart robot gateway."""
+        if self._bot_client is None:
+            raise ConnectorError(
+                "UNAVAILABLE", "WeCom bot client is not configured for bot mode"
+            )
+
+        chat_id = conversation["conversation_id"]
+        chat_type = "group" if conversation["kind"] == "group" else "single"
+        content_parts = request.get("content", [])
+        text_lines: list[str] = []
+        for p in content_parts:
+            if isinstance(p, Mapping) and p.get("kind") == "text":
+                text_lines.append(str(p.get("text", "")))
+        content = "".join(text_lines) or " "
+
+        reply_id = conversation.get("reply_message_id")
+        try:
+            # Run coroutine synchronously or in active loop
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+
+            if loop and loop.is_running():
+                # In active event loop, run in executor or task
+                fut = asyncio.run_coroutine_threadsafe(
+                    self._do_bot_send(chat_id, content, chat_type, reply_id), loop
+                )
+                req_id = fut.result(timeout=config.timeout_seconds)
+            else:
+                req_id = asyncio.run(
+                    self._do_bot_send(chat_id, content, chat_type, reply_id)
+                )
+
+            return {
+                "status": "accepted",
+                "vendor_message_id": req_id,
+                "reason": "delivered via WeCom openws bot gateway",
+            }
+        except Exception as exc:
+            return {
+                "status": "rejected",
+                "vendor_message_id": "",
+                "reason": f"WeCom bot send failed: {exc}",
+            }
+
+    async def _do_bot_send(
+        self, chat_id: str, content: str, chat_type: str, reply_id: str | None
+    ) -> str:
+        if self._bot_client is None:
+            raise RuntimeError("Bot client not available")
+        if not self._bot_client.is_connected:
+            await self._bot_client.connect()
+
+        if reply_id:
+            return await self._bot_client.respond(reply_id, content)
+        return await self._bot_client.send_proactive(
+            chat_id, content, chat_type=chat_type
+        )
+
     # ── DirectPluginRuntime adapter ────────────────────────────────────
-    # 中文:# 中文:DirectPluginRuntime 适配器。
 
     def on_invoke(
         self,
@@ -514,54 +706,82 @@ class WeComConnector:
         request_type_url: str | None = None,
         stream_results: bool = False,
     ) -> tuple[bool, Any]:
-        """Adapt the direct Plugin runtime call to the typed connector contract.
-
-            中文:将 direct Plugin runtime 调用适配为类型化 connector contract。
-        """
-
+        """Adapt the direct Plugin runtime call to the typed connector contract."""
         try:
-            if capability != CAPABILITY_ID:
+            if capability == CAPABILITY_ID:
+                if action != SEND_MESSAGE_METHOD:
+                    raise ConnectorError(
+                        "METHOD_NOT_FOUND",
+                        f"unsupported method {action!r}; wecom implements "
+                        f"{SEND_MESSAGE_METHOD!r}",
+                    )
+                if stream_results:
+                    raise ConnectorError(
+                        "METHOD_NOT_SUPPORTED", "send_message is not streaming"
+                    )
+                if request_type_url not in (None, SEND_MESSAGE_REQUEST_TYPE_URL):
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        f"request_type_url must be {SEND_MESSAGE_REQUEST_TYPE_URL}",
+                    )
+                _raise_if_cancelled(cancellation)
+
+                request = message_contract.SendMessageRequest()
+                try:
+                    request.ParseFromString(payload)
+                except DecodeError as exc:
+                    raise ConnectorError(
+                        "INVALID_REQUEST", "payload is not a SendMessageRequest"
+                    ) from exc
+
+                result = self.send_message(
+                    _send_request_to_mapping(request), cancellation=cancellation
+                )
+                delivery = message_contract.DeliveryResult()
+                _apply_delivery_result(delivery, result)
+                return True, _TypedPayload(
+                    delivery.SerializeToString(), DELIVERY_RESULT_TYPE_URL
+                )
+
+            elif capability == TOOL_PROVIDER_CAPABILITY_ID:
+                if action == LIST_TOOLS_METHOD:
+                    if request_type_url not in (None, LIST_TOOLS_REQUEST_TYPE_URL):
+                        raise ConnectorError(
+                            "INVALID_REQUEST",
+                            f"request_type_url must be {LIST_TOOLS_REQUEST_TYPE_URL}",
+                        )
+                    _raise_if_cancelled(cancellation)
+                    result_bytes = self.tool_provider.list_tools_proto(payload)
+                    return True, _TypedPayload(
+                        result_bytes, LIST_TOOLS_RESPONSE_TYPE_URL
+                    )
+                elif action == CALL_TOOL_METHOD:
+                    if request_type_url not in (None, CALL_TOOL_REQUEST_TYPE_URL):
+                        raise ConnectorError(
+                            "INVALID_REQUEST",
+                            f"request_type_url must be {CALL_TOOL_REQUEST_TYPE_URL}",
+                        )
+                    _raise_if_cancelled(cancellation)
+                    result_bytes = self.tool_provider.call_tool_proto(payload)
+                    return True, _TypedPayload(
+                        result_bytes, CALL_TOOL_RESPONSE_TYPE_URL
+                    )
+                else:
+                    raise ConnectorError(
+                        "METHOD_NOT_FOUND",
+                        f"unsupported tool method {action!r}; "
+                        f"implements {LIST_TOOLS_METHOD!r} and {CALL_TOOL_METHOD!r}",
+                    )
+
+            else:
                 raise ConnectorError(
                     "INVALID_REQUEST", f"unsupported capability {capability!r}"
                 )
-            if action != SEND_MESSAGE_METHOD:
-                raise ConnectorError(
-                    "METHOD_NOT_FOUND",
-                    f"unsupported method {action!r}; wecom.app v1 implements "
-                    f"{SEND_MESSAGE_METHOD!r}",
-                )
-            if stream_results:
-                raise ConnectorError(
-                    "METHOD_NOT_SUPPORTED", "send_message is not streaming"
-                )
-            if request_type_url not in (None, SEND_MESSAGE_REQUEST_TYPE_URL):
-                raise ConnectorError(
-                    "INVALID_REQUEST",
-                    f"request_type_url must be {SEND_MESSAGE_REQUEST_TYPE_URL}",
-                )
-            _raise_if_cancelled(cancellation)
 
-            request = message_contract.SendMessageRequest()
-            try:
-                request.ParseFromString(payload)
-            except DecodeError as exc:
-                raise ConnectorError(
-                    "INVALID_REQUEST", "payload is not a SendMessageRequest"
-                ) from exc
-
-            result = self.send_message(
-                _send_request_to_mapping(request), cancellation=cancellation
-            )
-            delivery = message_contract.DeliveryResult()
-            _apply_delivery_result(delivery, result)
-            return True, _TypedPayload(
-                delivery.SerializeToString(), DELIVERY_RESULT_TYPE_URL
-            )
         except ConnectorError as exc:
             return False, f"{exc.code}: {exc.message}"
 
     # ── internals ──────────────────────────────────────────────────────
-    # 中文:# 中文:内部辅助逻辑。
 
     def _require_configured(self) -> WeComInstanceConfig:
         if self._config is None:
@@ -638,13 +858,15 @@ class WeComConnector:
                 f"{media_type}.reference.vendor_media.media_id",
             )
 
-        remote_uri = _validated_remote_uri(
+        validated_uri = _validated_remote_uri(
             remote_uri, f"{media_type}.reference.remote_uri"
         )
-        file_name = part.get("file_name", "") if media_type == "file" else ""
+        file_name = part.get("file_name") or ""
+        mime_type = part.get("mime_type") or ""
         if not isinstance(file_name, str):
-            raise ConnectorError("INVALID_REQUEST", "file.file_name must be a string")
-        mime_type = part.get("mime_type", "")
+            raise ConnectorError(
+                "INVALID_REQUEST", f"{media_type}.file_name must be a string"
+            )
         if not isinstance(mime_type, str):
             raise ConnectorError(
                 "INVALID_REQUEST", f"{media_type}.mime_type must be a string"
@@ -655,7 +877,7 @@ class WeComConnector:
         response = transport.upload_media(
             token,
             media_type,
-            remote_uri,
+            validated_uri,
             file_name,
             mime_type,
             config,
@@ -668,7 +890,7 @@ class WeComConnector:
             response = transport.upload_media(
                 token,
                 media_type,
-                remote_uri,
+                validated_uri,
                 file_name,
                 mime_type,
                 config,
@@ -727,11 +949,7 @@ class _TypedPayload:
 
 
 def _environment_settings() -> dict[str, str] | None:
-    """Read one binding through the standard plugin activation environment.
-
-        中文:通过标准 Plugin activation 环境读取一个 binding。
-    """
-
+    """Read one binding through the standard plugin activation environment."""
     from cyrene_plugin_runtime.configuration import read_environment_settings
 
     return read_environment_settings()
@@ -791,7 +1009,12 @@ def _conversation_for_send(
     account_id = _required_text(
         conversation.get("account_id"), "conversation.account_id"
     )
-    if account_id.startswith("agent:") and account_id != f"agent:{config.agent_id}":
+    if (
+        config.mode in {"app", "hybrid"}
+        and config.agent_id
+        and account_id.startswith("agent:")
+        and account_id != f"agent:{config.agent_id}"
+    ):
         raise ConnectorError(
             "INVALID_REQUEST",
             f"conversation.account_id {account_id!r} is not this binding's agent",
@@ -837,7 +1060,7 @@ def _build_agent_message(
     if unsupported:
         raise ConnectorError(
             "INVALID_REQUEST",
-            f"unsupported vendor fact(s) {unsupported}; wecom.app v1 accepts 'msgtype'",
+            f"unsupported vendor fact(s) {unsupported}; wecom.app accepts 'msgtype'",
         )
     msgtype = vendor_facts.get("msgtype", "text")
     if msgtype not in SUPPORTED_TEXT_MSG_TYPES:
@@ -957,10 +1180,6 @@ def _delivery_result(
         "reason": f"errcode={errcode} errmsg={errmsg}",
         "vendor_facts": facts,
     }
-
-
-# ── proto mapping ──────────────────────────────────────────────────────
-# 中文:# 中文:protobuf 映射。
 
 
 def _send_request_to_mapping(request: Any) -> dict[str, Any]:
