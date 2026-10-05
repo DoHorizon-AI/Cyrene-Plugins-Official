@@ -100,7 +100,7 @@ impl WorkspaceAuthorityService for MockAuthorityService {
     ) -> Result<Response<ClaimInvocationsResponse>, Status> {
         let mut state = self.state.lock().unwrap();
         Ok(Response::new(ClaimInvocationsResponse {
-            invocations: state.enqueued.drain(..).collect(),
+            invocations: std::mem::take(&mut state.enqueued),
         }))
     }
 

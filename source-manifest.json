@@ -2882,8 +2882,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-connector/tests/connector_authority_integration.rs",
-      "sha256": "474d693fd54d3c51a631e160f784dd5fed3e51dccff4ed1b6a9ececf0a4f278c",
-      "size_bytes": 18751
+      "sha256": "9fec2ad6ccb7aa5c3d190b8b8b13583f3d65f348bd551ab91ef08a280ae852f2",
+      "size_bytes": 18752
     },
     {
       "kind": "file",
