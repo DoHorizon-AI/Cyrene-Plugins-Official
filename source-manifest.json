@@ -2931,8 +2931,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-product-adapters/src/lib.rs",
-      "sha256": "f9bdf0135f9547f22fb092ece3fc741d7e9854165a08072795f78b83a69ad3b4",
-      "size_bytes": 32746
+      "sha256": "ac30c9197817f973f1d0ee86701789e327059ae40a142e81bfca303bfcf130b7",
+      "size_bytes": 32756
     },
     {
       "kind": "file",

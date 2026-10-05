@@ -402,7 +402,7 @@ fn decode_lower_hex<const N: usize>(value: &str) -> Option<[u8; N]> {
         return None;
     }
     let mut bytes = [0; N];
-    for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+    for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
         let high = (pair[0] as char).to_digit(16)? as u8;
         let low = (pair[1] as char).to_digit(16)? as u8;
         bytes[index] = (high << 4) | low;
