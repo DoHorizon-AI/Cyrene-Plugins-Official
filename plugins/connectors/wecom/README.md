@@ -227,3 +227,15 @@ python3 -m pytest plugins/connectors/wecom/tests \
   --ignore=plugins/connectors/wecom/tests/test_wecom_live_smoke.py
 python3 plugins/connectors/wecom/tools/generate_message_connector_bindings.py
 ```
+
+### Reproduce capability bindings / 复现能力绑定
+
+Install the optional `bindings` dependency and run
+`python tools/generate_message_connector_bindings.py` from this package.
+The generator is pinned to `grpcio-tools==1.62.3`, matching the declared
+Protobuf 4.x runtime, and reads both canonical capability schemas in this repository.
+CI checks that regeneration leaves the checked-in bindings unchanged.
+
+安装可选的 `bindings` 依赖后，在本包运行上述命令。生成器固定为
+`grpcio-tools==1.62.3`，与声明的 Protobuf 4.x 运行时兼容；消息和工具能力均从本仓库
+的规范 schema 生成，CI 会检查生成结果与已提交文件完全一致。

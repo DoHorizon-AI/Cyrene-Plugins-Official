@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "140e0d9591faedd6d917efbaf02f64ff8b83fe155744aa8adcd203b613676eb4",
-      "size_bytes": 37371
+      "sha256": "6c127a2520e637b7a4f3ca633af3eac8a1fa3a0c8b719157fd858db50a02cfd0",
+      "size_bytes": 37645
     },
     {
       "kind": "file",
@@ -1363,8 +1363,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/README.md",
-      "sha256": "f748bf8060f1a5f75cd016892a3b842b15b392f6665a2eb83ca23b4896f2acea",
-      "size_bytes": 15122
+      "sha256": "5f9f80ea8f14947f7b5474326f0a49f59814f3548bdf6e027b630eb50e5c69f5",
+      "size_bytes": 15811
     },
     {
       "kind": "file",
@@ -1384,8 +1384,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/pyproject.toml",
-      "sha256": "198909eb6b8e7e5d45f5554af6def352f586f3cdbb41c3fc6095dde57371c544",
-      "size_bytes": 827
+      "sha256": "d9fa7222e077fc17a5470792cab50cdee61defccfbbaf82205e39f2f05989497",
+      "size_bytes": 896
     },
     {
       "kind": "file",
@@ -1405,8 +1405,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/_generated/tool_provider_pb2.py",
-      "sha256": "24167a97df096a226f07c460f60161fab7fbae78d92dd3d68c6940f04345f4f9",
-      "size_bytes": 5078
+      "sha256": "b3013443e2a8a1b9de2be9772e4b04e8d328246756240ca5dd7186a8c542efa8",
+      "size_bytes": 4836
     },
     {
       "kind": "file",
@@ -1517,8 +1517,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tools/generate_message_connector_bindings.py",
-      "sha256": "94414013d8d76fd0560bbc5bb332eaf56ade1a566ac7208f39c3ba175c43be85",
-      "size_bytes": 2288
+      "sha256": "5f60a925a2ce9e3847027defbf4238c3e772431177cb131f1ba4a9ebd0f24484",
+      "size_bytes": 3474
     },
     {
       "kind": "file",

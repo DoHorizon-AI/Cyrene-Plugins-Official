@@ -95,7 +95,7 @@ jobs:
           compression-level: 0
       - name: Install Python runtime test dependencies
         run: |
-          python3 -m pip install --disable-pip-version-check pytest ruff jsonschema==4.23.0 PyYAML
+          python3 -m pip install --disable-pip-version-check pytest ruff jsonschema==4.23.0 PyYAML grpcio-tools==1.62.3
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_plugin_runtime \
@@ -112,6 +112,10 @@ jobs:
             -e plugins/tools/dataset-preparation \
             -e plugins/tools/dataset-validator \
             -e plugins/training/llama-factory
+      - name: Verify reproducible WeCom capability bindings
+        run: |
+          python3 plugins/connectors/wecom/tools/generate_message_connector_bindings.py
+          git diff --exit-code -- plugins/connectors/wecom/src/wecom_connector/_generated
       - name: Lint Python runtime and official Plugin sources
         run: |
           python3 -m ruff check \
