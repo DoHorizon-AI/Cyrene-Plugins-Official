@@ -1,17 +1,147 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://contracts.cyrene.io/message.connector.v1.wecom/configuration.schema.json",
-  "title": "wecom.app connector activation configuration",
+  "title": "WeCom unified connector activation configuration",
   "type": "object",
-  "required": ["corp_id", "corp_secret", "agent_id"],
   "properties": {
     "binding_id": {"type": "string", "minLength": 1},
+    "mode": {
+      "type": "string",
+      "enum": ["app", "bot", "hybrid"],
+      "default": "app"
+    },
     "corp_id": {"type": "string", "minLength": 1},
-    "corp_secret": {"type": "string", "minLength": 1},
+    "corp_secret": {
+      "type": "string",
+      "description": "Legacy direct injection. Prefer corp_secret_env_ref so the secret value remains outside the configuration JSON."
+    },
+    "corp_secret_env_ref": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{0,127}$",
+      "default": "WECOM_CORP_SECRET"
+    },
     "agent_id": {"type": "integer", "minimum": 1},
-    "base_url": {"type": "string", "pattern": "^https://"},
+    "base_url": {"type": "string", "pattern": "^https?://"},
+    "bot_id": {"type": "string", "minLength": 1},
+    "bot_secret": {
+      "type": "string",
+      "description": "Legacy direct injection. Prefer bot_secret_env_ref so the secret value remains outside the configuration JSON."
+    },
+    "bot_secret_env_ref": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{0,127}$",
+      "default": "WECOM_BOT_SECRET"
+    },
+    "websocket_url": {"type": "string", "pattern": "^wss?://"},
+    "home_channel": {"type": "string"},
+    "allowed_users": {"type": "array", "items": {"type": "string"}},
+    "cli_enabled": {"type": "boolean"},
+    "cli_path": {"type": "string", "minLength": 1},
+    "cli_config_dir": {"type": "string", "minLength": 1},
+    "cli": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": false},
+        "executable_path": {"type": "string", "minLength": 1},
+        "config_dir": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Dedicated @wecom/cli identity store for the signed-in human operator."
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"enabled": {"const": true}}, "required": ["enabled"]},
+          "then": {"required": ["config_dir"]}
+        }
+      ]
+    },
+    "approved_write_operations": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "calendar.schedules.create",
+          "todo.create",
+          "todo.finish"
+        ]
+      },
+      "default": [],
+      "description": "Operator-approved exact write operation IDs. All writes stay disabled unless the exact ID is configured and repeated in the tool invocation."
+    },
+    "navigator": {
+      "type": "object",
+      "properties": {
+        "enabled": {"type": "boolean", "default": true},
+        "base_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Loopback-only Navigator URL on the same runtime host."
+        },
+        "workspace_id": {"type": "string", "minLength": 1},
+        "connector_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Must equal the activation binding_id; omitted means the binding_id is used."
+        },
+        "secret_env_ref": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]{0,127}$",
+          "description": "Environment variable name holding a workspace-scoped Navigator bearer token."
+        },
+        "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 60},
+        "retry_count": {"type": "integer", "minimum": 0, "maximum": 5, "default": 2},
+        "trusted_conversations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "properties": {
+              "account_id": {"type": "string", "minLength": 1},
+              "conversation_id": {"type": "string", "minLength": 1},
+              "kind": {"type": "string", "enum": ["private", "group"]},
+              "owner_id": {"type": "string", "minLength": 1},
+              "session_id": {"type": "string", "minLength": 1},
+              "trusted_senders": {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {"type": "string", "minLength": 1}
+              }
+            },
+            "required": [
+              "account_id",
+              "conversation_id",
+              "kind",
+              "owner_id",
+              "session_id",
+              "trusted_senders"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {"properties": {"enabled": {"const": true}}, "required": ["enabled"]},
+          "then": {
+            "required": ["base_url", "workspace_id", "secret_env_ref", "trusted_conversations"]
+          }
+        }
+      ]
+    },
     "timeout_seconds": {"type": "number", "exclusiveMinimum": 0},
     "token_refresh_skew_seconds": {"type": "number", "minimum": 0}
   },
-  "additionalProperties": false
+  "required": ["binding_id"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {"properties": {"cli_enabled": {"const": true}}, "required": ["cli_enabled"]},
+      "then": {"required": ["cli_config_dir"]}
+    }
+  ]
 }

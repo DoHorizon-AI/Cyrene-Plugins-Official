@@ -1322,7 +1322,20 @@ public sealed class QqHostClient : IAsyncDisposable
     private static string RedactDiagnostic(string value)
     {
         const string redacted = "<redacted>";
-        string[] markers = ["password", "token", "secret", "ticket", "cookie"];
+        string[] markers =
+        [
+            "password",
+            "token",
+            "secret",
+            "ticket",
+            "cookie",
+            "qr_payload",
+            "qr-payload",
+            "qr_code",
+            "qr-code",
+            "login_id",
+            "login-id"
+        ];
         StringBuilder builder = new(value.Length);
         int cursor = 0;
         while (cursor < value.Length)
@@ -1349,6 +1362,10 @@ public sealed class QqHostClient : IAsyncDisposable
             }
 
             int separator = markerStart + marker.Length;
+            if (separator < value.Length && value[separator] is '\'' or '"')
+            {
+                separator++;
+            }
             while (separator < value.Length && char.IsWhiteSpace(value[separator]))
             {
                 separator++;
@@ -1366,10 +1383,23 @@ public sealed class QqHostClient : IAsyncDisposable
             {
                 secretStart++;
             }
+            char quote = secretStart < value.Length && value[secretStart] is '\'' or '"'
+                ? value[secretStart++]
+                : '\0';
             int secretEnd = secretStart;
-            while (secretEnd < value.Length && !char.IsWhiteSpace(value[secretEnd]))
+            if (quote != '\0')
             {
-                secretEnd++;
+                int closingQuote = value.IndexOf(quote, secretStart);
+                secretEnd = closingQuote >= 0 ? closingQuote : value.Length;
+            }
+            else
+            {
+                while (secretEnd < value.Length
+                    && !char.IsWhiteSpace(value[secretEnd])
+                    && value[secretEnd] is not (',' or '}' or ']'))
+                {
+                    secretEnd++;
+                }
             }
 
             builder.Append(value, cursor, secretStart - cursor);

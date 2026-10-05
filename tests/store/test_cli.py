@@ -246,7 +246,7 @@ class TestCatalogCliExecution:
         assert rc == 0
         captured = capsys.readouterr()
         assert "Plugin Information: cyrene.connectors.im" in captured.out
-        assert "Official QQ/IM Connector" in captured.out
+        assert "QQ Connector" in captured.out
         assert "Language:     csharp" in captured.out
         assert "Supported Services: Cyrene-Exchange, Cyrene-Navigator" in captured.out
 

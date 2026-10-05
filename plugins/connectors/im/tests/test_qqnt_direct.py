@@ -119,6 +119,7 @@ def _config(
         "required_client_version": "qq-test-1",
         "required_host_abi": "fake-qqnt-linux-x86_64",
         "account_id": "10001",
+        "dedicated_account_confirmed": True,
         "timeout_seconds": timeout_seconds,
         "secret_refs": ["secret://test/qq-password"],
     }
@@ -469,6 +470,7 @@ def test_host_diagnostics_redact_credential_like_values(tmp_path: Path) -> None:
                 time.sleep(0.01)
         assert "fixture-password" not in diagnostics
         assert "fixture-token" not in diagnostics
+        assert "fixture opaque QR payload" not in diagnostics
         assert "<redacted>" in diagnostics
     finally:
         connector.close()
@@ -555,6 +557,136 @@ def test_password_login_updates_session_readiness(tmp_path: Path) -> None:
         assert connector.state == "READY"
     finally:
         connector.close()
+
+
+def test_navigator_bridge_health_requires_a_live_host_and_confirmed_account(
+    tmp_path: Path,
+) -> None:
+    from qq_connector import create_navigator_qq_bridge
+
+    absent = create_navigator_qq_bridge()
+    assert absent.health() == {
+        "status": "NOT_CONFIGURED",
+        "host_state": "NOT_CONFIGURED",
+        "api_ready": False,
+        "dedicated_account_confirmed": False,
+        "generation": 0,
+        "client_version": None,
+        "host_abi": None,
+        "failure_code": "NOT_CONFIGURED",
+    }
+    absent.close()
+
+    config = _config(tmp_path, "qq-live-health")
+    bridge = create_navigator_qq_bridge(config)
+    try:
+        assert bridge.health()["status"] == "NOT_RUN"
+        assert bridge.connector.invoke_extension(
+            "qq.group.list", {"account_id": "10001"}
+        )["status"] == "accepted"
+        health = bridge.health()
+        assert health == {
+            "status": "HEALTHY",
+            "host_state": "NATIVE_READY",
+            "api_ready": True,
+            "dedicated_account_confirmed": True,
+            "generation": 1,
+            "client_version": "qq-test-1",
+            "host_abi": "fake-qqnt-linux-x86_64",
+            "failure_code": None,
+        }
+    finally:
+        bridge.close()
+
+
+def test_qr_bridge_returns_bounded_opaque_payload_and_events(tmp_path: Path) -> None:
+    from qq_connector import create_navigator_qq_bridge
+
+    config = _config(tmp_path, "qq-qr-events", mode="login_qr")
+    config["login_policy"] = "qr"
+    bridge = create_navigator_qq_bridge(config)
+    emitter = RecordingEmitter()
+    try:
+        assert bridge.subscribe_login_events("login-events", emitter) is None
+        response = bridge.request_qr({"account_id": "10001"})
+        result = response["result"]
+        assert response["operation"] == "qq.login.qr"
+        assert result["login_id"] == "fixture-login-1"
+        assert result["qr_payload"] == "cyrene-fixture-opaque-login-payload"
+        assert result["state"] == "pending"
+        assert result["expires_at_utc"].endswith("Z")
+        assert "mapping" in response
+
+        deadline = time.monotonic() + 1.0
+        while not emitter.events and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert emitter.events
+        event_type, payload, type_url = emitter.events[0]
+        assert event_type == "qq_login_state"
+        assert type_url == "type.cyrene.io/qq.client.v1.LoginStateEvent"
+        event = json.loads(payload)
+        assert event["event"] == "login.qr"
+        assert event["qr_payload"] == result["qr_payload"]
+        diagnostics = "\n".join(bridge.connector._host.diagnostics)  # noqa: SLF001
+        assert result["qr_payload"] not in diagnostics
+    finally:
+        bridge.close()
+
+
+def test_qr_bridge_rejects_expired_payload_and_unconfirmed_account(
+    tmp_path: Path,
+) -> None:
+    from qq_connector import create_navigator_qq_bridge
+
+    expired_config = _config(tmp_path, "qq-qr-expired", mode="qr_expired")
+    expired_config["login_policy"] = "qr"
+    expired = create_navigator_qq_bridge(expired_config)
+    unconfirmed_config = _config(tmp_path, "qq-qr-unconfirmed")
+    unconfirmed_config["dedicated_account_confirmed"] = False
+    unconfirmed_config["login_policy"] = "qr"
+    unconfirmed = create_navigator_qq_bridge(unconfirmed_config)
+    try:
+        with pytest.raises(ConnectorError) as error:
+            expired.request_qr({"account_id": "10001"})
+        assert error.value.code == "QR_EXPIRED"
+        with pytest.raises(ConnectorError) as error:
+            unconfirmed.request_qr({"account_id": "10001"})
+        assert error.value.code == "ACCOUNT_UNCONFIRMED"
+        assert unconfirmed.connector.generation == 0
+    finally:
+        expired.close()
+        unconfirmed.close()
+
+
+def test_qr_poll_confirms_exact_account_and_rejects_mismatch(tmp_path: Path) -> None:
+    from qq_connector import create_navigator_qq_bridge
+
+    good_config = _config(tmp_path, "qq-qr-authorized", mode="login_authorized")
+    good_config["login_policy"] = "qr"
+    mismatch_config = _config(
+        tmp_path, "qq-qr-account-mismatch", mode="login_authorized_mismatch"
+    )
+    mismatch_config["login_policy"] = "qr"
+    good = create_navigator_qq_bridge(good_config)
+    mismatch = create_navigator_qq_bridge(mismatch_config)
+    try:
+        qr = good.request_qr({"account_id": "10001"})["result"]
+        result = good.poll_login(
+            {"account_id": "10001", "login_id": qr["login_id"]}
+        )["result"]
+        assert result == {"login_id": "fixture-login-1", "state": "authorized", "account_id": "10001"}
+        assert good.health()["status"] == "HEALTHY"
+
+        qr = mismatch.request_qr({"account_id": "10001"})["result"]
+        with pytest.raises(ConnectorError) as error:
+            mismatch.poll_login(
+                {"account_id": "10001", "login_id": qr["login_id"]}
+            )
+        assert error.value.code == "ACCOUNT_MISMATCH"
+        assert mismatch.health()["status"] == "FAILED"
+    finally:
+        good.close()
+        mismatch.close()
 
 
 def test_crashed_host_recovers_next_operation_without_replaying_the_failure(
@@ -802,12 +934,16 @@ def test_group_invite_approval_uses_fixed_native_notification_operation(
 def test_every_registered_qq_operation_has_a_fixed_fake_host_dispatch(
     tmp_path: Path,
 ) -> None:
-    connector = QQNTDirectConnector(_config(tmp_path, "qq-operations"))
+    config = _config(tmp_path, "qq-operations", mode="login_authorized")
+    config["login_policy"] = "qr"
+    connector = QQNTDirectConnector(config)
     try:
         for operation in QQ_OPERATION_NAMES:
             params: dict[str, Any] = {"account_id": "10001"}
             if operation == "qq.login.password":
                 params = {"secret_ref": "secret://test/qq-password"}
+            if operation == "qq.login.poll":
+                params = {"account_id": "10001", "login_id": "fixture-login-1"}
             if operation in CALLBACK_ONLY_OPERATION_NAMES:
                 with pytest.raises(ConnectorError, match="callback-only"):
                     connector.invoke_extension(operation, params)

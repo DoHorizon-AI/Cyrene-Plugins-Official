@@ -31,7 +31,7 @@ CONFIG = WeComInstanceConfig(
 class ScriptedTransport:
     """Deterministic WeCom transport double.
 
-        中文:确定性的 WeCom 传输替身。"""
+    中文:确定性的 WeCom 传输替身。"""
 
     def __init__(
         self,
@@ -143,7 +143,7 @@ def test_text_message_maps_target_and_caches_the_token() -> None:
     assert first["vendor_message_id"] == "MSG-1"
     assert second["status"] == "accepted"
     assert len(transport.token_calls) == 1  # cached across sends
-                                            # 中文:在多次发送间缓存。
+    # 中文:在多次发送间缓存。
 
     token, payload = transport.sends[0]
     assert token == "token-1"
