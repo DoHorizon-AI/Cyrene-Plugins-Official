@@ -273,6 +273,7 @@ capabilities:
         language: python
         publication: published
         methods:
+          - inbound_message
           - send_message
         interface_versions:
           - "1"

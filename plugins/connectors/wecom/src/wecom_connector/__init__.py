@@ -2,10 +2,10 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  📄 __init__.py                                                     │
 │  Package: wecom_connector                                           │
-│  Role: Unified WeCom application, bot WebSocket, and CLI connector. │
+│  Role: Unified WeCom application, bot, Navigator, and CLI connector. │
 │                                                                     │
 │  模块职责：统一的企业微信连接器与工具包。                                  │
-│  · message.connector.v1：出站应用消息与智能机器人 WebSocket 长连接通道    │
+│  · message.connector.v1：应用出站、bot 入站事件和本地 Navigator intake   │
 │  · tool.provider.v1：官方 @wecom/cli 结构化工具调用集成              │
 └─────────────────────────────────────────────────────────────────────┘
 """
@@ -14,8 +14,10 @@ from .bot_client import (
     InboundMessage,
     ScriptedWsTransport,
     WeComBotClient,
+    WeComBotRequestError,
     WeComWsTransport,
 )
+from .bot_runtime import WeComBotRuntime
 from .cli import (
     WeComCliClient,
     WeComCliError,
@@ -24,6 +26,8 @@ from .cli import (
 from .connector import (
     CAPABILITY_ID,
     DELIVERY_RESULT_TYPE_URL,
+    INBOUND_MESSAGE_EVENT_TYPE,
+    INBOUND_MESSAGE_TYPE_URL,
     SEND_MESSAGE_METHOD,
     SEND_MESSAGE_REQUEST_TYPE_URL,
     TOOL_PROVIDER_CAPABILITY_ID,
@@ -34,6 +38,17 @@ from .connector import (
     WeComInstanceConfig,
     WeComTransport,
 )
+from .navigator import (
+    NavigatorIntegrationConfig,
+    NavigatorTaskClient,
+    TrustedConversation,
+    notification_recipient_key,
+)
+from .navigator_workbridge import (
+    NavigatorWeComBridge,
+    create_navigator_wecom_bridge,
+)
+from .notification_worker import NavigatorNotificationWorker
 from .tool_provider import (
     CALL_TOOL_METHOD,
     LIST_TOOLS_METHOD,
@@ -46,7 +61,13 @@ __all__ = [
     "ConnectorError",
     "DELIVERY_RESULT_TYPE_URL",
     "InboundMessage",
+    "INBOUND_MESSAGE_EVENT_TYPE",
+    "INBOUND_MESSAGE_TYPE_URL",
     "LIST_TOOLS_METHOD",
+    "NavigatorIntegrationConfig",
+    "NavigatorNotificationWorker",
+    "NavigatorTaskClient",
+    "NavigatorWeComBridge",
     "SEND_MESSAGE_METHOD",
     "SEND_MESSAGE_REQUEST_TYPE_URL",
     "ScriptedWsTransport",
@@ -54,6 +75,8 @@ __all__ = [
     "UrllibWeComTransport",
     "VENDOR",
     "WeComBotClient",
+    "WeComBotRequestError",
+    "WeComBotRuntime",
     "WeComCliClient",
     "WeComCliError",
     "WeComCliStatus",
@@ -62,4 +85,7 @@ __all__ = [
     "WeComToolProvider",
     "WeComTransport",
     "WeComWsTransport",
+    "TrustedConversation",
+    "notification_recipient_key",
+    "create_navigator_wecom_bridge",
 ]

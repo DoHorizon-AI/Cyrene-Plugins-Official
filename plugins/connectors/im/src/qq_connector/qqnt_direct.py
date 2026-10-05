@@ -17,6 +17,7 @@ import re
 import threading
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -25,6 +26,11 @@ from cyrene_plugin_runtime.configuration import read_environment_settings
 from google.protobuf.message import DecodeError
 
 from ._generated import message_connector_pb2 as message_contract
+from .qqnt_direct_discovery import (
+    QQInstallationError,
+    discover_explicit,
+    discover_manifest,
+)
 from .qqnt_direct_host import (
     QQHostClient,
     QQHostError,
@@ -59,6 +65,32 @@ _MAX_EVENT_IDS = 2_048
 _MAX_CALLBACK_REQUESTS = 2_048
 _MAX_EXTENSION_RESPONSE_BYTES = 8 * 1024 * 1024
 _MAX_MEDIA_REFERENCE_BYTES = 4 * 1024
+_MAX_QR_PAYLOAD_BYTES = 4 * 1024
+_MAX_QR_TTL_SECONDS = 10 * 60
+_MAX_ACTIVE_LOGIN_ATTEMPTS = 4
+_MAX_TERMINAL_LOGIN_STATES = 32
+_LOGIN_EVENT_TYPE = "qq_login_state"
+_LOGIN_EVENT_TYPE_URL = "type.cyrene.io/qq.client.v1.LoginStateEvent"
+_LOGIN_OPERATIONS = frozenset(
+    {
+        "qq.login.connect",
+        "qq.login.online",
+        "qq.login.offline",
+        "qq.login.quick",
+        "qq.login.password",
+        "qq.login.qr",
+        "qq.login.poll",
+    }
+)
+_OUTBOUND_OPERATIONS = frozenset(
+    {
+        "qq.message.send",
+        "qq.message.forward",
+        "qq.message.forward_comment",
+        "qq.message.multi_forward",
+        "qq.file.forward",
+    }
+)
 _CALLBACK_OPERATION_BY_EVENT = {
     "message.send_completion": ("qq.message.send_completion", {"qq.message.send"}),
     "qq.message.send_completion": ("qq.message.send_completion", {"qq.message.send"}),
@@ -75,6 +107,8 @@ _SUPPORTED_EVENT_NAMES = frozenset(
     {
         "message.received",
         "request.received",
+        "login.qr",
+        "login.state",
         *tuple(_CALLBACK_OPERATION_BY_EVENT),
     }
 )
@@ -108,6 +142,7 @@ class QQNTDirectConfig:
     required_host_abi: str
     account_id: str | None = None
     login_policy: str = "existing_session"
+    dedicated_account_confirmed: bool = False
     platform: str = "linux-x86_64"
     timeout_seconds: float = 10.0
     startup_timeout_seconds: float = 30.0
@@ -124,7 +159,7 @@ class QQNTDirectConfig:
     def from_mapping(cls, value: Mapping[str, Any]) -> QQNTDirectConfig:
         """Validate one direct binding and reject all OneBot endpoint fields.
 
-            中文:校验一个 direct binding,并拒绝所有 OneBot Endpoint 字段。
+        中文:校验一个 direct binding,并拒绝所有 OneBot Endpoint 字段。
         """
 
         if not isinstance(value, Mapping):
@@ -142,6 +177,7 @@ class QQNTDirectConfig:
             "account_id",
             "self_account_id",
             "login_policy",
+            "dedicated_account_confirmed",
             "platform",
             "timeout_seconds",
             "startup_timeout_seconds",
@@ -227,6 +263,11 @@ class QQNTDirectConfig:
             raise ConnectorError(
                 "INVALID_REQUEST", "login_policy must be existing_session or qr"
             )
+        dedicated_account_confirmed = value.get("dedicated_account_confirmed", False)
+        if not isinstance(dedicated_account_confirmed, bool):
+            raise ConnectorError(
+                "INVALID_REQUEST", "dedicated_account_confirmed must be boolean"
+            )
         timeout_seconds = _positive_number(
             value.get("timeout_seconds", 10.0), "timeout_seconds"
         )
@@ -300,6 +341,7 @@ class QQNTDirectConfig:
             required_host_abi=required_host_abi,
             account_id=account_id,
             login_policy=login_policy,
+            dedicated_account_confirmed=dedicated_account_confirmed,
             platform=platform,
             timeout_seconds=timeout_seconds,
             startup_timeout_seconds=startup_timeout,
@@ -317,7 +359,7 @@ class QQNTDirectConfig:
     def from_settings(cls, settings: Mapping[str, str]) -> QQNTDirectConfig:
         """Build direct configuration from the generic worker environment.
 
-            中文:根据通用 Worker 环境构造 direct 配置。
+        中文:根据通用 Worker 环境构造 direct 配置。
         """
 
         config: dict[str, Any] = {}
@@ -339,7 +381,7 @@ class QQNTDirectConfig:
     def host_launch(self) -> QQHostLaunchConfig:
         """Return the immutable process launch configuration for this binding.
 
-            中文:返回此 binding 不可变的进程启动配置。
+        中文:返回此 binding 不可变的进程启动配置。
         """
 
         return QQHostLaunchConfig(
@@ -365,7 +407,7 @@ class QQNTDirectConfig:
 class _Subscription:
     """One direct event subscription owned by the worker activation.
 
-        中文:由 Worker activation 所拥有的一个 direct 事件订阅。
+    中文:由 Worker activation 所拥有的一个 direct 事件订阅。
     """
 
     emitter: ApplicationEventEmitter
@@ -376,7 +418,7 @@ class _Subscription:
 class _TypedPayload:
     """Typed result wrapper consumed by the generic direct runtime.
 
-        中文:供通用 direct runtime 使用的类型化结果包装器。
+    中文:供通用 direct runtime 使用的类型化结果包装器。
     """
 
     value: bytes
@@ -386,7 +428,7 @@ class _TypedPayload:
 class QQNTDirectConnector:
     """Direct QQ adapter for one binding and one QQ Host generation.
 
-        中文:针对单个 binding 和单个 QQ Host 代次的 direct QQ 适配器。
+    中文:针对单个 binding 和单个 QQ Host 代次的 direct QQ 适配器。
     """
 
     plugin_id = "cyrene.connectors.im"
@@ -409,6 +451,9 @@ class QQNTDirectConnector:
         self._callback_requests: dict[str, str] = {}
         self._callback_lock = threading.Lock()
         self._seen_events: set[tuple[str, int, str]] = set()
+        self._login_attempts: dict[str, datetime] = {}
+        self._terminal_login_states: dict[str, dict[str, Any]] = {}
+        self._login_lock = threading.RLock()
         self._state = "CREATED"
         if config is not None:
             self.configure(config, host=host)
@@ -421,7 +466,7 @@ class QQNTDirectConnector:
     def configured_binding_id(self) -> str | None:
         """Return stable binding identity, never the worker generation.
 
-            中文:返回稳定的 binding 身份,不包含 Worker 代次。
+        中文:返回稳定的 binding 身份,不包含 Worker 代次。
         """
 
         return self._config.binding_id if self._config is not None else None
@@ -430,7 +475,7 @@ class QQNTDirectConnector:
     def runtime_profile(self) -> str:
         """Return the immutable direct runtime profile.
 
-            中文:返回不可变的 direct runtime profile。
+        中文:返回不可变的 direct runtime profile。
         """
 
         return QQ_RUNTIME_PROFILE
@@ -439,7 +484,7 @@ class QQNTDirectConnector:
     def generation(self) -> int:
         """Return the current Host generation, or zero before startup.
 
-            中文:返回当前 Host 代次;启动前返回 0。
+        中文:返回当前 Host 代次;启动前返回 0。
         """
 
         return self._host.generation if self._host is not None else 0
@@ -448,21 +493,231 @@ class QQNTDirectConnector:
     def state(self) -> str:
         """Return the connector lifecycle state.
 
-            中文:返回 connector 生命周期状态。
+        中文:返回 connector 生命周期状态。
         """
 
-        if self._host is not None and self._host.state == "FAILED":
+        if self._config is None or self._host is None:
+            return "NOT_CONFIGURED"
+        host_state = self._host.state
+        if host_state == "FAILED":
             return "FAILED"
+        if host_state != "NATIVE_READY":
+            if self._state == "FAILED":
+                return "FAILED"
+            return host_state
+        if self._session_generation != self._host.generation:
+            return "NATIVE_READY"
         return self._state
 
     @property
     def compatibility(self) -> Mapping[str, Any]:
         """Return the negotiated QQ Host compatibility report.
 
-            中文:返回已协商的 QQ Host 兼容性报告。
+        中文:返回已协商的 QQ Host 兼容性报告。
         """
 
         return self._host.compatibility if self._host is not None else {}
+
+    def host_discovery(self) -> dict[str, Any]:
+        """Report whether one configured protected Host artifact is discoverable.
+
+        This path check does not launch the Host or assert that it implements a
+        lawful Tencent interface; the exact Host ABI still must pass handshake
+        and the real API source gate remains separate.
+
+        报告一个已配置的受保护 Host 制品是否可发现。该路径校验不会启动 Host，
+        也不会宣称它实现了合法的腾讯接口；仍须通过准确 ABI 握手和真实 API 来源门禁。
+        """
+
+        config = self._config
+        if config is None:
+            return {
+                "status": "NOT_CONFIGURED",
+                "platform": None,
+                "client_version": None,
+                "host_abi": None,
+                "source": None,
+                "failure_code": "NOT_CONFIGURED",
+            }
+        try:
+            installation = (
+                discover_manifest(
+                    config.installation_manifest,
+                    required_client_version=config.required_client_version,
+                )
+                if config.installation_manifest is not None
+                else discover_explicit(
+                    config.host_executable,
+                    config.data_dir,
+                    config.required_client_version,
+                    expected_platform=config.platform,
+                )
+            )
+        except QQInstallationError as exc:
+            return {
+                "status": "NOT_RUN",
+                "platform": config.platform,
+                "client_version": config.required_client_version,
+                "host_abi": config.required_host_abi,
+                "source": "operator_manifest"
+                if config.installation_manifest is not None
+                else "operator_path",
+                "failure_code": exc.code,
+            }
+        return {
+            "status": "CONFIGURED",
+            "platform": installation.platform,
+            "client_version": installation.client_version,
+            "host_abi": config.required_host_abi,
+            "source": installation.source,
+            "failure_code": None,
+        }
+
+    def health(self) -> dict[str, Any]:
+        """Probe the configured Host's actual login API without starting it.
+
+        Profile configuration alone is never reported as healthy.  This probe
+        only calls `qq.login.self_status` after the current Host generation has
+        completed session bootstrap and confirmed the configured dedicated
+        account.
+
+        配置档本身绝不会被报告为健康。只有当前 Host 代次已完成 session bootstrap，
+        并确认已配置的专用账号后，此探测才会调用 `qq.login.self_status`。
+        """
+
+        config = self._config
+        host = self._host
+        if config is None or host is None:
+            return _health_report(
+                status="NOT_CONFIGURED",
+                host_state="NOT_CONFIGURED",
+                dedicated_account_confirmed=False,
+                generation=0,
+                failure_code="NOT_CONFIGURED",
+            )
+
+        base = {
+            "host_state": host.state,
+            "generation": host.generation,
+            "dedicated_account_confirmed": bool(
+                config.account_id and config.dedicated_account_confirmed
+            ),
+            "client_version": config.required_client_version,
+            "host_abi": config.required_host_abi,
+            "failure_code": getattr(host, "failure_code", None),
+        }
+        if host.state == "FAILED":
+            status = (
+                "NOT_RUN" if base["failure_code"] == "NO_INSTALLATION" else "FAILED"
+            )
+            return _health_report(status=status, api_ready=False, **base)
+        if host.state != "NATIVE_READY":
+            status = (
+                "NOT_RUN"
+                if base["failure_code"] in {None, "NO_INSTALLATION"}
+                else "UNHEALTHY"
+            )
+            return _health_report(status=status, api_ready=False, **base)
+        if self._session_generation != host.generation or not self._session_started:
+            return _health_report(status="NOT_RUN", api_ready=False, **base)
+        if self._state != "READY":
+            return _health_report(status=self._state, api_ready=False, **base)
+        if not config.account_id or not config.dedicated_account_confirmed:
+            return _health_report(status="ACCOUNT_UNCONFIRMED", api_ready=False, **base)
+
+        try:
+            result = self._call_operation(
+                "qq.login.self_status", {"account_id": config.account_id}
+            )
+            if not isinstance(result, Mapping):
+                return _health_report(status="UNHEALTHY", api_ready=False, **base)
+            account_id = _optional_identifier(result.get("account_id"))
+            state = result.get("state")
+            ready = (
+                state in {"ready", "online", "logged_in"} or result.get("ready") is True
+            )
+            if account_id != config.account_id:
+                self._state = "FAILED"
+                return _health_report(
+                    status="ACCOUNT_MISMATCH", api_ready=False, **base
+                )
+            if not ready:
+                self._update_session_state(result)
+                return _health_report(status=self._state, api_ready=False, **base)
+            return _health_report(status="HEALTHY", api_ready=True, **base)
+        except ConnectorError as exc:
+            return _health_report(
+                status="UNHEALTHY",
+                api_ready=False,
+                failure_code=exc.code,
+                **{key: value for key, value in base.items() if key != "failure_code"},
+            )
+
+    def request_qr(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Start a bounded QR login for the explicitly confirmed account.
+
+        The returned `qr_payload` is opaque text for local UI rendering. It is
+        never written to diagnostics or passed to a remote QR renderer.
+
+        为明确确认的专用账号发起有界二维码登录。返回的 `qr_payload` 是供 UI 本地渲染的
+        不透明文本；不会写入诊断信息，也不会传给远程二维码渲染服务。
+        """
+
+        config = self._require_configured()
+        self._require_dedicated_account(config)
+        if config.login_policy != "qr":
+            raise ConnectorError("INVALID_REQUEST", "login_policy must be qr")
+        value = _mapping(params, "qq.login.qr params")
+        unknown = set(value).difference({"account_id"})
+        if unknown:
+            raise ConnectorError(
+                "INVALID_REQUEST", "qq.login.qr contains unknown fields"
+            )
+        account_id = value.get("account_id", config.account_id)
+        if _required_identifier(account_id, "account_id") != config.account_id:
+            raise ConnectorError(
+                "ACCOUNT_MISMATCH", "QQ login account does not match binding"
+            )
+        return self.invoke_extension("qq.login.qr", {"account_id": config.account_id})
+
+    def poll_login(self, params: Mapping[str, Any]) -> dict[str, Any]:
+        """Poll only a current, unexpired QR attempt by its opaque login id.
+
+        仅使用不透明 login id 轮询当前且未过期的二维码尝试。
+        """
+
+        config = self._require_configured()
+        self._require_dedicated_account(config)
+        value = _mapping(params, "qq.login.poll params")
+        unknown = set(value).difference({"account_id", "login_id"})
+        if unknown:
+            raise ConnectorError(
+                "INVALID_REQUEST", "qq.login.poll contains unknown fields"
+            )
+        account_id = _required_identifier(
+            value.get("account_id", config.account_id), "account_id"
+        )
+        if account_id != config.account_id:
+            raise ConnectorError(
+                "ACCOUNT_MISMATCH", "QQ login account does not match binding"
+            )
+        login_id = _required_identifier(value.get("login_id"), "login_id")
+        with self._login_lock:
+            expires_at = self._login_attempts.get(login_id)
+            completed = self._terminal_login_states.get(login_id)
+        if completed is not None:
+            return _login_poll_response(completed)
+        if expires_at is None:
+            raise ConnectorError("INVALID_REQUEST", "QQ login attempt is unknown")
+        if expires_at <= _utc_now():
+            with self._login_lock:
+                self._login_attempts.pop(login_id, None)
+            self._state = "LOGIN_REQUIRED"
+            raise ConnectorError("QR_EXPIRED", "QQ login QR has expired")
+        return self.invoke_extension(
+            "qq.login.poll",
+            {"account_id": config.account_id, "login_id": login_id},
+        )
 
     def configure(
         self,
@@ -472,7 +727,7 @@ class QQNTDirectConnector:
     ) -> None:
         """Configure one direct worker activation without selecting another binding.
 
-            中文:配置一次 direct Worker activation,不会另行选择 binding。
+        中文:配置一次 direct Worker activation,不会另行选择 binding。
         """
 
         parsed = (
@@ -495,7 +750,7 @@ class QQNTDirectConnector:
     def on_configure(self, settings: Mapping[str, str]) -> str | None:
         """Apply one standard worker configuration and return a typed failure.
 
-            中文:应用一份标准 Worker 配置,并返回类型化失败结果。
+        中文:应用一份标准 Worker 配置,并返回类型化失败结果。
         """
 
         try:
@@ -512,10 +767,11 @@ class QQNTDirectConnector:
     ) -> dict[str, Any]:
         """Map canonical ordered content directly to the QQ native send operation.
 
-            中文:将规范的有序内容直接映射到 QQ 原生发送操作。
+        中文:将规范的有序内容直接映射到 QQ 原生发送操作。
         """
 
         config = self._require_configured()
+        self._require_dedicated_account(config)
         if not isinstance(request, Mapping):
             raise ConnectorError(
                 "INVALID_REQUEST", "send_message request must be an object"
@@ -565,10 +821,11 @@ class QQNTDirectConnector:
     ) -> dict[str, Any]:
         """Map canonical approval requests to fixed QQ friend or group operations.
 
-            中文:将规范审批请求映射为固定的 QQ 好友或群组操作。
+        中文:将规范审批请求映射为固定的 QQ 好友或群组操作。
         """
 
         config = self._require_configured()
+        self._require_dedicated_account(config)
         value = _mapping(request, "respond_request")
         unknown = set(value).difference(
             {"request_id", "request_kind", "decision", "comment", "vendor_request"}
@@ -623,7 +880,7 @@ class QQNTDirectConnector:
     ) -> dict[str, Any]:
         """Invoke one allow-listed QQ operation with no service/method passthrough.
 
-            中文:调用一个允许列表中的 QQ 操作,不允许透传 service 或 method。
+        中文:调用一个允许列表中的 QQ 操作,不允许透传 service 或 method。
         """
 
         config = self._require_configured()
@@ -654,6 +911,52 @@ class QQNTDirectConnector:
                 "password login requires a configured secret_ref and never raw "
                 "password",
             )
+        if operation in _LOGIN_OPERATIONS:
+            self._require_dedicated_account(config)
+            requested_account = checked_params.get("account_id", config.account_id)
+            if (
+                _required_identifier(requested_account, "account_id")
+                != config.account_id
+            ):
+                raise ConnectorError(
+                    "ACCOUNT_MISMATCH", "QQ login account does not match binding"
+                )
+            checked_params["account_id"] = config.account_id
+        if operation == "qq.login.qr" and config.login_policy != "qr":
+            raise ConnectorError("INVALID_REQUEST", "login_policy must be qr")
+        if operation == "qq.login.qr":
+            with self._login_lock:
+                now = _utc_now()
+                self._login_attempts = {
+                    login_id: expiry
+                    for login_id, expiry in self._login_attempts.items()
+                    if expiry > now
+                }
+                if len(self._login_attempts) >= _MAX_ACTIVE_LOGIN_ATTEMPTS:
+                    raise ConnectorError(
+                        "LOGIN_IN_PROGRESS", "too many active QQ QR login attempts"
+                    )
+        if operation == "qq.login.poll":
+            login_id = _required_identifier(checked_params.get("login_id"), "login_id")
+            if "qr_code" in checked_params:
+                raise ConnectorError(
+                    "INVALID_REQUEST",
+                    "QR contents must not be repeated in poll requests",
+                )
+            with self._login_lock:
+                expires_at = self._login_attempts.get(login_id)
+                completed = self._terminal_login_states.get(login_id)
+            if completed is not None:
+                return _login_poll_response(completed)
+            if expires_at is None:
+                raise ConnectorError("INVALID_REQUEST", "QQ login attempt is unknown")
+            if expires_at <= _utc_now():
+                with self._login_lock:
+                    self._login_attempts.pop(login_id, None)
+                self._state = "LOGIN_REQUIRED"
+                raise ConnectorError("QR_EXPIRED", "QQ login QR has expired")
+        if operation in _OUTBOUND_OPERATIONS:
+            self._require_dedicated_account(config)
         _raise_if_cancelled(cancellation)
         if spec.mapping == "session":
             # Explicit lifecycle actions are authoritative. Do not invoke the
@@ -685,6 +988,9 @@ class QQNTDirectConnector:
                 self._update_session_state(result)
         if operation == "qq.login.offline":
             self._state = "LOGIN_REQUIRED"
+            with self._login_lock:
+                self._login_attempts.clear()
+                self._terminal_login_states.clear()
         elif operation in {
             "qq.session.start_nt",
             "qq.login.connect",
@@ -695,6 +1001,17 @@ class QQNTDirectConnector:
             "qq.login.self_status",
         }:
             self._update_session_state(result)
+        if operation == "qq.login.qr":
+            qr_payload = _validate_qr_payload(result)
+            with self._login_lock:
+                if qr_payload["login_id"] not in self._terminal_login_states:
+                    self._login_attempts[qr_payload["login_id"]] = qr_payload[
+                        "expires_at"
+                    ]
+            self._state = "QR_PENDING"
+            result = qr_payload["result"]
+        elif operation == "qq.login.poll":
+            result = self._update_login_poll_state(result, config.account_id)
         return {
             "operation": operation,
             "status": "accepted",
@@ -719,7 +1036,7 @@ class QQNTDirectConnector:
     ) -> tuple[bool, Any]:
         """Adapt canonical protobuf and explicit QQ JSON calls to direct operations.
 
-            中文:将规范 protobuf 调用和显式 QQ JSON 调用适配为 direct 操作。
+        中文:将规范 protobuf 调用和显式 QQ JSON 调用适配为 direct 操作。
         """
 
         del request_id, stream_results
@@ -794,7 +1111,7 @@ class QQNTDirectConnector:
     ) -> str | None:
         """Attach one binding-local event stream and enable the native listener.
 
-            中文:附加一个 binding 本地事件流,并启用原生 listener。
+        中文:附加一个 binding 本地事件流,并启用原生 listener。
         """
 
         if capability not in {"message.connector.v1", QQ_CAPABILITY_ID}:
@@ -805,7 +1122,10 @@ class QQNTDirectConnector:
             filter_value = _decode_filter(filter_payload)
             self._ensure_started()
             self._subscriptions[subscription_id] = _Subscription(emitter, filter_value)
-            if self._subscription_generation != self.generation:
+            if (
+                filter_value.get("event_type") != _LOGIN_EVENT_TYPE
+                and self._subscription_generation != self.generation
+            ):
                 self._call_operation(
                     "qq.message.subscribe",
                     {"events": ["message.received", "request.received"]},
@@ -823,7 +1143,7 @@ class QQNTDirectConnector:
     def on_unsubscribe(self, subscription_id: str, reason: str) -> None:
         """Remove one subscription without touching another binding or generation.
 
-            中文:移除一个订阅,不影响其他 binding 或代次。
+        中文:移除一个订阅,不影响其他 binding 或代次。
         """
 
         del reason
@@ -846,7 +1166,7 @@ class QQNTDirectConnector:
     def on_shutdown(self, grace_period_ms: int) -> None:
         """Close the QQ Host process tree within the worker shutdown budget.
 
-            中文:在 Worker 关闭预算内关闭整个 QQ Host 进程树。
+        中文:在 Worker 关闭预算内关闭整个 QQ Host 进程树。
         """
 
         del grace_period_ms
@@ -855,7 +1175,7 @@ class QQNTDirectConnector:
     def close(self) -> None:
         """Drain subscriptions and reap the binding-local QQ Host child.
 
-            中文:排空订阅,并回收 binding 本地的 QQ Host 子进程。
+        中文:排空订阅,并回收 binding 本地的 QQ Host 子进程。
         """
 
         self._subscriptions.clear()
@@ -867,7 +1187,7 @@ class QQNTDirectConnector:
     def publish_inbound_event(self, event: Mapping[str, Any]) -> int:
         """Normalize one direct native event and emit it to matching subscribers.
 
-            中文:规范化一个 direct 原生事件,并将其发给匹配的订阅者。
+        中文:规范化一个 direct 原生事件,并将其发给匹配的订阅者。
         """
 
         return self._on_host_event(event)
@@ -902,7 +1222,7 @@ class QQNTDirectConnector:
     def _ensure_host_started(self) -> None:
         """Start or recover the Host without implicitly bootstrapping QQ.
 
-            中文:启动或恢复 Host,但不隐式 bootstrap QQ。
+        中文:启动或恢复 Host,但不隐式 bootstrap QQ。
         """
 
         if self._host is None:
@@ -931,6 +1251,9 @@ class QQNTDirectConnector:
             self._session_bootstrap_stage = 0
             self._session_generation = self._host.generation
             self._subscription_generation = None
+            with self._login_lock:
+                self._login_attempts.clear()
+                self._terminal_login_states.clear()
             with self._callback_lock:
                 self._callback_requests.clear()
             self._state = "NATIVE_READY"
@@ -938,7 +1261,7 @@ class QQNTDirectConnector:
     def _finish_startup(self) -> None:
         """Restore subscriptions after a generation has completed startup.
 
-            中文:在某个代次完成启动后恢复订阅。
+        中文:在某个代次完成启动后恢复订阅。
         """
 
         if (
@@ -988,7 +1311,7 @@ class QQNTDirectConnector:
             def remember_request(request_id: str) -> None:
                 """Bind a callback-capable native call to its originating request.
 
-                    中文:将一个支持回调的原生调用关联到其发起请求。
+                中文:将一个支持回调的原生调用关联到其发起请求。
                 """
 
                 nonlocal callback_request_id
@@ -1017,7 +1340,7 @@ class QQNTDirectConnector:
     def _remember_callback_request(self, request_id: str, operation: str) -> None:
         """Remember callback-capable request identities for this generation.
 
-            中文:记录此代次中支持回调的请求标识。
+        中文:记录此代次中支持回调的请求标识。
         """
 
         if not isinstance(request_id, str) or not request_id:
@@ -1031,7 +1354,7 @@ class QQNTDirectConnector:
     def _forget_callback_request(self, request_id: str | None) -> None:
         """Discard a callback identity when its originating request failed.
 
-            中文:当发起请求失败时,丢弃对应的回调标识。
+        中文:当发起请求失败时,丢弃对应的回调标识。
         """
 
         if not request_id:
@@ -1071,6 +1394,99 @@ class QQNTDirectConnector:
         elif state == "failed":
             self._state = "FAILED"
 
+    def _require_dedicated_account(self, config: QQNTDirectConfig) -> None:
+        """Require an explicitly confirmed account for login and outbound work.
+
+        登录和出站操作必须使用明确确认的专用账号。
+        """
+
+        if not config.account_id or not config.dedicated_account_confirmed:
+            raise ConnectorError(
+                "ACCOUNT_UNCONFIRMED",
+                "QQ login and outbound actions require a confirmed dedicated account",
+            )
+
+    def _update_login_poll_state(
+        self, result: Any, expected_account_id: str | None
+    ) -> dict[str, Any]:
+        """Normalize one bounded QR poll transition and confirm its account.
+
+        规范化一次有界 QR 轮询状态变化并确认登录账号。
+        """
+
+        if not isinstance(result, Mapping):
+            raise ConnectorError(
+                "PROTOCOL_MISMATCH", "QQ QR poll result must be an object"
+            )
+        login_id = _required_identifier(result.get("login_id"), "login_id")
+        if set(result).difference({"login_id", "state", "account_id"}):
+            raise ConnectorError(
+                "PROTOCOL_MISMATCH", "QQ QR poll result has unknown fields"
+            )
+        with self._login_lock:
+            known_login = login_id in self._login_attempts
+            completed = self._terminal_login_states.get(login_id)
+        if not known_login and completed is not None:
+            if result.get("state") != completed.get("state"):
+                raise ConnectorError(
+                    "PROTOCOL_MISMATCH",
+                    "QQ QR poll conflicts with terminal login state",
+                )
+            if result.get("account_id") != completed.get("account_id"):
+                raise ConnectorError(
+                    "PROTOCOL_MISMATCH", "QQ QR poll account conflicts with login state"
+                )
+            return dict(completed)
+        if not known_login:
+            raise ConnectorError(
+                "PROTOCOL_MISMATCH", "QQ QR poll returned an unknown login_id"
+            )
+        state = result.get("state")
+        if state not in {"scanned", "authorized", "expired", "failed"}:
+            raise ConnectorError(
+                "PROTOCOL_MISMATCH", "QQ QR poll returned an invalid state"
+            )
+        normalized = dict(result)
+        normalized["login_id"] = login_id
+        if state == "authorized":
+            account_id = _optional_identifier(result.get("account_id"))
+            if expected_account_id is None or account_id != expected_account_id:
+                self._state = "FAILED"
+                with self._login_lock:
+                    self._login_attempts.pop(login_id, None)
+                    self._remember_terminal_login_state(
+                        login_id,
+                        {
+                            "login_id": login_id,
+                            "state": "failed",
+                            "failure_code": "ACCOUNT_MISMATCH",
+                        },
+                    )
+                raise ConnectorError(
+                    "ACCOUNT_MISMATCH", "QQ QR login account does not match binding"
+                )
+            self._state = "READY"
+            with self._login_lock:
+                self._login_attempts.pop(login_id, None)
+                self._remember_terminal_login_state(login_id, normalized)
+        elif "account_id" in result:
+            raise ConnectorError(
+                "PROTOCOL_MISMATCH", "QQ account is exposed before QR authorization"
+            )
+        elif state == "expired":
+            self._state = "LOGIN_REQUIRED"
+            with self._login_lock:
+                self._login_attempts.pop(login_id, None)
+                self._remember_terminal_login_state(login_id, normalized)
+        elif state == "failed":
+            self._state = "FAILED"
+            with self._login_lock:
+                self._login_attempts.pop(login_id, None)
+                self._remember_terminal_login_state(login_id, normalized)
+        else:
+            self._state = "QR_PENDING"
+        return normalized
+
     def _on_host_event(self, event: Mapping[str, Any]) -> int:
         if not isinstance(event, Mapping):
             return 0
@@ -1090,6 +1506,11 @@ class QQNTDirectConnector:
             or payload.get("message_id")
             or payload.get("request_id")
         )
+        if event_id is None and event_name in {"login.qr", "login.state"}:
+            login_id = payload.get("login_id")
+            login_state = payload.get("state", "pending")
+            if login_id is not None:
+                event_id = f"{event_name}:{login_id}:{login_state}"
         if event_id is not None:
             key = (self.configured_binding_id or "", self.generation, str(event_id))
             if key in self._seen_events:
@@ -1116,6 +1537,31 @@ class QQNTDirectConnector:
                     INBOUND_REQUEST_EVENT_TYPE,
                     normalized_request,
                     "type.cyrene.io/message.connector.v1.InboundRequestPayload",
+                )
+            if event_name == "login.qr":
+                if not self._can_handle_login_event():
+                    return 0
+                qr_event = _validate_qr_payload(payload)
+                with self._login_lock:
+                    if qr_event["login_id"] in self._terminal_login_states:
+                        return 0
+                    self._login_attempts[qr_event["login_id"]] = qr_event["expires_at"]
+                self._state = "QR_PENDING"
+                return self._emit(
+                    _LOGIN_EVENT_TYPE,
+                    {"event": "login.qr", **qr_event["event"]},
+                    _LOGIN_EVENT_TYPE_URL,
+                )
+            if event_name == "login.state":
+                if not self._can_handle_login_event():
+                    return 0
+                normalized_login_state = self._normalize_login_state_event(payload)
+                if not normalized_login_state:
+                    return 0
+                return self._emit(
+                    _LOGIN_EVENT_TYPE,
+                    {"event": "login.state", **normalized_login_state},
+                    _LOGIN_EVENT_TYPE_URL,
                 )
             callback_spec = _CALLBACK_OPERATION_BY_EVENT.get(event_name)
             if callback_spec is not None:
@@ -1156,6 +1602,90 @@ class QQNTDirectConnector:
             return 0
         return 0
 
+    def _can_handle_login_event(self) -> bool:
+        """Require an explicitly configured dedicated account for login events.
+
+        登录事件必须限定到明确配置的专用账号。
+        """
+
+        return bool(
+            self._config
+            and self._config.account_id
+            and self._config.dedicated_account_confirmed
+        )
+
+    def _remember_terminal_login_state(
+        self, login_id: str, state: Mapping[str, Any]
+    ) -> None:
+        """Retain a bounded terminal state so event/poll ordering is idempotent.
+
+        保留有界终态，使事件与轮询响应的到达顺序不会改变结果。
+        """
+
+        self._terminal_login_states[login_id] = dict(state)
+        while len(self._terminal_login_states) > _MAX_TERMINAL_LOGIN_STATES:
+            self._terminal_login_states.pop(next(iter(self._terminal_login_states)))
+
+    def _normalize_login_state_event(
+        self, payload: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Validate a QR login event without retaining QR contents.
+
+        校验 QR 登录事件，但不保留二维码内容。
+        """
+
+        login_id = _required_identifier(payload.get("login_id"), "login_id")
+        with self._login_lock:
+            expires_at = self._login_attempts.get(login_id)
+        if expires_at is None:
+            return {}
+        if set(payload).difference({"login_id", "state", "account_id"}):
+            return {}
+        state = payload.get("state")
+        if state not in {"scanned", "authorized", "expired", "failed"}:
+            return {}
+        normalized: dict[str, Any] = {"login_id": login_id, "state": state}
+        if state == "authorized":
+            account_id = _optional_identifier(payload.get("account_id"))
+            if self._config is None or account_id != self._config.account_id:
+                self._state = "FAILED"
+                with self._login_lock:
+                    self._login_attempts.pop(login_id, None)
+                    self._remember_terminal_login_state(
+                        login_id,
+                        {
+                            "login_id": login_id,
+                            "state": "failed",
+                            "failure_code": "ACCOUNT_MISMATCH",
+                        },
+                    )
+                return {
+                    "login_id": login_id,
+                    "state": "failed",
+                    "failure_code": "ACCOUNT_MISMATCH",
+                }
+            normalized["account_id"] = account_id
+            self._state = "READY"
+            with self._login_lock:
+                self._login_attempts.pop(login_id, None)
+                self._remember_terminal_login_state(login_id, normalized)
+        elif "account_id" in payload:
+            return {}
+        elif state == "expired" or expires_at <= _utc_now():
+            normalized["state"] = "expired"
+            self._state = "LOGIN_REQUIRED"
+            with self._login_lock:
+                self._login_attempts.pop(login_id, None)
+                self._remember_terminal_login_state(login_id, normalized)
+        elif state == "failed":
+            self._state = "FAILED"
+            with self._login_lock:
+                self._login_attempts.pop(login_id, None)
+                self._remember_terminal_login_state(login_id, normalized)
+        else:
+            self._state = "QR_PENDING"
+        return normalized
+
     def _emit(self, event_type: str, value: Any, type_url: str) -> int:
         if event_type in {INBOUND_MESSAGE_EVENT_TYPE, INBOUND_REQUEST_EVENT_TYPE}:
             if event_type == INBOUND_MESSAGE_EVENT_TYPE:
@@ -1184,7 +1714,7 @@ class QQNTDirectConnector:
 def _connector_host_error(error: QQHostError) -> ConnectorError:
     """Map Host process errors to the existing generic connector error vocabulary.
 
-        中文:将 Host 进程错误映射为现有的通用 connector 错误词汇。
+    中文:将 Host 进程错误映射为现有的通用 connector 错误词汇。
     """
 
     mapping = {
@@ -1209,7 +1739,7 @@ def _canonical_send_request(
 ) -> dict[str, Any]:
     """Convert canonical protobuf fields to Python data without a OneBot JSON hop.
 
-        中文:将规范 protobuf 字段转换为 Python 数据,全程不经过 OneBot JSON。
+    中文:将规范 protobuf 字段转换为 Python 数据,全程不经过 OneBot JSON。
     """
 
     conversation = request.conversation
@@ -1280,7 +1810,7 @@ def _reference_from_proto(
 ) -> dict[str, Any]:
     """Preserve remote and vendor media references as typed direct data.
 
-        中文:将远程媒体引用和供应商媒体引用保留为类型化 direct 数据。
+    中文:将远程媒体引用和供应商媒体引用保留为类型化 direct 数据。
     """
 
     which = reference.WhichOneof("location")
@@ -1304,7 +1834,7 @@ def _reference_from_proto(
 def _delivery_payload(result: Mapping[str, Any]) -> bytes:
     """Build the canonical DeliveryResult protobuf from a native result.
 
-        中文:根据原生结果构造规范 DeliveryResult protobuf。
+    中文:根据原生结果构造规范 DeliveryResult protobuf。
     """
 
     response = message_contract.DeliveryResult(
@@ -1339,7 +1869,7 @@ def _conversation_for_send(
 ) -> dict[str, Any]:
     """Validate direct conversation identity and preserve QQ peer identifiers.
 
-        中文:校验 direct 会话身份,并保留 QQ 对端标识。
+    中文:校验 direct 会话身份,并保留 QQ 对端标识。
     """
 
     conversation = _mapping(request.get("conversation"), "conversation")
@@ -1417,7 +1947,7 @@ def _qq_peer_identity_facts(request: Mapping[str, Any]) -> dict[str, str]:
 def _build_native_elements(request: Mapping[str, Any]) -> list[dict[str, Any]]:
     """Map canonical ordered parts to direct native element objects.
 
-        中文:将规范有序内容部分映射为 direct 原生元素对象。
+    中文:将规范有序内容部分映射为 direct 原生元素对象。
     """
 
     content = request.get("content")
@@ -1472,7 +2002,7 @@ def _build_native_elements(request: Mapping[str, Any]) -> list[dict[str, Any]]:
 def _native_reference(value: Any, field: str) -> dict[str, str]:
     """Validate a binding-safe remote or QQ media reference.
 
-        中文:校验适用于当前 binding 的远程媒体引用或 QQ 媒体引用。
+    中文:校验适用于当前 binding 的远程媒体引用或 QQ 媒体引用。
     """
 
     reference = _mapping(value, field)
@@ -1500,7 +2030,7 @@ def _normalize_native_message(
 ) -> dict[str, Any]:
     """Normalize a Host-native message without serializing through OneBot.
 
-        中文:规范化 Host 原生消息,不通过 OneBot 序列化。
+    中文:规范化 Host 原生消息,不通过 OneBot 序列化。
     """
 
     account_id = _required_identifier(payload.get("account_id"), "account_id")
@@ -1642,7 +2172,7 @@ def _native_inbound_reference(
 ) -> dict[str, Any]:
     """Convert a normalized native media object to a canonical attachment reference.
 
-        中文:将规范化的原生媒体对象转换为规范附件引用。
+    中文:将规范化的原生媒体对象转换为规范附件引用。
     """
 
     remote = element.get("remote_uri")
@@ -1665,7 +2195,7 @@ def _normalize_native_request(
 ) -> dict[str, Any]:
     """Normalize a direct friend/group request for the canonical approval seam.
 
-        中文:规范化 direct 好友／群组请求,供规范审批接口使用。
+    中文:规范化 direct 好友／群组请求,供规范审批接口使用。
     """
 
     account_id = _required_identifier(payload.get("account_id"), "account_id")
@@ -1693,7 +2223,7 @@ def _normalize_native_request(
 def _inbound_message_payload(value: Mapping[str, Any]) -> bytes:
     """Build the canonical protobuf event from normalized direct data.
 
-        中文:根据规范化的 direct 数据构造规范 protobuf 事件。
+    中文:根据规范化的 direct 数据构造规范 protobuf 事件。
     """
 
     payload = message_contract.InboundMessagePayload()
@@ -1749,7 +2279,7 @@ def _inbound_message_payload(value: Mapping[str, Any]) -> bytes:
 def _decode_json_object(payload: bytes, field: str) -> dict[str, Any]:
     """Decode one bounded JSON object used by an explicit owner-scoped method.
 
-        中文:解码显式 owner-scoped 方法使用的一个有界 JSON 对象。
+    中文:解码显式 owner-scoped 方法使用的一个有界 JSON 对象。
     """
 
     try:
@@ -1764,7 +2294,7 @@ def _decode_json_object(payload: bytes, field: str) -> dict[str, Any]:
 def _decode_filter(payload: bytes) -> dict[str, Any]:
     """Validate the small binding-local subscription filter.
 
-        中文:校验精简的 binding 本地订阅过滤器。
+    中文:校验精简的 binding 本地订阅过滤器。
     """
 
     if not payload:
@@ -1775,6 +2305,21 @@ def _decode_filter(payload: bytes) -> dict[str, Any]:
         raise ConnectorError(
             "INVALID_REQUEST", "subscription filter contains unknown fields"
         )
+    for field, item in value.items():
+        if not isinstance(item, str) or not item.strip():
+            raise ConnectorError(
+                "INVALID_REQUEST", f"subscription filter {field} must be non-empty text"
+            )
+    if value.get("event_type") not in {
+        None,
+        INBOUND_MESSAGE_EVENT_TYPE,
+        INBOUND_REQUEST_EVENT_TYPE,
+        "qq_callback",
+        _LOGIN_EVENT_TYPE,
+    }:
+        raise ConnectorError(
+            "INVALID_REQUEST", "subscription event_type is unsupported"
+        )
     return value
 
 
@@ -1783,7 +2328,7 @@ def _filter_matches(
 ) -> bool:
     """Apply event-type and conversation filters without payload-based routing.
 
-        中文:应用事件类型和会话过滤条件,不按负载内容路由。
+    中文:应用事件类型和会话过滤条件,不按负载内容路由。
     """
 
     if filter_value.get("event_type") not in {None, event_type}:
@@ -1801,10 +2346,126 @@ def _filter_matches(
     )
 
 
+def _utc_now() -> datetime:
+    """Return an aware UTC timestamp used by QR expiry checks.
+
+    返回 QR 过期校验使用的 UTC 时刻。
+    """
+
+    return datetime.now(UTC)
+
+
+def _validate_qr_payload(value: Any) -> dict[str, Any]:
+    """Validate and bound the normalized short-lived QR login payload.
+
+    Validate only the Cyrene Host contract; no vendor-specific QR encoding or
+    login protocol is inferred here.
+
+    校验并限制规范化的短时 QR 登录载荷。这里只验证 Cyrene Host 合约，
+    不推断厂商专有的二维码编码或登录协议。
+    """
+
+    if not isinstance(value, Mapping):
+        raise ConnectorError("PROTOCOL_MISMATCH", "QQ QR result must be an object")
+    allowed_fields = {"login_id", "qr_payload", "expires_at_utc", "state"}
+    if set(value).difference(allowed_fields):
+        raise ConnectorError("PROTOCOL_MISMATCH", "QQ QR result has unknown fields")
+    login_id = _required_identifier(value.get("login_id"), "login_id")
+    payload = value.get("qr_payload")
+    if not isinstance(payload, str) or not payload.strip():
+        raise ConnectorError("PROTOCOL_MISMATCH", "QQ QR payload is missing")
+    if len(payload.encode("utf-8")) > _MAX_QR_PAYLOAD_BYTES or any(
+        ord(character) < 0x20 or ord(character) == 0x7F for character in payload
+    ):
+        raise ConnectorError(
+            "PROTOCOL_MISMATCH", "QQ QR payload is invalid or too large"
+        )
+    if value.get("state") != "pending":
+        raise ConnectorError("PROTOCOL_MISMATCH", "QQ QR result state must be pending")
+    expiry_text = value.get("expires_at_utc")
+    if not isinstance(expiry_text, str):
+        raise ConnectorError("PROTOCOL_MISMATCH", "QQ QR expiry is missing")
+    try:
+        expiry = datetime.fromisoformat(
+            expiry_text[:-1] + "+00:00" if expiry_text.endswith("Z") else expiry_text
+        )
+    except ValueError as exc:
+        raise ConnectorError("PROTOCOL_MISMATCH", "QQ QR expiry is invalid") from exc
+    if expiry.tzinfo is None or expiry.utcoffset() != UTC.utcoffset(expiry):
+        raise ConnectorError("PROTOCOL_MISMATCH", "QQ QR expiry must be UTC")
+    now = _utc_now()
+    ttl_seconds = (expiry.astimezone(UTC) - now).total_seconds()
+    if ttl_seconds <= 0:
+        raise ConnectorError("QR_EXPIRED", "QQ login QR has expired")
+    if ttl_seconds > _MAX_QR_TTL_SECONDS:
+        raise ConnectorError(
+            "PROTOCOL_MISMATCH", "QQ QR expiry exceeds the 10 minute limit"
+        )
+    canonical_expiry = expiry.astimezone(UTC).isoformat().replace("+00:00", "Z")
+    normalized = {
+        "login_id": login_id,
+        "qr_payload": payload,
+        "expires_at_utc": canonical_expiry,
+        "state": "pending",
+    }
+    return {
+        "login_id": login_id,
+        "expires_at": expiry.astimezone(UTC),
+        "result": normalized,
+        "event": normalized,
+    }
+
+
+def _health_report(
+    *,
+    status: str,
+    host_state: str,
+    dedicated_account_confirmed: bool,
+    generation: int,
+    api_ready: bool = False,
+    client_version: str | None = None,
+    host_abi: str | None = None,
+    failure_code: str | None = None,
+) -> dict[str, Any]:
+    """Create the stable, credential-free Navigator health response.
+
+    构造稳定且不含凭据的 Navigator 健康响应。
+    """
+
+    return {
+        "status": status,
+        "host_state": host_state,
+        "api_ready": api_ready,
+        "dedicated_account_confirmed": dedicated_account_confirmed,
+        "generation": generation,
+        "client_version": client_version,
+        "host_abi": host_abi,
+        "failure_code": failure_code,
+    }
+
+
+def _login_poll_response(result: Mapping[str, Any]) -> dict[str, Any]:
+    """Build the fixed qq.login.poll response for a cached terminal event.
+
+    为已经由事件确认的终态构造固定 qq.login.poll 响应。
+    """
+
+    operation = get_qq_operation("qq.login.poll")
+    if operation is None:
+        raise ConnectorError("UNKNOWN_OPERATION", "qq.login.poll is not registered")
+    return {
+        "operation": operation.name,
+        "status": "accepted",
+        "result": dict(result),
+        "priority": operation.priority,
+        "mapping": {"service": operation.service, "method": operation.method},
+    }
+
+
 def _facts_from_result(result: Mapping[str, Any]) -> list[dict[str, str]]:
     """Keep only bounded identity facts from a native send result.
 
-        中文:仅保留原生发送结果中有界的身份事实。
+    中文:仅保留原生发送结果中有界的身份事实。
     """
 
     facts: list[dict[str, str]] = []
@@ -1831,7 +2492,7 @@ def _normalize_callback(
 ) -> dict[str, Any]:
     """Normalize only typed callback facts correlated to an originating call.
 
-        中文:仅规范化与发起调用相关联的类型化回调事实。
+    中文:仅规范化与发起调用相关联的类型化回调事实。
     """
 
     result: dict[str, Any] = {
@@ -1923,7 +2584,7 @@ def _mapping(value: Any, field: str) -> Mapping[str, Any]:
 def _validated_remote_uri(value: Any, field: str) -> str:
     """Accept only bounded HTTP(S) references across the canonical seam.
 
-        中文:只接受有界的 HTTP(S) 引用,通过规范接口传递。
+    中文:只接受有界的 HTTP(S) 引用,通过规范接口传递。
     """
 
     remote = _required_text(value, field)
@@ -1938,7 +2599,7 @@ def _validated_remote_uri(value: Any, field: str) -> str:
 def _validated_local_result_reference(value: Any, field: str) -> str:
     """Accept only bounded binding-private references for local media results.
 
-        中文:只接受用于本地媒体结果的有界 binding 私有引用。
+    中文:只接受用于本地媒体结果的有界 binding 私有引用。
     """
 
     reference = _required_text(value, field)
@@ -1987,7 +2648,7 @@ def _positive_number(value: Any, field: str) -> float:
 def _bounded_number(value: Any, field: str, *, minimum: float, maximum: float) -> float:
     """Validate one finite numeric setting against a strict safety range.
 
-        中文:根据严格的安全范围校验一个有限数值设置。
+    中文:根据严格的安全范围校验一个有限数值设置。
     """
 
     if isinstance(value, bool) or not isinstance(value, (int, float)):
@@ -2004,7 +2665,7 @@ def _bounded_number(value: Any, field: str, *, minimum: float, maximum: float) -
 def _bounded_integer(value: Any, field: str, *, minimum: int, maximum: int) -> int:
     """Validate one bounded integer setting without accepting booleans.
 
-        中文:校验一个有界整数设置,并拒绝布尔值。
+    中文:校验一个有界整数设置,并拒绝布尔值。
     """
 
     if isinstance(value, bool) or not isinstance(value, int):

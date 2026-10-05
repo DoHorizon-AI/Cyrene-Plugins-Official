@@ -42,6 +42,15 @@ HEARTBEAT_INTERVAL_SECONDS = 30.0
 RECONNECT_BACKOFF = [1.0, 2.0, 5.0, 10.0, 30.0]
 
 
+class WeComBotRequestError(RuntimeError):
+    """Vendor acknowledgement rejection with its stable error code."""
+
+    def __init__(self, errcode: int | str, errmsg: str) -> None:
+        super().__init__(errmsg)
+        self.errcode = errcode
+        self.errmsg = errmsg
+
+
 class WeComWsTransport(Protocol):
     """Protocol for WebSocket transport to enable deterministic testing."""
 
@@ -107,7 +116,8 @@ class ScriptedWsTransport:
     """Deterministic scriptable WebSocket transport for unit testing."""
 
     def __init__(self) -> None:
-        self.inbound_queue: asyncio.Queue[str] = asyncio.Queue()
+        self.inbound_queue: asyncio.Queue[str | BaseException] = asyncio.Queue()
+        self._loop: asyncio.AbstractEventLoop | None = None
         self.sent_messages: list[dict[str, Any]] = []
         self._closed = False
         self.send_hook: Callable[[dict[str, Any]], None] | None = None
@@ -121,9 +131,11 @@ class ScriptedWsTransport:
             self.send_hook(parsed)
 
     async def recv(self) -> str:
-        if self._closed and self.inbound_queue.empty():
-            raise asyncio.CancelledError("Transport closed")
-        return await self.inbound_queue.get()
+        self._loop = asyncio.get_running_loop()
+        value = await self.inbound_queue.get()
+        if isinstance(value, BaseException):
+            raise value
+        return value
 
     async def close(self) -> None:
         self._closed = True
@@ -133,7 +145,28 @@ class ScriptedWsTransport:
 
     def push_inbound(self, payload: Mapping[str, Any]) -> None:
         """Push a message to be received by recv()."""
-        self.inbound_queue.put_nowait(json.dumps(payload, ensure_ascii=False))
+        value = json.dumps(payload, ensure_ascii=False)
+        self._enqueue(value)
+
+    def drop(self, reason: str = "scripted WebSocket dropped") -> None:
+        """Cause one receive to fail so reconnect behavior can be tested.
+
+        中文:模拟一次 WebSocket 断线,以验证重连行为。
+        """
+
+        self._closed = True
+        self._enqueue(ConnectionError(reason))
+
+    def _enqueue(self, value: str | BaseException) -> None:
+        loop = self._loop
+        try:
+            current_loop = asyncio.get_running_loop()
+        except RuntimeError:
+            current_loop = None
+        if loop is not None and loop.is_running() and current_loop is not loop:
+            loop.call_soon_threadsafe(self.inbound_queue.put_nowait, value)
+        else:
+            self.inbound_queue.put_nowait(value)
 
 
 @dataclass
@@ -161,11 +194,14 @@ class WeComBotClient:
         websocket_url: str = DEFAULT_WS_URL,
         *,
         transport: WeComWsTransport | None = None,
+        transport_factory: Callable[[], WeComWsTransport] | None = None,
     ) -> None:
         self._bot_id = bot_id
         self._bot_secret = bot_secret
         self._ws_url = websocket_url
         self._custom_transport = transport
+        self._transport_factory = transport_factory
+        self._custom_transport_used = False
         self._transport: WeComWsTransport | None = None
         self._running = False
         self._connected = False
@@ -174,12 +210,24 @@ class WeComBotClient:
         self._listen_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
         self._pending_requests: dict[str, asyncio.Future[dict[str, Any]]] = {}
+        self._reconnect_count = 0
+        self._last_error: str | None = None
 
     @property
     def is_connected(self) -> bool:
         return self._connected and (
             self._transport is not None and self._transport.is_open()
         )
+
+    @property
+    def reconnect_count(self) -> int:
+        """Return the number of successful reconnects after the initial session."""
+        return self._reconnect_count
+
+    @property
+    def last_error(self) -> str | None:
+        """Return a bounded, secret-free last transport error for health reporting."""
+        return self._last_error
 
     def register_handler(
         self, handler: Callable[[InboundMessage], Awaitable[None]]
@@ -194,12 +242,8 @@ class WeComBotClient:
                 "bot_id and bot_secret are required for WeCom bot connection"
             )
 
-        if self._custom_transport is not None:
-            self._transport = self._custom_transport
-        else:
-            transport = AsyncWebsocketsTransport(self._ws_url)
-            await transport.connect()
-            self._transport = transport
+        transport = await self._new_transport()
+        self._transport = transport
 
         # Send aibot_subscribe handshake
         req_id = f"sub-{uuid.uuid4().hex[:16]}"
@@ -215,23 +259,45 @@ class WeComBotClient:
         await self._transport.send(json.dumps(subscribe_cmd, ensure_ascii=False))
 
         # Await handshake reply
-        raw_reply = await asyncio.wait_for(
-            self._transport.recv(), timeout=CONNECT_TIMEOUT_SECONDS
-        )
-        reply = json.loads(raw_reply)
+        try:
+            raw_reply = await asyncio.wait_for(
+                transport.recv(), timeout=CONNECT_TIMEOUT_SECONDS
+            )
+            reply = json.loads(raw_reply)
+        except BaseException:
+            await transport.close()
+            if self._transport is transport:
+                self._transport = None
+            raise
         errcode = reply.get("errcode", reply.get("body", {}).get("errcode", 0))
         errmsg = reply.get("errmsg", reply.get("body", {}).get("errmsg", "ok"))
         if errcode != 0 and errcode is not None:
-            await self._transport.close()
+            await transport.close()
+            self._transport = None
             raise RuntimeError(
                 f"WeCom bot handshake failed: errcode={errcode}, errmsg={errmsg}"
             )
 
         self._connected = True
         self._running = True
+        self._last_error = None
+
+    async def _new_transport(self) -> WeComWsTransport:
+        """Create a fresh transport for the initial connection or a reconnect."""
+        if self._transport_factory is not None:
+            transport = self._transport_factory()
+        elif self._custom_transport is not None and not self._custom_transport_used:
+            transport = self._custom_transport
+            self._custom_transport_used = True
+        else:
+            transport = AsyncWebsocketsTransport(self._ws_url)
+            await transport.connect()
+        return transport
 
     async def start(self) -> None:
         """Connect and launch background listening and heartbeat tasks."""
+        if self._running and self._listen_task is not None:
+            return
         await self.connect()
         self._listen_task = asyncio.create_task(self._listen_loop())
         self._heartbeat_task = asyncio.create_task(self._heartbeat_loop())
@@ -240,12 +306,13 @@ class WeComBotClient:
         """Stop listening and close transport."""
         self._running = False
         self._connected = False
-        if self._heartbeat_task is not None:
-            self._heartbeat_task.cancel()
-            self._heartbeat_task = None
-        if self._listen_task is not None:
-            self._listen_task.cancel()
-            self._listen_task = None
+        tasks = [
+            task
+            for task in (self._heartbeat_task, self._listen_task)
+            if task is not None
+        ]
+        for task in tasks:
+            task.cancel()
         for fut in self._pending_requests.values():
             if not fut.done():
                 fut.cancel()
@@ -253,6 +320,10 @@ class WeComBotClient:
         if self._transport is not None:
             await self._transport.close()
             self._transport = None
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
+        self._heartbeat_task = None
+        self._listen_task = None
 
     async def respond(
         self,
@@ -279,8 +350,8 @@ class WeComBotClient:
                 },
             },
         }
-        await self._transport.send(json.dumps(payload, ensure_ascii=False))
-        return req_id
+        response = await self._send_with_ack(req_id, payload)
+        return _vendor_receipt_id(response, req_id)
 
     async def stream_respond(
         self,
@@ -325,8 +396,31 @@ class WeComBotClient:
                 msg_type: {"content": content},
             },
         }
-        await self._transport.send(json.dumps(payload, ensure_ascii=False))
-        return req_id
+        response = await self._send_with_ack(req_id, payload)
+        return _vendor_receipt_id(response, req_id)
+
+    async def _send_with_ack(
+        self, req_id: str, payload: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Send one request and wait for its matching vendor acknowledgement."""
+        if not self.is_connected or self._transport is None:
+            raise RuntimeError("WeCom bot client is not connected")
+        future = asyncio.get_running_loop().create_future()
+        self._pending_requests[req_id] = future
+        try:
+            await self._transport.send(json.dumps(payload, ensure_ascii=False))
+            response = await asyncio.wait_for(future, timeout=CONNECT_TIMEOUT_SECONDS)
+        except BaseException:
+            if self._pending_requests.get(req_id) is future:
+                self._pending_requests.pop(req_id, None)
+            if not future.done():
+                future.cancel()
+            raise
+        errcode = response.get("errcode", response.get("body", {}).get("errcode", 0))
+        errmsg = response.get("errmsg", response.get("body", {}).get("errmsg", "ok"))
+        if errcode not in (0, None):
+            raise WeComBotRequestError(errcode, str(errmsg))
+        return response
 
     async def ping(self) -> None:
         """Send application ping heartbeat."""
@@ -352,9 +446,30 @@ class WeComBotClient:
 
     async def _listen_loop(self) -> None:
         """Receive and route incoming WebSocket frames."""
-        while self._running and self._transport is not None:
+        backoff_index = 0
+        while self._running:
+            transport = self._transport
+            if transport is None:
+                try:
+                    await self.connect()
+                    self._reconnect_count += 1
+                    backoff_index = 0
+                    transport = self._transport
+                except asyncio.CancelledError:
+                    break
+                except Exception as exc:
+                    self._connected = False
+                    self._last_error = str(exc)[:512]
+                    delay = RECONNECT_BACKOFF[
+                        min(backoff_index, len(RECONNECT_BACKOFF) - 1)
+                    ]
+                    backoff_index += 1
+                    await asyncio.sleep(delay)
+                    continue
+            if transport is None:
+                continue
             try:
-                raw = await self._transport.recv()
+                raw = await transport.recv()
                 msg = json.loads(raw)
                 cmd = msg.get("cmd")
                 req_id = msg.get("headers", {}).get("req_id")
@@ -374,14 +489,37 @@ class WeComBotClient:
                         "cmd": APP_CMD_PONG,
                         "headers": msg.get("headers", {}),
                     }
-                    await self._transport.send(json.dumps(pong_msg))
+                    await transport.send(json.dumps(pong_msg))
             except asyncio.CancelledError:
                 break
             except Exception as exc:
                 logger.error("Error in WeCom bot listen loop: %s", exc, exc_info=True)
                 if not self._running:
                     break
-                await asyncio.sleep(1.0)
+                self._connected = False
+                self._last_error = str(exc)[:512]
+                self._fail_pending_requests(exc)
+                if self._transport is transport:
+                    self._transport = None
+                try:
+                    await transport.close()
+                except Exception:
+                    logger.debug(
+                        "Failed to close dropped WeCom transport", exc_info=True
+                    )
+                delay = RECONNECT_BACKOFF[
+                    min(backoff_index, len(RECONNECT_BACKOFF) - 1)
+                ]
+                backoff_index += 1
+                await asyncio.sleep(delay)
+
+    def _fail_pending_requests(self, error: BaseException) -> None:
+        """Fail outstanding sends when their connection is no longer usable."""
+        pending = tuple(self._pending_requests.values())
+        self._pending_requests.clear()
+        for future in pending:
+            if not future.done():
+                future.set_exception(RuntimeError(f"WeCom connection lost: {error}"))
 
     async def _handle_msg_callback(self, raw_msg: dict[str, Any]) -> None:
         """Parse incoming aibot_msg_callback and notify registered handlers."""
@@ -424,3 +562,15 @@ class WeComBotClient:
                     handler_err,
                     exc_info=True,
                 )
+
+
+def _vendor_receipt_id(response: Mapping[str, Any], request_id: str) -> str:
+    """Use the vendor's returned message identity when the acknowledgement has one."""
+    body = response.get("body", {})
+    if not isinstance(body, Mapping):
+        body = {}
+    for key in ("msgid", "msg_id", "message_id"):
+        value = response.get(key, body.get(key))
+        if isinstance(value, str) and value:
+            return value
+    return request_id

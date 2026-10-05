@@ -211,9 +211,8 @@ class WeComCliClient:
                 check=False,
             )
         except subprocess.TimeoutExpired as exc:
-            cmd_str = " ".join(full_cmd)
             raise WeComCliError(
-                f"wecom-cli command timed out after {self._timeout}s: {cmd_str}",
+                f"wecom-cli command timed out after {self._timeout}s",
                 returncode=124,
             ) from exc
         except OSError as exc:

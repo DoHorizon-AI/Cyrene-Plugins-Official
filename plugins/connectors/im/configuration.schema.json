@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://cyrene.dev/schemas/im-qqnt-direct-configuration-v0.1.json",
-  "title": "Cyrene QQ/IM Connector Configuration",
+  "title": "Cyrene QQ Connector Configuration",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -94,6 +94,11 @@
         "integer"
       ],
       "minimum": 1
+    },
+    "dedicated_account_confirmed": {
+      "type": "boolean",
+      "default": false,
+      "description": "Explicit operator confirmation that account_id is a dedicated QQ account for login and outbound actions."
     },
     "login_policy": {
       "type": "string",

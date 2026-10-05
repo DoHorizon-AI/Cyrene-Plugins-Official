@@ -522,6 +522,196 @@ public sealed class DispatcherTests
         await host.CloseAsync(CancellationToken.None);
     }
 
+    [Fact]
+    public async Task QqDispatcherUsesBoundedQrPollingAndLiveHealth()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/im/tests/fixtures/fake_qq_host.py");
+        if (!File.Exists(fixture))
+        {
+            return;
+        }
+
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-qr-test-{Guid.NewGuid():N}");
+        string requestLog = Path.Combine(dataDirectory, "requests.jsonl");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=login_authorized",
+            $"--request-log={requestLog}") with
+        {
+            LoginPolicy = "qr"
+        };
+        await using QqHostClient host = new(profile.HostLaunch);
+        using QqDirectInvocationDispatcher dispatcher = new(profile, host);
+
+        QqDirectHealthReport absent = await dispatcher.HealthAsync(CancellationToken.None);
+        Assert.Equal("NOT_RUN", absent.Status);
+        Assert.False(absent.ApiReady);
+
+        InvocationResult qrResponse = await InvokeQqAsync(
+            dispatcher,
+            "qq.login.qr",
+            "{}");
+        Assert.Null(qrResponse.Error);
+        using JsonDocument qrEnvelope = JsonDocument.Parse(qrResponse.Payload!.Value.ToByteArray());
+        JsonElement qr = qrEnvelope.RootElement.GetProperty("result");
+        Assert.Equal("fixture-login-1", qr.GetProperty("login_id").GetString());
+        Assert.Equal(
+            "cyrene-fixture-opaque-login-payload",
+            qr.GetProperty("qr_payload").GetString());
+        Assert.Equal("pending", qr.GetProperty("state").GetString());
+        Assert.EndsWith("Z", qr.GetProperty("expires_at_utc").GetString());
+
+        InvocationResult pollResponse = await InvokeQqAsync(
+            dispatcher,
+            "qq.login.poll",
+            "{\"login_id\":\"fixture-login-1\"}");
+        Assert.Null(pollResponse.Error);
+        using JsonDocument pollEnvelope = JsonDocument.Parse(
+            pollResponse.Payload!.Value.ToByteArray());
+        JsonElement poll = pollEnvelope.RootElement.GetProperty("result");
+        Assert.Equal("authorized", poll.GetProperty("state").GetString());
+        Assert.Equal("10001", poll.GetProperty("account_id").GetString());
+
+        QqDirectHealthReport ready = await dispatcher.HealthAsync(CancellationToken.None);
+        Assert.Equal("HEALTHY", ready.Status);
+        Assert.True(ready.ApiReady);
+        Assert.True(ready.DedicatedAccountConfirmed);
+        Assert.Equal("fixture-client", ready.ClientVersion);
+        Assert.Equal("fake-qqnt-linux-x86_64", ready.HostAbi);
+
+        string[] requestLines = File.ReadAllLines(requestLog);
+        JsonElement pollRequest = default;
+        foreach (string line in requestLines)
+        {
+            using JsonDocument logged = JsonDocument.Parse(line);
+            if (logged.RootElement.TryGetProperty("operation", out JsonElement operation)
+                && operation.GetString() == "qq.login.poll")
+            {
+                pollRequest = logged.RootElement.Clone();
+                break;
+            }
+        }
+
+        Assert.NotEqual(JsonValueKind.Undefined, pollRequest.ValueKind);
+        JsonElement pollParams = pollRequest.GetProperty("params");
+        Assert.Equal("10001", pollParams.GetProperty("account_id").GetString());
+        Assert.False(pollParams.TryGetProperty("qr_code", out _));
+    }
+
+    [Theory]
+    [InlineData("qr_expired", "QR_EXPIRED")]
+    [InlineData("login_authorized_mismatch", "ACCOUNT_MISMATCH")]
+    public async Task QqDispatcherFailsClosedOnQrExpiryAndAccountMismatch(
+        string mode,
+        string expectedCode)
+    {
+        string fixture = RepositoryPath(
+            "plugins/connectors/im/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-qr-fail-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(fixture, dataDirectory, $"--mode={mode}") with
+        {
+            LoginPolicy = "qr"
+        };
+        await using QqHostClient host = new(profile.HostLaunch);
+        using QqDirectInvocationDispatcher dispatcher = new(profile, host);
+
+        InvocationResult qr = await InvokeQqAsync(dispatcher, "qq.login.qr", "{}");
+        if (mode == "qr_expired")
+        {
+            Assert.Equal(expectedCode, qr.Error?.DomainCode);
+            return;
+        }
+
+        Assert.Null(qr.Error);
+        InvocationResult poll = await InvokeQqAsync(
+            dispatcher,
+            "qq.login.poll",
+            "{\"login_id\":\"fixture-login-1\"}");
+        Assert.Equal(expectedCode, poll.Error?.DomainCode);
+    }
+
+    [Fact]
+    public async Task QqDispatcherRequiresConfirmedDedicatedAccountBeforeLogin()
+    {
+        string fixture = RepositoryPath(
+            "plugins/connectors/im/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-unconfirmed-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(fixture, dataDirectory) with
+        {
+            LoginPolicy = "qr",
+            DedicatedAccountConfirmed = false
+        };
+        await using QqHostClient host = new(profile.HostLaunch);
+        using QqDirectInvocationDispatcher dispatcher = new(profile, host);
+
+        InvocationResult result = await InvokeQqAsync(dispatcher, "qq.login.qr", "{}");
+        Assert.Equal("ACCOUNT_UNCONFIRMED", result.Error?.DomainCode);
+        Assert.Equal(0, host.Generation);
+    }
+
+    [Fact]
+    public async Task QqDispatcherStreamsLoginQrEventsWithoutMessageReadiness()
+    {
+        if (!OperatingSystem.IsLinux() || !File.Exists("/usr/bin/python3"))
+        {
+            return;
+        }
+
+        string fixture = RepositoryPath(
+            "plugins/connectors/im/tests/fixtures/fake_qq_host.py");
+        string dataDirectory = Path.Combine(
+            Path.GetTempPath(),
+            $"cyrene-qq-login-event-test-{Guid.NewGuid():N}");
+        QqDirectProfile profile = CreateQqProfile(
+            fixture,
+            dataDirectory,
+            "--mode=login_qr") with
+        {
+            LoginPolicy = "qr"
+        };
+        await using QqHostClient host = new(profile.HostLaunch);
+        using QqDirectInvocationDispatcher dispatcher = new(profile, host);
+        using CancellationTokenSource cancellation = new(TimeSpan.FromSeconds(5));
+        await using IAsyncEnumerator<DirectStreamItem> events = dispatcher
+            .InvokeStreamAsync(
+                CreateSubscriptionRequest(
+                    "qq-login-events",
+                    "{\"event_type\":\"qq_login_state\"}",
+                    QqDirectInvocationDispatcher.CapabilityId),
+                cancellation.Token)
+            .GetAsyncEnumerator(cancellation.Token);
+        Task<bool> nextEvent = events.MoveNextAsync().AsTask();
+
+        InvocationResult qr = await InvokeQqAsync(dispatcher, "qq.login.qr", "{}");
+        Assert.Null(qr.Error);
+        Assert.True(await nextEvent.WaitAsync(TimeSpan.FromSeconds(5)));
+        DirectStreamItem item = events.Current;
+        Assert.NotNull(item.Payload);
+        Assert.Equal(QqDirectInvocationDispatcher.LoginStateEventType, item.Payload.EventType);
+        Assert.Equal(
+            QqDirectInvocationDispatcher.LoginStateEventTypeUrl,
+            item.Payload.TypeUrl);
+        using JsonDocument eventDocument = JsonDocument.Parse(item.Payload.Value.ToByteArray());
+        Assert.Equal("login.qr", eventDocument.RootElement.GetProperty("event").GetString());
+        Assert.Equal(
+            "cyrene-fixture-opaque-login-payload",
+            eventDocument.RootElement.GetProperty("qr_payload").GetString());
+        Assert.Equal("pending", eventDocument.RootElement.GetProperty("state").GetString());
+    }
+
     [Theory]
     [InlineData("{\"account_id\":true}")]
     [InlineData("{\"account_id\":[]}")]
@@ -786,8 +976,26 @@ public sealed class DispatcherTests
             + $"\"data_dir\":{JsonString(dataDirectory)},"
             + "\"required_client_version\":\"fixture-client\","
             + "\"required_host_abi\":\"fake-qqnt-linux-x86_64\","
-            + "\"account_id\":\"10001\"}";
+            + "\"account_id\":\"10001\","
+            + "\"dedicated_account_confirmed\":true}";
         return QqDirectProfileLoader.FromJson(json);
+    }
+
+    private static async Task<InvocationResult> InvokeQqAsync(
+        QqDirectInvocationDispatcher dispatcher,
+        string operation,
+        string parameters)
+    {
+        return await dispatcher.InvokeAsync(
+            new DirectInvocationRequest
+            {
+                Capability = QqDirectInvocationDispatcher.CapabilityId,
+                InterfaceVersion = QqDirectInvocationDispatcher.InterfaceVersion,
+                Method = operation,
+                PayloadTypeUrl = QqDirectInvocationDispatcher.RequestTypeUrl,
+                Payload = ByteString.CopyFromUtf8($"{{\"params\":{parameters}}}")
+            },
+            CancellationToken.None);
     }
 
     private static string JsonString(string value) =>
@@ -840,9 +1048,10 @@ public sealed class DispatcherTests
 
     private static DirectInvocationRequest CreateSubscriptionRequest(
         string requestId,
-        string filter) => new()
+        string filter,
+        string capability = QqDirectMessageMapper.CapabilityId) => new()
         {
-            Capability = QqDirectMessageMapper.CapabilityId,
+            Capability = capability,
             InterfaceVersion = QqDirectMessageMapper.InterfaceVersion,
             Method = QqDirectMessageMapper.EventsMethod,
             PayloadTypeUrl = QqDirectMessageMapper.FilterTypeUrl,

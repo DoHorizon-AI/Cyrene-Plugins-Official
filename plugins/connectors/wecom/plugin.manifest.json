@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "cyrene.connectors.wecom",
   "name": "Official WeCom Unified Connector",
-  "version": "0.2.0",
-  "description": "WeCom unified message and tools connector implementing message.connector.v1 (application and OpenWS bot WebSocket) and tool.provider.v1 (@wecom/cli tools).",
+  "version": "0.3.0",
+  "description": "Unified WeCom application and OpenWS bot connector with canonical inbound events, scoped local Navigator tasks and terminal replies, and bounded tool.provider.v1 @wecom/cli tools.",
   "kind": "capability-plugin",
   "capabilities": [
     "message.connector.v1",
@@ -17,6 +17,12 @@
     {
       "capability": "message.connector.v1",
       "name": "send_message",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "capability": "message.connector.v1",
+      "name": "inbound_message",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
@@ -57,7 +63,8 @@
   "secrets": {
     "optionalSecretRefs": [
       "WECOM_CORP_SECRET",
-      "WECOM_BOT_SECRET"
+      "WECOM_BOT_SECRET",
+      "WECOM_NAVIGATOR_BEARER_TOKEN"
     ]
   },
   "state": {
