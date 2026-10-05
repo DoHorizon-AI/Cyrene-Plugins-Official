@@ -95,7 +95,9 @@ jobs:
           compression-level: 0
       - name: Install Python runtime test dependencies
         run: |
-          python3 -m pip install --disable-pip-version-check pytest ruff jsonschema==4.23.0 PyYAML grpcio-tools==1.62.3
+          python3 -m pip install --disable-pip-version-check \
+            -r tools/ci/connection-release-requirements.txt \
+            pytest ruff PyYAML grpcio-tools==1.62.3
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_plugin_runtime \
@@ -146,8 +148,10 @@ jobs:
             plugins/tools/dataset-validator \
             plugins/training/llama-factory \
             tools/ci/capability_catalog.py \
+            tools/ci/connection_release.py \
             tools/ci/update_source_manifest.py \
             tools/ci/validate_manifests.py \
+            tests/release/test_connection_release_health.py \
             tools/ci/verify_source_manifest.py
       - name: Run Python runtime and official Plugin tests
         run: |
@@ -165,6 +169,7 @@ jobs:
             plugins/tools/dataset-preparation/tests \
             plugins/tools/dataset-validator/tests \
             plugins/training/llama-factory/tests \
+            tests/release/test_connection_release_health.py \
             tests/store/test_catalog.py \
             tests/store/test_cli.py
       - name: Verify Python/native behavior matrix

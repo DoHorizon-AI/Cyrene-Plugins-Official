@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 ┌──────────────────────────────────────────────────────────────────────────┐
 │  📄 connection_release.py                                                │
@@ -39,6 +38,18 @@ CONNECTION_COMPONENT_IDS = frozenset(
         "cy-workspace-frontend-bridge",
     }
 )
+# Match each native binary's loopback health defaults in runtime/rust/*/src/main.rs.
+# 中文：健康地址属于组件源码固定默认值，不从发布参数或 artifact URI 推导。
+NATIVE_HTTP_READINESS: dict[str, dict[str, Any]] = {
+    "cy-workspace-relay": {"kind": "http", "port": 18080, "path": "/readyz"},
+    "cy-workspace-connector": {"kind": "http", "port": 18081, "path": "/readyz"},
+    "cy-workspace-frontend-bridge": {
+        "kind": "http",
+        "port": 18082,
+        "path": "/readyz",
+    },
+    "cy-workspace-sidecar": {"kind": "http", "port": 18083, "path": "/readyz"},
+}
 
 
 def _sha256(data: bytes) -> str:
@@ -393,6 +404,13 @@ def create_manifest(args: argparse.Namespace) -> dict[str, Any]:
             }
         },
     }
+    if descriptor["artifact"].get("kind") == "native-binary":
+        health = NATIVE_HTTP_READINESS.get(component_id)
+        if health is None:
+            raise ValueError(
+                f"native component has no trusted HTTP readiness endpoint: {component_id}"
+            )
+        document["health"] = dict(health)
     if isinstance(compatibility_group, dict):
         contract_lock = _verify_protocol_lock(compatibility_group)
         document["compatibility"] = {
