@@ -11,15 +11,15 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/component-release.yml",
-      "sha256": "6121d15be1d7bd3733680cd670d48dc57a82f9407645b281f4a1eb5d7c43c3de",
-      "size_bytes": 35014
+      "sha256": "0fc4b0c7319a0cb988ec4e94788807efe099f6122df4d2dff1bd1d7c8580cb96",
+      "size_bytes": 35031
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "6c127a2520e637b7a4f3ca633af3eac8a1fa3a0c8b719157fd858db50a02cfd0",
-      "size_bytes": 37645
+      "sha256": "ed10148448db4522980197ab04000943dac7f1c5b78b756dbf31cdebf19d6de8",
+      "size_bytes": 37782
     },
     {
       "kind": "file",
@@ -2966,8 +2966,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-connector/Cargo.lock",
-      "sha256": "a4f512bb479df1eb27a245a5fc3703e678ff78c50fc31d28e3401e56ec31d278",
-      "size_bytes": 59446
+      "sha256": "53d0d2b73c7c613f37f8f9897381c0a3fe1731b3fbaa175978bb34d18c0b8b1d",
+      "size_bytes": 59469
     },
     {
       "kind": "file",
@@ -2975,6 +2975,13 @@
       "path": "runtime/rust/cyrene-workspace-connector/Cargo.toml",
       "sha256": "6b4cb724a0299fcad37440a29fbdc928c5daed61598c4e4aff3f210bde781b3a",
       "size_bytes": 1111
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-workspace-connector/README.md",
+      "sha256": "7f15dace75bd3f192ba073558b4458cd8c9cc76f3cf11d3e38a0122d7f90871b",
+      "size_bytes": 8238
     },
     {
       "kind": "file",
@@ -2987,22 +2994,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-connector/src/lib.rs",
-      "sha256": "e6d2f4894fbe663c281592b57561e5fe6a659c9f8fc06059a51c1013e07ddab7",
-      "size_bytes": 25288
+      "sha256": "41146dddb1c2ab2c0e3b9ec23855b4b80b833ad34839a5e786da2475c56eafd0",
+      "size_bytes": 25316
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-connector/src/main.rs",
-      "sha256": "228a4d638c0b9603e18931e55e60b632c78c29ec6bc0c1384258a6ad77842067",
-      "size_bytes": 8235
+      "sha256": "e4fccaf0cc9c72cfa39dab3ce17571137deccdf21ec6965850bff1da397edf9c",
+      "size_bytes": 8503
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-connector/tests/connector_authority_integration.rs",
-      "sha256": "f00d38bf9133eac0788fcb7c958bb9326b3f36e78d4722c8411c18eb27b09fe2",
-      "size_bytes": 14522
+      "sha256": "9fec2ad6ccb7aa5c3d190b8b8b13583f3d65f348bd551ab91ef08a280ae852f2",
+      "size_bytes": 18752
     },
     {
       "kind": "file",
@@ -3036,22 +3043,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-product-adapters/Cargo.lock",
-      "sha256": "180520ab99c9b5483107c0d3df36a9e2c7f7610d093ba4e770eb5d86c4be51a9",
-      "size_bytes": 45879
+      "sha256": "5e746002a88cc2bad3088a4c92c2d47b8fa0d4a61f2c0b3dade8b53a78f7ebe0",
+      "size_bytes": 45915
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-product-adapters/Cargo.toml",
-      "sha256": "04f4d810ca7bf9cb2c438de4154ce8150162de3b141a7e613f56f268220574f2",
-      "size_bytes": 668
+      "sha256": "a3ef4db67c3494eb55ac934a3020222965fd7fd26d5a841672ae78f6fdee3ef3",
+      "size_bytes": 797
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-product-adapters/src/lib.rs",
-      "sha256": "17a78289c795ac2018c9be493b34e8e278e939f495e71f2837d02bdb845bba68",
-      "size_bytes": 10498
+      "sha256": "ac30c9197817f973f1d0ee86701789e327059ae40a142e81bfca303bfcf130b7",
+      "size_bytes": 32756
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-workspace-product-adapters/tests/dispatch_credentials.rs",
+      "sha256": "0f7cb29dfd808b6073ce9c57086bc06458542968a8b02b6b3271694817f07232",
+      "size_bytes": 23378
     },
     {
       "kind": "file",
@@ -3113,8 +3127,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/systemd/cy-workspace-connector.service",
-      "sha256": "fa36773ee90dcc5334e5f5d3d3cc43ef97db39c6abb996fbd17198418db73c62",
-      "size_bytes": 605
+      "sha256": "7918cd8de4683000b4df6d6a910b69b13b732170c37eff8f5343614c6e9881a6",
+      "size_bytes": 772
     },
     {
       "kind": "file",
