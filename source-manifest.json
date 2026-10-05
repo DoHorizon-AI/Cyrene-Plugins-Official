@@ -38,6 +38,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": ".github/workflows/vllm-runtime-package-release.yml",
+      "sha256": "ed56999d1624ba7678a0bc94afbf276737a9d3d29c1bcf361b52c3471764e082",
+      "size_bytes": 18705
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": ".gitignore",
       "sha256": "cabca7ea3d148e5b2956dba9fd881e91048d6a19050c39636a7ce2b4e113c3f3",
       "size_bytes": 707
@@ -1684,9 +1691,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/package_service_adapter.py",
+      "sha256": "153696d8aaad661c75bfe0598b343401eec28af795f01bde9dd390f13edabbf7",
+      "size_bytes": 10488
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/serving/vllm-runtime/plugin.manifest.json",
-      "sha256": "7e391b6a71ae75bc316ccb54a643f12bc702fce4424bfc378a42193d8da416e2",
-      "size_bytes": 4005
+      "sha256": "7832d0c3e5f2c49d5147b0136399bdc33460c07d97d5aafd4c91053dcfb99be6",
+      "size_bytes": 4080
     },
     {
       "kind": "file",
@@ -1694,6 +1708,13 @@
       "path": "plugins/serving/vllm-runtime/pyproject.toml",
       "sha256": "abb2b93f6520121082e9c1c5dc0f9a93b17a5e12a84b0106082111bab0dc4a32",
       "size_bytes": 677
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/serving/vllm-runtime/tests/test_package_service_adapter.py",
+      "sha256": "f8e76574a8fdabee0693592e289162085f611644199efbfc0d857a04357df3d7",
+      "size_bytes": 10361
     },
     {
       "kind": "file",
@@ -1713,8 +1734,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/serving/vllm-runtime/vllm_runtime.py",
-      "sha256": "483cc25d25d78e8a02fc7761d53b1f6ac9750f632e2250949b3406c2cf2eff42",
-      "size_bytes": 43375
+      "sha256": "0f41d8c62b59fc0e685a17fac5c89ffb17c95af3cf22a53baf9dbc5884c4079f",
+      "size_bytes": 43805
     },
     {
       "kind": "file",
@@ -4925,6 +4946,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tests/release/test_vllm_runtime_package.py",
+      "sha256": "3772903f72800659f9009214e978bd94cd0592bf8a4ef49b4a793c10fddd8f4d",
+      "size_bytes": 11534
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tests/store/__init__.py",
       "sha256": "9eab2e405381c893fe198d865824da543c6c002a8299968352b836967ab38df4",
       "size_bytes": 54
@@ -4984,6 +5012,20 @@
       "path": "tooling/release/training_llama_factory_package.py",
       "sha256": "0d35148b58d752a2c057d615a5f1ef9c2c9fa71c611d72861832d8b553720324",
       "size_bytes": 40828
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/vllm-runtime-requirements.lock",
+      "sha256": "d839b7fe62eb716ffb5f0377f5af2c1eaf5e6dbaecced5caadfe6f29f510bfd8",
+      "size_bytes": 97
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/vllm_runtime_package.py",
+      "sha256": "d95bb550ddf166736b3aa5ffb8fb83d3543de344469a4de616e6f0003f50c064",
+      "size_bytes": 35752
     },
     {
       "kind": "file",
