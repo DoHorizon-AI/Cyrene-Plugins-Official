@@ -39,7 +39,7 @@ from .qqnt_direct_protocol import QQHostProtocolError, read_frame, write_frame
 QQ_HOST_PROTOCOL = "cyrene.qq.host.v1"
 QQ_HOST_PROTOCOL_VERSION = "1"
 _REDACTED_DIAGNOSTIC = re.compile(
-    r"(?i)(password|token|secret|ticket|cookie)(\s*[:=]\s*)\S+"
+    r"""(?i)((?:password|token|secret|ticket|cookie|qr[_-]?payload|qr[_-]?code|login[_-]?id)\s*["']?\s*[:=]\s*)(?:"[^"]*"|'[^']*'|[^\s,}]+)"""
 )
 _BINDING_OWNER_FILE = ".cyrene-binding-owner.json"
 
@@ -47,7 +47,7 @@ _BINDING_OWNER_FILE = ".cyrene-binding-owner.json"
 class QQHostError(RuntimeError):
     """Structured error produced by the QQ Host process boundary.
 
-        中文:QQ Host 进程边界产生的结构化错误。
+    中文:QQ Host 进程边界产生的结构化错误。
     """
 
     def __init__(self, code: str, message: str) -> None:
@@ -60,7 +60,7 @@ class QQHostError(RuntimeError):
 class QQHostLaunchConfig:
     """Immutable launch inputs for exactly one binding and one process tree.
 
-        中文:仅供一个 binding 和一个进程树使用的不可变启动输入。
+    中文:仅供一个 binding 和一个进程树使用的不可变启动输入。
     """
 
     binding_id: str
@@ -84,7 +84,7 @@ class QQHostLaunchConfig:
 class _PendingRequest:
     """One generation-scoped request waiting for a Host response.
 
-        中文:一条按代次关联、正在等待 Host 响应的请求。
+    中文:一条按代次关联、正在等待 Host 响应的请求。
     """
 
     completed: threading.Event
@@ -137,7 +137,7 @@ class QQHostClient:
     def binding_id(self) -> str:
         """Return the immutable binding identity assigned to this client.
 
-            中文:返回分配给此客户端的不可变 binding 身份。
+        中文:返回分配给此客户端的不可变 binding 身份。
         """
 
         return self._config.binding_id
@@ -146,7 +146,7 @@ class QQHostClient:
     def generation(self) -> int:
         """Return the current process generation, or zero before first start.
 
-            中文:返回当前进程代次;首次启动之前返回 0。
+        中文:返回当前进程代次;首次启动之前返回 0。
         """
 
         with self._state_lock:
@@ -156,7 +156,7 @@ class QQHostClient:
     def state(self) -> str:
         """Return the current lifecycle state.
 
-            中文:返回当前生命周期状态。
+        中文:返回当前生命周期状态。
         """
 
         with self._state_lock:
@@ -166,7 +166,7 @@ class QQHostClient:
     def compatibility(self) -> Mapping[str, Any]:
         """Return the bounded Host hello report without credentials.
 
-            中文:返回不含凭据的有界 Host hello 报告。
+        中文:返回不含凭据的有界 Host hello 报告。
         """
 
         with self._state_lock:
@@ -176,7 +176,7 @@ class QQHostClient:
     def diagnostics(self) -> tuple[str, ...]:
         """Return bounded, redacted diagnostics useful for operator evidence.
 
-            中文:返回有界且已脱敏、可供操作人员留存证据的诊断信息。
+        中文:返回有界且已脱敏、可供操作人员留存证据的诊断信息。
         """
 
         with self._state_lock:
@@ -186,7 +186,7 @@ class QQHostClient:
     def supervision(self) -> Mapping[str, Any]:
         """Return bounded restart and crash-circuit state for diagnostics.
 
-            中文:返回用于诊断的有界重启与崩溃熔断状态。
+        中文:返回用于诊断的有界重启与崩溃熔断状态。
         """
 
         with self._state_lock:
@@ -203,14 +203,14 @@ class QQHostClient:
     def start(self) -> Mapping[str, Any]:
         """Start the child, negotiate protocol compatibility, and return its report.
 
-        Raises:
-            QQHostError: If the child cannot start or fails the exact protocol,
-                binding, platform, or QQ client-version checks.
+                Raises:
+                    QQHostError: If the child cannot start or fails the exact protocol,
+                        binding, platform, or QQ client-version checks.
 
-            中文:启动子进程、协商协议兼容性并返回协商报告。
+                    中文:启动子进程、协商协议兼容性并返回协商报告。
 
-Raises:如果子进程无法启动,或未通过针对协议、binding、平台或 QQ 客户端版本的精确校验,
-则抛出 QQHostError。
+        Raises:如果子进程无法启动,或未通过协议、binding、平台或
+        QQ 客户端版本的精确校验,则抛出 QQHostError。
         """
 
         with self._state_lock:
@@ -347,7 +347,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
     def restart(self) -> Mapping[str, Any]:
         """Drain the current child and start a new generation for this binding.
 
-            中文:排空当前子进程,并为此 binding 启动一个新的代次。
+        中文:排空当前子进程,并为此 binding 启动一个新的代次。
         """
 
         self.close()
@@ -410,7 +410,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
     ) -> Any:
         """Send one fixed operation and await its generation-scoped response.
 
-            中文:发送一个固定操作,并等待与当前代次关联的响应。
+        中文:发送一个固定操作,并等待与当前代次关联的响应。
         """
 
         if not isinstance(operation, str) or not operation.strip():
@@ -499,7 +499,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
     def close(self) -> None:
         """Request shutdown, then boundedly reap the entire child process.
 
-            中文:请求关闭,然后在有界时间内回收整个子进程。
+        中文:请求关闭,然后在有界时间内回收整个子进程。
         """
 
         with self._state_lock:
@@ -540,9 +540,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
                 try:
                     stream.close()
                 except (BrokenPipeError, OSError):
-                    self._record_diagnostic(
-                        "QQ Host process stream was already closed"
-                    )
+                    self._record_diagnostic("QQ Host process stream was already closed")
         for thread in (self._reader_thread, self._stderr_thread):
             if thread is not None and thread is not threading.current_thread():
                 thread.join(timeout=self._config.shutdown_timeout_seconds)
@@ -715,7 +713,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
     def _listener_watch_loop(self) -> None:
         """Fail closed if the binding-local Host process tree opens TCP LISTEN.
 
-            中文:如果 binding 本地的 Host 进程树打开了 TCP LISTEN listener,则失败关闭。
+        中文:如果 binding 本地的 Host 进程树打开了 TCP LISTEN listener,则失败关闭。
         """
 
         process = self._process
@@ -731,7 +729,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
                 return
 
     def _record_diagnostic(self, value: str) -> None:
-        redacted = _REDACTED_DIAGNOSTIC.sub(r"\1\2<redacted>", value)[:512]
+        redacted = _REDACTED_DIAGNOSTIC.sub(r"\1<redacted>", value)[:512]
         with self._state_lock:
             self._diagnostics.append(redacted)
             del self._diagnostics[:-64]
@@ -745,7 +743,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
     ) -> None:
         """Mark one still-current Host generation failed without touching others.
 
-            中文:仅将一个仍为当前代次的 Host 标记为失败,不触碰其他代次。
+        中文:仅将一个仍为当前代次的 Host 标记为失败,不触碰其他代次。
         """
 
         with self._state_lock:
@@ -760,7 +758,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
     def _prune_restart_history(self, now: float) -> None:
         """Discard recovery attempts outside the configured rolling window.
 
-            中文:丢弃落在已配置滚动时间窗之外的恢复尝试。
+        中文:丢弃落在已配置滚动时间窗之外的恢复尝试。
         """
 
         cutoff = now - self._config.restart_window_seconds
@@ -771,7 +769,7 @@ Raises:如果子进程无法启动,或未通过针对协议、binding、平台�
     def _release_binding_lock(self) -> None:
         """Unlock and close this binding's active owner-marker handle.
 
-            中文:解锁并关闭此 binding 当前持有的 owner-marker 句柄。
+        中文:解锁并关闭此 binding 当前持有的 owner-marker 句柄。
         """
 
         handle = self._binding_lock_handle
@@ -803,7 +801,7 @@ def _terminate_process_tree(
 ) -> None:
     """Terminate the binding-local process group without touching other bindings.
 
-        中文:终止 binding 本地的进程组,不触碰其他 binding。
+    中文:终止 binding 本地的进程组,不触碰其他 binding。
     """
 
     if process.poll() is not None and not include_exited:
@@ -870,7 +868,7 @@ def _assert_no_tcp_listener(process: subprocess.Popen[bytes]) -> None:
 def _linux_tcp_listening_inodes() -> set[str]:
     """Return socket inodes in the Linux IPv4/IPv6 TCP LISTEN state.
 
-        中文:返回处于 Linux IPv4／IPv6 TCP LISTEN 状态的 socket inode。
+    中文:返回处于 Linux IPv4／IPv6 TCP LISTEN 状态的 socket inode。
     """
 
     inodes: set[str] = set()
@@ -892,7 +890,7 @@ def _linux_tcp_listening_inodes() -> set[str]:
 def _linux_process_tree(root_pid: int) -> tuple[int, ...]:
     """Return a best-effort snapshot of one process and its descendants.
 
-        中文:尽力返回一个进程及其后代进程的快照。
+    中文:尽力返回一个进程及其后代进程的快照。
     """
 
     parents: dict[int, int] = {}

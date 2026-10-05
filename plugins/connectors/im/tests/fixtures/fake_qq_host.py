@@ -15,6 +15,7 @@ import os
 import socket
 import subprocess
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -190,6 +191,37 @@ def _response(
             "state": "ready",
             "account_id": "10001",
         }
+    if operation == "qq.login.qr" and mode in {
+        "login_qr",
+        "qr_expired",
+        "login_authorized",
+        "login_authorized_mismatch",
+        "login_expired",
+    }:
+        expires_at = datetime.now(timezone.utc) + timedelta(
+            seconds=-1 if mode == "qr_expired" else 120
+        )
+        result = {
+            "login_id": "fixture-login-1",
+            "qr_payload": "cyrene-fixture-opaque-login-payload",
+            "expires_at_utc": expires_at.isoformat().replace("+00:00", "Z"),
+            "state": "pending",
+        }
+    if operation == "qq.login.poll" and mode in {
+        "login_authorized",
+        "login_authorized_mismatch",
+        "login_expired",
+    }:
+        result = {
+            "login_id": params.get("login_id", "fixture-login-1"),
+            "state": (
+                "expired"
+                if mode == "login_expired"
+                else "authorized"
+            ),
+        }
+        if mode != "login_expired":
+            result["account_id"] = "10002" if mode == "login_authorized_mismatch" else "10001"
     if mode == "login_failed" and operation == "qq.login.quick":
         return {
             "type": "response",
@@ -469,7 +501,10 @@ def main() -> int:
             }
         )
     if mode == "stderr_secret":
-        sys.stderr.write("password=fixture-password token=fixture-token\n")
+        sys.stderr.write(
+            'password=fixture-password token=fixture-token '
+            'qr_payload="fixture opaque QR payload"\n'
+        )
         sys.stderr.flush()
     if mode == "crash_once":
         marker = Path(os.environ.get("CYRENE_QQ_BINDING_DATA_DIR", ".")) / (
@@ -606,6 +641,40 @@ def main() -> int:
                         "status": "completed",
                         "progress": 1.0,
                     },
+                }
+            )
+        if operation == "qq.login.qr" and mode in {
+            "login_qr",
+            "qr_expired",
+            "login_authorized",
+            "login_authorized_mismatch",
+            "login_expired",
+        }:
+            qr_result = response.get("result", {})
+            _write_frame(
+                {
+                    "type": "event",
+                    "event": "login.qr",
+                    "event_id": f"{message.get('request_id')}-qr",
+                    "binding_id": binding_id,
+                    "generation": generation,
+                    "payload": qr_result,
+                }
+            )
+        if operation == "qq.login.poll" and mode in {
+            "login_authorized",
+            "login_authorized_mismatch",
+            "login_expired",
+        }:
+            login_result = response.get("result", {})
+            _write_frame(
+                {
+                    "type": "event",
+                    "event": "login.state",
+                    "event_id": f"{message.get('request_id')}-state",
+                    "binding_id": binding_id,
+                    "generation": generation,
+                    "payload": login_result,
                 }
             )
         if operation == "qq.message.subscribe":

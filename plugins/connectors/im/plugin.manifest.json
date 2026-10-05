@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
   "id": "cyrene.connectors.im",
-  "name": "Official QQ/IM Connector",
+  "name": "QQ Connector",
   "version": "0.1.0",
-  "description": "QQNT direct IM connector implementing message.connector.v1 and qq.client.v1.",
+  "description": "QQ connector implementing message.connector.v1 and qq.client.v1 over the configured Cyrene QQ Host protocol.",
   "kind": "capability-plugin",
   "capabilities": [
     "message.connector.v1",

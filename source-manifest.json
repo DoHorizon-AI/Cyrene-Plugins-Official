@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "581ce493db93a61962d2f38a60b1657ae6bf227effbf9c882d8f50b30b8ed87d",
-      "size_bytes": 37508
+      "sha256": "ed10148448db4522980197ab04000943dac7f1c5b78b756dbf31cdebf19d6de8",
+      "size_bytes": 37782
     },
     {
       "kind": "file",
@@ -159,15 +159,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "6497b18a1e7243d28ad934c270ac89ef5e75d0e994d18cd1b9ef57a9a7bea0e8",
-      "size_bytes": 19051
+      "sha256": "0ec179eddaddc9eaa3ed477c991a3ab76b3f219737a13a766f7bc7d4fa06b934",
+      "size_bytes": 19485
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "daae34a2fcca4dde58fd1930d91f6da59b1eda5806b873f9364efd1d3b843952",
-      "size_bytes": 18891
+      "sha256": "7b6d2a4e05047f30d8bd75aa7796e36a21573d2c449e27a2a87c348c7452fed6",
+      "size_bytes": 19655
     },
     {
       "kind": "file",
@@ -880,15 +880,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/QQNT_DIRECT_PROTOCOL.md",
-      "sha256": "eb513cc515bbd65e0ab6bc0ff8fe5c35749e11d2988d615d4843b274696f2d3b",
-      "size_bytes": 17323
+      "sha256": "6d892d284182fa58b347b6084b7ba0033cdf1203c1c87204e6fba3ded32b9afa",
+      "size_bytes": 20097
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/QQNT_DIRECT_REAL_SMOKE.md",
-      "sha256": "3e4e6d1a353590db6ef1b425112641cd1f8ff925139de4c904dc243f2752d624",
-      "size_bytes": 13997
+      "sha256": "c705447f90cb0a2e60357382efbaf70f303d6cf1c61f56aef08d60e815730e8d",
+      "size_bytes": 15368
     },
     {
       "kind": "file",
@@ -908,22 +908,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/README.md",
-      "sha256": "c4dbf4376cf8570aed08f090e3b09b177bdf7ae6a80af0a306e7d8fbe08b4c6d",
-      "size_bytes": 2790
+      "sha256": "7ba5e080b7dfd188a824f616830a16c1b753b937b8d07f254b52da72e2be8427",
+      "size_bytes": 5321
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/behavior_matrix.json",
-      "sha256": "79bebf05e58f8d4cdd95987d4d2f538fef4d63836f0ff90cca55af7be09bc9ca",
-      "size_bytes": 17961
+      "sha256": "61b26bc80b424195200fe9b274f5aed9786915d28dec462956653d0d2b168f6f",
+      "size_bytes": 20112
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/configuration.schema.json",
-      "sha256": "a5dc705e7f9bd4dcb43451f94014dd3ffe4ea362b31ec7969a929015cb95f115",
-      "size_bytes": 8498
+      "sha256": "4d719efd57f22342052628fbbccd20e9d3cf8d8e2f411ea3279df14db6de505a",
+      "size_bytes": 8716
     },
     {
       "kind": "file",
@@ -936,22 +936,36 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/package-descriptor.json",
-      "sha256": "eb381ab63aaebbe106db264ad7405bbdd8e41198268201b67fecb593fc2c4783",
-      "size_bytes": 2482
+      "sha256": "6564422d595874fd370c2fae7393d2a8a84e31f031d974e86a563876f53a4375",
+      "size_bytes": 3208
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/plugin.manifest.json",
-      "sha256": "bf28607e3c04df923430b392fd9397a175184b9c54337680525ab488cf50bea8",
-      "size_bytes": 27188
+      "sha256": "cb45088dcacf6f9a8fe07749b2561e42f9e0cf2a9416d4fa161426c67c97616d",
+      "size_bytes": 27208
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/pyproject.toml",
-      "sha256": "52129d131ed2de4c3aaf7fed39deb1f27337260c906592b789aed016c4f66018",
-      "size_bytes": 915
+      "sha256": "5664e2043dc86d71c985f2023beeaa98bd6350fae0f1cc75855ba440578cb171",
+      "size_bytes": 1065
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/qq-package-lock.example.json",
+      "sha256": "be0503bec9c99802bfae10ba8a354f0d20d5b108bea63cc1c176a828640617e2",
+      "size_bytes": 88
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/im/qq-package-lock.schema.json",
+      "sha256": "cce467cdb0eb443ebe1dc939a12df1d8d183175a089665b4aa1c2217645bcc1d",
+      "size_bytes": 1657
     },
     {
       "kind": "file",
@@ -964,8 +978,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/__init__.py",
-      "sha256": "c09c07f773a51abc304e128b8c1bdc0124dd2835aa22c900acd35e3662f4dc54",
-      "size_bytes": 2206
+      "sha256": "4239311b4dce41d41f2cd21715be08a5b135b274ce1a579615f5449d2c018115",
+      "size_bytes": 2763
     },
     {
       "kind": "file",
@@ -984,6 +998,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/navigator_bridge.py",
+      "sha256": "5164ec387dfe994f76b6c07f91f0a3721a3e99880934010c451cae1b4fe58c24",
+      "size_bytes": 4467
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/plugin.py",
       "sha256": "60bcb751181fc5bf229aa531833332a0abc7d0dde1caea09033752a72139c566",
       "size_bytes": 5509
@@ -991,9 +1012,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/im/src/qq_connector/qq_official_packages.py",
+      "sha256": "8c73a9df624058d47ebd1ca9550a48e8f4dbe3e18e49b62fc1870480c5e39178",
+      "size_bytes": 28180
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct.py",
-      "sha256": "a90944b0322a1608433efa76e1e8d2a12b5290724aca277052917a3b03124a52",
-      "size_bytes": 79255
+      "sha256": "52097b6d16ffbfe64311c83d19807eba494ca2252017b65d9d93a3d0fd358178",
+      "size_bytes": 106752
     },
     {
       "kind": "file",
@@ -1006,8 +1034,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_host.py",
-      "sha256": "634ee3c9de344e9670e473807c407cfe4c6541c03c4cfe2db57b1ff45b11e150",
-      "size_bytes": 40052
+      "sha256": "072e50ddb8317bba31e66f93bc18cabf3e62cbc7a720586a5ddeb42d7076284b",
+      "size_bytes": 40048
     },
     {
       "kind": "file",
@@ -1034,8 +1062,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/fixtures/fake_qq_host.py",
-      "sha256": "fb053e04116d741d56ba0ae571f7afbb0f3a12f146b3fa50230d51394b707659",
-      "size_bytes": 22835
+      "sha256": "af67590f66864d91a983511b2ce6b20e07a4c3ab60fae720f618c3ea996310a8",
+      "size_bytes": 25243
     },
     {
       "kind": "file",
@@ -1054,6 +1082,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/im/tests/test_qq_official_packages.py",
+      "sha256": "0ea09c03fbcbcf4e7f80195716f1b95eff4de0f079e063762ee0fbdccab035e5",
+      "size_bytes": 7311
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/im/tests/test_qqnt_dependency_boundary.py",
       "sha256": "19705b3777c38335e3279f6e05ad57e32ab5bdf8902e7f4793a51bfbef88d392",
       "size_bytes": 2035
@@ -1062,15 +1097,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/test_qqnt_direct.py",
-      "sha256": "ad9bfe45e1d2b82001042b65f9d0b06b463a7843d01f5699273b79e57d4e74ea",
-      "size_bytes": 57706
+      "sha256": "ac0ebee7199731c5bab9358021ec2fa8641024adf8ea6252ff9a3f578cd2bff3",
+      "size_bytes": 63068
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tests/test_qqnt_host_tck.py",
-      "sha256": "584164e2d85c466b58df1cff6d7e456b6fed751289cb5bcd8e8675bb278e2a5c",
-      "size_bytes": 10875
+      "sha256": "b9da4226c9f365783d92307a1008ad8cec59f4f64cd04249c02e277daa600326",
+      "size_bytes": 12532
     },
     {
       "kind": "file",
@@ -1090,8 +1125,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/tools/verify_behavior_matrix.py",
-      "sha256": "c806512a72709b5b4299899405ab32b162970fd40d73105c540f5896ee4be2ec",
-      "size_bytes": 6095
+      "sha256": "aa9602a0b4a5894ca675452ce12ec2f4164a499021848eaa5812eb1cbd26b815",
+      "size_bytes": 6237
     },
     {
       "kind": "file",
@@ -1328,36 +1363,36 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/README.md",
-      "sha256": "5d6522534b225c3497533ce77f9b7685a7556a8d3734395b638f9a5ea5583bd8",
-      "size_bytes": 5163
+      "sha256": "5f9f80ea8f14947f7b5474326f0a49f59814f3548bdf6e027b630eb50e5c69f5",
+      "size_bytes": 15811
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/configuration.schema.json",
-      "sha256": "95b0bf6d76192f0de6d2b7e46b1a2139e6637288e270e340321d73fcb4640006",
-      "size_bytes": 750
+      "sha256": "4181f056993cbe339263573c4d16320a7e8a07e0e80525f78c68599915eb5952",
+      "size_bytes": 5265
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/plugin.manifest.json",
-      "sha256": "16247935547f827706f6593790d64fdafe494e32efda52fc7e1d14c17ec5089a",
-      "size_bytes": 1330
+      "sha256": "95cf5fd06e2400a81079fad56685961f71cade938908cd28bb991fd5e6d85d3a",
+      "size_bytes": 1929
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/pyproject.toml",
-      "sha256": "833597ebede7333a34fe3997121d71e9ac12f111fa03ab7375e0c8827934e3fe",
-      "size_bytes": 815
+      "sha256": "d9fa7222e077fc17a5470792cab50cdee61defccfbbaf82205e39f2f05989497",
+      "size_bytes": 896
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/__init__.py",
-      "sha256": "ce255e6b0d233b725b0dd8045c09f456dcb04ccf17ae01b6d43aff419dff7183",
-      "size_bytes": 674
+      "sha256": "f675b529a49a3d2cba4c4446317c65cf1f7258913fcfb91dd3455b01dc1ad340",
+      "size_bytes": 2923
     },
     {
       "kind": "file",
@@ -1369,30 +1404,121 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/_generated/tool_provider_pb2.py",
+      "sha256": "b3013443e2a8a1b9de2be9772e4b04e8d328246756240ca5dd7186a8c542efa8",
+      "size_bytes": 4836
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/bot_client.py",
+      "sha256": "7176489438059c402c9b702a07fa63aba2dc419422a11161602ba47482be0a68",
+      "size_bytes": 21641
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/bot_runtime.py",
+      "sha256": "d755c8b6d8b9a9f0e82504ff30d83bfb2c27dfc61c8293d71b6f54845f9196fb",
+      "size_bytes": 6987
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/cli.py",
+      "sha256": "698d38e4a50a4532763d038fd5f743d2a12ed6583068fb9e8d7b25932ccf3091",
+      "size_bytes": 8220
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/connector.py",
-      "sha256": "03d63dd4d98cdad868323730573de884f1c93bec1091679c1112ca8e1c9fd594",
-      "size_bytes": 39592
+      "sha256": "b59ef7016147eb8eb52e606344cead5c02066b0c5e6b3448250473aaef102a67",
+      "size_bytes": 77459
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/errors.py",
+      "sha256": "059d636cb6b77977604fd96ddb688e6a38f56438412e51f5c1b19b12f9db3ade",
+      "size_bytes": 433
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/navigator.py",
+      "sha256": "7424ef0f0d1ff692cba5f91515c026e2d2b21b08e5643657a9d0470dc549cb70",
+      "size_bytes": 18027
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/navigator_workbridge.py",
+      "sha256": "f53e6f73d0dfb63a618db321e6edc21ecf57e12501c07a9385a573fd7773c42c",
+      "size_bytes": 7834
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/notification_worker.py",
+      "sha256": "f8e2a7dd6658e7e0c503cbf10201033d40b9868263776fc6ec9299ceaf24ec24",
+      "size_bytes": 14156
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/src/wecom_connector/tool_provider.py",
+      "sha256": "017b619ee71497d559b46cf5e086581b562f78ac5aed73cb0dfb0f8018f4717b",
+      "size_bytes": 18236
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_bot.py",
+      "sha256": "c1d83f266fee62ddf81fb784d0773c0511efd5ea591fff6ce85bb11c7ce9de20",
+      "size_bytes": 16328
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_cli.py",
+      "sha256": "8df9f7ad77bd34ef343fc009c740400585692218824ebba08bec8a75415cf49d",
+      "size_bytes": 15478
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_connector.py",
-      "sha256": "503c1c145c6ab59257691d6cb3bf148d07a2644e5389a472a9852eec9238e874",
-      "size_bytes": 17891
+      "sha256": "c0af08102c801d1201bb555c8138285109967588caebc41d97befc7d2c4d063e",
+      "size_bytes": 17847
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_live_smoke.py",
+      "sha256": "bad46afad4385d78364a894b16bfd0d24d542142fb5a542f8d495dbbfc368239",
+      "size_bytes": 1966
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/wecom/tests/test_wecom_navigator.py",
+      "sha256": "c31ec6523ce2e1c9f49e3a1764b5d82f4e3bb867f6696a490eda096cf7fb5a01",
+      "size_bytes": 15080
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_transport.py",
-      "sha256": "828e18acbccfbd120613f12935e5ff481c33d2ae91e280a12e3266b71724715a",
-      "size_bytes": 7689
+      "sha256": "a0f81e3a8f53f475a3175209fa3d8984db66a748041acc1a6e3de67e32809751",
+      "size_bytes": 7685
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tools/generate_message_connector_bindings.py",
-      "sha256": "94414013d8d76fd0560bbc5bb332eaf56ade1a566ac7208f39c3ba175c43be85",
-      "size_bytes": 2288
+      "sha256": "5f60a925a2ce9e3847027defbf4238c3e772431177cb131f1ba4a9ebd0f24484",
+      "size_bytes": 3474
     },
     {
       "kind": "file",
@@ -1916,15 +2042,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectEventSubscriptionRegistry.cs",
-      "sha256": "9e4c04c9d384502dab8484329c249ea754f1a2a29476c0d64c84722d4e04fe71",
-      "size_bytes": 12915
+      "sha256": "38c249555c7f5a7b7b1ec525f94239202200bb316d90956b61dd82077c6202ad",
+      "size_bytes": 13161
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectInvocationDispatcher.cs",
-      "sha256": "65137c348269a14af14d110c630374af189e00e05304a45103858f615abc9141",
-      "size_bytes": 26561
+      "sha256": "5744e25bf23c5ecd09bb17abc3cafa4f0ad4106ade00c46b001d70e20a70e122",
+      "size_bytes": 49806
     },
     {
       "kind": "file",
@@ -1937,15 +2063,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqDirectProfile.cs",
-      "sha256": "2216e317d8b6317d61746ff6c18a4f28518baf940fca818531c66590ab8a3f58",
-      "size_bytes": 12456
+      "sha256": "6916a27bf355d14b4a72e83c52191d868d0c56871dfd53ff68d659a0f6f9ed7c",
+      "size_bytes": 12821
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostClient.cs",
-      "sha256": "c6d96f85e224ddcba7b0f975e56ec495f140d41abf636a8e63a3a4df40ec63cc",
-      "size_bytes": 44052
+      "sha256": "986c67c4e24d550099a609bd0c284185a8b1bf5f8725ccff2ac2a3194d0ed783",
+      "size_bytes": 44916
     },
     {
       "kind": "file",
@@ -1958,8 +2084,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Core/QqHostJsonModels.cs",
-      "sha256": "c80766c3fa9dac794c6397e32e7aca2098a3f2020b8fff320a7455d023c32d97",
-      "size_bytes": 17846
+      "sha256": "c622884c2bf2300ed0dee08464a07390d3e85660919efac9f165d40f229a4d22",
+      "size_bytes": 21034
     },
     {
       "kind": "file",
@@ -2007,8 +2133,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/dotnet-native-aot/Cyrene.Im.Tests/DispatcherTests.cs",
-      "sha256": "d595bcd689df46e752b92947f66761c36d263e27dd80728f1e7d8b77a9353a2f",
-      "size_bytes": 35257
+      "sha256": "0b07a81fd4115b293698114515e2ad79a20943272b52b8012c22ddd77ea6ba93",
+      "size_bytes": 43990
     },
     {
       "kind": "file",
@@ -4982,8 +5108,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "21dd82676b7f3f63907b304fe251de7a66e723254252771c658a764726da433f",
-      "size_bytes": 23726
+      "sha256": "c272fcfb79cab2a74d625706a63e46d4b765554c6936ae9a9f182c85f54ae358",
+      "size_bytes": 23714
     },
     {
       "kind": "file",
@@ -5108,8 +5234,8 @@
       "kind": "file",
       "mode": "100755",
       "path": "tools/ci/exercise_im_native_qqnt.py",
-      "sha256": "8632bca84df80941dce55457b6206eefc23821807e965a478a8de6bd8614e412",
-      "size_bytes": 16620
+      "sha256": "5edff96a9fd1dd9de8603e7cb5893038bab0e043d036bf60e8d59ae9b19e6c3f",
+      "size_bytes": 16845
     },
     {
       "kind": "file",
