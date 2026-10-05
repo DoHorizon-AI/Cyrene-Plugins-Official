@@ -325,6 +325,7 @@ impl WorkspaceConnectorWorker {
                     ConnectorError::Invocation("canonical invocation body is missing".into())
                 })?,
                 target,
+                credential,
                 Duration::ZERO,
             );
             let result = dispatch.await;

@@ -11,7 +11,7 @@ use std::time::Duration;
 use clap::Parser;
 use cyrene_workspace_client_sdk::{AuthorityClient, ClientSdkError, MutualTlsClientConfig};
 use cyrene_workspace_connector::WorkspaceConnectorWorker;
-use cyrene_workspace_product_adapters::GenericProductHttpAdapter;
+use cyrene_workspace_product_adapters::{GenericProductHttpAdapter, ProtectedCredentialProvider};
 use tracing::{error, info};
 
 const MAX_STARTUP_CONNECTION_ATTEMPTS: u32 = 8;
@@ -66,6 +66,9 @@ struct Args {
         value_delimiter = ','
     )]
     allowed_private_origins: Vec<String>,
+
+    #[arg(long, env = "CYRENE_CONNECTOR_PRODUCT_CREDENTIAL_MAP")]
+    product_credential_map_path: String,
 
     #[arg(
         long,
@@ -149,9 +152,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
+    let credential_provider = ProtectedCredentialProvider::new(&args.product_credential_map_path)?;
     let http_adapter = Arc::new(GenericProductHttpAdapter::new(
         Duration::from_secs(30),
         args.allowed_private_origins,
+        credential_provider,
     ));
     let mut worker = WorkspaceConnectorWorker::new_with_readiness(
         args.workspace_id,
