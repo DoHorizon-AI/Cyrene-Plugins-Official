@@ -5234,8 +5234,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/connection_release.py",
-      "sha256": "d5618aca30b6ad0838b9a0c67e16285a27d479eb64addfa6de1d7d46f8e1f666",
-      "size_bytes": 26821
+      "sha256": "28c0eb77980bc32b5225f662bc1ffb4d5da8dd13cbdb9992aaea51e8225326de",
+      "size_bytes": 26798
     },
     {
       "kind": "file",
