@@ -1482,8 +1482,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_cli.py",
-      "sha256": "656f6fd099120fb05dcfdbfb246b5f7294eaa9f94218b4e5a941067266715efe",
-      "size_bytes": 14997
+      "sha256": "8df9f7ad77bd34ef343fc009c740400585692218824ebba08bec8a75415cf49d",
+      "size_bytes": 15478
     },
     {
       "kind": "file",
@@ -5094,8 +5094,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "21dd82676b7f3f63907b304fe251de7a66e723254252771c658a764726da433f",
-      "size_bytes": 23726
+      "sha256": "c272fcfb79cab2a74d625706a63e46d4b765554c6936ae9a9f182c85f54ae358",
+      "size_bytes": 23714
     },
     {
       "kind": "file",

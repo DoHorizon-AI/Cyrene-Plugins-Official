@@ -25,8 +25,17 @@ from wecom_connector import (
 from wecom_connector._generated import tool_provider_pb2 as tool_contract
 
 
-def test_wecom_cli_version_parsing() -> None:
-    client = WeComCliClient()
+@pytest.fixture
+def fake_wecom_cli(tmp_path) -> WeComCliClient:
+    """Provide an isolated executable path without searching the host PATH."""
+    executable = tmp_path / "wecom-cli"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    return WeComCliClient(executable_path=executable)
+
+
+def test_wecom_cli_version_parsing(fake_wecom_cli: WeComCliClient) -> None:
+    client = fake_wecom_cli
     with patch.object(
         client,
         "_run_raw",
@@ -41,8 +50,10 @@ def test_wecom_cli_version_parsing() -> None:
         assert version == "1.3.4"
 
 
-def test_wecom_cli_auth_status_authorized() -> None:
-    client = WeComCliClient()
+def test_wecom_cli_auth_status_authorized(
+    fake_wecom_cli: WeComCliClient,
+) -> None:
+    client = fake_wecom_cli
     with patch.object(
         client,
         "_run_raw",
@@ -57,8 +68,8 @@ def test_wecom_cli_auth_status_authorized() -> None:
         assert status == "authorized"
 
 
-def test_wecom_cli_execute_json_output() -> None:
-    client = WeComCliClient()
+def test_wecom_cli_execute_json_output(fake_wecom_cli: WeComCliClient) -> None:
+    client = fake_wecom_cli
     fake_json = {"items": [{"title": "Review PR"}], "total": 1}
     with patch.object(
         client,
@@ -74,8 +85,8 @@ def test_wecom_cli_execute_json_output() -> None:
         assert res == fake_json
 
 
-def test_wecom_cli_execute_error_handling() -> None:
-    client = WeComCliClient()
+def test_wecom_cli_execute_error_handling(fake_wecom_cli: WeComCliClient) -> None:
+    client = fake_wecom_cli
     with patch.object(
         subprocess,
         "run",
@@ -110,8 +121,8 @@ def test_tool_provider_list_tools() -> None:
     assert "wecom_cli_exec" not in tool_ids
 
 
-def test_tool_provider_call_auth_status() -> None:
-    cli = WeComCliClient()
+def test_tool_provider_call_auth_status(fake_wecom_cli: WeComCliClient) -> None:
+    cli = fake_wecom_cli
     with (
         patch.object(
             cli,
