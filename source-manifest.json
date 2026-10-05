@@ -11,15 +11,15 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/component-release.yml",
-      "sha256": "6121d15be1d7bd3733680cd670d48dc57a82f9407645b281f4a1eb5d7c43c3de",
-      "size_bytes": 35014
+      "sha256": "41c5464ea62cfa818691d43944ad91cf88d4e4760d10c062fa5b1aa7a1728dae",
+      "size_bytes": 35031
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "140e0d9591faedd6d917efbaf02f64ff8b83fe155744aa8adcd203b613676eb4",
-      "size_bytes": 37371
+      "sha256": "581ce493db93a61962d2f38a60b1657ae6bf227effbf9c882d8f50b30b8ed87d",
+      "size_bytes": 37508
     },
     {
       "kind": "file",

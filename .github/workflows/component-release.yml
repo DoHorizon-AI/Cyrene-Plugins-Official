@@ -94,7 +94,7 @@ jobs:
       - name: Run connection runtime source gates
         run: |
           set -euo pipefail
-          for crate in relay connector sidecar frontend-bridge; do
+          for crate in relay connector sidecar frontend-bridge product-adapters; do
             cargo test --locked --manifest-path "runtime/rust/cyrene-workspace-$crate/Cargo.toml"
           done
       - name: Validate release tool syntax
