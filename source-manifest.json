@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "ed10148448db4522980197ab04000943dac7f1c5b78b756dbf31cdebf19d6de8",
-      "size_bytes": 37782
+      "sha256": "7a3700327b57955fa3382bea4c6c1cf880105d86821ae7f495f6cda1a0fdc7d3",
+      "size_bytes": 38008
     },
     {
       "kind": "file",
@@ -5079,6 +5079,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tests/release/test_connection_release_health.py",
+      "sha256": "d250f4df02332ec1e9f79746c25d9ab1f4ceb24af5712a47352cedfbc61c19fe",
+      "size_bytes": 9097
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tests/release/test_training_llama_factory_package.py",
       "sha256": "6ec840b5b9135c654f58c4b025d8412df3320c5e8a62a1ed48e8620a959e3fea",
       "size_bytes": 9935
@@ -5227,8 +5234,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/connection_release.py",
-      "sha256": "e8f31eebbed0a7008935e89c086d568408be613ef7b375e24cbac2f3dabe4bd4",
-      "size_bytes": 25895
+      "sha256": "d5618aca30b6ad0838b9a0c67e16285a27d479eb64addfa6de1d7d46f8e1f666",
+      "size_bytes": 26821
     },
     {
       "kind": "file",
