@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.tools.dataset-generation",
+  "name": "Dataset Generation",
+  "version": "0.1.0",
+  "description": "Build provenance-preserving SFT bundles and opt-in grounded QA drafts through model.provider.v1.",
+  "kind": "capability-plugin",
+  "capabilities": ["dataset.generation.v1"],
+  "supportedServices": ["Cyrene-Catalyst"],
+  "methods": [
+    {
+      "name": "prepare_sft",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/PrepareSftRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/PrepareSftResponse"
+    },
+    {
+      "name": "generate_qa",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/GenerateQaRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/GenerateQaResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "dataset_generation:DatasetGenerationPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "dataset_generation:DatasetGenerationPlugin"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": ["linux", "windows", "darwin"]
+  },
+  "configuration": {
+    "schemaRef": "contracts/v1/configuration.schema.json"
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

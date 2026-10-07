@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.tools.document-parsing",
+  "name": "Document Parsing",
+  "version": "0.1.0",
+  "description": "Stateless PDF and DOCX conversion to DoclingDocument JSON, a located block index, and digest receipts.",
+  "kind": "capability-plugin",
+  "capabilities": ["document.parsing.v1"],
+  "supportedServices": ["Cyrene-Catalyst"],
+  "methods": [
+    {
+      "name": "parse",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/ParseRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/ParseResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "document_parsing:DocumentParsingPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "document_parsing:DocumentParsingPlugin"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": ["linux", "windows", "darwin"]
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

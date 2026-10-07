@@ -1,0 +1,317 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/dataset.generation.v1/schema.json",
+  "title": "dataset.generation.v1",
+  "description": "Private executor payload contract for review-gated SFT packaging and explicitly requested grounded QA drafts.",
+  "$defs": {
+    "AbsolutePath": {"type": "string", "minLength": 1},
+    "Uuid": {"type": "string", "format": "uuid"},
+    "Digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "Split": {
+      "type": "object",
+      "required": ["train", "validation", "test"],
+      "properties": {
+        "train": {"type": "number", "minimum": 0, "maximum": 1},
+        "validation": {"type": "number", "minimum": 0, "maximum": 1},
+        "test": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "FileReceipt": {
+      "type": "object",
+      "required": ["digest", "size_bytes", "row_count"],
+      "properties": {
+        "digest": {"$ref": "#/$defs/Digest"},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "row_count": {"type": "integer", "minimum": 0},
+        "schema_fields": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "Citation": {
+      "type": "object",
+      "required": ["source_revision_id", "block_id"],
+      "properties": {
+        "source_revision_id": {"$ref": "#/$defs/Uuid"},
+        "block_id": {"type": "string", "minLength": 1},
+        "locator": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "GenerationProvenance": {
+      "type": "object",
+      "required": ["recipe_id", "recipe_version", "provider_binding_id", "model", "budget", "usage"],
+      "properties": {
+        "recipe_id": {"type": "string", "minLength": 1},
+        "recipe_version": {"type": "string", "minLength": 1},
+        "recipe_digest": {"type": "string", "minLength": 1},
+        "provider_binding_id": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "budget": {"type": "object"},
+        "usage": {"type": "object"},
+        "generated_at": {"type": "string", "format": "date-time"},
+        "source_block_ids": {"type": "array", "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
+    },
+    "ProductGenerationReceipt": {
+      "type": "object",
+      "required": ["recipeId", "recipeVersion", "recipeDigest", "bindingId", "model", "budget", "usage", "generatedAt", "sourceBlockIds"],
+      "properties": {
+        "recipeId": {"type": "string", "minLength": 1},
+        "recipeVersion": {"type": "string", "minLength": 1},
+        "recipeDigest": {"$ref": "#/$defs/Digest"},
+        "bindingId": {"type": "string", "minLength": 1},
+        "model": {"type": "string", "minLength": 1},
+        "budget": {"type": "object"},
+        "usage": {"type": "object"},
+        "generatedAt": {"type": "string", "format": "date-time"},
+        "sourceBlockIds": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+      },
+      "additionalProperties": false
+    },
+    "InstructionRecord": {
+      "type": "object",
+      "required": ["instruction", "output"],
+      "properties": {
+        "instruction": {"type": "string", "minLength": 1},
+        "input": {"type": "string"},
+        "output": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "ConversationTurn": {
+      "type": "object",
+      "required": ["from", "value"],
+      "properties": {
+        "from": {"enum": ["human", "assistant", "gpt"]},
+        "value": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": false
+    },
+    "ConversationRecord": {
+      "type": "object",
+      "required": ["conversations"],
+      "properties": {
+        "conversations": {
+          "type": "array",
+          "minItems": 2,
+          "items": {"$ref": "#/$defs/ConversationTurn"}
+        }
+      },
+      "additionalProperties": false
+    },
+    "SftSample": {
+      "type": "object",
+      "required": ["sample_id", "source_family_id", "content", "origin", "policy", "citations"],
+      "properties": {
+        "sample_id": {"type": "string", "minLength": 1},
+        "source_family_id": {"type": "string", "minLength": 1},
+        "group_id": {"type": ["string", "null"]},
+        "content": {
+          "oneOf": [
+            {"$ref": "#/$defs/InstructionRecord"},
+            {"$ref": "#/$defs/ConversationRecord"}
+          ]
+        },
+        "origin": {"enum": ["EXTRACTED", "NORMALIZED", "HUMAN_EDITED", "GENERATED"]},
+        "policy": {
+          "type": "object",
+          "properties": {
+            "allow_training": {"type": "boolean"},
+            "allowTraining": {"type": "boolean"},
+            "allowed_use_purposes": {"type": "array", "items": {"enum": ["knowledge_retrieval", "model_training"]}},
+            "allowedUsePurposes": {"type": "array", "items": {"enum": ["knowledge_retrieval", "model_training"]}},
+            "allowed_principal_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            "allowedPrincipalRefs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            "allow_knowledge": {"type": "boolean"},
+            "allowKnowledge": {"type": "boolean"}
+          },
+          "additionalProperties": false
+        },
+        "citations": {"type": "array", "minItems": 1, "items": {"$ref": "#/$defs/Citation"}},
+        "generation": {"$ref": "#/$defs/GenerationProvenance"}
+      },
+      "additionalProperties": false
+    },
+    "ManualSamplesDocument": {
+      "type": "object",
+      "required": ["schema_version", "content_revision_id", "content_revision_state", "samples"],
+      "properties": {
+        "schema_version": {"const": "cyrene.dataset.sft-samples.v1"},
+        "content_revision_id": {"$ref": "#/$defs/Uuid"},
+        "content_revision_state": {"const": "APPROVED"},
+        "samples": {"type": "array", "items": {"$ref": "#/$defs/SftSample"}}
+      },
+      "additionalProperties": false
+    },
+    "ContentBlock": {
+      "type": "object",
+      "required": ["id", "sourceRevisionId", "ordinal", "kind", "text", "origin", "policy"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "sourceRevisionId": {"$ref": "#/$defs/Uuid"},
+        "source_revision_id": {"$ref": "#/$defs/Uuid"},
+        "source_family_id": {"type": "string", "minLength": 1},
+        "sourceFamilyId": {"type": "string", "minLength": 1},
+        "source_id": {"type": "string", "minLength": 1},
+        "sourceId": {"type": "string", "minLength": 1},
+        "group_id": {"type": "string", "minLength": 1},
+        "groupId": {"type": "string", "minLength": 1},
+        "conversation_id": {"type": "string", "minLength": 1},
+        "conversationId": {"type": "string", "minLength": 1},
+        "sample_id": {"type": "string", "minLength": 1},
+        "sampleId": {"type": "string", "minLength": 1},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "kind": {"type": "string", "minLength": 1},
+        "text": {"type": "string", "minLength": 1},
+        "origin": {"enum": ["EXTRACTED", "NORMALIZED", "HUMAN_EDITED", "GENERATED"]},
+        "policy": {
+          "type": "object",
+          "properties": {
+            "allow_training": {"type": "boolean"},
+            "allowTraining": {"type": "boolean"},
+            "allow_knowledge": {"type": "boolean"},
+            "allowKnowledge": {"type": "boolean"},
+            "allowed_use_purposes": {"type": "array", "items": {"enum": ["knowledge_retrieval", "model_training"]}},
+            "allowedUsePurposes": {"type": "array", "items": {"enum": ["knowledge_retrieval", "model_training"]}},
+            "allowed_principal_refs": {"type": "array", "items": {"type": "string", "minLength": 1}},
+            "allowedPrincipalRefs": {"type": "array", "items": {"type": "string", "minLength": 1}}
+          },
+          "additionalProperties": false
+        },
+        "locator": {"type": "object"},
+        "generation": {"$ref": "#/$defs/GenerationProvenance"},
+        "generationProvenance": {"$ref": "#/$defs/GenerationProvenance"},
+        "generationReceipt": {"$ref": "#/$defs/ProductGenerationReceipt"}
+      },
+      "additionalProperties": false
+    },
+    "ApprovedBlocksDocument": {
+      "type": "object",
+      "required": ["blocks"],
+      "properties": {
+        "schema_version": {"enum": ["cyrene.content.blocks.v1", "cyrene.document.blocks.v1"]},
+        "content_revision_id": {"$ref": "#/$defs/Uuid"},
+        "content_revision_state": {"const": "APPROVED"},
+        "id": {"$ref": "#/$defs/Uuid"},
+        "contentRevisionId": {"$ref": "#/$defs/Uuid"},
+        "contentRevisionState": {"const": "APPROVED"},
+        "state": {"const": "APPROVED"},
+        "blocks": {"type": "array", "items": {"$ref": "#/$defs/ContentBlock"}}
+      },
+      "additionalProperties": false
+    },
+    "PrepareSftRequest": {
+      "type": "object",
+      "required": [
+        "bundle_path", "result_path", "dataset_id",
+        "content_revision_id", "processing_run_id", "mode"
+      ],
+      "oneOf": [
+        {"required": ["samples_path"]},
+        {"required": ["blocks_path"]}
+      ],
+      "properties": {
+        "blocks_path": {"$ref": "#/$defs/AbsolutePath"},
+        "samples_path": {"$ref": "#/$defs/AbsolutePath"},
+        "bundle_path": {"$ref": "#/$defs/AbsolutePath"},
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "dataset_id": {"$ref": "#/$defs/Uuid"},
+        "content_revision_id": {"$ref": "#/$defs/Uuid"},
+        "processing_run_id": {"$ref": "#/$defs/Uuid"},
+        "mode": {"enum": ["instruction", "conversation"]},
+        "split": {"$ref": "#/$defs/Split"}
+      },
+      "additionalProperties": false
+    },
+    "PrepareSftResponse": {
+      "type": "object",
+      "required": [
+        "profile", "bundle_digest", "bundle_size_bytes", "sample_count",
+        "files", "split_stats", "warnings"
+      ],
+      "properties": {
+        "profile": {"const": "CYRENE_SFT_BUNDLE_V1"},
+        "bundle_digest": {"$ref": "#/$defs/Digest"},
+        "bundle_size_bytes": {"type": "integer", "minimum": 0},
+        "sample_count": {"type": "integer", "minimum": 0},
+        "files": {
+          "type": "object",
+          "required": ["train.jsonl", "validation.jsonl", "test.jsonl", "provenance.jsonl", "manifest.json"],
+          "properties": {
+            "train.jsonl": {"$ref": "#/$defs/FileReceipt"},
+            "validation.jsonl": {"$ref": "#/$defs/FileReceipt"},
+            "test.jsonl": {"$ref": "#/$defs/FileReceipt"},
+            "provenance.jsonl": {"$ref": "#/$defs/FileReceipt"},
+            "manifest.json": {"$ref": "#/$defs/FileReceipt"}
+          },
+          "additionalProperties": false
+        },
+        "split_stats": {"type": "object"},
+        "warnings": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    },
+    "GenerationBudget": {
+      "type": "object",
+      "required": ["max_examples", "max_calls"],
+      "properties": {
+        "max_examples": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "max_calls": {"type": "integer", "minimum": 1, "maximum": 1000},
+        "max_input_tokens": {"type": "integer", "minimum": 1, "maximum": 1000000},
+        "max_output_tokens": {"type": "integer", "minimum": 1, "maximum": 100000}
+      },
+      "additionalProperties": false
+    },
+    "GenerateQaRequest": {
+      "type": "object",
+      "required": [
+        "blocks_path", "drafts_path", "provenance_path", "result_path",
+        "dataset_id", "content_revision_id", "processing_run_id", "generation"
+      ],
+      "properties": {
+        "blocks_path": {"$ref": "#/$defs/AbsolutePath"},
+        "drafts_path": {"$ref": "#/$defs/AbsolutePath"},
+        "provenance_path": {"$ref": "#/$defs/AbsolutePath"},
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "dataset_id": {"$ref": "#/$defs/Uuid"},
+        "content_revision_id": {"$ref": "#/$defs/Uuid"},
+        "processing_run_id": {"$ref": "#/$defs/Uuid"},
+        "split": {"$ref": "#/$defs/Split"},
+        "generation": {"$ref": "#/$defs/GenerationBudget"}
+      },
+      "additionalProperties": false
+    },
+    "GenerateQaResponse": {
+      "type": "object",
+      "required": [
+        "status", "drafts_digest", "drafts_size_bytes", "draft_count", "provenance_digest",
+        "provenance_size_bytes", "provider", "recipe", "budget", "split_stats",
+        "warnings"
+      ],
+      "properties": {
+        "status": {"const": "SUCCEEDED"},
+        "drafts_digest": {"$ref": "#/$defs/Digest"},
+        "drafts_size_bytes": {"type": "integer", "minimum": 0},
+        "draft_count": {"type": "integer", "minimum": 0},
+        "provenance_digest": {"$ref": "#/$defs/Digest"},
+        "provenance_size_bytes": {"type": "integer", "minimum": 0},
+        "provider": {
+          "type": "object",
+          "required": ["binding_id", "model"],
+          "properties": {
+            "binding_id": {"type": "string", "minLength": 1},
+            "model": {"type": "string", "minLength": 1}
+          },
+          "additionalProperties": false
+        },
+        "recipe": {"type": "object"},
+        "budget": {"type": "object"},
+        "split_stats": {"type": "object"},
+        "warnings": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    }
+  }
+}

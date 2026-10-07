@@ -85,6 +85,54 @@ capabilities:
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/computer_runtime_contract_tck.rs
       - contracts/tck/computer-runtime-v1
+  - id: dataset.generation.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/dataset-generation/contracts/v1/schema.json
+    contract_methods:
+      - generate_qa
+      - prepare_sft
+    implementations:
+      - ref: cyrene.tools.dataset-generation
+        source: plugins/tools/dataset-generation/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - generate_qa
+          - prepare_sft
+        interface_versions:
+          - "1"
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-07
+    tck: []
+  - id: dataset.knowledge.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/knowledge-preparation/contracts/v1/schema.json
+    contract_methods:
+      - build
+    implementations:
+      - ref: cyrene.tools.knowledge-preparation
+        source: plugins/tools/knowledge-preparation/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - build
+        interface_versions:
+          - "1"
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-10-07
+    tck: []
   - id: dataset.preparation.v1
     interface_versions:
       - "1"
@@ -111,6 +159,29 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: REAL
         verified_at: 2026-09-13
+    tck: []
+  - id: document.parsing.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/document-parsing/contracts/v1/schema.json
+    contract_methods:
+      - parse
+    implementations:
+      - ref: cyrene.tools.document-parsing
+        source: plugins/tools/document-parsing/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - parse
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-10-07
     tck: []
   - id: evaluation.runner.v1
     interface_versions:
