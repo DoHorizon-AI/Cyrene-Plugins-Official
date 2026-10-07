@@ -17,6 +17,7 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
 
+import pytest
 from office_parsing import parse_office
 from openpyxl import Workbook
 from openpyxl.worksheet.table import Table
@@ -137,6 +138,41 @@ def test_xlsx_payload_and_blocks_are_utf8_json_serializable(tmp_path: Path) -> N
 
     assert "客户说明：已审核" in result.blocks[0]["text"]
     assert "客户说明：已审核" in str(result.payload["sheets"][0]["cells"])
+
+
+@pytest.mark.parametrize(
+    ("suffix", "media_type", "expected_format"),
+    [
+        (".pptx", PPTX_MEDIA_TYPE, "PPTX"),
+        (".xlsx", XLSX_MEDIA_TYPE, "XLSX"),
+    ],
+)
+def test_extensionless_content_addressed_staging_uses_declared_media_type(
+    tmp_path: Path,
+    suffix: str,
+    media_type: str,
+    expected_format: str,
+) -> None:
+    """Parse private hash-addressed blobs without relying on their file suffix."""
+
+    original = tmp_path / f"handoff{suffix}"
+    if suffix == ".pptx":
+        _write_pptx(original)
+    else:
+        _write_xlsx(original)
+
+    digest = hashlib.sha256(original.read_bytes()).hexdigest()
+    blob = tmp_path / "blobs" / "sha256" / digest[:2] / digest[2:]
+    blob.parent.mkdir(parents=True)
+    blob.write_bytes(original.read_bytes())
+    assert blob.suffix == ""
+
+    context = _context(original, media_type)
+    original_result = parse_office(original, context)
+    staged_result = parse_office(blob, context)
+
+    assert staged_result.source_format == expected_format
+    assert staged_result == original_result
 
 
 def _context(source: Path, media_type: str) -> ParseContext:

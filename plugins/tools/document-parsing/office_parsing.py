@@ -27,7 +27,10 @@ _PPTX_MEDIA_TYPE = (
 )
 _XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 _XLSX_NS = {"main": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
-_SUPPORTED_PURPOSES = {"pptx": _PPTX_MEDIA_TYPE, "xlsx": _XLSX_MEDIA_TYPE}
+_FORMAT_BY_MEDIA_TYPE = {
+    _PPTX_MEDIA_TYPE: "pptx",
+    _XLSX_MEDIA_TYPE: "xlsx",
+}
 
 
 def parse_office(source_path: Path, context: ParseContext) -> ParseResult:
@@ -43,21 +46,19 @@ def parse_office(source_path: Path, context: ParseContext) -> ParseResult:
     Returns:
         A shared ``ParseResult`` containing the complete Office projection.
     Raises:
-        ValueError: If the extension, media type, path, or source digest is invalid.
+        ValueError: If the media type, path, or source digest is invalid.
     """
 
     source_path = Path(source_path)
     if not source_path.is_file():
         raise ValueError("source_path must point to a regular file")
-    extension = source_path.suffix.lower().lstrip(".")
-    expected_media_type = _SUPPORTED_PURPOSES.get(extension)
-    if expected_media_type is None:
-        raise ValueError("only .pptx and .xlsx Office files are supported")
-    if context.media_type != expected_media_type:
-        raise ValueError(f"media_type does not match .{extension} source format")
+    media_type = context.media_type.split(";", maxsplit=1)[0].strip().lower()
+    office_format = _FORMAT_BY_MEDIA_TYPE.get(media_type)
+    if office_format is None:
+        raise ValueError("only PPTX and XLSX Office media types are supported")
     _validate_source_identity(source_path, context)
 
-    if extension == "pptx":
+    if office_format == "pptx":
         return _parse_pptx(source_path, context)
     return _parse_xlsx(source_path, context)
 
@@ -420,11 +421,22 @@ def _parse_xlsx(source_path: Path, context: ParseContext) -> ParseResult:
     """Extract worksheet cells and workbook metadata using formula/cache views."""
 
     from openpyxl import load_workbook
+    from openpyxl.utils.exceptions import InvalidFileException
 
     try:
-        formula_book = load_workbook(source_path, data_only=False, read_only=False)
-        cached_book = load_workbook(source_path, data_only=True, read_only=False)
-    except (OSError, zipfile.BadZipFile, ValueError, KeyError) as exc:
+        with (
+            source_path.open("rb") as formula_file,
+            source_path.open("rb") as cached_file,
+        ):
+            formula_book = load_workbook(formula_file, data_only=False, read_only=False)
+            cached_book = load_workbook(cached_file, data_only=True, read_only=False)
+    except (
+        OSError,
+        zipfile.BadZipFile,
+        InvalidFileException,
+        ValueError,
+        KeyError,
+    ) as exc:
         raise ValueError(f"invalid XLSX source: {exc}") from exc
 
     diagnostics: list[ParserDiagnostic] = []

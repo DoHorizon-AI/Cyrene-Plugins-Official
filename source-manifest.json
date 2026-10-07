@@ -2049,8 +2049,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/document-parsing/office_parsing.py",
-      "sha256": "0a0b7431088fe7f6a7bf5f59bbcb8687ba17109aaf21fb5598e2825c768c1c9a",
-      "size_bytes": 29155
+      "sha256": "295bb87a2669c3ed52b8805aef8edab78cd3d3be0f73389388b0a9fc79b8436f",
+      "size_bytes": 29317
     },
     {
       "kind": "file",
@@ -2098,8 +2098,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/document-parsing/tests/test_office_parsing.py",
-      "sha256": "f5cca2dd856f8bc56a8324ce3ad2b93c2f813671a8334b55012138203108f38f",
-      "size_bytes": 11054
+      "sha256": "be475655ce10b1a2313d4a3f7cbaed73beb5c8b0894da30d5ad3603cdc0ab27e",
+      "size_bytes": 12134
     },
     {
       "kind": "file",
