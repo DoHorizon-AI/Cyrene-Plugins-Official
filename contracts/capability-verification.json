@@ -349,6 +349,51 @@
           "notes": "Cross-repository dispatch is real; the provider behind the connector is still a test double, and RTX 50 / real vLLM acceptance is not performed here."
         }
       ]
+    },
+    {
+      "capability": "document.parsing.v1",
+      "implementation": "cyrene.tools.document-parsing",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-10-07",
+          "environment": "linux / Python 3.12 slim venv / real PDF and DOCX fixtures through Docling and the DOCX table fallback",
+          "command": "pytest -q plugins/tools/document-parsing/tests/test_document_parsing.py",
+          "result": "4 passed; PDF and DOCX outputs include located blocks, and conversion limitations are reported",
+          "notes": "No OCR or remote model endpoint was used; Windows packaging acceptance remains separate."
+        }
+      ]
+    },
+    {
+      "capability": "dataset.knowledge.v1",
+      "implementation": "cyrene.tools.knowledge-preparation",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-10-07",
+          "environment": "linux / Python 3.12 / local DirectPluginRuntime gRPC server with real ZIP and policy fixtures",
+          "command": "python -m pytest -q plugins/tools/knowledge-preparation/tests",
+          "result": "3 passed; runtime built a six-chunk package, and the consumer returned results only for an authorized principal",
+          "notes": "All I/O used local fixtures; no external model or remote service was called."
+        }
+      ]
+    },
+    {
+      "capability": "dataset.generation.v1",
+      "implementation": "cyrene.tools.dataset-generation",
+      "verification_level": "DISPATCH_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-07",
+          "environment": "linux / Python 3.12 / in-process DirectPluginRuntime gRPC with a scripted model.provider.v1 fixture",
+          "command": "python -m pytest -q plugins/tools/dataset-generation/tests",
+          "result": "7 passed; 20 SFT records split 16/2/2 across 8/1/1 source families, and the provider-bound generation flow preserved receipts",
+          "notes": "The model provider is a deterministic test double; no external model endpoint was called."
+        }
+      ]
     }
   ]
 }

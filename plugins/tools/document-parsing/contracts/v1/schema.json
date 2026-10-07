@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/document.parsing.v1/schema.json",
+  "title": "document.parsing.v1",
+  "$defs": {
+    "AbsolutePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/])"
+    },
+    "Sha256Digest": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "Receipt": {
+      "type": "object",
+      "required": ["digest", "size"],
+      "properties": {
+        "digest": {"$ref": "#/$defs/Sha256Digest"},
+        "size": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "ParseRequest": {
+      "type": "object",
+      "required": [
+        "source_path",
+        "payload_path",
+        "blocks_path",
+        "result_path",
+        "source_ref",
+        "source_digest",
+        "filename",
+        "media_type"
+      ],
+      "properties": {
+        "source_path": {"$ref": "#/$defs/AbsolutePath"},
+        "payload_path": {"$ref": "#/$defs/AbsolutePath"},
+        "blocks_path": {"$ref": "#/$defs/AbsolutePath"},
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "source_ref": {"type": "string", "minLength": 1},
+        "source_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "filename": {"type": "string", "minLength": 1},
+        "media_type": {
+          "enum": [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "Locator": {
+      "type": "object",
+      "required": [
+        "source_pages",
+        "section_path",
+        "item_ref",
+        "tree_level",
+        "provenance"
+      ],
+      "properties": {
+        "source_pages": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "uniqueItems": true
+        },
+        "section_path": {"type": "array", "items": {"type": "string"}},
+        "item_ref": {"type": "string", "minLength": 1},
+        "tree_level": {"type": "integer", "minimum": 0},
+        "table_index": {"type": "integer", "minimum": 0},
+        "provenance": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    },
+    "Block": {
+      "type": "object",
+      "required": ["id", "ordinal", "kind", "text", "locator"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "kind": {"type": "string", "minLength": 1},
+        "text": {"type": "string"},
+        "locator": {"$ref": "#/$defs/Locator"}
+      },
+      "additionalProperties": false
+    },
+    "BlocksDocument": {
+      "type": "object",
+      "required": ["schema_version", "source_ref", "source_digest", "blocks"],
+      "properties": {
+        "schema_version": {"const": "cyrene.document.blocks.v1"},
+        "source_ref": {"type": "string", "minLength": 1},
+        "source_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "blocks": {"type": "array", "items": {"$ref": "#/$defs/Block"}}
+      },
+      "additionalProperties": false
+    },
+    "ParseResponse": {
+      "type": "object",
+      "required": [
+        "source_digest",
+        "source_format",
+        "status",
+        "conversion_profile",
+        "page_count",
+        "block_count",
+        "warning_count",
+        "warnings",
+        "payload_digest",
+        "payload_size",
+        "blocks_digest",
+        "blocks_size",
+        "result_digest",
+        "result_size"
+      ],
+      "properties": {
+        "source_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "source_format": {"enum": ["PDF", "DOCX"]},
+        "status": {"enum": ["success", "partial_success"]},
+        "conversion_profile": {"type": "string", "minLength": 1},
+        "page_count": {"type": ["integer", "null"], "minimum": 0},
+        "block_count": {"type": "integer", "minimum": 0},
+        "warning_count": {"type": "integer", "minimum": 0},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "payload_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "payload_size": {"type": "integer", "minimum": 0},
+        "blocks_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "blocks_size": {"type": "integer", "minimum": 0},
+        "result_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "result_size": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "ParseReport": {
+      "type": "object",
+      "required": [
+        "schema_version",
+        "capability",
+        "source_ref",
+        "source_digest",
+        "filename",
+        "media_type",
+        "source_format",
+        "status",
+        "conversion_profile",
+        "docling_version",
+        "docling_document_digest",
+        "page_count",
+        "block_count",
+        "conversion_errors",
+        "conversion_limitations",
+        "unparsed_content",
+        "warnings",
+        "locator_policy",
+        "receipts"
+      ],
+      "properties": {
+        "schema_version": {"const": "cyrene.document.parsing.result.v1"},
+        "capability": {"const": "document.parsing.v1"},
+        "source_ref": {"type": "string"},
+        "source_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "filename": {"type": "string"},
+        "media_type": {"type": "string"},
+        "source_format": {"enum": ["PDF", "DOCX"]},
+        "status": {"enum": ["success", "partial_success"]},
+        "conversion_profile": {"type": "string"},
+        "docling_version": {"type": ["string", "null"]},
+        "docling_document_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "page_count": {"type": ["integer", "null"], "minimum": 0},
+        "block_count": {"type": "integer", "minimum": 0},
+        "conversion_errors": {"type": "array", "items": {"type": "object"}},
+        "conversion_limitations": {"type": "array", "items": {"type": "string"}},
+        "unparsed_content": {"type": "array", "items": {"type": "object"}},
+        "warnings": {"type": "array", "items": {"type": "string"}},
+        "locator_policy": {"type": "object"},
+        "receipts": {
+          "type": "object",
+          "required": ["source", "payload", "blocks"],
+          "properties": {
+            "source": {"$ref": "#/$defs/Receipt"},
+            "payload": {"$ref": "#/$defs/Receipt"},
+            "blocks": {"$ref": "#/$defs/Receipt"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

@@ -112,6 +112,9 @@ jobs:
             -e plugins/providers/model-api-connector \
             -e plugins/serving/vllm-runtime \
             -e plugins/tools/dataset-preparation \
+            -e plugins/tools/document-parsing \
+            -e plugins/tools/knowledge-preparation \
+            -e plugins/tools/dataset-generation \
             -e plugins/tools/dataset-validator \
             -e plugins/training/llama-factory
       - name: Verify reproducible WeCom capability bindings
@@ -145,6 +148,9 @@ jobs:
             plugins/providers/model-api-connector \
             plugins/serving/vllm-runtime \
             plugins/tools/dataset-preparation \
+            plugins/tools/document-parsing \
+            plugins/tools/knowledge-preparation \
+            plugins/tools/dataset-generation \
             plugins/tools/dataset-validator \
             plugins/training/llama-factory \
             tools/ci/capability_catalog.py \
@@ -167,6 +173,9 @@ jobs:
             plugins/providers/model-api-connector/tests \
             plugins/serving/vllm-runtime/tests \
             plugins/tools/dataset-preparation/tests \
+            plugins/tools/document-parsing/tests \
+            plugins/tools/knowledge-preparation/tests \
+            plugins/tools/dataset-generation/tests \
             plugins/tools/dataset-validator/tests \
             plugins/training/llama-factory/tests \
             tests/release/test_connection_release_health.py \

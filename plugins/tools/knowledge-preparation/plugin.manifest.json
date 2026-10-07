@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.tools.knowledge-preparation",
+  "name": "Knowledge Preparation",
+  "version": "0.1.0",
+  "description": "Build and independently query policy-filtered CYRENE_KNOWLEDGE_BUNDLE_V1 packages.",
+  "kind": "capability-plugin",
+  "capabilities": ["dataset.knowledge.v1"],
+  "supportedServices": ["Cyrene-Catalyst"],
+  "methods": [
+    {
+      "name": "build",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/BuildRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/BuildResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "knowledge_preparation:KnowledgePreparationPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "knowledge_preparation:KnowledgePreparationPlugin"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": ["linux", "windows", "darwin"]
+  },
+  "secrets": {},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

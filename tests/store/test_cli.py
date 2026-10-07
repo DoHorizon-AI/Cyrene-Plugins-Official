@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tarfile
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -28,6 +29,39 @@ from tools.store import installer
 from tools.store.cli import build_parser, main
 
 EXECUTABLE_PATH = _REPO_ROOT / "tools" / "store" / "cyrene_plugin_store.py"
+DATA_TOOLS_PLUGIN_METADATA: dict[str, dict[str, object]] = {
+    "cyrene.tools.document-parsing": {
+        "name": "Document Parsing",
+        "language": "python",
+        "kind": "capability-plugin",
+        "capabilities": ["document.parsing.v1"],
+        "supportedServices": ["Cyrene-Catalyst"],
+    },
+    "cyrene.tools.knowledge-preparation": {
+        "name": "Knowledge Preparation",
+        "language": "python",
+        "kind": "capability-plugin",
+        "capabilities": ["dataset.knowledge.v1"],
+        "supportedServices": ["Cyrene-Catalyst"],
+    },
+    "cyrene.tools.dataset-generation": {
+        "name": "Dataset Generation",
+        "language": "python",
+        "kind": "capability-plugin",
+        "capabilities": ["dataset.generation.v1"],
+        "supportedServices": ["Cyrene-Catalyst"],
+    },
+}
+
+
+def _assert_data_tools_plugin_metadata(plugins: list[dict[str, Any]]) -> None:
+    """Check the trial plugins expose their frozen catalog metadata."""
+    plugins_by_id = {plugin["id"]: plugin for plugin in plugins}
+    for plugin_id, expected_metadata in DATA_TOOLS_PLUGIN_METADATA.items():
+        assert plugin_id in plugins_by_id
+        plugin = plugins_by_id[plugin_id]
+        for field, expected_value in expected_metadata.items():
+            assert plugin[field] == expected_value
 
 
 # ─────────────────────────────────────────────────────────────────────
@@ -174,13 +208,15 @@ class TestCatalogCliExecution:
     """Tests `catalog list` and `catalog show` CLI commands."""
 
     def test_catalog_list_all(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test `catalog list` returns all 14 official plugins."""
+        """Test `catalog list` returns all 17 official plugins."""
         rc = main(["catalog", "list"])
         assert rc == 0
         captured = capsys.readouterr()
-        assert "Cyrene Plugin Catalog (14 plugins):" in captured.out
+        assert "Cyrene Plugin Catalog (17 plugins):" in captured.out
         assert "cyrene.connectors.im" in captured.out
         assert "cyrene.tools.computer-runtime" in captured.out
+        for plugin_id in DATA_TOOLS_PLUGIN_METADATA:
+            assert plugin_id in captured.out
 
     def test_catalog_list_profile_filter(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test `catalog list --profile echo` filters to 3 plugins."""
@@ -207,6 +243,7 @@ class TestCatalogCliExecution:
         captured = capsys.readouterr()
         assert "cyrene.tools.dataset-preparation" in captured.out
         assert "cyrene.tools.dataset-validator" in captured.out
+        assert "cyrene.tools.dataset-generation" in captured.out
 
     def test_catalog_list_service_filter(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test `catalog list --service Cyrene-Navigator` filters to 5 plugins."""
@@ -229,6 +266,22 @@ class TestCatalogCliExecution:
         assert "cyrene.evaluation.exact-match" in captured_echo.out
         assert "cyrene.evaluation.llm-judge" in captured_echo.out
 
+        # Catalyst includes the three trial plugins and the two existing dataset tools.
+        rc_catalyst = main(
+            ["catalog", "list", "--service", "Cyrene-Catalyst", "--json"]
+        )
+        assert rc_catalyst == 0
+        catalyst_data = json.loads(capsys.readouterr().out)
+        catalyst_ids = {plugin["id"] for plugin in catalyst_data}
+        assert catalyst_ids == {
+            "cyrene.tools.dataset-generation",
+            "cyrene.tools.dataset-preparation",
+            "cyrene.tools.dataset-validator",
+            "cyrene.tools.document-parsing",
+            "cyrene.tools.knowledge-preparation",
+        }
+        _assert_data_tools_plugin_metadata(catalyst_data)
+
     def test_catalog_list_json_format(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test `catalog list --json` outputs valid JSON array."""
         rc = main(["catalog", "list", "--json"])
@@ -236,9 +289,10 @@ class TestCatalogCliExecution:
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert isinstance(data, list)
-        assert len(data) == 14
+        assert len(data) == 17
         plugin_ids = {p["id"] for p in data}
         assert "cyrene.serving.vllm-runtime" in plugin_ids
+        _assert_data_tools_plugin_metadata(data)
 
     def test_catalog_show_existing(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test `catalog show <id>` prints structured plugin details."""
@@ -523,4 +577,5 @@ class TestExecutableEntryPoint:
         assert proc.returncode == 0
         data = json.loads(proc.stdout)
         assert isinstance(data, list)
-        assert len(data) == 14
+        assert len(data) == 17
+        _assert_data_tools_plugin_metadata(data)
