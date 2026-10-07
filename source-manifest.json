@@ -1895,8 +1895,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/dataset_generation.py",
-      "sha256": "558ebffb1b8492baa5a92381dd6381d9b024b5cddeea8e3d01f1a5c9faf291f2",
-      "size_bytes": 70894
+      "sha256": "2fafe1788ae0aa3ba6bc152cb2c1421c48b45a7ae45fa977dc0f9a7c23e0cff2",
+      "size_bytes": 71151
     },
     {
       "kind": "file",
@@ -1915,9 +1915,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/dataset-generation/tests/fixtures/trial-training.jsonl",
+      "sha256": "ac810b0a98a5d0d1d8990752115d0a9f8b92bdb7758c47d0501bb8c0230418b6",
+      "size_bytes": 8942
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/dataset-generation/tests/test_dataset_generation.py",
-      "sha256": "289969a8026f9fcb5f896c92a7ae82f94e3e0c9a43f96ca7359049d930b07c23",
-      "size_bytes": 21695
+      "sha256": "c52a505a96c14256dcec1fd02a46d4d653642b19d0c646ad6c5758f17024a5b2",
+      "size_bytes": 22739
     },
     {
       "kind": "file",
@@ -5248,15 +5255,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "12da8ec2919726166d16b3709540677152f764dd0c1954c5070209dad4ef856a",
-      "size_bytes": 13673
+      "sha256": "7abe74f6259d6a8545d39c1d8f4d9b70bc443d517b5f3c688a334c643d4bc6fb",
+      "size_bytes": 15192
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "c272fcfb79cab2a74d625706a63e46d4b765554c6936ae9a9f182c85f54ae358",
-      "size_bytes": 23714
+      "sha256": "20b800483e90b47d96527ad5c7d840b5ef25902fe62f9dfb9b36237117f130fa",
+      "size_bytes": 26011
     },
     {
       "kind": "file",

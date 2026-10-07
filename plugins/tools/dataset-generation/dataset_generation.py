@@ -1050,11 +1050,16 @@ def _learned_content(value: Any, mode: str, field: str) -> dict[str, Any]:
         _keys(
             value, required={"instruction", "output"}, optional={"input"}, field=field
         )
-        row = {
-            key: _required_text(value[key], f"{field}.{key}")
-            for key in ("instruction", "input", "output")
-            if key in value
-        }
+        row: dict[str, str] = {}
+        for key in ("instruction", "input", "output"):
+            if key not in value:
+                continue
+            if key == "input":
+                if not isinstance(value[key], str):
+                    raise RequestError(f"{field}.input must be a string")
+                row[key] = value[key]
+            else:
+                row[key] = _required_text(value[key], f"{field}.{key}")
         if not row["instruction"].strip() or not row["output"].strip():
             raise RequestError(
                 f"{field}.instruction and {field}.output must be non-empty"

@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import zipfile
 from pathlib import Path
@@ -34,6 +35,9 @@ CONTENT_REVISION_ID = "00000000-0000-4000-8000-000000000002"
 PROCESSING_RUN_ID = "00000000-0000-4000-8000-000000000003"
 SOURCE_REVISION_ID = "00000000-0000-4000-8000-000000000004"
 SPLIT = {"train": 0.7, "validation": 0.2, "test": 0.1}
+TRAINING_FIXTURE_SHA256 = (
+    "ac810b0a98a5d0d1d8990752115d0a9f8b92bdb7758c47d0501bb8c0230418b6"
+)
 
 
 class ScriptedModelProvider:
@@ -294,11 +298,10 @@ def test_manual_sample_path_builds_sft_without_a_provider_binding(
 def test_fixed_jsonl_fixture_splits_ten_source_families_and_excludes_management_data(
     tmp_path: Path,
 ) -> None:
-    fixture = (
-        Path(__file__).resolve().parents[5]
-        / "workspace/tests/fixtures/data-tools-trial/trial-training.jsonl"
-    )
-    source_lines = fixture.read_text(encoding="utf-8").splitlines()
+    fixture = Path(__file__).resolve().parent / "fixtures" / "trial-training.jsonl"
+    fixture_bytes = fixture.read_bytes()
+    assert hashlib.sha256(fixture_bytes).hexdigest() == TRAINING_FIXTURE_SHA256
+    source_lines = fixture_bytes.decode("utf-8").splitlines()
     assert len(source_lines) == 20
     blocks = [
         {
@@ -343,6 +346,12 @@ def test_fixed_jsonl_fixture_splits_ten_source_families_and_excludes_management_
             )
             assert entry["policy"]["allowed_principal_refs"] == ["org:trial-alpha"]
         assert len(family_splits) == 10
+        assert {
+            split_name: sum(
+                1 for split in family_splits.values() if split == {split_name}
+            )
+            for split_name in ("train", "validation", "test")
+        } == {"train": 8, "validation": 1, "test": 1}
         assert all(len(splits) == 1 for splits in family_splits.values())
         for member in ("train.jsonl", "validation.jsonl", "test.jsonl"):
             rows = [
@@ -510,9 +519,19 @@ def test_one_call_direct_runtime_generation_approval_and_sft_handoff(
     )
     client = DirectPluginClient.for_local_connection_ref(generation_ref)
     source_path = tmp_path / "approved-source.json"
+    structured_source = json.dumps(
+        {
+            "instruction": "文档的恢复代码是什么？",
+            "input": "",
+            "output": "ORCHID-42",
+        },
+        ensure_ascii=False,
+    )
+    source_block = _content_block("source-block", "fixture-family", structured_source)
+    source_block["kind"] = "code"
     _write_blocks(
         source_path,
-        _content_block("source-block", "fixture-family", "A public trial handbook."),
+        source_block,
     )
     generate_request = {
         "blocks_path": str(source_path),
@@ -547,12 +566,20 @@ def test_one_call_direct_runtime_generation_approval_and_sft_handoff(
     )
     assert generated_result["status"] == "SUCCEEDED"
     assert generated_result["budget"]["calls_used"] == 1
+    assert generated_result["draft_count"] == 1
+    assert not any(
+        warning["code"] == "QA_BLOCK_NOT_SAFE_CONTEXT"
+        for warning in generated_result["warnings"]
+    )
     assert draft == {
         "instruction": "What is in the source?",
         "output": "A public trial handbook.",
     }
     assert generated_sidecar["review_state"] == "PENDING"
     assert len(provider.requests) == 1
+    provider_context = provider.requests[0].messages[1].content
+    assert '"input":""' in provider_context
+    assert '"output":"ORCHID-42"' in provider_context
 
     # Simulate Catalyst's human approval creating a new approved revision and
     # carrying the private sidecar receipt into ContentBlock.generationReceipt.
