@@ -607,3 +607,106 @@ def test_v02_provider_completion_overrun_is_reported_in_result_and_receipt(
     assert second_receipt["budget"]["requestedOutputTokens"] == 8
     assert second_receipt["usage"]["providerPromptTokens"] == 5
     assert second_receipt["usage"]["providerCompletionTokens"] == 12
+
+
+def test_v02_empty_non_training_blocks_are_skipped_before_text_validation(
+    tmp_path: Path,
+) -> None:
+    eligible_text = "Eligible prose is the only training-approved context."
+    blocks = [
+        _content_block(
+            "eligible-prose",
+            "eligible-family",
+            eligible_text,
+            ordinal=0,
+        ),
+        _content_block(
+            "empty-picture",
+            "layout-family",
+            "",
+            ordinal=1,
+            kind="picture",
+            policy={
+                "allowTraining": False,
+                "allowKnowledge": True,
+                "allowedUsePurposes": ["knowledge_retrieval"],
+            },
+        ),
+        _content_block(
+            "empty-layout",
+            "blank-family",
+            "",
+            ordinal=2,
+            kind="paragraph",
+            policy={"allowTraining": False, "allowedUsePurposes": []},
+        ),
+    ]
+    result, provider, drafts, provenance = _generate(
+        tmp_path,
+        blocks,
+        [{"prompt_tokens": 18, "completion_tokens": 7}],
+        {"max_examples": 1, "max_calls": 1, "max_input_tokens": 500},
+    )
+
+    assert result["status"] == "SUCCEEDED"
+    assert result["budget"]["calls_used"] == 1
+    assert result["draft_count"] == len(drafts) == len(provenance) == 1
+    assert len(provider.requests) == 1
+    user_context = provider.requests[0].messages[1].content
+    assert eligible_text in user_context
+    assert "empty-picture" not in user_context
+    assert "empty-layout" not in user_context
+    assert provenance[0]["source_family_id"] == "eligible-family"
+    skipped = {
+        warning["message"]
+        for warning in result["warnings"]
+        if warning["code"] == "BLOCK_SKIPPED_TRAINING_POLICY"
+    }
+    assert any(
+        "empty-picture" in message and "layout-family" in message for message in skipped
+    )
+    assert any(
+        "empty-layout" in message and "blank-family" in message for message in skipped
+    )
+
+
+def test_v02_empty_training_eligible_block_fails_before_provider_call(
+    tmp_path: Path,
+) -> None:
+    block_path = tmp_path / "eligible-empty.json"
+    _write_json(
+        block_path,
+        _blocks_document(
+            [
+                _content_block(
+                    "eligible-empty",
+                    "eligible-family",
+                    "",
+                    ordinal=0,
+                )
+            ]
+        ),
+    )
+    plugin = DatasetGenerationPlugin(
+        GenerationConfig(
+            binding_id="model.binding.must-not-call",
+            model_endpoint="grpc://127.0.0.1:1",
+            model="fixture-qwen-compatible",
+        )
+    )
+    request = {
+        "blocks_path": str(block_path),
+        "drafts_path": str(tmp_path / "eligible-empty-drafts.jsonl"),
+        "provenance_path": str(tmp_path / "eligible-empty-provenance.jsonl"),
+        "result_path": str(tmp_path / "eligible-empty-result.json"),
+        "dataset_id": DATASET_ID,
+        "content_revision_id": CONTENT_REVISION_ID,
+        "processing_run_id": PROCESSING_RUN_ID,
+        "generation": {"max_examples": 1, "max_calls": 1},
+    }
+
+    with pytest.raises(
+        RequestError,
+        match=r"blocks\[0\]\.text must be a non-empty string",
+    ):
+        plugin.generate_qa(request)
