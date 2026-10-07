@@ -4,12 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-document-parsing"
-version = "0.1.0"
+version = "0.2.0"
 description = "Stateless implementation of document.parsing.v1"
 requires-python = ">=3.11"
 dependencies = [
   "cyrene-plugin-runtime>=0.2,<0.3",
   "docling-slim[format-pdf,format-office,cli]>=2.135,<2.136",
+  "openpyxl>=3.1,<4",
+  "Pillow>=10,<13",
+  "pypdfium2>=4.30,<6",
+  "python-docx>=1.1,<2",
+  "python-pptx>=1.0,<2",
   # Docling's native PDF pipeline imports R-tree even when no model extras are used.
   "rtree>=1.4,<2",
 ]
@@ -19,7 +24,13 @@ test = ["pytest>=8,<10"]
 models = ["docling-slim[models-local,feat-ocr-rapidocr]>=2.135,<2.136"]
 
 [tool.setuptools]
-py-modules = ["document_parsing"]
+py-modules = [
+  "document_parsing",
+  "office_parsing",
+  "ocr_parsing",
+  "parsing_types",
+  "simple_parsing",
+]
 
 [tool.setuptools.data-files]
 "share/cyrene/plugins/cyrene.tools.document-parsing" = [

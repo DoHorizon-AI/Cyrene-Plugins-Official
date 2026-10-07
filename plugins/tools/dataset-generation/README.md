@@ -47,8 +47,10 @@ and permissions are fixed so identical inputs and IDs produce identical bytes.
 `generate_qa` splits source families before making calls, bounds examples/calls
 and input/output budgets, stores provider-reported token usage only when present,
 and checkpoints completed results after each successful call. It never retries
-an ambiguous provider result. Package tests use a scripted provider over the
-real DirectPluginRuntime connection.
+an ambiguous provider result. Provider-reported usage beyond a declared input
+or output cap is returned as a warning; an input-cap overrun prevents later
+calls. Package tests use a scripted provider over the real DirectPluginRuntime
+connection.
 
 ---
 
@@ -85,5 +87,6 @@ ZIP 成员顺序、时间戳和权限固定，因此相同输入和标识会产�
 
 `generate_qa` 在 Provider 调用前先拆分 source family，限制 examples/calls 和
 input/output 预算；只有 Provider 实际上报时才记录 token usage，并在每次成功调用后
-保存检查点。Provider 结果不明时绝不重试。Package tests 使用真实
+保存检查点。Provider 上报的 usage 超过输入或输出上限时会返回 warning；输入预算超限后
+不会继续发起调用。Provider 结果不明时绝不重试。Package tests 使用真实
 DirectPluginRuntime connection 上的 scripted Provider。

@@ -307,11 +307,7 @@ class DatasetGenerationPlugin:
             if mode == "instruction"
             else []
         )
-        if has_input and any(has_input) and not all(has_input):
-            raise RequestError(
-                "instruction samples must either all include input or all omit it"
-            )
-        if mode == "instruction" and has_input and all(has_input):
+        if mode == "instruction" and has_input and any(has_input):
             schema_fields = ["instruction", "input", "output"]
         file_bytes: dict[str, bytes] = {
             "train.jsonl": b"".join(learned["train"]),
@@ -454,6 +450,7 @@ class DatasetGenerationPlugin:
         reported_completion_tokens = 0
         prompt_usage_known = True
         completion_usage_known = True
+        provider_input_budget_exceeded = False
         calls_used = 0
         drafts: list[dict[str, Any]] = []
         provenance: list[dict[str, Any]] = []
@@ -482,6 +479,8 @@ class DatasetGenerationPlugin:
                     raise RequestError(
                         "operation cancelled after partial results were checkpointed"
                     )
+                if provider_input_budget_exceeded:
+                    break
                 if len(drafts) >= budget["max_examples"]:
                     warnings.append(
                         {
@@ -555,6 +554,16 @@ class DatasetGenerationPlugin:
                     prompt_usage_known = False
                 else:
                     reported_prompt_tokens += usage["prompt_tokens"]
+                    input_limit = budget.get("max_input_tokens")
+                    if input_limit is not None and reported_prompt_tokens > input_limit:
+                        _append_warning(
+                            warnings,
+                            "PROVIDER_INPUT_USAGE_EXCEEDED_BUDGET",
+                            "Provider-reported prompt usage "
+                            f"({reported_prompt_tokens}) exceeded max_input_tokens "
+                            f"({input_limit}); no further calls will be made.",
+                        )
+                        provider_input_budget_exceeded = True
                 if usage["completion_tokens"] is None:
                     completion_usage_known = False
                     # Reserve the entire request cap when the endpoint omits usage.
@@ -562,6 +571,22 @@ class DatasetGenerationPlugin:
                     remaining_output_tokens = 0
                 else:
                     reported_completion_tokens += usage["completion_tokens"]
+                    if usage["completion_tokens"] > requested_output_tokens:
+                        _append_warning(
+                            warnings,
+                            "PROVIDER_OUTPUT_USAGE_EXCEEDED_CALL_CAP",
+                            "Provider-reported completion usage "
+                            f"({usage['completion_tokens']}) exceeded the requested "
+                            f"per-call cap ({requested_output_tokens}).",
+                        )
+                    if reported_completion_tokens > output_cap:
+                        _append_warning(
+                            warnings,
+                            "PROVIDER_OUTPUT_USAGE_EXCEEDED_BUDGET",
+                            "Provider-reported completion usage "
+                            f"({reported_completion_tokens}) exceeded max_output_tokens "
+                            f"({output_cap}).",
+                        )
                     remaining_output_tokens = max(
                         0, remaining_output_tokens - usage["completion_tokens"]
                     )

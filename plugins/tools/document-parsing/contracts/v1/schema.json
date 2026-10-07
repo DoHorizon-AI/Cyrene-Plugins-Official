@@ -44,7 +44,14 @@
         "media_type": {
           "enum": [
             "application/pdf",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+            "text/markdown",
+            "text/plain",
+            "image/png",
+            "image/jpeg"
           ]
         }
       },
@@ -96,6 +103,31 @@
       },
       "additionalProperties": false
     },
+    "Diagnostic": {
+      "type": "object",
+      "required": ["code", "message", "kind", "severity"],
+      "properties": {
+        "code": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1},
+        "kind": {"enum": ["parser", "ocr"]},
+        "severity": {"const": "warning"},
+        "locator": {"type": "object"},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+      },
+      "additionalProperties": false
+    },
+    "UnsupportedContent": {
+      "type": "object",
+      "required": ["kind", "message"],
+      "properties": {
+        "kind": {"type": "string", "minLength": 1},
+        "code": {"type": "string", "minLength": 1},
+        "message": {"type": "string", "minLength": 1},
+        "locator": {"type": "object"},
+        "details": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
     "ParseResponse": {
       "type": "object",
       "required": [
@@ -104,9 +136,13 @@
         "status",
         "conversion_profile",
         "page_count",
+        "slide_count",
+        "sheet_count",
         "block_count",
         "warning_count",
         "warnings",
+        "diagnostics",
+        "unsupported_content",
         "payload_digest",
         "payload_size",
         "blocks_digest",
@@ -116,13 +152,17 @@
       ],
       "properties": {
         "source_digest": {"$ref": "#/$defs/Sha256Digest"},
-        "source_format": {"enum": ["PDF", "DOCX"]},
+        "source_format": {"enum": ["PDF", "DOCX", "PPTX", "XLSX", "CSV", "MARKDOWN", "TXT", "PNG", "JPEG"]},
         "status": {"enum": ["success", "partial_success"]},
         "conversion_profile": {"type": "string", "minLength": 1},
         "page_count": {"type": ["integer", "null"], "minimum": 0},
+        "slide_count": {"type": ["integer", "null"], "minimum": 0},
+        "sheet_count": {"type": ["integer", "null"], "minimum": 0},
         "block_count": {"type": "integer", "minimum": 0},
         "warning_count": {"type": "integer", "minimum": 0},
         "warnings": {"type": "array", "items": {"type": "string"}},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/Diagnostic"}},
+        "unsupported_content": {"type": "array", "items": {"$ref": "#/$defs/UnsupportedContent"}},
         "payload_digest": {"$ref": "#/$defs/Sha256Digest"},
         "payload_size": {"type": "integer", "minimum": 0},
         "blocks_digest": {"$ref": "#/$defs/Sha256Digest"},
@@ -144,14 +184,19 @@
         "source_format",
         "status",
         "conversion_profile",
+        "payload_format",
         "docling_version",
         "docling_document_digest",
         "page_count",
+        "slide_count",
+        "sheet_count",
         "block_count",
         "conversion_errors",
         "conversion_limitations",
         "unparsed_content",
         "warnings",
+        "diagnostics",
+        "unsupported_content",
         "locator_policy",
         "receipts"
       ],
@@ -161,18 +206,35 @@
         "source_ref": {"type": "string"},
         "source_digest": {"$ref": "#/$defs/Sha256Digest"},
         "filename": {"type": "string"},
-        "media_type": {"type": "string"},
-        "source_format": {"enum": ["PDF", "DOCX"]},
+        "media_type": {
+          "enum": [
+            "application/pdf",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "text/csv",
+            "text/markdown",
+            "text/plain",
+            "image/png",
+            "image/jpeg"
+          ]
+        },
+        "source_format": {"enum": ["PDF", "DOCX", "PPTX", "XLSX", "CSV", "MARKDOWN", "TXT", "PNG", "JPEG"]},
         "status": {"enum": ["success", "partial_success"]},
         "conversion_profile": {"type": "string"},
+        "payload_format": {"enum": ["docling-document-json", "adapter-json"]},
         "docling_version": {"type": ["string", "null"]},
-        "docling_document_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "docling_document_digest": {"oneOf": [{"$ref": "#/$defs/Sha256Digest"}, {"type": "null"}]},
         "page_count": {"type": ["integer", "null"], "minimum": 0},
+        "slide_count": {"type": ["integer", "null"], "minimum": 0},
+        "sheet_count": {"type": ["integer", "null"], "minimum": 0},
         "block_count": {"type": "integer", "minimum": 0},
         "conversion_errors": {"type": "array", "items": {"type": "object"}},
         "conversion_limitations": {"type": "array", "items": {"type": "string"}},
         "unparsed_content": {"type": "array", "items": {"type": "object"}},
         "warnings": {"type": "array", "items": {"type": "string"}},
+        "diagnostics": {"type": "array", "items": {"$ref": "#/$defs/Diagnostic"}},
+        "unsupported_content": {"type": "array", "items": {"$ref": "#/$defs/UnsupportedContent"}},
         "locator_policy": {"type": "object"},
         "receipts": {
           "type": "object",
