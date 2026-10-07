@@ -15,13 +15,17 @@ import json
 import zipfile
 from pathlib import Path
 
+import ocr_parsing
 import pytest
 from document_parsing import DocumentParsingPlugin, TypedPayload
+from parsing_types import OcrRegion, OcrResult, ParseContext, ParserDiagnostic
+from PIL import Image, ImageDraw
 
 PDF_MEDIA_TYPE = "application/pdf"
 DOCX_MEDIA_TYPE = (
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 )
+TEXT_MEDIA_TYPE = "text/plain"
 
 
 def test_parses_generated_pdf_with_real_docling(tmp_path: Path) -> None:
@@ -69,6 +73,97 @@ def test_parses_generated_docx_and_does_not_invent_page_numbers(tmp_path: Path) 
     )
 
 
+def test_scanned_pdf_page_uses_local_ocr_and_keeps_page_locator(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Render one image-only PDF page and retain OCR text with its page and box."""
+
+    source = tmp_path / "scanned.pdf"
+    _write_image_pdf(source)
+    calls: list[int] = []
+
+    def fake_ocr(
+        image: Image.Image,
+        *,
+        context: ParseContext,
+        page_number: int,
+        config: object,
+    ) -> OcrResult:
+        assert image.width > 0 and image.height > 0
+        calls.append(page_number)
+        return OcrResult(
+            text="scanned page text",
+            engine="tesseract-cli",
+            languages=("eng",),
+            confidence=0.94,
+            regions=(
+                OcrRegion(
+                    text="scanned page text",
+                    bbox={"x": 12.0, "y": 18.0, "width": 240.0, "height": 40.0},
+                    confidence=0.94,
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(ocr_parsing, "ocr_image", fake_ocr)
+    result = _parse(source, tmp_path, "source:scanned-pdf", PDF_MEDIA_TYPE)
+
+    blocks = json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
+    ocr_block = next(block for block in blocks["blocks"] if block["kind"] == "text")
+    assert calls == [1]
+    assert ocr_block["text"] == "scanned page text"
+    assert ocr_block["locator"]["source_pages"] == [1]
+    assert ocr_block["locator"]["provenance"][0]["type"] == "ocr"
+    assert ocr_block["locator"]["provenance"][0]["bbox"]["width"] == 240.0
+    assert result["conversion_profile"].endswith("+local-page-ocr")
+
+
+def test_scanned_pdf_without_ocr_text_is_explicitly_unparsed(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Never turn an image-only page into an empty successful conversion."""
+
+    source = tmp_path / "unreadable-scan.pdf"
+    _write_image_pdf(source)
+
+    def disabled_ocr(
+        image: Image.Image,
+        *,
+        context: ParseContext,
+        page_number: int,
+        config: object,
+    ) -> OcrResult:
+        return OcrResult(
+            text="",
+            engine="unavailable",
+            languages=("eng",),
+            diagnostics=(
+                ParserDiagnostic(
+                    code="ocr.engine_unavailable",
+                    message="No local OCR engine is configured.",
+                    kind="ocr",
+                    locator={"page_number": page_number},
+                ),
+            ),
+        )
+
+    monkeypatch.setattr(ocr_parsing, "ocr_image", disabled_ocr)
+    result = _parse(source, tmp_path, "source:unreadable-scan", PDF_MEDIA_TYPE)
+
+    assert result["status"] == "partial_success"
+    assert any(
+        item["code"] == "ocr.engine_unavailable"
+        and item["locator"]["source_pages"] == [1]
+        for item in result["diagnostics"]
+    )
+    assert any(
+        item["kind"] == "scanned_page" and item["locator"]["source_pages"] == [1]
+        for item in result["unsupported_content"]
+    )
+
+
 def test_direct_runtime_requires_digest_and_exact_payload_fields(
     tmp_path: Path,
 ) -> None:
@@ -97,6 +192,29 @@ def test_direct_runtime_requires_digest_and_exact_payload_fields(
     assert not ok
     assert isinstance(response, str)
     assert "unknown request fields" in response
+
+
+def test_routes_plain_text_through_shared_payload_and_receipt_envelope(
+    tmp_path: Path,
+) -> None:
+    """Persist a simple adapter result with the common report and digest receipts."""
+
+    source = tmp_path / "notes.txt"
+    source.write_text("first line\nsecond line\n", encoding="utf-8")
+    result = _parse(source, tmp_path, "source:text-sample", TEXT_MEDIA_TYPE)
+
+    payload = json.loads((tmp_path / "docling.json").read_text(encoding="utf-8"))
+    blocks = json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
+    report = json.loads((tmp_path / "result.json").read_text(encoding="utf-8"))
+    assert result["source_format"] == "TXT"
+    assert payload["raw_text"] == "first line\nsecond line\n"
+    assert [block["locator"]["item_ref"] for block in blocks["blocks"]] == [
+        "line:1",
+        "line:2",
+    ]
+    assert report["payload_format"] == "adapter-json"
+    assert report["docling_document_digest"] is None
+    assert report["receipts"]["payload"]["digest"] == result["payload_digest"]
 
 
 def test_rejects_source_digest_mismatch(tmp_path: Path) -> None:
@@ -181,6 +299,14 @@ def _write_text_pdf(path: Path, text: str) -> None:
         )
     )
     path.write_bytes(pdf)
+
+
+def _write_image_pdf(path: Path) -> None:
+    """Create a one-page raster-only PDF with Pillow's local PDF writer."""
+
+    image = Image.new("RGB", (1200, 500), "white")
+    ImageDraw.Draw(image).text((40, 160), "SCANNED PAGE OCR", fill="black")
+    image.save(path, format="PDF", resolution=200)
 
 
 def _write_minimal_docx(path: Path, text: str) -> None:

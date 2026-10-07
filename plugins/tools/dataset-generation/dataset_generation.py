@@ -262,12 +262,16 @@ class DatasetGenerationPlugin:
         mode = _enum_text(request["mode"], "mode", {"instruction", "conversation"})
         split = _split_config(request.get("split"))
         document = _read_json(input_path)
+        warnings: list[dict[str, str]] = []
         if isinstance(document, dict) and "blocks" in document:
-            blocks = _approved_blocks(document, content_revision_id)
-            samples, warnings = _samples_from_blocks(blocks, content_revision_id, mode)
+            blocks = _approved_blocks(document, content_revision_id, warnings=warnings)
+            samples, sample_warnings = _samples_from_blocks(
+                blocks, content_revision_id, mode
+            )
+            for warning in sample_warnings:
+                _append_warning(warnings, warning["code"], warning["message"])
         else:
             samples = _manual_samples(document, content_revision_id, mode)
-            warnings = []
         if not samples:
             raise RequestError("no approved SFT samples were supplied")
         if len(samples) > MAX_SAMPLES:
@@ -307,11 +311,7 @@ class DatasetGenerationPlugin:
             if mode == "instruction"
             else []
         )
-        if has_input and any(has_input) and not all(has_input):
-            raise RequestError(
-                "instruction samples must either all include input or all omit it"
-            )
-        if mode == "instruction" and has_input and all(has_input):
+        if mode == "instruction" and has_input and any(has_input):
             schema_fields = ["instruction", "input", "output"]
         file_bytes: dict[str, bytes] = {
             "train.jsonl": b"".join(learned["train"]),
@@ -422,10 +422,12 @@ class DatasetGenerationPlugin:
         processing_run_id = _uuid(request["processing_run_id"], "processing_run_id")
         split = _split_config(request.get("split"))
         budget = _generation_budget(request["generation"])
-        blocks = _approved_blocks(_read_json(blocks_path), content_revision_id)
+        warnings: list[dict[str, str]] = []
+        blocks = _approved_blocks(
+            _read_json(blocks_path), content_revision_id, warnings=warnings
+        )
         if len(blocks) > MAX_BLOCKS:
             raise RequestError(f"blocks exceeds {MAX_BLOCKS} records")
-        warnings: list[dict[str, str]] = []
         usable_blocks: list[dict[str, Any]] = []
         for block in blocks:
             context = _provider_context(block["text"])
@@ -454,6 +456,7 @@ class DatasetGenerationPlugin:
         reported_completion_tokens = 0
         prompt_usage_known = True
         completion_usage_known = True
+        provider_input_budget_exceeded = False
         calls_used = 0
         drafts: list[dict[str, Any]] = []
         provenance: list[dict[str, Any]] = []
@@ -482,6 +485,8 @@ class DatasetGenerationPlugin:
                     raise RequestError(
                         "operation cancelled after partial results were checkpointed"
                     )
+                if provider_input_budget_exceeded:
+                    break
                 if len(drafts) >= budget["max_examples"]:
                     warnings.append(
                         {
@@ -555,6 +560,16 @@ class DatasetGenerationPlugin:
                     prompt_usage_known = False
                 else:
                     reported_prompt_tokens += usage["prompt_tokens"]
+                    input_limit = budget.get("max_input_tokens")
+                    if input_limit is not None and reported_prompt_tokens > input_limit:
+                        _append_warning(
+                            warnings,
+                            "PROVIDER_INPUT_USAGE_EXCEEDED_BUDGET",
+                            "Provider-reported prompt usage "
+                            f"({reported_prompt_tokens}) exceeded max_input_tokens "
+                            f"({input_limit}); no further calls will be made.",
+                        )
+                        provider_input_budget_exceeded = True
                 if usage["completion_tokens"] is None:
                     completion_usage_known = False
                     # Reserve the entire request cap when the endpoint omits usage.
@@ -562,6 +577,22 @@ class DatasetGenerationPlugin:
                     remaining_output_tokens = 0
                 else:
                     reported_completion_tokens += usage["completion_tokens"]
+                    if usage["completion_tokens"] > requested_output_tokens:
+                        _append_warning(
+                            warnings,
+                            "PROVIDER_OUTPUT_USAGE_EXCEEDED_CALL_CAP",
+                            "Provider-reported completion usage "
+                            f"({usage['completion_tokens']}) exceeded the requested "
+                            f"per-call cap ({requested_output_tokens}).",
+                        )
+                    if reported_completion_tokens > output_cap:
+                        _append_warning(
+                            warnings,
+                            "PROVIDER_OUTPUT_USAGE_EXCEEDED_BUDGET",
+                            "Provider-reported completion usage "
+                            f"({reported_completion_tokens}) exceeded max_output_tokens "
+                            f"({output_cap}).",
+                        )
                     remaining_output_tokens = max(
                         0, remaining_output_tokens - usage["completion_tokens"]
                     )
@@ -1251,10 +1282,15 @@ def _generation_provenance(value: Any, field: str) -> dict[str, Any]:
     return result
 
 
-def _approved_blocks(document: Any, content_revision_id: str) -> list[dict[str, Any]]:
-    """Validate approved, training-permitted block records for QA context.
+def _approved_blocks(
+    document: Any,
+    content_revision_id: str,
+    *,
+    warnings: list[dict[str, str]],
+) -> list[dict[str, Any]]:
+    """Validate block identity and policy before requiring eligible text.
 
-    中文:校验已批准且允许训练的 block records，作为 QA 生成上下文。
+    中文:先校验 block 身份与 policy；仅训练允许的 block 才必须包含非空文本。
     """
 
     if not isinstance(document, dict):
@@ -1335,11 +1371,6 @@ def _approved_blocks(document: Any, content_revision_id: str) -> list[dict[str, 
         )
         ordinal = _integer(raw.get("ordinal"), f"{field}.ordinal", minimum=0)
         kind = _required_text(raw.get("kind"), f"{field}.kind")
-        text = _required_text(raw.get("text"), f"{field}.text")
-        if len(text) > MAX_BLOCK_TEXT_CHARS:
-            raise RequestError(
-                f"{field}.text exceeds {MAX_BLOCK_TEXT_CHARS} characters"
-            )
         origin = _enum_text(
             raw.get("origin"),
             f"{field}.origin",
@@ -1348,18 +1379,34 @@ def _approved_blocks(document: Any, content_revision_id: str) -> list[dict[str, 
         policy = raw.get("policy")
         if not isinstance(policy, dict):
             raise RequestError(f"{field}.policy must be an object")
-        if not _training_policy(policy, f"{field}.policy"):
-            continue
-        block = {
-            "id": block_id,
-            "sample_id": _optional_text(
+        training_allowed = _training_policy(policy, f"{field}.policy")
+        normalized_policy = _normalized_training_policy(policy, f"{field}.policy")
+        sample_id = (
+            _optional_text(
                 raw.get("sample_id", raw.get("sampleId")), f"{field}.sampleId"
             )
             or _optional_text(
                 row_metadata.get("sampleId", row_metadata.get("sample_id")),
                 f"{field}.text.sampleId",
             )
-            or _block_sample_id(block_id),
+            or _block_sample_id(block_id)
+        )
+        if not training_allowed:
+            _append_warning(
+                warnings,
+                "BLOCK_SKIPPED_TRAINING_POLICY",
+                f"Block {block_id} from source family {source_family_id} was skipped "
+                "because model_training is not allowed.",
+            )
+            continue
+        text = _required_text(raw.get("text"), f"{field}.text")
+        if len(text) > MAX_BLOCK_TEXT_CHARS:
+            raise RequestError(
+                f"{field}.text exceeds {MAX_BLOCK_TEXT_CHARS} characters"
+            )
+        block = {
+            "id": block_id,
+            "sample_id": sample_id,
             "source_revision_id": source_revision_id,
             "source_family_id": source_family_id,
             "source_family_explicit": source_family_explicit,
@@ -1371,7 +1418,7 @@ def _approved_blocks(document: Any, content_revision_id: str) -> list[dict[str, 
             "kind": kind,
             "text": text,
             "origin": origin,
-            "policy": _normalized_training_policy(policy, f"{field}.policy"),
+            "policy": normalized_policy,
         }
         locator = raw.get("locator")
         if locator is not None:

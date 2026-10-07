@@ -2,9 +2,9 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  📄 document_parsing.py                                             │
 │  Module: document_parsing                                           │
-│  Role: Stateless document.parsing.v1 PDF/DOCX conversion.           │
+│  Role: Stateless document.parsing.v1 file conversion.              │
 │                                                                     │
-│  模块职责：无状态 PDF/DOCX 解析，输出完整 Docling 文档与定位索引。       │
+│  模块职责：无状态多格式解析，输出原生 JSON、定位索引与诊断。             │
 └─────────────────────────────────────────────────────────────────────┘
 """
 
@@ -16,11 +16,19 @@ import os
 import re
 import unicodedata
 import zipfile
-from collections.abc import Iterable
-from dataclasses import dataclass
+from collections.abc import Callable, Iterable
+from dataclasses import dataclass, replace
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
+
+from parsing_types import (
+    OcrConfig,
+    ParseContext,
+    ParserDiagnostic,
+    ParseResult,
+    make_block,
+)
 
 CAPABILITY_ID = "document.parsing.v1"
 INTERFACE_VERSION = "1"
@@ -28,14 +36,43 @@ TYPE_PREFIX = f"type.cyrene.io/{CAPABILITY_ID}"
 BLOCKS_SCHEMA = "cyrene.document.blocks.v1"
 RESULT_SCHEMA = "cyrene.document.parsing.result.v1"
 MAX_SOURCE_BYTES = 128 * 1024 * 1024
-MAX_DOCX_ENTRIES = 20_000
-MAX_DOCX_EXPANDED_BYTES = 512 * 1024 * 1024
+MAX_OOXML_ENTRIES = 20_000
+MAX_OOXML_EXPANDED_BYTES = 512 * 1024 * 1024
 MAX_REPORTED_ERRORS = 500
 SOURCE_DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 SUPPORTED_MEDIA_TYPES = {
     "pdf": "application/pdf",
     "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "csv": "text/csv",
+    "markdown": "text/markdown",
+    "txt": "text/plain",
+    "png": "image/png",
+    "jpeg": "image/jpeg",
 }
+
+MEDIA_TYPE_FORMATS = {
+    media_type: source_format
+    for source_format, media_type in {
+        "PDF": SUPPORTED_MEDIA_TYPES["pdf"],
+        "DOCX": SUPPORTED_MEDIA_TYPES["docx"],
+        "PPTX": SUPPORTED_MEDIA_TYPES["pptx"],
+        "XLSX": SUPPORTED_MEDIA_TYPES["xlsx"],
+        "CSV": SUPPORTED_MEDIA_TYPES["csv"],
+        "MARKDOWN": SUPPORTED_MEDIA_TYPES["markdown"],
+        "TXT": SUPPORTED_MEDIA_TYPES["txt"],
+        "PNG": SUPPORTED_MEDIA_TYPES["png"],
+        "JPEG": SUPPORTED_MEDIA_TYPES["jpeg"],
+    }.items()
+}
+
+
+class ParserExecutionError(RuntimeError):
+    """Raised when a valid source cannot be converted by its selected parser.
+
+    中文：有效来源无法由对应解析器转换时抛出。
+    """
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,13 +87,13 @@ class TypedPayload:
 
 
 class DocumentParsingPlugin:
-    """Convert one staged PDF or DOCX without owning Product state.
+    """Parse one staged source without owning Product state.
 
-    中文：在 staging 路径上转换单个 PDF 或 DOCX，不持有 Product 状态。
+    中文：在 staging 路径上解析单个来源，不持有 Product 状态。
     """
 
     plugin_id = "cyrene.tools.document-parsing"
-    version = "0.1.0"
+    version = "0.2.0"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
@@ -131,6 +168,8 @@ class DocumentParsingPlugin:
             json.JSONDecodeError,
         ) as exc:
             return False, f"INVALID_INPUT: {exc}"
+        except ParserExecutionError as exc:
+            return False, f"PARSER_FAILURE: {exc}"
         except ImportError as exc:
             return False, f"DEPENDENCY_MISSING: {exc}"
 
@@ -153,13 +192,12 @@ class DocumentParsingPlugin:
         filename: str,
         media_type: str,
     ) -> dict[str, Any]:
-        """Convert a staged source and persist the full document and block index.
+        """Parse one staged source and persist its payload, blocks, and report.
 
-        The source path is read only. PDF page numbers in locators are one-based;
-        the adapter leaves them absent for formats where Docling has no page data.
-
-        中文：只读转换 staging 源文件，并写入完整文档、block 索引和报告；可用页码
-        固定为从 1 开始，Docling 未提供的页码保持缺失。
+        PDF/DOCX retain Docling's complete JSON export. PDF pages without native
+        text use the separately configured local OCR helper. Source page numbers
+        are one-based; Office and simple adapters own their native locators.
+        中文：保存完整 Docling JSON、公开 blocks 与转换报告；扫描页 OCR 独立于模型下载。
         """
 
         source_path = _absolute_path(source_path, "source_path")
@@ -167,112 +205,149 @@ class DocumentParsingPlugin:
         blocks_path = _absolute_path(blocks_path, "blocks_path")
         result_path = _absolute_path(result_path, "result_path")
         _validate_request_identity(source_ref, source_digest, filename)
+        media_type = _required_text(media_type, "media_type").lower()
         source_format = _validate_source(source_path, media_type)
-        actual_source_digest = _sha256_file(source_path)
-        if actual_source_digest != source_digest:
+        if _sha256_file(source_path) != source_digest:
             raise ValueError("source_digest does not match the staged source bytes")
         _validate_output_paths(source_path, (payload_path, blocks_path, result_path))
 
-        from docling.datamodel.base_models import InputFormat
-
-        converter, conversion_profile = _build_converter(InputFormat, source_format)
-        conversion = converter.convert(str(source_path))
-        document = getattr(conversion, "document", None)
-        if document is None:
-            errors = _conversion_errors(conversion, source_path)
-            summary = errors[0]["message"] if errors else "Docling returned no document"
-            raise ValueError(f"Docling conversion failed: {summary}")
-
-        # Preserve Docling's full structured export; only the companion block index is normalized.
-        # 完整保留 Docling 结构化导出；仅规范化配套的公开 block 索引。
-        docling_payload = document.export_to_dict()
-        payload_bytes = _canonical_json(docling_payload)
-        payload_receipt = _write_bytes(payload_path, payload_bytes)
-
-        blocks, extraction_warnings = _extract_blocks(
-            document,
+        context = ParseContext(
             source_ref=source_ref,
             source_digest=source_digest,
-            source_path=source_path,
-            source_format=source_format,
+            filename=filename,
+            media_type=media_type,
         )
+        docling_version: str | None = None
+        conversion_errors: list[dict[str, Any]] = []
+        conversion_limitations: list[str] = []
+        if source_format in {"PDF", "DOCX"}:
+            parsed, conversion_errors, conversion_limitations = _parse_docling(
+                source_path, context, source_format
+            )
+            docling_version = _docling_version()
+        elif source_format in {"PPTX", "XLSX"}:
+            from office_parsing import parse_office
+
+            parsed = parse_office(source_path, context)
+        else:
+            from ocr_parsing import ocr_config_from_env
+            from simple_parsing import parse_simple
+
+            try:
+                ocr_config = ocr_config_from_env()
+            except ValueError as exc:
+                ocr_config = OcrConfig(engine="none")
+                diagnostic = ParserDiagnostic(
+                    code="ocr.config_invalid",
+                    message=str(exc),
+                    kind="ocr",
+                )
+                parsed = parse_simple(source_path, context, ocr_config=ocr_config)
+                parsed = _with_diagnostic(parsed, diagnostic)
+            else:
+                parsed = parse_simple(source_path, context, ocr_config=ocr_config)
+
+        if source_format == "PDF":
+            from ocr_parsing import ocr_config_from_env, ocr_image
+
+            try:
+                ocr_config = ocr_config_from_env()
+            except ValueError as exc:
+                ocr_config = OcrConfig(engine="none")
+                diagnostic = ParserDiagnostic(
+                    code="ocr.config_invalid",
+                    message=str(exc),
+                    kind="ocr",
+                )
+                parsed = _with_diagnostic(parsed, diagnostic)
+            parsed = _add_pdf_page_ocr(
+                source_path, context, parsed, ocr_config, ocr_image
+            )
+
+        parsed = _finalize_parse_result(parsed)
+        payload_receipt = _write_json(payload_path, parsed.payload)
         blocks_document = {
             "schema_version": BLOCKS_SCHEMA,
             "source_ref": source_ref,
             "source_digest": source_digest,
-            "blocks": blocks,
+            "blocks": parsed.blocks,
         }
         blocks_receipt = _write_json(blocks_path, blocks_document)
-
-        conversion_errors = _conversion_errors(conversion, source_path)
-        conversion_limitations: list[str] = []
-        if conversion_profile == "pdf-native-no-model-download":
-            conversion_limitations.append(
-                "Native PDF parsing does not run OCR or infer reading order/table structure; scanned or layout-only content may remain unparsed."
+        warnings = list(dict.fromkeys(parsed.warnings))
+        if conversion_errors:
+            warnings.extend(
+                message
+                for error in conversion_errors
+                if (message := str(error.get("message", "")))
+                and message not in warnings
             )
-        warnings = [entry["message"] for entry in conversion_errors]
-        warnings.extend(extraction_warnings)
-        warnings.extend(conversion_limitations)
-        status = _status_text(getattr(conversion, "status", "success"))
-        if status == "failure":
-            summary = (
-                warnings[0] if warnings else "Docling marked the conversion as failed."
-            )
-            raise ValueError(f"Docling conversion failed: {summary}")
-        if status == "partial_success" and not warnings:
-            warnings.append("Docling marked the conversion as partial success.")
-        pages = getattr(document, "pages", None)
-        page_count = len(pages) if pages else None
-        if source_format == "PDF" and not page_count:
-            page_count = None
-            warnings.append("Docling returned no PDF page records.")
-        if not blocks:
-            warnings.append("Docling returned no addressable content blocks.")
-
-        conversion_report: dict[str, Any] = {
+        warnings.extend(
+            limitation
+            for limitation in conversion_limitations
+            if limitation not in warnings
+        )
+        diagnostics = [_diagnostic_json(item) for item in parsed.diagnostics]
+        unsupported_content = list(parsed.unsupported_content)
+        source_receipt = {
+            "digest": source_digest,
+            "size": source_path.stat().st_size,
+        }
+        report: dict[str, Any] = {
             "schema_version": RESULT_SCHEMA,
             "capability": CAPABILITY_ID,
             "source_ref": source_ref,
             "source_digest": source_digest,
             "filename": Path(filename).name,
             "media_type": media_type,
-            "source_format": source_format,
-            "status": status,
-            "conversion_profile": conversion_profile,
-            "docling_version": _docling_version(),
-            "docling_document_digest": payload_receipt["digest"],
-            "page_count": page_count,
-            "block_count": len(blocks),
+            "source_format": parsed.source_format,
+            "status": parsed.status,
+            "conversion_profile": parsed.conversion_profile,
+            "docling_version": docling_version,
+            "docling_document_digest": (
+                payload_receipt["digest"] if docling_version is not None else None
+            ),
+            "payload_format": (
+                "docling-document-json"
+                if docling_version is not None
+                else "adapter-json"
+            ),
+            "page_count": parsed.page_count,
+            "slide_count": parsed.slide_count,
+            "sheet_count": parsed.sheet_count,
+            "block_count": len(parsed.blocks),
             "conversion_errors": conversion_errors,
             "conversion_limitations": conversion_limitations,
             "unparsed_content": _unparsed_content(
-                conversion_errors, extraction_warnings
+                conversion_errors, unsupported_content
             ),
             "warnings": warnings,
+            "diagnostics": diagnostics,
+            "unsupported_content": unsupported_content,
             "locator_policy": {
-                "source_pages": "Docling page_no values, normalized to one-based integers; [] when absent.",
+                "source_pages": "One-based source page/slide values; empty when a source format has no page locator.",
                 "docx_pagination": "No synthetic source page numbers are assigned.",
-                "coordinates": "Docling provenance bounding boxes retain their coordinate origin.",
+                "coordinates": "Adapter provenance preserves source-native geometry and coordinate units.",
             },
             "receipts": {
-                "source": {
-                    "digest": source_digest,
-                    "size": source_path.stat().st_size,
-                },
+                "source": source_receipt,
                 "payload": payload_receipt,
                 "blocks": blocks_receipt,
             },
         }
-        result_receipt = _write_json(result_path, conversion_report)
-        return {
+        result_receipt = _write_json(result_path, report)
+        response: dict[str, Any] = {
             "source_digest": source_digest,
-            "source_format": source_format,
-            "status": status,
-            "conversion_profile": conversion_profile,
-            "page_count": page_count,
-            "block_count": len(blocks),
+            "source_format": parsed.source_format,
+            "status": parsed.status,
+            "conversion_profile": parsed.conversion_profile,
+            "page_count": parsed.page_count,
+            "slide_count": parsed.slide_count,
+            "sheet_count": parsed.sheet_count,
+            "block_count": len(parsed.blocks),
             "warning_count": len(warnings),
             "warnings": warnings,
+            "diagnostics": diagnostics,
+            "unsupported_content": unsupported_content,
             "payload_digest": payload_receipt["digest"],
             "payload_size": payload_receipt["size"],
             "blocks_digest": blocks_receipt["digest"],
@@ -280,6 +355,408 @@ class DocumentParsingPlugin:
             "result_digest": result_receipt["digest"],
             "result_size": result_receipt["size"],
         }
+        return response
+
+
+def _parse_docling(
+    source_path: Path,
+    context: ParseContext,
+    source_format: str,
+) -> tuple[ParseResult, list[dict[str, Any]], list[str]]:
+    """Run Docling and preserve its complete source-format JSON export.
+
+    中文：调用 Docling 并保留完整原生 JSON；公开 blocks 另行规范化。
+    """
+
+    from docling.datamodel.base_models import InputFormat
+
+    try:
+        converter, conversion_profile = _build_converter(InputFormat, source_format)
+        conversion = converter.convert(str(source_path))
+    except ImportError:
+        raise
+    except Exception as exc:
+        raise ParserExecutionError(
+            f"Docling conversion raised {type(exc).__name__}: {exc}"
+        ) from exc
+
+    document = getattr(conversion, "document", None)
+    conversion_errors = _conversion_errors(conversion, source_path)
+    if document is None:
+        summary = (
+            conversion_errors[0]["message"]
+            if conversion_errors
+            else "Docling returned no document"
+        )
+        raise ParserExecutionError(f"Docling conversion failed: {summary}")
+
+    try:
+        # Keep the native export intact; normalized blocks are a separate public view.
+        # 保留完整原生导出；规范化 blocks 是独立的公开视图。
+        payload = document.export_to_dict()
+    except Exception as exc:
+        raise ParserExecutionError(
+            f"Docling JSON export failed: {type(exc).__name__}: {exc}"
+        ) from exc
+
+    blocks, extraction_warnings = _extract_blocks(
+        document,
+        context=context,
+        source_path=source_path,
+        source_format=source_format,
+    )
+    limitations: list[str] = []
+    if conversion_profile == "pdf-native-no-model-download":
+        limitations.append(
+            "Native PDF parsing uses embedded text only; image-only or layout-only pages need local OCR and may remain unparsed."
+        )
+    warnings = [str(entry["message"]) for entry in conversion_errors]
+    warnings.extend(extraction_warnings)
+    status = _status_text(getattr(conversion, "status", "success"))
+    if status == "failure":
+        summary = (
+            warnings[0] if warnings else "Docling marked the conversion as failed."
+        )
+        raise ParserExecutionError(f"Docling conversion failed: {summary}")
+    if status == "partial_success" and not warnings:
+        warnings.append("Docling marked the conversion as partial success.")
+
+    pages = getattr(document, "pages", None)
+    page_count = len(pages) if pages else None
+    diagnostics: list[ParserDiagnostic] = []
+    unsupported: list[dict[str, Any]] = []
+    diagnostics.extend(
+        ParserDiagnostic(
+            code="docling.conversion_warning",
+            message=warning,
+            kind="parser",
+        )
+        for warning in (str(entry["message"]) for entry in conversion_errors)
+    )
+    diagnostics.extend(
+        ParserDiagnostic(
+            code="docling.block_projection_warning",
+            message=warning,
+            kind="parser",
+        )
+        for warning in extraction_warnings
+    )
+    for warning in warnings:
+        if (
+            not diagnostics
+            and warning == "Docling marked the conversion as partial success."
+        ):
+            diagnostics.append(
+                ParserDiagnostic(
+                    code="docling.partial_success",
+                    message=warning,
+                    kind="parser",
+                )
+            )
+    if source_format == "PDF" and not page_count:
+        warning = "Docling returned no PDF page records."
+        warnings.append(warning)
+        diagnostics.append(
+            ParserDiagnostic("docling.page_records_missing", warning, "parser")
+        )
+    if not blocks:
+        warning = "Docling returned no addressable content blocks."
+        warnings.append(warning)
+        unsupported.append(
+            {
+                "kind": "document_content",
+                "code": "docling.no_addressable_blocks",
+                "message": warning,
+                "locator": {
+                    "source_pages": [],
+                    "section_path": [],
+                    "item_ref": "document",
+                    "tree_level": 0,
+                    "provenance": [],
+                },
+            }
+        )
+        diagnostics.append(
+            ParserDiagnostic("docling.no_addressable_blocks", warning, "parser")
+        )
+    result = ParseResult(
+        payload=payload,
+        blocks=blocks,
+        source_format=source_format,
+        conversion_profile=conversion_profile,
+        status="partial_success" if status == "partial_success" else "success",
+        page_count=page_count,
+        warnings=list(dict.fromkeys([*warnings, *limitations])),
+        diagnostics=diagnostics,
+        unsupported_content=unsupported,
+    )
+    return result, conversion_errors, limitations
+
+
+def _add_pdf_page_ocr(
+    source_path: Path,
+    context: ParseContext,
+    parsed: ParseResult,
+    config: OcrConfig,
+    ocr_image: Callable[..., Any],
+) -> ParseResult:
+    """OCR PDF pages that have no native text and preserve page-level limits.
+
+    PDF rendering uses pypdfium2 only when a textless page is found. OCR remains a
+    separately configured local engine and never downloads models.
+    中文：仅对无原生文本页逐页 OCR；渲染和 OCR 不触发模型下载。
+    """
+
+    import pypdfium2 as pdfium
+
+    page_numbers_with_text = {
+        page
+        for block in parsed.blocks
+        if str(block.get("text", "")).strip()
+        for page in block.get("locator", {}).get("source_pages", [])
+        if isinstance(page, int) and not isinstance(page, bool) and page > 0
+    }
+    blocks = list(parsed.blocks)
+    initial_block_count = len(blocks)
+    warnings = list(parsed.warnings)
+    diagnostics = list(parsed.diagnostics)
+    unsupported = list(parsed.unsupported_content)
+    profile = parsed.conversion_profile
+
+    try:
+        pdf_document = pdfium.PdfDocument(str(source_path))
+    except Exception as exc:
+        raise ParserExecutionError(
+            f"PDF page rendering could not open the source: {type(exc).__name__}: {exc}"
+        ) from exc
+
+    page_count = len(pdf_document)
+    ocr_attempted = False
+    try:
+        for page_number in range(1, page_count + 1):
+            if page_number in page_numbers_with_text:
+                continue
+            ocr_attempted = True
+            page_locator = _page_locator(page_number, f"ocr:page:{page_number}")
+            page = pdf_document[page_number - 1]
+            bitmap = None
+            image = None
+            try:
+                bitmap = page.render(scale=config.dpi / 72.0)
+                image = bitmap.to_pil()
+                result = ocr_image(
+                    image,
+                    context=context,
+                    page_number=page_number,
+                    config=config,
+                )
+            except Exception as exc:  # noqa: BLE001
+                # One page-level OCR failure must not discard other pages.
+                message = f"PDF page {page_number} OCR failed ({type(exc).__name__})."
+                diagnostic = ParserDiagnostic(
+                    code="ocr.page_failed",
+                    message=message,
+                    kind="ocr",
+                    locator=page_locator,
+                )
+                diagnostics.append(diagnostic)
+                warnings.append(message)
+                unsupported.append(
+                    {
+                        "kind": "scanned_page",
+                        "code": "ocr.page_unparsed",
+                        "message": message,
+                        "locator": page_locator,
+                    }
+                )
+                continue
+            finally:
+                if image is not None:
+                    image.close()
+                if bitmap is not None:
+                    bitmap.close()
+                page.close()
+
+            result_text = _normalize_text(result.text) if result.text.strip() else ""
+            result_diagnostics = list(result.diagnostics)
+            for item in result_diagnostics:
+                diagnostic_locator = _ocr_diagnostic_locator(item.locator, page_number)
+                normalized = replace(item, locator=diagnostic_locator)
+                diagnostics.append(normalized)
+                warnings.append(normalized.message)
+
+            region_texts: list[str] = []
+            for region_index, region in enumerate(result.regions):
+                text = _normalize_text(region.text)
+                if not text:
+                    continue
+                region_texts.append(text)
+                item_ref = f"ocr:page:{page_number}:region:{region_index}"
+                blocks.append(
+                    make_block(
+                        context,
+                        ordinal=len(blocks),
+                        item_ref=item_ref,
+                        kind="text",
+                        text=text,
+                        source_pages=(page_number,),
+                        provenance=(
+                            {
+                                "type": "ocr",
+                                "engine": result.engine,
+                                "languages": list(result.languages),
+                                "confidence": region.confidence,
+                                "bbox": dict(region.bbox),
+                                "coordinate_unit": "rendered-image-pixels",
+                            },
+                        ),
+                    )
+                )
+            if result_text and not region_texts:
+                blocks.append(
+                    make_block(
+                        context,
+                        ordinal=len(blocks),
+                        item_ref=f"ocr:page:{page_number}:text",
+                        kind="text",
+                        text=result_text,
+                        source_pages=(page_number,),
+                        provenance=(
+                            {
+                                "type": "ocr",
+                                "engine": result.engine,
+                                "languages": list(result.languages),
+                                "confidence": result.confidence,
+                            },
+                        ),
+                    )
+                )
+            if not region_texts and not result_text:
+                message = f"PDF page {page_number} has no native text and OCR returned no text."
+                if not any(item.locator == page_locator for item in diagnostics):
+                    diagnostic = ParserDiagnostic(
+                        code="ocr.page_no_text",
+                        message=message,
+                        kind="ocr",
+                        locator=page_locator,
+                    )
+                    diagnostics.append(diagnostic)
+                    warnings.append(message)
+                unsupported.append(
+                    {
+                        "kind": "scanned_page",
+                        "code": "ocr.page_unparsed",
+                        "message": message,
+                        "locator": page_locator,
+                    }
+                )
+    finally:
+        pdf_document.close()
+
+    if ocr_attempted:
+        profile = f"{profile}+local-page-ocr"
+    if len(blocks) > initial_block_count:
+        unsupported = [
+            item
+            for item in unsupported
+            if item.get("code") != "docling.no_addressable_blocks"
+        ]
+        diagnostics = [
+            item for item in diagnostics if item.code != "docling.no_addressable_blocks"
+        ]
+        warnings = [
+            warning
+            for warning in warnings
+            if warning != "Docling returned no addressable content blocks."
+        ]
+    return replace(
+        parsed,
+        blocks=blocks,
+        conversion_profile=profile,
+        page_count=page_count,
+        warnings=list(dict.fromkeys(warnings)),
+        diagnostics=diagnostics,
+        unsupported_content=unsupported,
+    )
+
+
+def _page_locator(page_number: int, item_ref: str) -> dict[str, Any]:
+    """Build the common locator shape for page-level OCR diagnostics."""
+
+    return {
+        "source_pages": [page_number],
+        "section_path": [],
+        "item_ref": item_ref,
+        "tree_level": 0,
+        "provenance": [],
+    }
+
+
+def _ocr_diagnostic_locator(
+    locator: dict[str, Any] | None,
+    default_page: int,
+) -> dict[str, Any]:
+    """Normalize adapter OCR locator details into the public block locator shape.
+
+    中文：将 OCR helper 的页码和框坐标包装成统一来源定位结构。
+    """
+
+    if locator is None:
+        return _page_locator(default_page, f"ocr:page:{default_page}")
+    required = {"source_pages", "section_path", "item_ref", "tree_level", "provenance"}
+    if required.issubset(locator):
+        return _to_json_value(locator)
+    page_number = locator.get("page_number", default_page)
+    if (
+        not isinstance(page_number, int)
+        or isinstance(page_number, bool)
+        or page_number < 1
+    ):
+        page_number = default_page
+    item_ref = str(locator.get("item_ref") or f"ocr:page:{page_number}")
+    provenance = {"type": "ocr_diagnostic", **_to_json_value(locator)}
+    return {
+        "source_pages": [page_number],
+        "section_path": [],
+        "item_ref": item_ref,
+        "tree_level": 0,
+        "provenance": [provenance],
+    }
+
+
+def _with_diagnostic(parsed: ParseResult, diagnostic: ParserDiagnostic) -> ParseResult:
+    """Add one diagnostic while retaining an adapter's existing output."""
+
+    return replace(
+        parsed,
+        diagnostics=[*parsed.diagnostics, diagnostic],
+        warnings=list(dict.fromkeys([*parsed.warnings, diagnostic.message])),
+    )
+
+
+def _finalize_parse_result(parsed: ParseResult) -> ParseResult:
+    """Mark unresolved content or warnings as partial success."""
+
+    partial = bool(parsed.unsupported_content or parsed.diagnostics)
+    if parsed.status == "partial_success" or partial:
+        return replace(parsed, status="partial_success")
+    return parsed
+
+
+def _diagnostic_json(diagnostic: ParserDiagnostic) -> dict[str, Any]:
+    """Serialize the stable diagnostic fields without null optional keys."""
+
+    result: dict[str, Any] = {
+        "code": diagnostic.code,
+        "message": diagnostic.message,
+        "kind": diagnostic.kind,
+        "severity": diagnostic.severity,
+    }
+    if diagnostic.locator is not None:
+        result["locator"] = _to_json_value(diagnostic.locator)
+    if diagnostic.confidence is not None:
+        result["confidence"] = diagnostic.confidence
+    return result
 
 
 def _build_converter(input_format: Any, source_format: str) -> tuple[Any, str]:
@@ -341,8 +818,7 @@ def _build_converter(input_format: Any, source_format: str) -> tuple[Any, str]:
 def _extract_blocks(
     document: Any,
     *,
-    source_ref: str,
-    source_digest: str,
+    context: ParseContext,
     source_path: Path,
     source_format: str,
 ) -> tuple[list[dict[str, Any]], list[str]]:
@@ -405,28 +881,20 @@ def _extract_blocks(
             warnings.append(
                 f"{item_ref}: Docling supplied no public text for this {kind} item."
             )
-        block_id = hashlib.sha256(
-            f"{source_ref}\0{source_digest}\0{item_ref}".encode()
-        ).hexdigest()
-        locator: dict[str, Any] = {
-            "source_pages": source_pages,
-            "section_path": list(section_stack),
-            "item_ref": item_ref,
-            "tree_level": tree_level,
-            "provenance": provenance,
-        }
-        if kind == "table":
-            table_index = _table_index(item_ref)
-            if table_index is not None:
-                locator["table_index"] = table_index
+        table_index = _table_index(item_ref) if kind == "table" else None
         blocks.append(
-            {
-                "id": f"sha256:{block_id}",
-                "ordinal": len(blocks),
-                "kind": kind,
-                "text": text,
-                "locator": locator,
-            }
+            make_block(
+                context,
+                ordinal=len(blocks),
+                item_ref=item_ref,
+                kind=kind,
+                text=text,
+                source_pages=source_pages,
+                section_path=section_stack,
+                tree_level=tree_level,
+                table_index=table_index,
+                provenance=provenance,
+            )
         )
 
     return blocks, warnings
@@ -605,18 +1073,16 @@ def _conversion_errors(conversion: Any, source_path: Path) -> list[dict[str, Any
 
 
 def _unparsed_content(
-    errors: list[dict[str, Any]], extraction_warnings: list[str]
+    errors: list[dict[str, Any]],
+    unsupported_content: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Summarize content that Docling reported or the adapter could not project.
+    """Summarize conversion issues and explicit adapter gaps.
 
-    中文：汇总 Docling 明确报告失败或 adapter 无法投影的内容。
+    中文：汇总转换问题和 adapter 明确报告的未解析内容。
     """
 
     unparsed = [{"kind": "conversion_error", **error} for error in errors]
-    unparsed.extend(
-        {"kind": "block_projection_warning", "message": message}
-        for message in extraction_warnings
-    )
+    unparsed.extend(unsupported_content)
     return unparsed
 
 
@@ -638,9 +1104,9 @@ def _redact_source_path(value: Any, source_path: str) -> Any:
 
 
 def _validate_source(source_path: Path, media_type: str) -> str:
-    """Check source bytes, declared media type, and actual PDF/DOCX structure.
+    """Check source bytes, declared media type, and format signatures.
 
-    中文：校验来源字节数、声明类型以及实际 PDF/DOCX 结构。
+    中文：校验来源字节数、声明类型及 PDF、OOXML、文本和图片结构。
     """
 
     if not source_path.is_file():
@@ -651,31 +1117,60 @@ def _validate_source(source_path: Path, media_type: str) -> str:
     if source_size > MAX_SOURCE_BYTES:
         raise ValueError(f"source file exceeds {MAX_SOURCE_BYTES} bytes")
 
-    normalized_media_type = media_type.lower()
-    if normalized_media_type == SUPPORTED_MEDIA_TYPES["pdf"]:
+    source_format = MEDIA_TYPE_FORMATS.get(media_type)
+    if source_format is None:
+        raise ValueError(f"unsupported media_type: {media_type}")
+    if source_format == "PDF":
         with source_path.open("rb") as stream:
             if not stream.read(8).startswith(b"%PDF-"):
                 raise ValueError("source bytes do not contain a PDF header")
         return "PDF"
-    if normalized_media_type == SUPPORTED_MEDIA_TYPES["docx"]:
+    expected_root = {
+        "DOCX": "word/document.xml",
+        "PPTX": "ppt/presentation.xml",
+        "XLSX": "xl/workbook.xml",
+    }.get(source_format)
+    if expected_root is not None:
+        _validate_ooxml_package(source_path, expected_root, source_format)
+        return source_format
+    if source_format in {"CSV", "MARKDOWN", "TXT"}:
         try:
-            with zipfile.ZipFile(source_path) as archive:
-                entries = archive.infolist()
-                if len(entries) > MAX_DOCX_ENTRIES:
-                    raise ValueError("DOCX archive contains too many entries")
-                expanded_size = sum(entry.file_size for entry in entries)
-                if expanded_size > MAX_DOCX_EXPANDED_BYTES:
-                    raise ValueError("DOCX expanded size exceeds the safe limit")
-                names = {entry.filename for entry in entries}
-                if (
-                    "[Content_Types].xml" not in names
-                    or "word/document.xml" not in names
-                ):
-                    raise ValueError("DOCX archive is missing its document parts")
-        except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
-            raise ValueError("source bytes are not a readable DOCX package") from exc
-        return "DOCX"
-    raise ValueError("media_type must identify application/pdf or OOXML Word DOCX")
+            source_path.read_text(encoding="utf-8-sig")
+        except UnicodeError as exc:
+            raise ValueError(f"{source_format} source must be UTF-8 text") from exc
+        return source_format
+    with source_path.open("rb") as stream:
+        header = stream.read(8)
+    if source_format == "PNG" and header != b"\x89PNG\r\n\x1a\n":
+        raise ValueError("source bytes do not contain a PNG signature")
+    if source_format == "JPEG" and not header.startswith(b"\xff\xd8\xff"):
+        raise ValueError("source bytes do not contain a JPEG signature")
+    return source_format
+
+
+def _validate_ooxml_package(
+    source_path: Path, required_root: str, source_format: str
+) -> None:
+    """Apply bounded ZIP checks before delegating an OOXML source.
+
+    中文：在委派 Office 适配器之前限制压缩包条目数和展开大小。
+    """
+
+    try:
+        with zipfile.ZipFile(source_path) as archive:
+            entries = archive.infolist()
+            if len(entries) > MAX_OOXML_ENTRIES:
+                raise ValueError("OOXML archive contains too many entries")
+            expanded_size = sum(entry.file_size for entry in entries)
+            if expanded_size > MAX_OOXML_EXPANDED_BYTES:
+                raise ValueError("OOXML expanded size exceeds the safe limit")
+            names = {entry.filename for entry in entries}
+            if "[Content_Types].xml" not in names or required_root not in names:
+                raise ValueError(f"{source_format} archive is missing required parts")
+    except (OSError, zipfile.BadZipFile, RuntimeError) as exc:
+        raise ValueError(
+            f"source bytes are not a readable {source_format} package"
+        ) from exc
 
 
 def _validate_request_identity(
