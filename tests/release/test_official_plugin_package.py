@@ -76,6 +76,16 @@ class OfficialPluginPackageTests(unittest.TestCase):
         """
 
         cases: list[tuple[str, Path, str, str]] = []
+        expected_target = {
+            "os": "linux",
+            "osVersion": "24.04",
+            "distribution": "ubuntu",
+            "distributionVersion": "24.04",
+            "architecture": "x86_64",
+            "abi": "glibc-2.39",
+            "runtime": "python:3.12",
+        }
+        self.assertEqual(release.TARGET, expected_target)
         for index, package_id in enumerate(sorted(release.PACKAGE_SPECS)):
             spec = release.PACKAGE_SPECS[package_id]
             output_dir = self.temp_root / f"package-{index}"
@@ -104,6 +114,20 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 (self.repository / spec.source_dir / "plugin.manifest.json").read_text(
                     encoding="utf-8"
                 )
+            )
+            component_manifest = json.loads(
+                outputs["component_manifest"].read_text(encoding="utf-8")
+            )
+            package_release = json.loads(
+                outputs["release_metadata"].read_text(encoding="utf-8")
+            )
+            self.assertEqual(component_manifest["target"], expected_target)
+            self.assertEqual(
+                component_manifest["releaseId"],
+                f"preview-{spec.component_id}-{manifest['version']}-{self.source_sha}",
+            )
+            self.assertEqual(
+                package_release["attestation_policy"]["provider"], "github-actions"
             )
             cases.append(
                 (

@@ -48,7 +48,8 @@ TARGET = {
     "distribution": "ubuntu",
     "distributionVersion": "24.04",
     "architecture": "x86_64",
-    "runtime": "python-3.12",
+    "abi": "glibc-2.39",
+    "runtime": "python:3.12",
 }
 SUPPORTED_CHANNELS = {"candidate", "preview", "stable"}
 CAPABILITY_PROTOCOL = "cyrene.plugin.runtime.v1"
@@ -1115,7 +1116,7 @@ def build_release_artifacts(
                 },
             },
             "attestation_policy": {
-                "provider": "github-artifact-attestation",
+                "provider": "github-actions",
                 "workflow": f"{REPOSITORY}/{WORKFLOW_PATH}",
                 "source_commit": source_sha,
                 "subject_asset_names": sorted(
@@ -1495,7 +1496,7 @@ def _validate_attestation_policy(
         )
     ]
     expected = {
-        "provider": "github-artifact-attestation",
+        "provider": "github-actions",
         "workflow": f"{REPOSITORY}/{WORKFLOW_PATH}",
         "source_commit": source_sha,
         "subject_asset_names": sorted(

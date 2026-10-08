@@ -5374,8 +5374,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "812602dcef581b9559a348e106bef833333490dd50762c4ee518d592b448aa20",
-      "size_bytes": 8257
+      "sha256": "0d33c37073e7fd0f357bf7bcfd0249fcda1605e285064354411ed1206e346287",
+      "size_bytes": 9251
     },
     {
       "kind": "file",
@@ -5444,8 +5444,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/official_plugin_package.py",
-      "sha256": "970a64820ad678bedcf31629010c0a5159b837b5d09187b1ae19690411b83081",
-      "size_bytes": 63734
+      "sha256": "4b6154768238f8fe908a9bc68190cc9070971eb9b578d620bf96a6f7c58cb15c",
+      "size_bytes": 63733
     },
     {
       "kind": "file",
