@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/training-plugin-package-release.yml",
-      "sha256": "f679d7b8e5064678fb1e7e0c16b819c0bbeb8bff5dc09051907526cd582c2179",
-      "size_bytes": 15761
+      "sha256": "b15e78970314dfa36dd3f843530018294405662d9a8ec8450f77702fea479944",
+      "size_bytes": 16720
     },
     {
       "kind": "file",
@@ -5318,8 +5318,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_training_llama_factory_package.py",
-      "sha256": "6ec840b5b9135c654f58c4b025d8412df3320c5e8a62a1ed48e8620a959e3fea",
-      "size_bytes": 9935
+      "sha256": "80d875747119f6bc8366c1912c0d5237c3f77408ea5d5ddb147f9e079f630fbe",
+      "size_bytes": 11037
     },
     {
       "kind": "file",

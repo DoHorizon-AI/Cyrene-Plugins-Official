@@ -7,6 +7,7 @@ Contract tests for the immutable training Plugin release producer.
 from __future__ import annotations
 
 import json
+import re
 import tempfile
 import unittest
 import zipfile
@@ -127,6 +128,29 @@ class TrainingPluginReleaseTests(unittest.TestCase):
             target=release.TARGET_ID,
             preparer_wheel=self.wheel,
         )
+
+    def test_workflow_assets_match_current_source_owned_package_version(self) -> None:
+        """Release the actual built version after a bump. | 发布文件名与源码版本一致。"""
+
+        repository = Path(__file__).resolve().parents[2]
+        actual_manifest = json.loads(
+            (repository / release.PACKAGE_SOURCE / "plugin.manifest.json").read_text()
+        )
+        fixture_manifest = _manifest()
+        fixture_manifest["version"] = actual_manifest["version"]
+        _write(
+            self.root / release.PACKAGE_SOURCE / "plugin.manifest.json",
+            json.dumps(fixture_manifest),
+        )
+        outputs = self._build("current-version")
+        workflow = (repository / release.WORKFLOW_PATH).read_text()
+        published_names = {
+            name.replace("${TRAINING_PACKAGE_VERSION}", str(actual_manifest["version"]))
+            for name in re.findall(
+                r'^\s+"(?:\$PUBLISH_DIR/)?(cyrene[^"\n]+)"$', workflow, re.MULTILINE
+            )
+        }
+        self.assertEqual(published_names, {path.name for path in outputs.values()})
 
     def test_release_is_deterministic_and_matches_package_runtime_descriptor(
         self,
