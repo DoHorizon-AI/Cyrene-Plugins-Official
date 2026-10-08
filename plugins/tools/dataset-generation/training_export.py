@@ -30,6 +30,17 @@ _MAX_RECORD_BYTES = 16 * 1024 * 1024
 _MAX_BLOCKERS = 100
 _SPLIT_ALGORITHM = "sha256-ranked-lineage-component-v1"
 _PROFILE = "CYRENE_SFT_BUNDLE_V1"
+_FORMAT_ERROR_CODES = frozenset(
+    {
+        "INVALID_JSON",
+        "training.invalid_json",
+        "INVALID_ENCODING",
+        "FORMAT_UNRECOGNIZED",
+        "MESSAGE_STRUCTURE_INVALID",
+        "FIELD_MISSING",
+        "FIELD_TYPE_INVALID",
+    }
+)
 _OUTPUT_FILES = (
     "train.jsonl",
     "validation.jsonl",
@@ -272,7 +283,10 @@ def _insert_snapshot_record(
         raise TypeError("record.processingHistory must be an array of objects")
     if record.get("detectedFormat") not in {None, "", "unknown", "auto"}:
         totals["recognized"] += 1
-    if any(issue.get("severity") == "error" for issue in issues):
+    if any(
+        isinstance(issue.get("code"), str) and issue["code"] in _FORMAT_ERROR_CODES
+        for issue in issues
+    ):
         totals["formatErrors"] += 1
     if any("duplicate" in str(issue.get("code", "")).lower() for issue in issues):
         totals["duplicateCandidates"] += 1
@@ -432,9 +446,11 @@ def _validate_messages(messages: Any, line_number: int) -> None:
 
 
 def _training_allowed(policy: dict[str, Any]) -> bool:
-    return policy.get("allowTraining") is True and isinstance(
-        policy.get("allowedUsePurposes"), list
-    ) and "model_training" in policy["allowedUsePurposes"]
+    return (
+        policy.get("allowTraining") is True
+        and isinstance(policy.get("allowedUsePurposes"), list)
+        and "model_training" in policy["allowedUsePurposes"]
+    )
 
 
 def _raise_if_blocked(totals: dict[str, Any], diagnostics_path: Path) -> None:

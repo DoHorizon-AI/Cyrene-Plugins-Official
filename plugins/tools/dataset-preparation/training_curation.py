@@ -744,7 +744,9 @@ def _normalize_item(
         "id": f"record:{source['source_revision_id']}:{item.ordinal}",
         "sampleId": _sample_id(item.raw_record, field_mapping, source, item.ordinal),
         "sourceRevisionId": source["source_revision_id"],
-        "sourceFamilyId": source["source_family_id"],
+        "sourceFamilyId": _training_family_id(
+            item.raw_record, field_mapping, source["source_family_id"]
+        ),
         "conversationId": _conversation_id(
             item.raw_record, field_mapping, item.ordinal
         ),
@@ -2023,11 +2025,26 @@ def _validate_recipe(recipe: Any) -> dict[str, Any]:
 
 
 def _normalize_text(value: str, recipe: Mapping[str, Any]) -> str:
-    """Normalize line endings, Unicode composition, and edge whitespace only."""
+    """Normalize line endings and Unicode without trimming meaningful content."""
 
-    text = value.replace("\r\n", "\n").replace("\r", "\n").strip()
+    text = value.replace("\r\n", "\n").replace("\r", "\n")
     form = str(recipe.get("unicodeNormalization", "NFC"))
     return text if form == "none" else unicodedata.normalize(form, text)
+
+
+def _training_family_id(
+    raw: Any, fields: Mapping[str, Any], default: str
+) -> str:
+    """Use an explicit record family for cross-file split isolation when present."""
+
+    value = _mapped_value(raw, fields, "sourceFamilyId")
+    if value is None and isinstance(raw, dict):
+        value = raw.get("source_family_id", raw.get("sourceFamilyId"))
+    if isinstance(value, str) and value.strip():
+        return value.strip()
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    return default
 
 
 def _mapped_value(

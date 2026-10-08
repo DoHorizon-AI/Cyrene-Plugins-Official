@@ -353,6 +353,99 @@ def test_policy_only_snapshot_writes_counts_to_failure_diagnostics(tmp_path) -> 
     assert diagnostics["published"] == 0
 
 
+@pytest.mark.parametrize("disposition", ["review", "excluded"])
+def test_format_error_counts_use_curation_code_classifier(
+    tmp_path, disposition
+) -> None:
+    snapshot = tmp_path / "snapshot.jsonl"
+    messages = [
+        {"role": "user", "content": "question"},
+        {"role": "assistant", "content": "answer"},
+    ]
+    format_codes = [
+        "INVALID_JSON",
+        "INVALID_ENCODING",
+        "FORMAT_UNRECOGNIZED",
+        "MESSAGE_STRUCTURE_INVALID",
+        "FIELD_MISSING",
+        "FIELD_TYPE_INVALID",
+    ]
+    non_format_error_codes = [
+        "UNSUPPORTED_ROLE",
+        "UNSUPPORTED_TOOL_CALL",
+        "UNSUPPORTED_MULTIMODAL",
+        "POLICY_BLOCKED",
+        "EMPTY_RESPONSE",
+    ]
+    records = [
+        _record(
+            index,
+            messages,
+            disposition=disposition,
+            issues=[{"code": code, "message": code, "severity": "error"}],
+        )
+        for index, code in enumerate(format_codes)
+    ]
+    records.extend(
+        _record(
+            len(format_codes) + index,
+            messages,
+            disposition="excluded",
+            issues=[{"code": code, "message": code, "severity": "error"}],
+        )
+        for index, code in enumerate(non_format_error_codes)
+    )
+    records.append(_record(99, messages))
+    _write_snapshot(snapshot, records)
+
+    if disposition == "review":
+        with pytest.raises(ValueError, match="record is still in review"):
+            prepare_training_sft(_request(snapshot, tmp_path / "out"))
+        counts = json.loads(
+            (tmp_path / "out" / "export-diagnostics.json").read_text(encoding="utf-8")
+        )
+    else:
+        receipt = prepare_training_sft(_request(snapshot, tmp_path / "out"))
+        counts = receipt["counts"]
+
+    assert counts["total"] == 12
+    assert counts["formatErrors"] == 6
+    assert counts["review"] == (6 if disposition == "review" else 0)
+    assert counts["excluded"] == (5 if disposition == "review" else 11)
+
+
+def test_format_error_counts_include_legacy_invalid_json_code(tmp_path) -> None:
+    snapshot = tmp_path / "snapshot.jsonl"
+    _write_snapshot(
+        snapshot,
+        [
+            _record(
+                1,
+                [
+                    {"role": "user", "content": "question"},
+                    {"role": "assistant", "content": "answer"},
+                ],
+                disposition="review",
+                issues=[
+                    {
+                        "code": "training.invalid_json",
+                        "message": "legacy invalid JSON issue",
+                        "severity": "error",
+                    }
+                ],
+            )
+        ],
+    )
+
+    with pytest.raises(ValueError, match="record is still in review"):
+        prepare_training_sft(_request(snapshot, tmp_path / "out"))
+
+    diagnostics = json.loads(
+        (tmp_path / "out" / "export-diagnostics.json").read_text(encoding="utf-8")
+    )
+    assert diagnostics["formatErrors"] == 1
+
+
 def test_review_records_block_export_until_explicitly_resolved(tmp_path) -> None:
     snapshot = tmp_path / "snapshot.jsonl"
     _write_snapshot(

@@ -296,7 +296,7 @@ def test_manual_field_and_role_mapping_use_same_normalizer(tmp_path: Path) -> No
 
     assert record["sampleId"] == "external-7"
     assert record["normalized"]["messages"] == [
-        {"role": "user", "content": "say hello\nfriend"},
+        {"role": "user", "content": "  say hello\n\nfriend"},
         {"role": "assistant", "content": "hi"},
     ]
 
@@ -540,6 +540,100 @@ def test_human_remap_cannot_change_authoritative_lineage_or_policy(
             recipe_digest="sha256:" + "b" * 64,
             format_hint="promptCompletion",
         )
+
+
+def test_record_family_id_is_preserved_across_sources_and_remap(
+    tmp_path: Path,
+) -> None:
+    sources = []
+    for source_name, revision_id, descriptor_family, prompt in (
+        ("legacy.jsonl", "legacy-rev", "file-family-a", "Legacy question"),
+        ("visitor.jsonl", "visitor-rev", "file-family-b", "Visitor question"),
+    ):
+        source_path = tmp_path / source_name
+        source_path.write_text(
+            json.dumps(
+                {
+                    "source_family_id": "shared-training-family",
+                    "prompt": prompt,
+                    "completion": "Answer",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        sources.append(_source(source_path, revision_id, descriptor_family))
+
+    output = tmp_path / "cross-file-family-records.jsonl"
+    _curate(
+        sources,
+        output,
+        tmp_path / "cross-file-family-checkpoint.json",
+    )
+    records = _read_envelopes(output)
+    assert [record["sourceFamilyId"] for record in records] == [
+        "shared-training-family",
+        "shared-training-family",
+    ]
+    assert [record["sourceRevisionId"] for record in records] == [
+        "legacy-rev",
+        "visitor-rev",
+    ]
+
+    remapped = [
+        remap_training_record(
+            record=record,
+            recipe=RECIPE,
+            recipe_digest=RECIPE_DIGEST,
+            format_hint="promptCompletion",
+        )
+        for record in records
+    ]
+    assert [record["sourceFamilyId"] for record in remapped] == [
+        "shared-training-family",
+        "shared-training-family",
+    ]
+    assert all(
+        "LINEAGE_METADATA_CONFLICT"
+        not in {issue["code"] for issue in record["issues"]}
+        for record in remapped
+    )
+
+
+def test_text_normalization_preserves_indented_code_and_rejects_whitespace_only(
+    tmp_path: Path,
+) -> None:
+    source = tmp_path / "code-and-empty.jsonl"
+    source.write_text(
+        json.dumps(
+            {
+                "prompt": "Explain this function",
+                "completion": "\n    def answer():\n        return 42\n",
+            }
+        )
+        + "\n"
+        + json.dumps({"prompt": "Empty answer", "completion": " \t\r\n "})
+        + "\n",
+        encoding="utf-8",
+    )
+    output = tmp_path / "code-and-empty-records.jsonl"
+    _curate(
+        [_source(source, "code-and-empty-rev")],
+        output,
+        tmp_path / "code-and-empty-checkpoint.json",
+    )
+    code_record, empty_record = _read_envelopes(output)
+
+    assert code_record["normalized"]["messages"][1]["content"] == (
+        "\n    def answer():\n        return 42\n"
+    )
+    assert code_record["disposition"] == "eligible"
+    assert empty_record["normalized"]["messages"][1]["content"] == " \t\n "
+    empty_issue = next(
+        issue for issue in empty_record["issues"] if issue["code"] == "EMPTY_RESPONSE"
+    )
+    assert empty_issue["severity"] == "error"
+    assert empty_record["disposition"] == "review"
 
 
 def test_malformed_record_policy_is_fail_closed(tmp_path: Path) -> None:

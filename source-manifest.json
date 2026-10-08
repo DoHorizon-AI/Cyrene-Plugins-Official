@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/training-plugin-package-release.yml",
-      "sha256": "0b514929b5cef2e210cf4e9ba5cf198391051b9f423ad7babb8ac1ebda306368",
-      "size_bytes": 15703
+      "sha256": "f679d7b8e5064678fb1e7e0c16b819c0bbeb8bff5dc09051907526cd582c2179",
+      "size_bytes": 15761
     },
     {
       "kind": "file",
@@ -1937,15 +1937,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/tests/test_training_export.py",
-      "sha256": "9e36fe66db428c2650420379f4b0fb8cd82479b8d553c99b4cb0a35d8e762665",
-      "size_bytes": 18602
+      "sha256": "2ab26c191a3b04dcef330f518fc220ba221cc1b553313552c7da5e36cf1f7ac1",
+      "size_bytes": 21581
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/training_export.py",
-      "sha256": "b1ac3148c3bfe7d36ab6dface741e8a7fac32ebf145fcc21728107116f47bcb6",
-      "size_bytes": 33423
+      "sha256": "4cfa800e772911d1c9c4baf2950ef66a54b7bc88a2bdad13bd7ffcba62390a7e",
+      "size_bytes": 33761
     },
     {
       "kind": "file",
@@ -1993,15 +1993,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/tests/test_training_curation.py",
-      "sha256": "0f95b70776a7f8252c1ccf3c448f50694e0a42e6048aebe75cf01d462815eca3",
-      "size_bytes": 27859
+      "sha256": "a041bfe8396c5de8023a749491da27649dea3480a07f925022103750769db7b5",
+      "size_bytes": 30848
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/training_curation.py",
-      "sha256": "35bb19918ab97acc315808b64c51b0099a17b2ee7b59d01e8211e93c815c02d8",
-      "size_bytes": 87391
+      "sha256": "b7e06cce3ee75802eddef7018c5cf750bea4eebe9d3f6294d5978d50b2029f33",
+      "size_bytes": 87998
     },
     {
       "kind": "file",
