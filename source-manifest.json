@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/data-tools-package-release.yml",
-      "sha256": "801d59a0b16565d5fe81d975b596432bf05f07458704790f5693ef9048006493",
-      "size_bytes": 14985
+      "sha256": "a01b896cdae0b76c6b3a797a6d8141aa5bd4fd8c3c1d7740d6abd8bda5452f91",
+      "size_bytes": 15262
     },
     {
       "kind": "file",
@@ -5374,8 +5374,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "0d33c37073e7fd0f357bf7bcfd0249fcda1605e285064354411ed1206e346287",
-      "size_bytes": 9251
+      "sha256": "f78eedf11d0d20e5b32da7597688cd78dd2b290c9ede0039f74761b806a3b87c",
+      "size_bytes": 12413
     },
     {
       "kind": "file",
@@ -5444,8 +5444,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/official_plugin_package.py",
-      "sha256": "4b6154768238f8fe908a9bc68190cc9070971eb9b578d620bf96a6f7c58cb15c",
-      "size_bytes": 63733
+      "sha256": "5dabff5365581ea9aeaace7990777e948e8359b22d05753bd2c316644c6617d6",
+      "size_bytes": 67645
     },
     {
       "kind": "file",
