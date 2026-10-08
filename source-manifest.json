@@ -1936,6 +1936,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/dataset-generation/tests/test_generation_fault_injection.py",
+      "sha256": "bb7d451a5086dba083ca6e5160a94b8eff1aeca48ac74a6fece50565857850c8",
+      "size_bytes": 12100
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/dataset-generation/tests/test_training_export.py",
       "sha256": "2ab26c191a3b04dcef330f518fc220ba221cc1b553313552c7da5e36cf1f7ac1",
       "size_bytes": 21581
@@ -2128,6 +2135,13 @@
       "path": "plugins/tools/document-parsing/tests/test_office_parsing.py",
       "sha256": "be475655ce10b1a2313d4a3f7cbaed73beb5c8b0894da30d5ad3603cdc0ab27e",
       "size_bytes": 12134
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/document-parsing/tests/test_parser_stress.py",
+      "sha256": "d9099633720a9e7223fb8b6707e31e73c67cf4c14ba5990a9bea243a62bde3f7",
+      "size_bytes": 11699
     },
     {
       "kind": "file",
