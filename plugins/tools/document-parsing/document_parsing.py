@@ -176,7 +176,10 @@ class DocumentParsingPlugin:
         from docling.datamodel.base_models import InputFormat
 
         converter, conversion_profile = _build_converter(InputFormat, source_format)
-        conversion = converter.convert(str(source_path))
+        try:
+            conversion = converter.convert(str(source_path))
+        except Exception as exc:
+            raise ValueError(f"Docling conversion failed: {exc}") from exc
         document = getattr(conversion, "document", None)
         if document is None:
             errors = _conversion_errors(conversion, source_path)
