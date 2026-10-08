@@ -22,7 +22,7 @@
         "format": {"enum": ["auto", "jsonl", "json", "parquet", "csv"]},
         "schema": {
           "type": ["string", "null"],
-          "enum": ["instruction", "conversation", "sharegpt", null]
+          "enum": ["instruction", "instruction_history", "conversation", "sharegpt", "messages", "prompt_completion", null]
         },
         "sample_size": {"type": "integer", "minimum": 0, "maximum": 100},
         "max_errors": {"type": "integer", "minimum": 1, "maximum": 1000},

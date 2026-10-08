@@ -21,6 +21,11 @@ from pathlib import Path
 from typing import Any
 
 import duckdb
+from training_curation import (
+    CurationCancelled,
+    curate_training_records,
+    remap_training_record,
+)
 
 CAPABILITY_ID = "dataset.preparation.v1"
 INTERFACE_VERSION = "1"
@@ -61,7 +66,7 @@ class DatasetPreparationPlugin:
     """
 
     plugin_id = "cyrene.tools.dataset-preparation"
-    version = "0.1.3"
+    version = "0.2.0"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
@@ -81,7 +86,13 @@ class DatasetPreparationPlugin:
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
-        if action not in {"inspect", "prepare", "transform"}:
+        if action not in {
+            "inspect",
+            "prepare",
+            "transform",
+            "curate_training_records",
+            "remap_training_record",
+        }:
             return False, f"METHOD_NOT_FOUND: unsupported method {action!r}"
         expected_type_url = f"{TYPE_PREFIX}.{action}.request"
         if request_type_url != expected_type_url:
@@ -113,12 +124,37 @@ class DatasetPreparationPlugin:
                     split=request.get("split"),
                     output_dir=request.get("output_dir"),
                 )
-            else:
+            elif action == "transform":
                 result = self.transform(
                     _path(request.get("source_path"), "source_path"),
                     _path(request.get("destination_path"), "destination_path"),
                     source_format=request.get("source_format"),
                 )
+            elif action == "curate_training_records":
+                result = curate_training_records(
+                    sources=request.get("sources"),
+                    result_path=request.get("result_path"),
+                    checkpoint_path=request.get("checkpoint_path"),
+                    recipe_digest=request.get("recipe_digest"),
+                    recipe=request.get("recipe"),
+                    cancellation=cancellation,
+                )
+            else:
+                result = remap_training_record(
+                    record=request.get("record"),
+                    recipe=request.get("recipe"),
+                    recipe_digest=request.get("recipe_digest"),
+                    format_hint=request.get("format"),
+                    field_mapping=request.get("field_mapping"),
+                    role_mapping=request.get("role_mapping"),
+                    raw_record=request.get("raw_record"),
+                    note=request.get("note"),
+                )
+        except CurationCancelled:
+            return (
+                False,
+                "CANCELLED: curation checkpoint persisted; retry with the same request to resume",
+            )
         except (
             TypeError,
             ValueError,

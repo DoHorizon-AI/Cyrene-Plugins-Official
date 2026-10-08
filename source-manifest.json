@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/training-plugin-package-release.yml",
-      "sha256": "0b514929b5cef2e210cf4e9ba5cf198391051b9f423ad7babb8ac1ebda306368",
-      "size_bytes": 15703
+      "sha256": "f679d7b8e5064678fb1e7e0c16b819c0bbeb8bff5dc09051907526cd582c2179",
+      "size_bytes": 15761
     },
     {
       "kind": "file",
@@ -159,8 +159,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "68096f464d8e1909c3bbc9482eb805992192595c133faf19d765421a82763dd4",
-      "size_bytes": 21484
+      "sha256": "847e46050c56ae64764789b344050007c9bf257a808185435a99605f0ea30261",
+      "size_bytes": 21678
     },
     {
       "kind": "file",
@@ -1874,8 +1874,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/README.md",
-      "sha256": "3f0c7d9de1e40519b139d053eab53daffb79bf04b5d4a78c8f422435522d8f5f",
-      "size_bytes": 5593
+      "sha256": "f8ec064a7e722f6679ac8133db31eb5c2eae55bf5c9b5303185318e6459bb8b7",
+      "size_bytes": 7899
     },
     {
       "kind": "file",
@@ -1888,29 +1888,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/contracts/v1/schema.json",
-      "sha256": "1e596e41e600fd52c04f43c7cf1cd8028d91b4016e5e8dd7ec9d78350ef2162d",
-      "size_bytes": 13462
+      "sha256": "57bd32b27453c3e4a417fc4821b78ddc70c7932d9bc81b2c287af2635c101353",
+      "size_bytes": 16420
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/dataset_generation.py",
-      "sha256": "3a1e7949d51e6cee091683ae333bbd74463d2719e9477f3535a37f7e4f9d3fcd",
-      "size_bytes": 73329
+      "sha256": "f02a8b1e1c767e769d1830051eabde74f7d3f0572777a79f8ad438d8d204963e",
+      "size_bytes": 73521
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/plugin.manifest.json",
-      "sha256": "833f345abf36e6d287f28ec2a18dea39915e334b078685d9f322b4660effde5d",
-      "size_bytes": 1647
+      "sha256": "e567fad1f59362a63bc5ad8453e1b38904b4d002d73a4c14a47818979568979c",
+      "size_bytes": 1954
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/pyproject.toml",
-      "sha256": "9f7d8c2a159eb6dd2782a721e231e35573b70bb58d9347fb2d8f57d678d6e8d3",
-      "size_bytes": 739
+      "sha256": "41cabfabc89f18a13756f1bb38752c70cab88e475a010d88f0a265b7aee3acea",
+      "size_bytes": 770
     },
     {
       "kind": "file",
@@ -1936,37 +1936,51 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/dataset-generation/tests/test_training_export.py",
+      "sha256": "2ab26c191a3b04dcef330f518fc220ba221cc1b553313552c7da5e36cf1f7ac1",
+      "size_bytes": 21581
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/dataset-generation/training_export.py",
+      "sha256": "4cfa800e772911d1c9c4baf2950ef66a54b7bc88a2bdad13bd7ffcba62390a7e",
+      "size_bytes": 33761
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/dataset-preparation/README.md",
-      "sha256": "d87bb72687ff8256ed0e7291a645be7b963bc3acf9286b4b2fbe8774e0a9f3be",
-      "size_bytes": 2306
+      "sha256": "6ee924785d6ea5b9ce3e2ad801fe3bbaab51204a00c1737ea133aee1a2b24981",
+      "size_bytes": 5571
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/contracts/v1/schema.json",
-      "sha256": "92702369626d731184dd16368421a2996bd461b84b09750700c48ed994e29512",
-      "size_bytes": 3491
+      "sha256": "01f96e8cfad310b51eabbe0f21436ae1d6494ffaef5add6e1c6c00ec7d0c2bd3",
+      "size_bytes": 10775
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/dataset_preparation.py",
-      "sha256": "4f46787d5fb67ce2565465bfc2f9e9d20380fa8d8161f9f950cca16533ec0ec4",
-      "size_bytes": 28633
+      "sha256": "e11c41877abcfb0b5473a762881d9987750258bf1f2ab342e5859349072b1959",
+      "size_bytes": 30078
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/plugin.manifest.json",
-      "sha256": "8f475ec36feaa7cfd70798f0ff58bb654c50cf2e2a2c24e63edad403b1a345dc",
-      "size_bytes": 1816
+      "sha256": "8bb6091eff5d0482be80ecbc08e3d47d894d96bb45f02d11e3e73fae71f3ee75",
+      "size_bytes": 2349
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/pyproject.toml",
-      "sha256": "bb13711aa092115427121e587512d7db7080d1f9ddcc11a43732b7bdafe663fc",
-      "size_bytes": 654
+      "sha256": "e34d7eba272d456a6214e1d764314958ce203a0e889a8655095717d9a457a4b0",
+      "size_bytes": 683
     },
     {
       "kind": "file",
@@ -1978,23 +1992,37 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/dataset-preparation/tests/test_training_curation.py",
+      "sha256": "a041bfe8396c5de8023a749491da27649dea3480a07f925022103750769db7b5",
+      "size_bytes": 30848
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/dataset-preparation/training_curation.py",
+      "sha256": "b7e06cce3ee75802eddef7018c5cf750bea4eebe9d3f6294d5978d50b2029f33",
+      "size_bytes": 87998
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/dataset-validator/README.md",
-      "sha256": "ec2faa8086df8c6ee60914e27d3f9a837c7a2a520a82998eab9a4d98725585ac",
-      "size_bytes": 1396
+      "sha256": "d2c9c0fe30e040ce6217e220d645db027c49ddfdb6577869bc51ba9b53dee8f8",
+      "size_bytes": 2842
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/contracts/v1/schema.json",
-      "sha256": "5e623ea6b54646e7738ad9d7c2f11b62cab6055e4bbdb489ebe7d9a185c7b163",
-      "size_bytes": 2723
+      "sha256": "4c1334175cb8fec8a086002ea9922ffe8cb866484d020a0bb365fcf1d9c219a8",
+      "size_bytes": 2779
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/dataset_validator.py",
-      "sha256": "b079c9e0f2a7cdd34031b59b821307e3a39655768da9ef6ae8e283ccb43a7043",
-      "size_bytes": 16183
+      "sha256": "1284f74b9b1fcec35b822845fd79d07372956ffeb174c63650a787178e47d4eb",
+      "size_bytes": 25729
     },
     {
       "kind": "file",
@@ -2007,15 +2035,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/pyproject.toml",
-      "sha256": "4a37ce240cdfe91db37eb54ed879f0c32bf326756aa9c921264ecbc1d63dcdf1",
-      "size_bytes": 640
+      "sha256": "2576783111c6c831ec903296cdfc2e59eb2665acf3c71d61bc2b20fd52571870",
+      "size_bytes": 670
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-validator/tests/test_dataset_validator.py",
-      "sha256": "a9ad9c86a8d0dcf677bf30f6f3393a8d4046448afd8afaee1c924381069e81b8",
-      "size_bytes": 2214
+      "sha256": "558d5d75707ffc66220808ff1555931ef5bb717eb6a786917b02462fe8d60699",
+      "size_bytes": 7127
     },
     {
       "kind": "file",
@@ -2168,36 +2196,36 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/README.md",
-      "sha256": "9e1f7c744b6390c0edbac3cbf3f9172ffa32b4554522a2e23b4126c208a52842",
-      "size_bytes": 2673
+      "sha256": "ab14a22c37fd9be73285e83f765d22c0fa16ed6a7c006805a56ff15d1ee794d2",
+      "size_bytes": 3561
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/contracts/v1/schema.json",
-      "sha256": "56a6404b49e550744a3044da9e729f7c1262b4bae9503cd7bcef6de453e94a6c",
-      "size_bytes": 3702
+      "sha256": "8b82dad42323a21dd3ded03a0ec2494d5a9d5f3e368e1ee32c68f9535ef54f03",
+      "size_bytes": 3832
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/llama_factory.py",
-      "sha256": "22ba920d952b7ff1292fe5060eeeeb9c8e0ecdb6fcdb4fd57233cc2e5e8b9b4d",
-      "size_bytes": 14332
+      "sha256": "6ecda08636bd15fa4ca53b412ae529b83341dc97415eee5951eba48134aafbcb",
+      "size_bytes": 17556
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/plugin.manifest.json",
-      "sha256": "2d584706fd4a8b802996f0bca941c3f1f3483dec534450ca0ed76d0f7ec9ca1a",
+      "sha256": "ffb303ced5100e27d10e17cfe1b30a6b165d51cde1b83b8cd347d4b7b27f0a7b",
       "size_bytes": 4262
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/pyproject.toml",
-      "sha256": "e6f2ba94c1793b38cfa4393b9f1e0fc5e6c5b58052a20558d64ae51ed70035bc",
-      "size_bytes": 616
+      "sha256": "714ee17fe24f458206b61b7bf4ea4afab4e40b6253bccd10f762e1fd6043776e",
+      "size_bytes": 617
     },
     {
       "kind": "file",
@@ -2210,8 +2238,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/tests/test_llama_factory.py",
-      "sha256": "7bd4b8203ed05cc1c279755e1678ff4a0f74726426e34dd10c4d1d95aad1ef89",
-      "size_bytes": 4391
+      "sha256": "595e7222e40bfda996d6e0251aa4f45fe83dce3fa5bede22cecdbc383644be1b",
+      "size_bytes": 7687
     },
     {
       "kind": "file",
