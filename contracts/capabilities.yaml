@@ -95,6 +95,7 @@ capabilities:
     contract_methods:
       - generate_qa
       - prepare_sft
+      - prepare_training_sft
     implementations:
       - ref: cyrene.tools.dataset-generation
         source: plugins/tools/dataset-generation/plugin.manifest.json
@@ -104,6 +105,7 @@ capabilities:
         methods:
           - generate_qa
           - prepare_sft
+          - prepare_training_sft
         interface_versions:
           - "1"
         verification_level: DISPATCH_VERIFIED
@@ -141,8 +143,10 @@ capabilities:
       paths:
         - plugins/tools/dataset-preparation/contracts/v1/schema.json
     contract_methods:
+      - curate_training_records
       - inspect
       - prepare
+      - remap_training_record
       - transform
     implementations:
       - ref: cyrene.tools.dataset-preparation
@@ -151,8 +155,10 @@ capabilities:
         language: python
         publication: published
         methods:
+          - curate_training_records
           - inspect
           - prepare
+          - remap_training_record
           - transform
         interface_versions:
           - "1"

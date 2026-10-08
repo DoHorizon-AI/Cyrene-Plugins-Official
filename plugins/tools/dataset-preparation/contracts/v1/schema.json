@@ -90,6 +90,140 @@
         "output_size": {"type": "integer", "minimum": 0}
       },
       "additionalProperties": false
-    }
+    },
+    "TrainingPolicy": {
+      "type": "object",
+      "required": ["allowTraining", "allowedUsePurposes"],
+      "properties": {
+        "allowTraining": {"type": "boolean"},
+        "allowedUsePurposes": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": true
+    },
+    "TrainingSource": {
+      "type": "object",
+      "required": ["source_path", "source_revision_id", "source_family_id", "filename", "policy"],
+      "properties": {
+        "source_path": {"$ref": "#/$defs/AbsolutePath"},
+        "source_revision_id": {"type": "string", "minLength": 1},
+        "source_family_id": {"type": "string", "minLength": 1},
+        "filename": {"type": "string", "minLength": 1},
+        "policy": {"$ref": "#/$defs/TrainingPolicy"},
+        "format": {"enum": ["auto", "alpaca", "promptCompletion", "messages", "sharegpt", "chatml"]},
+        "field_mapping": {"type": "object", "additionalProperties": {"type": "string"}},
+        "role_mapping": {"type": "object", "additionalProperties": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "TrainingCurationRecipe": {
+      "type": "object",
+      "required": ["id", "version", "format", "fieldMapping", "roleMapping", "maxCharacters", "minCharacters", "unicodeNormalization"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1},
+        "version": {"type": "string", "minLength": 1},
+        "format": {"enum": ["auto", "alpaca", "promptCompletion", "messages", "sharegpt", "chatml"]},
+        "fieldMapping": {"type": "object", "additionalProperties": {"type": "string"}},
+        "roleMapping": {"type": "object", "additionalProperties": {"type": "string"}},
+        "maxCharacters": {"type": "integer", "minimum": 1, "maximum": 10000000},
+        "minCharacters": {"type": "integer", "minimum": 0, "maximum": 10000000},
+        "unicodeNormalization": {"enum": ["NFC", "NFD", "NFKC", "NFKD", "none"]}
+      },
+      "additionalProperties": false
+    },
+    "TrainingCurationRequest": {
+      "type": "object",
+      "required": ["sources", "result_path", "checkpoint_path", "recipe_digest", "recipe"],
+      "properties": {
+        "sources": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"$ref": "#/$defs/TrainingSource"}},
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "checkpoint_path": {"$ref": "#/$defs/AbsolutePath"},
+        "recipe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "recipe": {"$ref": "#/$defs/TrainingCurationRecipe"}
+      },
+      "additionalProperties": false
+    },
+    "TrainingCurationCounts": {
+      "type": "object",
+      "required": ["total", "recognized", "formatErrors", "duplicateCandidates", "pendingReview", "excluded", "eligible"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "recognized": {"type": "integer", "minimum": 0},
+        "formatErrors": {"type": "integer", "minimum": 0},
+        "duplicateCandidates": {"type": "integer", "minimum": 0},
+        "pendingReview": {"type": "integer", "minimum": 0},
+        "excluded": {"type": "integer", "minimum": 0},
+        "eligible": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "TrainingSourceReceipt": {
+      "type": "object",
+      "required": ["source_revision_id", "counts", "diagnostic_counts", "unsupported_counts", "status"],
+      "properties": {
+        "source_revision_id": {"type": "string"},
+        "failure": {"type": "string", "maxLength": 2000},
+        "counts": {"$ref": "#/$defs/TrainingCurationCounts"},
+        "diagnostic_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "unsupported_counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}},
+        "status": {"enum": ["PENDING", "SUCCEEDED", "SUCCEEDED_WITH_WARNINGS", "FAILED"]}
+      },
+      "additionalProperties": false
+    },
+    "TrainingCurationResponse": {
+      "type": "object",
+      "required": ["result_path", "digest", "size_bytes", "schema_version", "counts", "sources", "recipe_digest", "resumed_records"],
+      "properties": {
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "schema_version": {"const": "cyrene.training-record.v1"},
+        "counts": {"$ref": "#/$defs/TrainingCurationCounts"},
+        "sources": {"type": "array", "maxItems": 20, "items": {"$ref": "#/$defs/TrainingSourceReceipt"}},
+        "recipe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "resumed_records": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "TrainingRecordEnvelope": {
+      "type": "object",
+      "required": ["schemaVersion", "id", "sampleId", "sourceRevisionId", "sourceFamilyId", "conversationId", "ordinal", "locator", "rawRecord", "rawLine", "detectedFormat", "normalized", "disposition", "issues", "contentDigest", "recipeDigest", "processingHistory", "policy"],
+      "properties": {
+        "schemaVersion": {"const": "cyrene.training-record.v1"},
+        "id": {"type": "string"},
+        "sampleId": {"type": "string"},
+        "sourceRevisionId": {"type": "string"},
+        "sourceFamilyId": {"type": "string"},
+        "conversationId": {"type": ["string", "null"]},
+        "ordinal": {"type": "integer", "minimum": 0},
+        "locator": {"type": "object", "required": ["itemRef"], "properties": {"itemRef": {"type": "string"}}, "additionalProperties": true},
+        "rawRecord": {},
+        "rawLine": {"type": ["string", "null"]},
+        "detectedFormat": {"type": "string"},
+        "normalized": {"type": ["object", "null"]},
+        "disposition": {"enum": ["eligible", "review", "excluded"]},
+        "issues": {"type": "array", "items": {"type": "object", "required": ["code", "message", "severity"], "properties": {"code": {"type": "string"}, "message": {"type": "string"}, "severity": {"enum": ["warning", "error"]}}, "additionalProperties": false}},
+        "contentDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "recipeDigest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "processingHistory": {"type": "array", "items": {"type": "object"}},
+        "policy": {"$ref": "#/$defs/TrainingPolicy"}
+      },
+      "additionalProperties": false
+    },
+    "RemapTrainingRecordRequest": {
+      "type": "object",
+      "required": ["record", "recipe_digest", "recipe"],
+      "properties": {
+        "record": {"$ref": "#/$defs/TrainingRecordEnvelope"},
+        "recipe_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+        "recipe": {"$ref": "#/$defs/TrainingCurationRecipe"},
+        "format": {"enum": ["auto", "alpaca", "promptCompletion", "messages", "sharegpt", "chatml"]},
+        "field_mapping": {"type": "object", "additionalProperties": {"type": "string"}},
+        "role_mapping": {"type": "object", "additionalProperties": {"type": "string"}},
+        "raw_record": {},
+        "note": {"type": "string"}
+      },
+      "additionalProperties": false
+    },
+    "RemapTrainingRecordResponse": {"$ref": "#/$defs/TrainingRecordEnvelope"}
   }
 }

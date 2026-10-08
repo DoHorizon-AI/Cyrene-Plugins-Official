@@ -253,6 +253,66 @@
       },
       "additionalProperties": false
     },
+    "PrepareTrainingSftRequest": {
+      "type": "object",
+      "required": ["snapshot_path", "output_dir", "output_format", "recipe_digest", "recipe_version", "split"],
+      "properties": {
+        "snapshot_path": {"$ref": "#/$defs/AbsolutePath"},
+        "output_dir": {"$ref": "#/$defs/AbsolutePath"},
+        "output_format": {"enum": ["sft", "messages", "promptCompletion"]},
+        "recipe_digest": {"$ref": "#/$defs/Digest"},
+        "recipe_version": {"type": "string", "minLength": 1},
+        "dataset_id": {"$ref": "#/$defs/Uuid"},
+        "content_revision_id": {"$ref": "#/$defs/Uuid"},
+        "processing_run_id": {"$ref": "#/$defs/Uuid"},
+        "split": {
+          "type": "object",
+          "required": ["train", "validation", "test", "seed"],
+          "properties": {
+            "train": {"type": "number", "minimum": 0, "maximum": 1},
+            "validation": {"type": "number", "minimum": 0, "maximum": 1},
+            "test": {"type": "number", "minimum": 0, "maximum": 1},
+            "seed": {"type": ["string", "integer"]}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "TrainingExportCounts": {
+      "type": "object",
+      "required": ["total", "eligible", "excluded", "policyExcluded", "review", "published"],
+      "properties": {
+        "total": {"type": "integer", "minimum": 0},
+        "eligible": {"type": "integer", "minimum": 0},
+        "excluded": {"type": "integer", "minimum": 0},
+        "policyExcluded": {"type": "integer", "minimum": 0},
+        "review": {"type": "integer", "minimum": 0},
+        "published": {"type": "integer", "minimum": 0},
+        "formatErrors": {"type": "integer", "minimum": 0},
+        "duplicateCandidates": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "PrepareTrainingSftResponse": {
+      "type": "object",
+      "required": ["profile", "bundle_path", "bundle_digest", "bundle_size_bytes", "sample_count", "counts", "files", "split_stats", "recipe_digest", "source_recipe_digests", "output_format", "warnings"],
+      "properties": {
+        "profile": {"const": "CYRENE_SFT_BUNDLE_V1"},
+        "bundle_path": {"$ref": "#/$defs/AbsolutePath"},
+        "bundle_digest": {"$ref": "#/$defs/Digest"},
+        "bundle_size_bytes": {"type": "integer", "minimum": 0},
+        "sample_count": {"type": "integer", "minimum": 0},
+        "counts": {"$ref": "#/$defs/TrainingExportCounts"},
+        "files": {"type": "object", "additionalProperties": {"$ref": "#/$defs/FileReceipt"}},
+        "split_stats": {"type": "object"},
+        "recipe_digest": {"$ref": "#/$defs/Digest"},
+        "source_recipe_digests": {"type": "array", "items": {"$ref": "#/$defs/Digest"}},
+        "output_format": {"enum": ["sft", "messages", "promptCompletion"]},
+        "warnings": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    },
     "GenerationBudget": {
       "type": "object",
       "required": ["max_examples", "max_calls"],

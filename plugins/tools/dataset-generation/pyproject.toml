@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-dataset-generation"
-version = "0.1.0"
-description = "Deterministic SFT bundle building and controlled grounded QA generation"
+version = "0.2.0"
+description = "Streaming provenance-preserving training curation export and grounded QA generation"
 requires-python = ">=3.11"
 dependencies = [
   "cyrene-plugin-runtime>=0.2,<0.3",
@@ -16,7 +16,7 @@ dependencies = [
 test = ["pytest>=8,<10"]
 
 [tool.setuptools]
-py-modules = ["dataset_generation"]
+py-modules = ["dataset_generation", "training_export"]
 
 [tool.setuptools.data-files]
 "share/cyrene/plugins/cyrene.tools.dataset-generation" = [

@@ -19,15 +19,25 @@ from typing import Any
 CAPABILITY_ID = "tool.dataset.validator.v1"
 INTERFACE_VERSION = "1"
 TYPE_PREFIX = f"type.cyrene.io/{CAPABILITY_ID}"
+_MAX_JSONL_ROW_BYTES = 16 * 1024 * 1024
 SUPPORTED_FORMATS = frozenset({"jsonl", "json", "parquet", "csv"})
-SUPPORTED_SCHEMAS = frozenset({"instruction", "conversation", "sharegpt"})
+SUPPORTED_SCHEMAS = frozenset(
+    {
+        "instruction",
+        "instruction_history",
+        "conversation",
+        "sharegpt",
+        "messages",
+        "prompt_completion",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
 class TypedPayload:
     """Typed response consumed by DirectPluginRuntime.
 
-        中文:由 DirectPluginRuntime 使用的有类型响应。"""
+    中文:由 DirectPluginRuntime 使用的有类型响应。"""
 
     value: bytes
     type_url: str
@@ -36,10 +46,10 @@ class TypedPayload:
 class DatasetValidatorPlugin:
     """Validate reusable dataset structure without owning Product state.
 
-        中文:验证可复用数据集结构,不持有 Product 状态。"""
+    中文:验证可复用数据集结构,不持有 Product 状态。"""
 
     plugin_id = "cyrene.tools.dataset-validator"
-    version = "0.2.0"
+    version = "0.3.0"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
@@ -54,7 +64,7 @@ class DatasetValidatorPlugin:
     ) -> tuple[bool, TypedPayload | str]:
         """Dispatch one typed dataset-validation request.
 
-            中文:分发一个有类型的数据集验证请求。"""
+        中文:分发一个有类型的数据集验证请求。"""
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -114,7 +124,7 @@ class DatasetValidatorPlugin:
     ) -> dict[str, Any]:
         """Load and validate one local dataset staged for this Plugin process.
 
-            中文:加载并验证为此 Plugin 进程暂存的一个本地数据集。"""
+        中文:加载并验证为此 Plugin 进程暂存的一个本地数据集。"""
 
         path = Path(file_path)
         if not path.is_file():
@@ -143,8 +153,15 @@ class DatasetValidatorPlugin:
             )
 
         try:
-            rows, columns = _load_data(path, normalized_format)
-        except (OSError, UnicodeError, TypeError, ValueError, csv.Error) as exc:
+            rows, columns = _iter_data(path, normalized_format)
+        except (
+            OSError,
+            UnicodeError,
+            TypeError,
+            ValueError,
+            RecursionError,
+            csv.Error,
+        ) as exc:
             return _result(
                 valid=False,
                 errors=[_error(None, None, f"Failed to load data: {exc}")],
@@ -155,31 +172,27 @@ class DatasetValidatorPlugin:
         detected_schema = schema or _detect_schema(columns)
         errors: list[dict[str, Any]] = []
         warnings: list[str] = []
-        required = {
-            "instruction": {"instruction", "output"},
-            "conversation": {"conversations"},
-            "sharegpt": {"conversations"},
-        }.get(detected_schema or "", set())
-        missing = required - set(columns)
-        if missing:
-            errors.append(
-                _error(
-                    None,
-                    None,
-                    f"Missing required columns: {', '.join(sorted(missing))}",
-                )
-            )
-
         empty_prompt_count = 0
         empty_response_count = 0
         truncation_risks = 0
         total_characters = 0
-        for row_index, row in enumerate(rows):
+        row_count = 0
+        sampled_rows: list[dict[str, Any]] = []
+        observed_columns = set(columns)
+        for row_index, row, parse_error in rows:
+            row_count += 1
+            if parse_error is not None:
+                if len(errors) < max_errors:
+                    errors.append(_error(row_index, None, parse_error))
+                continue
+            assert row is not None
+            observed_columns.update(row)
+            if schema is None and detected_schema is None:
+                detected_schema = _detect_schema(list(row))
+            if len(sampled_rows) < sample_size:
+                sampled_rows.append(row)
             if len(errors) >= max_errors:
-                warnings.append(
-                    f"Maximum error count ({max_errors}) reached; validation stopped"
-                )
-                break
+                continue
             row_errors = _validate_row(row, detected_schema, row_index)
             errors.extend(row_errors[: max_errors - len(errors)])
             prompt, response, row_characters = _text_measurements(row)
@@ -188,6 +201,10 @@ class DatasetValidatorPlugin:
             total_characters += row_characters
             truncation_risks += int(row_characters / 3.5 > max_sequence_length)
 
+        if row_count and len(errors) >= max_errors:
+            warnings.append(
+                f"Maximum error count ({max_errors}) reached; additional errors were not recorded"
+            )
         if empty_prompt_count:
             warnings.append(f"{empty_prompt_count} rows have empty prompts")
         if empty_response_count:
@@ -199,17 +216,17 @@ class DatasetValidatorPlugin:
             )
 
         return _result(
-            valid=bool(rows) and not errors,
-            row_count=len(rows),
-            columns=columns,
+            valid=row_count > 0 and not errors,
+            row_count=row_count,
+            columns=sorted(observed_columns),
             errors=errors,
             warnings=warnings,
-            sample_rows=rows[:sample_size],
+            sample_rows=sampled_rows,
             detected_format=normalized_format,
             detected_schema=detected_schema,
             metrics={
-                "average_characters": round(total_characters / len(rows), 1)
-                if rows
+                "average_characters": round(total_characters / row_count, 1)
+                if row_count
                 else 0,
                 "empty_prompts": empty_prompt_count,
                 "empty_responses": empty_response_count,
@@ -243,38 +260,82 @@ def _detect_format(path: Path) -> str:
     if suffix in {".jsonl", ".json", ".parquet", ".csv"}:
         return suffix.removeprefix(".")
     try:
-        prefix = path.read_bytes()[:64].lstrip()
+        with path.open("rb") as stream:
+            prefix = stream.read(64).lstrip()
     except OSError:
         return "jsonl"
     return "json" if prefix.startswith((b"{", b"[")) else "jsonl"
 
 
-def _load_data(path: Path, format_type: str) -> tuple[list[dict[str, Any]], list[str]]:
+def _iter_data(path: Path, format_type: str) -> tuple[Any, list[str]]:
     if format_type == "jsonl":
-        rows = []
-        with path.open(encoding="utf-8") as stream:
-            for line_number, line in enumerate(stream, start=1):
-                if not line.strip():
-                    continue
-                value = json.loads(line)
-                if not isinstance(value, dict):
-                    raise TypeError(f"JSONL row {line_number} must be an object")
-                rows.append(value)
-        return rows, _columns(rows)
+
+        def jsonl_rows() -> Any:
+            with path.open("rb") as stream:
+                line_number = 0
+                while line := stream.readline(_MAX_JSONL_ROW_BYTES + 1):
+                    line_number += 1
+                    if len(line) > _MAX_JSONL_ROW_BYTES:
+                        while not line.endswith(b"\n"):
+                            line = stream.readline(_MAX_JSONL_ROW_BYTES + 1)
+                            if not line:
+                                break
+                        yield (
+                            line_number - 1,
+                            None,
+                            f"JSONL row exceeds {_MAX_JSONL_ROW_BYTES} byte limit",
+                        )
+                        continue
+                    if not line.strip():
+                        continue
+                    try:
+                        value = json.loads(
+                            line,
+                            object_pairs_hook=_unique_json_object,
+                            parse_constant=_reject_json_constant,
+                        )
+                    except (
+                        UnicodeDecodeError,
+                        json.JSONDecodeError,
+                        RecursionError,
+                        ValueError,
+                    ) as exc:
+                        yield line_number - 1, None, f"Invalid JSONL: {exc}"
+                        continue
+                    if not isinstance(value, dict):
+                        yield line_number - 1, None, "JSONL row must be an object"
+                        continue
+                    yield line_number - 1, value, None
+
+        return jsonl_rows(), []
     if format_type == "json":
         with path.open(encoding="utf-8") as stream:
-            value = json.load(stream)
+            value = json.load(
+                stream,
+                object_pairs_hook=_unique_json_object,
+                parse_constant=_reject_json_constant,
+            )
         items = value if isinstance(value, list) else [value]
         if not all(isinstance(item, dict) for item in items):
             raise ValueError("JSON root must be an object or an array of objects")
-        rows = [dict(item) for item in items]
-        return rows, _columns(rows)
+        return (
+            iter((index, dict(item), None) for index, item in enumerate(items)),
+            _columns(items),
+        )
     if format_type == "csv":
         with path.open(encoding="utf-8", newline="") as stream:
             reader = csv.DictReader(stream)
             if not reader.fieldnames:
                 raise ValueError("CSV header is required")
-            return [dict(row) for row in reader], list(reader.fieldnames)
+            columns = list(reader.fieldnames)
+
+        def csv_rows() -> Any:
+            with path.open(encoding="utf-8", newline="") as csv_stream:
+                reader = csv.DictReader(csv_stream)
+                for index, row in enumerate(reader):
+                    yield index, dict(row), None
+
+        return csv_rows(), columns
     try:
         import duckdb
     except ImportError as exc:  # pragma: no cover - packaging guard
@@ -282,11 +343,13 @@ def _load_data(path: Path, format_type: str) -> tuple[list[dict[str, Any]], list
     connection = duckdb.connect()
     try:
         relation = connection.read_parquet(str(path))
+        columns = list(relation.columns)
+
         rows = [
-            dict(zip(relation.columns, values, strict=True))
-            for values in relation.fetchall()
+            (index, dict(zip(columns, values, strict=True)), None)
+            for index, values in enumerate(relation.fetchall())
         ]
-        return rows, list(relation.columns)
+        return iter(rows), columns
     except duckdb.Error as exc:
         raise ValueError(f"Parquet could not be read: {exc}") from exc
     finally:
@@ -297,10 +360,29 @@ def _columns(rows: list[dict[str, Any]]) -> list[str]:
     return sorted({key for row in rows for key in row})
 
 
+def _unique_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON object key: {key}")
+        result[key] = value
+    return result
+
+
+def _reject_json_constant(value: str) -> None:
+    raise ValueError(f"non-standard JSON number is not allowed: {value}")
+
+
 def _detect_schema(columns: list[str]) -> str | None:
     values = set(columns)
+    if "messages" in values:
+        return "messages"
+    if {"prompt", "completion"}.issubset(values):
+        return "prompt_completion"
     if "conversations" in values:
         return "conversation"
+    if {"instruction", "input", "output", "system", "history"}.issubset(values):
+        return "instruction_history"
     if {"instruction", "output"}.issubset(values):
         return "instruction"
     return None
@@ -310,10 +392,33 @@ def _validate_row(
     row: dict[str, Any], schema: str | None, row_index: int
 ) -> list[dict[str, Any]]:
     if schema == "instruction":
-        return _validate_instruction_row(row, row_index)
+        return _validate_instruction_row(row, row_index) + _unexpected_fields(
+            row, {"instruction", "input", "output", "system", "history"}, row_index
+        )
+    if schema == "instruction_history":
+        return _validate_instruction_history_row(row, row_index) + _unexpected_fields(
+            row, {"instruction", "input", "output", "system", "history"}, row_index
+        )
+    if schema == "messages":
+        return _validate_messages_row(row, row_index) + _unexpected_fields(
+            row, {"messages"}, row_index
+        )
+    if schema == "prompt_completion":
+        return _validate_prompt_completion_row(row, row_index) + _unexpected_fields(
+            row, {"prompt", "completion"}, row_index
+        )
     if schema in {"conversation", "sharegpt"}:
         return _validate_conversation_row(row, row_index)
     return []
+
+
+def _unexpected_fields(
+    row: dict[str, Any], allowed: set[str], row_index: int
+) -> list[dict[str, Any]]:
+    return [
+        _error(row_index, field, "Unexpected field for the declared target schema")
+        for field in sorted(row.keys() - allowed)
+    ]
 
 
 def _validate_instruction_row(
@@ -341,6 +446,134 @@ def _validate_instruction_row(
                 type(row["input"]).__name__,
             )
         )
+    if "system" in row and not isinstance(row["system"], str):
+        errors.append(
+            _error(row_index, "system", "system must be a string", row["system"])
+        )
+    if "history" in row:
+        history = row["history"]
+        if not isinstance(history, list):
+            errors.append(
+                _error(row_index, "history", "history must be an array", history)
+            )
+        else:
+            for history_index, pair in enumerate(history):
+                if (
+                    not isinstance(pair, list)
+                    or len(pair) != 2
+                    or any(
+                        not isinstance(value, str) or not value.strip()
+                        for value in pair
+                    )
+                ):
+                    errors.append(
+                        _error(
+                            row_index,
+                            f"history[{history_index}]",
+                            "history entries must be [user, assistant] non-empty string pairs",
+                            pair,
+                        )
+                    )
+    return errors
+
+
+def _validate_instruction_history_row(
+    row: dict[str, Any], row_index: int
+) -> list[dict[str, Any]]:
+    errors = _validate_instruction_row(row, row_index)
+    if "system" not in row:
+        errors.append(_error(row_index, "system", "Missing required field: system"))
+    if "history" not in row:
+        errors.append(_error(row_index, "history", "Missing required field: history"))
+    return errors
+
+
+def _validate_messages_row(row: dict[str, Any], row_index: int) -> list[dict[str, Any]]:
+    messages = row.get("messages")
+    if not isinstance(messages, list) or not messages:
+        return [
+            _error(
+                row_index, "messages", "messages must be a non-empty array", messages
+            )
+        ]
+    errors: list[dict[str, Any]] = []
+    expected = "user"
+    saw_user = False
+    saw_assistant = False
+    for index, message in enumerate(messages):
+        field = f"messages[{index}]"
+        if not isinstance(message, dict):
+            errors.append(
+                _error(row_index, field, "message must be an object", message)
+            )
+            continue
+        role = message.get("role")
+        content = message.get("content")
+        if role not in {"system", "user", "assistant"}:
+            errors.append(
+                _error(row_index, f"{field}.role", "unsupported message role", role)
+            )
+            continue
+        if message.keys() != {"role", "content"}:
+            errors.append(
+                _error(
+                    row_index,
+                    field,
+                    "message objects may contain only role and content fields",
+                )
+            )
+        if not isinstance(content, str) or not content.strip():
+            errors.append(
+                _error(
+                    row_index,
+                    f"{field}.content",
+                    "content must be non-empty text",
+                    content,
+                )
+            )
+            continue
+        if role == "system":
+            if index != 0 or saw_user:
+                errors.append(
+                    _error(
+                        row_index,
+                        f"{field}.role",
+                        "system is only supported as the first message",
+                        role,
+                    )
+                )
+        elif role != expected:
+            errors.append(
+                _error(row_index, f"{field}.role", f"expected {expected} role", role)
+            )
+        else:
+            if role == "user":
+                saw_user = True
+                expected = "assistant"
+            else:
+                saw_assistant = True
+                expected = "user"
+    if not saw_user or not saw_assistant or expected != "user":
+        errors.append(
+            _error(
+                row_index,
+                "messages",
+                "messages must contain complete user/assistant turns and end with assistant",
+            )
+        )
+    return errors
+
+
+def _validate_prompt_completion_row(
+    row: dict[str, Any], row_index: int
+) -> list[dict[str, Any]]:
+    errors: list[dict[str, Any]] = []
+    for field in ("prompt", "completion"):
+        value = row.get(field)
+        if not isinstance(value, str) or not value.strip():
+            errors.append(
+                _error(row_index, field, f"{field} must be non-empty text", value)
+            )
     return errors
 
 
@@ -381,6 +614,24 @@ def _validate_conversation_row(
 
 
 def _text_measurements(row: dict[str, Any]) -> tuple[str, str, int]:
+    messages = row.get("messages")
+    if isinstance(messages, list):
+        prompt = "".join(
+            str(item.get("content", ""))
+            for item in messages
+            if isinstance(item, dict) and item.get("role") in {"system", "user"}
+        )
+        response = "".join(
+            str(item.get("content", ""))
+            for item in messages
+            if isinstance(item, dict) and item.get("role") == "assistant"
+        )
+        return prompt, response, len(prompt) + len(response)
+    prompt_completion = "completion" in row
+    if prompt_completion:
+        prompt = str(row.get("prompt") or "")
+        response = str(row.get("completion") or "")
+        return prompt, response, len(prompt) + len(response)
     conversations = row.get("conversations")
     if isinstance(conversations, list):
         values = [
@@ -392,7 +643,26 @@ def _text_measurements(row: dict[str, Any]) -> tuple[str, str, int]:
         return text, text, len(text)
     prompt = str(row.get("instruction") or row.get("prompt") or "")
     response = str(row.get("output") or row.get("response") or "")
-    return prompt, response, len(prompt) + len(response)
+    history = row.get("history")
+    history_characters = (
+        sum(
+            len(value)
+            for pair in history
+            if isinstance(pair, list)
+            for value in pair
+            if isinstance(value, str)
+        )
+        if isinstance(history, list)
+        else 0
+    )
+    system_characters = (
+        len(row.get("system", "")) if isinstance(row.get("system", ""), str) else 0
+    )
+    return (
+        prompt,
+        response,
+        len(prompt) + len(response) + history_characters + system_characters,
+    )
 
 
 def _error(

@@ -52,6 +52,23 @@ or output cap is returned as a warning; an input-cap overrun prevents later
 calls. Package tests use a scripted provider over the real DirectPluginRuntime
 connection.
 
+`prepare_training_sft` adds the Catalyst v0.3 path-based export for an approved
+`cyrene.training-record.v1` JSONL snapshot. It streams records into a temporary
+SQLite lineage index and writes the same immutable bundle profile without
+loading the full source or learned rows into memory; one JSONL row is capped at
+16 MiB, and blank or malformed lines block export with a diagnostic report.
+`sft` retains prior turns
+as LLaMA-Factory `history` pairs and preserves the system field; `messages`
+retains ordered system/user/assistant messages; `promptCompletion` accepts only
+one user/assistant turn without a system message. Unsupported roles, tool or
+multimodal fields, unresolved review rows, and lossy target conversions block
+the export with `export-diagnostics.json`. Policy-denied and explicitly
+excluded rows stay out of learned JSONL and are counted. Provenance records
+source/revision/family/conversation/locator and digests, while raw records and
+review fields remain in Catalyst's source snapshot. The manifest keeps the
+export ProcessingRun recipe digest distinct from the curation recipe digests;
+provenance preserves each record's curation recipe and processing history.
+
 ---
 
 <!-- Chinese Translation / 中文翻译 -->
@@ -90,3 +107,15 @@ input/output 预算；只有 Provider 实际上报时才记录 token usage，并
 保存检查点。Provider 上报的 usage 超过输入或输出上限时会返回 warning；输入预算超限后
 不会继续发起调用。Provider 结果不明时绝不重试。Package tests 使用真实
 DirectPluginRuntime connection 上的 scripted Provider。
+
+`prepare_training_sft` 为 Catalyst v0.3 增加基于文件路径的导出，输入是已批准的
+`cyrene.training-record.v1` JSONL 快照。插件将记录流式写入临时 SQLite 血缘索引，并
+使用现有不可变 bundle profile，不会将整个来源或训练行一次性加载到内存；每行限制为
+16 MiB，空行或损坏行会阻止导出并生成诊断报告。`sft` 通过
+LLaMA-Factory `history` 对保留先前轮次，并保留 system 字段；`messages` 保留有序的
+system/user/assistant 消息；`promptCompletion` 只接受没有 system 消息的单轮
+user/assistant 记录。未知角色、tool 或多模态字段、未解决的审核记录及有损目标转换会
+阻止导出，并生成 `export-diagnostics.json`。策略禁止和显式排除的记录不会进入训练
+JSONL，并会计数。Provenance 记录来源、revision、family、conversation、定位和摘要；原件
+及审核字段继续保存在 Catalyst 来源快照中。Manifest 区分导出 ProcessingRun Recipe 摘要
+与来源整理 Recipe 摘要；Provenance 保留每条记录的整理 Recipe 和处理历史。

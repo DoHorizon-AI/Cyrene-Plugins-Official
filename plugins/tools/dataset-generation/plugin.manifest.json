@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "cyrene.tools.dataset-generation",
   "name": "Dataset Generation",
-  "version": "0.1.0",
-  "description": "Build provenance-preserving SFT bundles and opt-in grounded QA drafts through model.provider.v1.",
+  "version": "0.2.0",
+  "description": "Build provenance-preserving SFT bundles from reviewed blocks or streaming training records, and opt-in grounded QA drafts.",
   "kind": "capability-plugin",
   "capabilities": ["dataset.generation.v1"],
   "supportedServices": ["Cyrene-Catalyst"],
@@ -14,6 +14,13 @@
       "executionMode": "service",
       "inputSchema": "contracts/v1/schema.json#/$defs/PrepareSftRequest",
       "outputSchema": "contracts/v1/schema.json#/$defs/PrepareSftResponse"
+    },
+    {
+      "name": "prepare_training_sft",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/PrepareTrainingSftRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/PrepareTrainingSftResponse"
     },
     {
       "name": "generate_qa",

@@ -34,6 +34,7 @@ from cyrene_model_provider_contracts import (
 )
 from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, DirectPluginError
 from cyrene_plugin_runtime.configuration import read_environment_settings
+from training_export import prepare_training_sft
 
 CAPABILITY_ID = "dataset.generation.v1"
 INTERFACE_VERSION = "1"
@@ -159,7 +160,7 @@ class DatasetGenerationPlugin:
     """
 
     plugin_id = "cyrene.tools.dataset-generation"
-    version = "0.1.0"
+    version = "0.2.0"
     capabilities = (CAPABILITY_ID,)
 
     def __init__(self, config: GenerationConfig | None = None) -> None:
@@ -186,7 +187,7 @@ class DatasetGenerationPlugin:
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
-        if action not in {"prepare_sft", "generate_qa"}:
+        if action not in {"prepare_sft", "prepare_training_sft", "generate_qa"}:
             return False, f"METHOD_NOT_FOUND: unsupported method {action!r}"
         expected_type_url = f"{TYPE_PREFIX}.{action}.request"
         if request_type_url != expected_type_url:
@@ -204,6 +205,8 @@ class DatasetGenerationPlugin:
                 raise RequestError("request must be an object")
             if action == "prepare_sft":
                 response = self.prepare_sft(request)
+            elif action == "prepare_training_sft":
+                response = prepare_training_sft(request)
             else:
                 response = self.generate_qa(request, cancellation=cancellation)
         except RequestError as error:
@@ -214,7 +217,7 @@ class DatasetGenerationPlugin:
             return False, f"UNAVAILABLE: {error}"
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
             return False, f"INVALID_REQUEST: payload is not UTF-8 JSON: {error}"
-        except (OSError, ValueError) as error:
+        except (OSError, TypeError, ValueError) as error:
             return False, f"INVALID_INPUT: {error}"
         if _cancelled(cancellation):
             return False, "CANCELLED: operation cancelled"

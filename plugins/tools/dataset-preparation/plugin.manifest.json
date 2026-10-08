@@ -2,8 +2,8 @@
   "schemaVersion": 1,
   "id": "cyrene.tools.dataset-preparation",
   "name": "Dataset Preparation",
-  "version": "0.1.3",
-  "description": "Deterministic dataset import, mapping, normalization, deduplication, splitting, and DuckDB conversion.",
+  "version": "0.2.0",
+  "description": "Deterministic dataset preparation and resumable training-data curation.",
   "kind": "capability-plugin",
   "capabilities": ["dataset.preparation.v1"],
   "supportedServices": [
@@ -30,6 +30,20 @@
       "executionMode": "service",
       "inputSchema": "contracts/v1/schema.json#/$defs/TransformRequest",
       "outputSchema": "contracts/v1/schema.json#/$defs/TransformResponse"
+    },
+    {
+      "name": "curate_training_records",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/TrainingCurationRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/TrainingCurationResponse"
+    },
+    {
+      "name": "remap_training_record",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/schema.json#/$defs/RemapTrainingRecordRequest",
+      "outputSchema": "contracts/v1/schema.json#/$defs/RemapTrainingRecordResponse"
     }
   ],
   "runtime": {

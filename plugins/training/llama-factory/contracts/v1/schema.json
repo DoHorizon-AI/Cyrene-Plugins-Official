@@ -47,7 +47,10 @@
           "type": "object",
           "required": ["path"],
           "additionalProperties": true,
-          "properties": { "path": { "type": "string" } }
+          "properties": {
+            "path": { "type": "string" },
+            "schema": { "enum": ["instruction", "instruction_history", "messages", "prompt_completion"] }
+          }
         },
         "output_dir": { "type": "string" },
         "stage": { "type": "string" },
