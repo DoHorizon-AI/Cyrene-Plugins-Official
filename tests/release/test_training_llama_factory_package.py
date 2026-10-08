@@ -208,7 +208,8 @@ class TrainingPluginReleaseTests(unittest.TestCase):
                 verified["dependency_lock"].read_bytes(),
             )
             self.assertIn("src/cyrene_plugin_runtime/bootstrap.py", archive.namelist())
-            self.assertIn("llama_factory.py", archive.namelist())
+            self.assertIn("src/llama_factory.py", archive.namelist())
+            self.assertNotIn("llama_factory.py", archive.namelist())
 
     def test_source_sha_binds_metadata_without_changing_identical_package_bytes(
         self,

@@ -1,0 +1,369 @@
+name: Official data-tools Plugin package releases
+
+on:
+  push:
+    branches: [develop, main, release]
+    paths:
+      - "LICENSE"
+      - "plugins/tools/dataset-preparation/**"
+      - "plugins/tools/document-parsing/**"
+      - "plugins/tools/dataset-generation/**"
+      - "plugins/tools/knowledge-preparation/**"
+      - "plugins/evaluation/exact-match/**"
+      - "plugins/training/llama-factory/**"
+      - "sdk/python/cyrene_plugin_runtime/**"
+      - "sdk/python/cyrene_model_provider_contracts/**"
+      - "tooling/release/**"
+      - "tests/release/test_official_plugin_package.py"
+      - "tests/release/test_training_llama_factory_package.py"
+      - "tools/ci/connection-release-requirements.txt"
+      - "tools/ci/source-manifest.json"
+      - ".github/workflows/data-tools-package-release.yml"
+      - ".github/workflows/training-plugin-package-release.yml"
+  pull_request:
+    branches: [develop, main, release]
+    paths:
+      - "LICENSE"
+      - "plugins/tools/dataset-preparation/**"
+      - "plugins/tools/document-parsing/**"
+      - "plugins/tools/dataset-generation/**"
+      - "plugins/tools/knowledge-preparation/**"
+      - "plugins/evaluation/exact-match/**"
+      - "plugins/training/llama-factory/**"
+      - "sdk/python/cyrene_plugin_runtime/**"
+      - "sdk/python/cyrene_model_provider_contracts/**"
+      - "tooling/release/**"
+      - "tests/release/test_official_plugin_package.py"
+      - "tests/release/test_training_llama_factory_package.py"
+      - "tools/ci/connection-release-requirements.txt"
+      - "tools/ci/source-manifest.json"
+      - ".github/workflows/data-tools-package-release.yml"
+      - ".github/workflows/training-plugin-package-release.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: data-tools-package-release-${{ github.repository }}-${{ github.sha }}
+  cancel-in-progress: false
+
+env:
+  REPOSITORY: DoHorizon-AI/Cyrene-Plugins-Official
+  SOURCE_SHA: ${{ github.sha }}
+  SOURCE_REF: ${{ github.ref }}
+  CHANNEL: ${{ github.event_name == 'pull_request' && 'candidate' || github.ref == 'refs/heads/develop' && 'preview' || 'stable' }}
+  TARGET: linux-ubuntu-24.04-x86_64-python-3.12
+
+jobs:
+  contract-tests:
+    name: package contract and clean-process startup tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned release build and metadata tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --requirement tooling/release/build-requirements.lock \
+            --requirement tools/ci/connection-release-requirements.txt
+
+      - name: Install exact runtime pins needed by clean-start tests
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from packaging.utils import canonicalize_name
+          from tooling.release.official_plugin_package import PACKAGE_SPECS, LOCK_PIN
+
+          requested = {"grpcio", "protobuf", "duckdb", "pillow"}
+          pins = {}
+          root = Path.cwd()
+          for spec in PACKAGE_SPECS.values():
+              lock = root / spec.source_dir / "requirements.lock"
+              for line in lock.read_text(encoding="utf-8").splitlines():
+                  if not line.strip() or line.lstrip().startswith("#"):
+                      continue
+                  match = LOCK_PIN.fullmatch(line.strip())
+                  if match is None:
+                      raise SystemExit(f"not an exact lock pin: {line}")
+                  name, version = match.groups()
+                  canonical = canonicalize_name(name)
+                  if canonical not in requested:
+                      continue
+                  previous = pins.setdefault(canonical, f"{name}=={version}")
+                  if previous != f"{name}=={version}":
+                      raise SystemExit(f"conflicting startup pin for {canonical}")
+          if set(pins) != requested:
+              raise SystemExit(f"startup lock pins missing: {sorted(requested - set(pins))}")
+          output = Path(os.environ["RUNNER_TEMP"]) / "startup-requirements.lock"
+          output.write_text("".join(f"{pins[name]}\n" for name in sorted(pins)))
+          print(output)
+          PY
+          python -m pip install --disable-pip-version-check --no-deps \
+            --requirement "$RUNNER_TEMP/startup-requirements.lock"
+
+      - name: Run release contract and clean-process startup tests
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            tooling/release/official_plugin_package.py \
+            tooling/release/training_llama_factory_package.py \
+            tests/release/test_official_plugin_package.py \
+            tests/release/test_training_llama_factory_package.py
+          python -m unittest discover \
+            -s tests/release -p 'test_official_plugin_package.py' -v
+          python -m unittest discover \
+            -s tests/release -p 'test_training_llama_factory_package.py' -v
+
+  build-and-verify:
+    name: build ${{ matrix.name }} Package Runtime release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [contract-tests]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: dataset-preparation
+            package_id: cyrene.tools.dataset-preparation
+          - name: document-parsing
+            package_id: cyrene.tools.document-parsing
+          - name: dataset-generation
+            package_id: cyrene.tools.dataset-generation
+          - name: knowledge-preparation
+            package_id: cyrene.tools.knowledge-preparation
+          - name: exact-match
+            package_id: cyrene.evaluation.exact-match
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned release build and metadata tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --requirement tooling/release/build-requirements.lock \
+            --requirement tools/ci/connection-release-requirements.txt
+
+      - name: Build and verify the source-bound package release
+        env:
+          PACKAGE_ID: ${{ matrix.package_id }}
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/data-tools-plugin-${{ matrix.name }}"
+          mkdir -p "$PUBLISH_DIR"
+          echo "PUBLISH_DIR=$PUBLISH_DIR" >> "$GITHUB_ENV"
+          python tooling/release/official_plugin_package.py build \
+            --output-dir "$PUBLISH_DIR" \
+            --package-id "$PACKAGE_ID" \
+            --source-ref "$SOURCE_REF" \
+            --channel "$CHANNEL" \
+            --target "$TARGET" \
+            --github-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+
+      - name: Upload the verified package release inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-plugin-release-${{ github.sha }}-${{ matrix.name }}
+          path: ${{ runner.temp }}/data-tools-plugin-${{ matrix.name }}/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  publish:
+    name: attest and stage ${{ matrix.name }} immutable release
+    if: github.event_name == 'push' && github.repository == 'DoHorizon-AI/Cyrene-Plugins-Official'
+    needs: [build-and-verify]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: dataset-preparation
+            package_id: cyrene.tools.dataset-preparation
+          - name: document-parsing
+            package_id: cyrene.tools.document-parsing
+          - name: dataset-generation
+            package_id: cyrene.tools.dataset-generation
+          - name: knowledge-preparation
+            package_id: cyrene.tools.knowledge-preparation
+          - name: exact-match
+            package_id: cyrene.evaluation.exact-match
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned package verifier tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --requirement tooling/release/build-requirements.lock \
+            --requirement tools/ci/connection-release-requirements.txt
+
+      - name: Download the source-gated package bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: official-plugin-release-${{ github.sha }}-${{ matrix.name }}
+          path: ${{ runner.temp }}/data-tools-plugin-release
+
+      - name: Verify exact source, lock, payload, SBOM, and component index
+        env:
+          PACKAGE_ID: ${{ matrix.package_id }}
+          PUBLISH_DIR: ${{ runner.temp }}/data-tools-plugin-release
+        run: |
+          set -euo pipefail
+          python tooling/release/official_plugin_package.py verify \
+            --output-dir "$PUBLISH_DIR" \
+            --package-id "$PACKAGE_ID" \
+            --source-ref "$SOURCE_REF" \
+            --channel "$CHANNEL" \
+            --target "$TARGET" \
+            --github-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+          python - "$PUBLISH_DIR" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          metadata_path = next(root.glob("*-package-release.json"))
+          metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+          if not metadata.get("release_tag"):
+              raise SystemExit("publish job received candidate metadata")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"RELEASE_TAG={metadata['release_tag']}\n")
+              stream.write(f"PACKAGE_VERSION={metadata['package']['version']}\n")
+          PY
+
+      - name: Create per-asset GitHub artifact attestations
+        uses: actions/attest@v4
+        with:
+          subject-checksums: ${{ runner.temp }}/data-tools-plugin-release/attestation-subjects.sha256
+
+      - name: Download and verify every asset attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          workflow="$REPOSITORY/.github/workflows/data-tools-package-release.yml"
+          while read -r expected_sha asset_name; do
+            subject="$RUNNER_TEMP/data-tools-plugin-release/$asset_name"
+            test -f "$subject"
+            digest="$(sha256sum "$subject" | cut -d ' ' -f 1)"
+            test "$digest" = "$expected_sha"
+            (
+              cd "$RUNNER_TEMP/data-tools-plugin-release"
+              gh attestation download "$subject" \
+                --repo "$REPOSITORY" \
+                --predicate-type https://slsa.dev/provenance/v1
+            )
+            bundle="$RUNNER_TEMP/data-tools-plugin-release/sha256:$digest.jsonl"
+            test -f "$bundle"
+            mv "$bundle" "$subject.attestation.jsonl"
+            gh attestation verify "$subject" \
+              --bundle "$subject.attestation.jsonl" \
+              --repo "$REPOSITORY" \
+              --signer-workflow "$workflow" \
+              --source-ref "$SOURCE_REF" \
+              --source-digest "$SOURCE_SHA" \
+              --predicate-type https://slsa.dev/provenance/v1
+          done < "$RUNNER_TEMP/data-tools-plugin-release/attestation-subjects.sha256"
+
+      - name: Refuse reuse of an immutable release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "immutable release tag already exists: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - name: Stage the verified immutable release without promoting latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_ID: ${{ matrix.package_id }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/data-tools-plugin-release-notes.md"
+          cat > "$notes" <<EOF
+          Immutable Package Runtime release for `$PACKAGE_ID@$PACKAGE_VERSION`.
+
+          Source commit: `$SOURCE_SHA`
+          Target: `$TARGET`
+          This draft includes the ZIP, Package Spec descriptor, exact dependency lock, Python runtime preparer wheel, CycloneDX SBOM, source-bound package metadata, component release manifest and index, and a detached GitHub artifact attestation for every asset.
+          EOF
+          mapfile -t assets < <(
+            find "$RUNNER_TEMP/data-tools-plugin-release" -maxdepth 1 -type f \
+              ! -name 'attestation-subjects.sha256' -print | sort
+          )
+          test "${#assets[@]}" -gt 0
+          release_flags=()
+          if [[ "$CHANNEL" == preview ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" "${assets[@]}" \
+            --repo "$REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "$PACKAGE_ID $PACKAGE_VERSION ($SOURCE_SHA)" \
+            --notes-file "$notes" \
+            --draft \
+            --latest=false \
+            "${release_flags[@]}"
+          gh release view "$RELEASE_TAG" --repo "$REPOSITORY" --json isDraft,isPrerelease,isLatest,tagName,assets > "$RUNNER_TEMP/release-readback.json"
+          python - "$RUNNER_TEMP/release-readback.json" "${assets[@]}" <<'PY'
+          import json
+          import pathlib
+          import sys
+
+          release_path, *asset_paths = sys.argv[1:]
+          record = json.loads(pathlib.Path(release_path).read_text(encoding="utf-8"))
+          expected = {pathlib.Path(path).name for path in asset_paths}
+          actual = {asset["name"] for asset in record["assets"]}
+          expected_prerelease = "preview-" in record["tagName"]
+          if (
+              not record["isDraft"]
+              or record["isLatest"]
+              or record["isPrerelease"] != expected_prerelease
+              or not record["tagName"]
+              or actual != expected
+          ):
+              raise SystemExit("staged release read-back differs from the verified asset set")
+          PY

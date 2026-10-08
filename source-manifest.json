@@ -17,6 +17,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": ".github/workflows/data-tools-package-release.yml",
+      "sha256": "801d59a0b16565d5fe81d975b596432bf05f07458704790f5693ef9048006493",
+      "size_bytes": 14985
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
       "sha256": "15bf8b10f8c2040b30888e8160d0d1757e25f60ccdae4ace2cda865e0a7390aa",
       "size_bytes": 38461
@@ -1600,6 +1607,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/evaluation/exact-match/requirements.lock",
+      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "size_bytes": 176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/evaluation/llm-judge/README.md",
       "sha256": "7201ec8eeaac3feec9eb2665d66405e163024ad5fbfe25b66d31b555efb24c4c",
       "size_bytes": 3779
@@ -1915,6 +1929,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/dataset-generation/requirements.lock",
+      "sha256": "74dee8376b8e1c839dbccadac50934a12dd94a33a6e534e51b0bde24323c9174",
+      "size_bytes": 299
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/dataset-generation/tests/fixtures/trial-training.jsonl",
       "sha256": "ac810b0a98a5d0d1d8990752115d0a9f8b92bdb7758c47d0501bb8c0230418b6",
       "size_bytes": 8942
@@ -1932,6 +1953,13 @@
       "path": "plugins/tools/dataset-generation/tests/test_dataset_generation_v02.py",
       "sha256": "5e172a49ab70d4adace3573d72f678ab8f8eed95e614b937299e684c8a44dc6f",
       "size_bytes": 24492
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/dataset-generation/tests/test_generation_fault_injection.py",
+      "sha256": "35a07bd00f2dd4004950ab26b0abc96d47c9a344b6ffd7efa9f45c21c9cc98be",
+      "size_bytes": 12086
     },
     {
       "kind": "file",
@@ -1981,6 +2009,13 @@
       "path": "plugins/tools/dataset-preparation/pyproject.toml",
       "sha256": "e34d7eba272d456a6214e1d764314958ce203a0e889a8655095717d9a457a4b0",
       "size_bytes": 683
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/dataset-preparation/requirements.lock",
+      "sha256": "be2adb4084cdab517147e3abd68d6c125ba2647377d3cfd21714d80c5110adbd",
+      "size_bytes": 190
     },
     {
       "kind": "file",
@@ -2104,6 +2139,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/document-parsing/requirements.lock",
+      "sha256": "e51163f363038ff3716974a627cb44ed1e061464cb29f1f735fe446cd2dbec84",
+      "size_bytes": 1109
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/document-parsing/simple_parsing.py",
       "sha256": "8bb5ba870b631ca958574033b2f873d7dad6fda645d7b68fe81e0d58b1ac87a9",
       "size_bytes": 22217
@@ -2128,6 +2170,13 @@
       "path": "plugins/tools/document-parsing/tests/test_office_parsing.py",
       "sha256": "be475655ce10b1a2313d4a3f7cbaed73beb5c8b0894da30d5ad3603cdc0ab27e",
       "size_bytes": 12134
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/document-parsing/tests/test_parser_stress.py",
+      "sha256": "de91ed0d585164c032063016e8546d39c52f6bfd8b82efceb5608fc642f64c97",
+      "size_bytes": 11665
     },
     {
       "kind": "file",
@@ -2177,6 +2226,13 @@
       "path": "plugins/tools/knowledge-preparation/pyproject.toml",
       "sha256": "871dfbef17fde9b1586ca78730d583608b2a6df80434dfc20e485574eb9c3db4",
       "size_bytes": 765
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/knowledge-preparation/requirements.lock",
+      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "size_bytes": 176
     },
     {
       "kind": "file",
@@ -5317,9 +5373,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tests/release/test_official_plugin_package.py",
+      "sha256": "0d33c37073e7fd0f357bf7bcfd0249fcda1605e285064354411ed1206e346287",
+      "size_bytes": 9251
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tests/release/test_training_llama_factory_package.py",
-      "sha256": "80d875747119f6bc8366c1912c0d5237c3f77408ea5d5ddb147f9e079f630fbe",
-      "size_bytes": 11037
+      "sha256": "91717765ba3a0af64053edee50281789b43c7a0b12c0bba5b0afe34fa0603fc9",
+      "size_bytes": 11110
     },
     {
       "kind": "file",
@@ -5380,6 +5443,48 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tooling/release/official_plugin_package.py",
+      "sha256": "4b6154768238f8fe908a9bc68190cc9070971eb9b578d620bf96a6f7c58cb15c",
+      "size_bytes": 63733
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/dataset-generation.in",
+      "sha256": "74dee8376b8e1c839dbccadac50934a12dd94a33a6e534e51b0bde24323c9174",
+      "size_bytes": 299
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/dataset-preparation.in",
+      "sha256": "bd4fd5ac57b62463e1cc8035dd7222bc265c63b73296f5cadae2fbe5d24dfe3a",
+      "size_bytes": 191
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/document-parsing.in",
+      "sha256": "47cf539a6c1e9fbfd44abeee9d77fff234a2b590733b570ab5732ba62ea2b86c",
+      "size_bytes": 338
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/exact-match.in",
+      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "size_bytes": 176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/knowledge-preparation.in",
+      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "size_bytes": 176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tooling/release/training-llama-factory-requirements.lock",
       "sha256": "a1f834d78cc0f884ddcf5c77c272c8cd16c98edf9c5599fc42d213f0d8a435db",
       "size_bytes": 105
@@ -5388,8 +5493,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/training_llama_factory_package.py",
-      "sha256": "0d35148b58d752a2c057d615a5f1ef9c2c9fa71c611d72861832d8b553720324",
-      "size_bytes": 40828
+      "sha256": "267872b6948619496e8f6a2ac99e8ccef85deb6b6c013f4b6f89aa0529794bea",
+      "size_bytes": 41059
     },
     {
       "kind": "file",

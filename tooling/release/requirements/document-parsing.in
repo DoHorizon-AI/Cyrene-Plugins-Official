@@ -1,0 +1,11 @@
+# Target: linux-ubuntu-24.04-x86_64-python-3.12
+# Internal runtime source: cyrene-plugin-runtime==0.2.0, vendored at src/cyrene_plugin_runtime.
+docling-slim[format-pdf,format-office,cli]>=2.135,<2.136
+openpyxl>=3.1,<4
+Pillow>=10,<13
+pypdfium2>=4.30,<6
+python-docx>=1.1,<2
+python-pptx>=1.0,<2
+rtree>=1.4,<2
+grpcio==1.62.3
+protobuf==4.25.9
