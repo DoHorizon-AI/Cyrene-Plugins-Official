@@ -172,7 +172,10 @@ def _package_entries(source_files: dict[str, bytes]) -> dict[str, bytes]:
         f"{PACKAGE_SOURCE}/README.md": "README.md",
         f"{PACKAGE_SOURCE}/PROVENANCE.md": "PROVENANCE.md",
         f"{PACKAGE_SOURCE}/plugin.manifest.json": "plugin.manifest.json",
-        f"{PACKAGE_SOURCE}/llama_factory.py": "llama_factory.py",
+        # The bootstrap only adds ``payload/src`` to the import path. Keep the
+        # training entrypoint beside the vendored SDK so a clean process does
+        # not depend on the caller's working directory or PYTHONPATH.
+        f"{PACKAGE_SOURCE}/llama_factory.py": "src/llama_factory.py",
         f"{PACKAGE_SOURCE}/contracts/v1/schema.json": "contracts/v1/schema.json",
         LOCK_SOURCE: "requirements.lock",
     }

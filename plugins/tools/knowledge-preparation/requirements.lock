@@ -1,0 +1,4 @@
+# Target: linux-ubuntu-24.04-x86_64-python-3.12
+# Internal runtime source: cyrene-plugin-runtime==0.2.0, vendored at src/cyrene_plugin_runtime.
+grpcio==1.62.3
+protobuf==4.25.9

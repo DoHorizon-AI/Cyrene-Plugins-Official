@@ -21,17 +21,17 @@ from typing import Any
 import pytest
 from cyrene_model_provider_contracts import (
     CAPABILITY_ID as MODEL_CAPABILITY_ID,
-    CHAT_COMPLETION_METHOD,
-    CHAT_COMPLETION_REQUEST_TYPE_URL,
+)
+from cyrene_model_provider_contracts import (
     CHAT_COMPLETION_RESPONSE_TYPE_URL,
     ChatCompletionChunk,
     ChatCompletionResponse,
-    decode_chat_completion_request,
     encode_chat_completion_response,
 )
-from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, DirectPluginError, serve
+from cyrene_plugin_runtime import (
+    serve,
+)
 from dataset_generation import (
-    CAPABILITY_ID,
     DatasetGenerationPlugin,
     GenerationConfig,
     GenerationUpstreamError,
@@ -125,8 +125,15 @@ def _write_approved_blocks(path: Path, *blocks: dict[str, Any]) -> None:
     )
 
 
-def _setup_pipeline(tmp_path: Path, provider: FaultyModelProvider, *, budget: dict[str, Any] | None = None):
-    provider_server, provider_ref = serve(provider, MODEL_CAPABILITY_ID, "1", "127.0.0.1:0")
+def _setup_pipeline(
+    tmp_path: Path,
+    provider: FaultyModelProvider,
+    *,
+    budget: dict[str, Any] | None = None,
+):
+    provider_server, provider_ref = serve(
+        provider, MODEL_CAPABILITY_ID, "1", "127.0.0.1:0"
+    )
     plugin = DatasetGenerationPlugin(
         GenerationConfig(
             binding_id="model.binding.fault",
@@ -157,7 +164,9 @@ def _setup_pipeline(tmp_path: Path, provider: FaultyModelProvider, *, budget: di
 
 def test_provider_timeout_simulation(tmp_path: Path) -> None:
     """When provider times out, fail cleanly with FAILED_AMBIGUOUS_PROVIDER_RESULT checkpoint."""
-    provider = FaultyModelProvider(error_to_raise="DEADLINE_EXCEEDED: model provider timed out after 2s")
+    provider = FaultyModelProvider(
+        error_to_raise="DEADLINE_EXCEEDED: model provider timed out after 2s"
+    )
     server, plugin, req = _setup_pipeline(tmp_path, provider)
     try:
         with pytest.raises(GenerationUpstreamError, match="timed out"):
@@ -172,7 +181,9 @@ def test_provider_timeout_simulation(tmp_path: Path) -> None:
 
 def test_provider_429_rate_limit_simulation(tmp_path: Path) -> None:
     """When provider returns 429/RESOURCE_EXHAUSTED, fail without silent retry."""
-    provider = FaultyModelProvider(error_to_raise="RESOURCE_EXHAUSTED: rate limit exceeded (HTTP 429)")
+    provider = FaultyModelProvider(
+        error_to_raise="RESOURCE_EXHAUSTED: rate limit exceeded (HTTP 429)"
+    )
     server, plugin, req = _setup_pipeline(tmp_path, provider)
     try:
         with pytest.raises(GenerationUpstreamError, match="rate limit exceeded"):
@@ -187,7 +198,9 @@ def test_provider_429_rate_limit_simulation(tmp_path: Path) -> None:
 
 def test_provider_500_internal_error_simulation(tmp_path: Path) -> None:
     """When provider returns 500/INTERNAL, fail cleanly and record checkpoint."""
-    provider = FaultyModelProvider(error_to_raise="INTERNAL: upstream server error (HTTP 500)")
+    provider = FaultyModelProvider(
+        error_to_raise="INTERNAL: upstream server error (HTTP 500)"
+    )
     server, plugin, req = _setup_pipeline(tmp_path, provider)
     try:
         with pytest.raises(GenerationUpstreamError, match="upstream server error"):
@@ -200,7 +213,9 @@ def test_provider_500_internal_error_simulation(tmp_path: Path) -> None:
 
 def test_malformed_output_not_json(tmp_path: Path) -> None:
     """When provider returns invalid JSON, fail with FAILED_PROVIDER_RESPONSE checkpoint."""
-    provider = FaultyModelProvider(raw_replies=["I am an AI and here is your answer: {not json"])
+    provider = FaultyModelProvider(
+        raw_replies=["I am an AI and here is your answer: {not json"]
+    )
     server, plugin, req = _setup_pipeline(tmp_path, provider)
     try:
         with pytest.raises(GenerationUpstreamError, match="not one JSON object"):
@@ -213,7 +228,9 @@ def test_malformed_output_not_json(tmp_path: Path) -> None:
 
 def test_malformed_output_missing_fields(tmp_path: Path) -> None:
     """When provider returns JSON missing question or answer, fail cleanly."""
-    provider = FaultyModelProvider(raw_replies=['{"response": "missing question and answer keys"}'])
+    provider = FaultyModelProvider(
+        raw_replies=['{"response": "missing question and answer keys"}']
+    )
     server, plugin, req = _setup_pipeline(tmp_path, provider)
     try:
         with pytest.raises(GenerationUpstreamError, match="only question and answer"):
@@ -279,6 +296,7 @@ def test_budget_exceeded_output_tokens(tmp_path: Path) -> None:
 
 def test_cancellation(tmp_path: Path) -> None:
     """When cancellation is triggered, checkpoints with CANCELLED status."""
+
     class FakeCancellation:
         def is_cancelled(self) -> bool:
             return True
