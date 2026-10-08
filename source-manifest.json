@@ -52,9 +52,30 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "AGENTS.md",
+      "sha256": "cf79af5feb735e3f35a3bfb3892c306668b78a034c6235345c432f87f94fb2a2",
+      "size_bytes": 2297
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "CLAUDE.md",
+      "sha256": "824fbdb4cac2064d0f5ca400ef422172179aa1bca83453693c1e3d251483c595",
+      "size_bytes": 59
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "CODEBUDDY.md",
+      "sha256": "824fbdb4cac2064d0f5ca400ef422172179aa1bca83453693c1e3d251483c595",
+      "size_bytes": 59
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "CONTRIBUTING.md",
-      "sha256": "468583c5c2ac0a4e41241b0a8eb082e19661e36052d07265ef2683d2003d30a0",
-      "size_bytes": 1767
+      "sha256": "55bd88f6432c44b061884e029c75ff4e87eac2d3c1caac3d511fd878c5b5002b",
+      "size_bytes": 3387
     },
     {
       "kind": "file",
@@ -1936,6 +1957,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/dataset-generation/tests/test_generation_fault_injection.py",
+      "sha256": "bb7d451a5086dba083ca6e5160a94b8eff1aeca48ac74a6fece50565857850c8",
+      "size_bytes": 12100
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/dataset-generation/tests/test_training_export.py",
       "sha256": "2ab26c191a3b04dcef330f518fc220ba221cc1b553313552c7da5e36cf1f7ac1",
       "size_bytes": 21581
@@ -2128,6 +2156,13 @@
       "path": "plugins/tools/document-parsing/tests/test_office_parsing.py",
       "sha256": "be475655ce10b1a2313d4a3f7cbaed73beb5c8b0894da30d5ad3603cdc0ab27e",
       "size_bytes": 12134
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/document-parsing/tests/test_parser_stress.py",
+      "sha256": "d9099633720a9e7223fb8b6707e31e73c67cf4c14ba5990a9bea243a62bde3f7",
+      "size_bytes": 11699
     },
     {
       "kind": "file",
