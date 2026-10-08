@@ -123,6 +123,23 @@ jobs:
           name: training-plugin-release-${{ github.sha }}-${{ github.run_id }}
           path: ${{ runner.temp }}/training-plugin-release
 
+      - name: Resolve the source-owned training package version
+        run: |
+          set -euo pipefail
+          python3 - <<'PY_VERSION'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          manifest = json.loads(Path("plugins/training/llama-factory/plugin.manifest.json").read_text())
+          version = manifest["version"]
+          if not isinstance(version, str) or not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?", version):
+              raise SystemExit("training package version is not valid SemVer")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"TRAINING_PACKAGE_VERSION={version}\n")
+          PY_VERSION
+
       - name: Verify source, target, Package Spec, lock, and payload digests
         run: |
           set -euo pipefail
@@ -146,11 +163,11 @@ jobs:
           set -euo pipefail
           workflow="$REPOSITORY/.github/workflows/training-plugin-package-release.yml"
           assets=(
-            "cyrene.training.llama-factory-0.1.0-linux-x86_64.zip"
-            "cyrene.training.llama-factory-0.1.0-package-descriptor.json"
-            "cyrene.training.llama-factory-0.1.0-requirements.lock"
+            "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-linux-x86_64.zip"
+            "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-descriptor.json"
+            "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-requirements.lock"
             "cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
-            "cyrene.training.llama-factory-0.1.0-package-release.json"
+            "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-release.json"
           )
           for asset in "${assets[@]}"; do
             subject="$PUBLISH_DIR/$asset"
@@ -178,7 +195,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          release_tag="${CHANNEL}-cyrene.training.llama-factory-0.1.0-${SOURCE_SHA}"
+          release_tag="${CHANNEL}-cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-${SOURCE_SHA}"
           if gh api "repos/$REPOSITORY/git/ref/tags/$release_tag" >/dev/null 2>&1; then
             echo "immutable release tag already exists: $release_tag" >&2
             exit 1
@@ -199,11 +216,11 @@ jobs:
           The release includes the package archive, Package Spec descriptor, exact runtime lock, Python preparer wheel, source-bound release metadata, and detached GitHub artifact attestations.
           EOF
           assets=(
-            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-linux-x86_64.zip"
-            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-package-descriptor.json"
-            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-requirements.lock"
+            "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-linux-x86_64.zip"
+            "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-descriptor.json"
+            "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-requirements.lock"
             "$PUBLISH_DIR/cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
-            "$PUBLISH_DIR/cyrene.training.llama-factory-0.1.0-package-release.json"
+            "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-release.json"
           )
           for asset in \
             "${assets[0]}" "${assets[1]}" "${assets[2]}" "${assets[3]}" "${assets[4]}"; do
