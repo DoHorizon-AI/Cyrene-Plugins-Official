@@ -13,6 +13,7 @@ import sys
 import tempfile
 import unittest
 import zipfile
+from copy import deepcopy
 from pathlib import Path
 
 from tooling.release import official_plugin_package as release
@@ -66,6 +67,88 @@ class OfficialPluginPackageTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_staged_release_readback_checks_github_asset_digests_and_sizes(
+        self,
+    ) -> None:
+        """Verify the documented GitHub CLI draft and asset JSON shape.
+
+        中文：按 release view 实际字段核对 draft、tag、target、名称、摘要和大小。
+        """
+
+        source_sha = "a" * 40
+        source_ref = "refs/heads/develop"
+        package_id = "cyrene.tools.dataset-preparation"
+        package_version = "0.2.0"
+        spec = release.PACKAGE_SPECS[package_id]
+        release_tag = f"preview-{spec.component_id}-{package_version}-{source_sha}"
+        asset_paths = [
+            self.temp_root / "package.zip",
+            self.temp_root / "package.zip.attestation.jsonl",
+        ]
+        for index, path in enumerate(asset_paths):
+            path.write_bytes(f"asset-{index}".encode("ascii"))
+        record = {
+            "isDraft": True,
+            "isImmutable": False,
+            "isPrerelease": True,
+            "tagName": release_tag,
+            "targetCommitish": source_sha,
+            "assets": [
+                {
+                    "name": path.name,
+                    "size": path.stat().st_size,
+                    "digest": release.training_release.sha256_file(path),
+                    "state": "uploaded",
+                }
+                for path in asset_paths
+            ],
+        }
+        release.verify_staged_release_readback(
+            record=record,
+            asset_paths=asset_paths,
+            release_tag=release_tag,
+            package_id=package_id,
+            package_version=package_version,
+            source_ref=source_ref,
+            source_sha=source_sha,
+            channel="preview",
+        )
+
+        mutations = (
+            (
+                "asset digest",
+                lambda row: row["assets"][0].update(digest="sha256:" + "0" * 64),
+            ),
+            (
+                "asset size",
+                lambda row: row["assets"][0].update(size=row["assets"][0]["size"] + 1),
+            ),
+            (
+                "unexpected asset",
+                lambda row: row["assets"].append(
+                    {**row["assets"][0], "name": "extra.bin"}
+                ),
+            ),
+            ("draft flag", lambda row: row.update(isDraft=False)),
+            ("immutable flag", lambda row: row.update(isImmutable=True)),
+            ("target commit", lambda row: row.update(targetCommitish="b" * 40)),
+        )
+        for label, mutate in mutations:
+            with self.subTest(label=label):
+                changed = deepcopy(record)
+                mutate(changed)
+                with self.assertRaises(release.PackageBuildError):
+                    release.verify_staged_release_readback(
+                        record=changed,
+                        asset_paths=asset_paths,
+                        release_tag=release_tag,
+                        package_id=package_id,
+                        package_version=package_version,
+                        source_ref=source_ref,
+                        source_sha=source_sha,
+                        channel="preview",
+                    )
 
     def test_five_packages_and_training_template_start_with_pythonpath_unset(
         self,

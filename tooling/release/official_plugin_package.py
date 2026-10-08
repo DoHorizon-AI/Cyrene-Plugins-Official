@@ -1522,6 +1522,107 @@ def _validate_attestation_policy(
         )
 
 
+def verify_staged_release_readback(
+    *,
+    record: Any,
+    asset_paths: list[Path],
+    release_tag: str,
+    package_id: str,
+    package_version: str,
+    source_ref: str,
+    source_sha: str,
+    channel: str,
+) -> None:
+    """Verify GitHub's draft-release identity and every uploaded asset byte.
+
+    The GitHub CLI release JSON exposes ``isDraft``, ``isImmutable``,
+    ``isPrerelease``, ``tagName``, ``targetCommitish``, and each asset's
+    ``name``, ``size``, ``digest``, and ``state``. It does not expose an
+    ``isLatest`` JSON field; draft state plus the create command's explicit
+    ``--latest=false`` prevents this staging step from advancing latest.
+    中文：按 CLI 实际返回字段核对 draft 身份及每个已上传资产的摘要与大小。
+    """
+
+    spec = PACKAGE_SPECS.get(package_id)
+    if spec is None:
+        raise PackageBuildError("staged release read-back has an unknown package ID")
+    expected_tag = _channel_identity(
+        channel, source_ref, source_sha, spec.component_id, package_version
+    )
+    if expected_tag is None or release_tag != expected_tag:
+        raise PackageBuildError(
+            "staged release read-back tag differs from the source identity"
+        )
+    if (
+        not isinstance(record, dict)
+        or record.get("isDraft") is not True
+        or record.get("isImmutable") is not False
+        or record.get("isPrerelease") is not (channel == "preview")
+        or record.get("tagName") != release_tag
+        or record.get("targetCommitish") != source_sha
+    ):
+        raise PackageBuildError(
+            "staged release read-back identity or draft state differs"
+        )
+
+    expected_assets: dict[str, dict[str, Any]] = {}
+    for path in asset_paths:
+        if path.is_symlink() or not path.is_file():
+            raise PackageBuildError(
+                f"verified staged asset is missing or unsafe: {path}"
+            )
+        name = path.name
+        if name in expected_assets:
+            raise PackageBuildError(
+                f"verified staged asset basename is duplicated: {name}"
+            )
+        expected_assets[name] = {
+            "size": path.stat().st_size,
+            "digest": training_release.sha256_file(path),
+        }
+    if not expected_assets:
+        raise PackageBuildError("verified staged asset set is empty")
+
+    rows = record.get("assets")
+    if not isinstance(rows, list):
+        raise PackageBuildError("staged release read-back assets are missing")
+    actual_assets: dict[str, dict[str, Any]] = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise PackageBuildError(
+                "staged release read-back contains a malformed asset"
+            )
+        name = row.get("name")
+        size = row.get("size")
+        digest = row.get("digest")
+        if (
+            not isinstance(name, str)
+            or not name
+            or name in actual_assets
+            or type(size) is not int
+            or size < 0
+            or not isinstance(digest, str)
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
+            or row.get("state") != "uploaded"
+        ):
+            raise PackageBuildError(
+                "staged release read-back asset metadata is malformed"
+            )
+        actual_assets[name] = {"size": size, "digest": digest}
+    if actual_assets != expected_assets:
+        missing = sorted(set(expected_assets) - set(actual_assets))
+        unexpected = sorted(set(actual_assets) - set(expected_assets))
+        mismatched = sorted(
+            name
+            for name in set(expected_assets) & set(actual_assets)
+            if expected_assets[name] != actual_assets[name]
+        )
+        raise PackageBuildError(
+            "staged release read-back differs from verified asset identities "
+            f"(missing={missing}, unexpected={unexpected}, mismatched={mismatched})"
+        )
+
+
 def _build_command(options: argparse.Namespace) -> None:
     paths = build_release_artifacts(
         root=options.root,

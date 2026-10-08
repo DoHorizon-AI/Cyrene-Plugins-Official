@@ -323,13 +323,14 @@ jobs:
         run: |
           set -euo pipefail
           notes="$RUNNER_TEMP/data-tools-plugin-release-notes.md"
-          cat > "$notes" <<EOF
-          Immutable Package Runtime release for `$PACKAGE_ID@$PACKAGE_VERSION`.
-
-          Source commit: `$SOURCE_SHA`
-          Target: `$TARGET`
-          This draft includes the ZIP, Package Spec descriptor, exact dependency lock, Python runtime preparer wheel, CycloneDX SBOM, source-bound package metadata, component release manifest and index, and a detached GitHub artifact attestation for every asset.
-          EOF
+          {
+            printf 'Immutable Package Runtime release for `%s@%s`.\n\n' \
+              "$PACKAGE_ID" "$PACKAGE_VERSION"
+            printf 'Source commit: `%s`\nTarget: `%s`\n\n' \
+              "$SOURCE_SHA" "$TARGET"
+            printf '%s\n' \
+              'This draft includes the ZIP, Package Spec descriptor, exact dependency lock, Python runtime preparer wheel, CycloneDX SBOM, source-bound package metadata, component release manifest and index, and a detached GitHub artifact attestation for every artifact.'
+          } > "$notes"
           mapfile -t assets < <(
             find "$RUNNER_TEMP/data-tools-plugin-release" -maxdepth 1 -type f \
               ! -name 'attestation-subjects.sha256' -print | sort
@@ -347,23 +348,29 @@ jobs:
             --draft \
             --latest=false \
             "${release_flags[@]}"
-          gh release view "$RELEASE_TAG" --repo "$REPOSITORY" --json isDraft,isPrerelease,isLatest,tagName,assets > "$RUNNER_TEMP/release-readback.json"
-          python - "$RUNNER_TEMP/release-readback.json" "${assets[@]}" <<'PY'
+          gh release view "$RELEASE_TAG" --repo "$REPOSITORY" \
+            --json isDraft,isImmutable,isPrerelease,tagName,targetCommitish,assets \
+            > "$RUNNER_TEMP/release-readback.json"
+          python - "$RUNNER_TEMP/release-readback.json" "$RELEASE_TAG" \
+            "$PACKAGE_ID" "$PACKAGE_VERSION" "$SOURCE_REF" "$SOURCE_SHA" \
+            "$CHANNEL" "${assets[@]}" <<'PY'
           import json
-          import pathlib
           import sys
+          from pathlib import Path
 
-          release_path, *asset_paths = sys.argv[1:]
-          record = json.loads(pathlib.Path(release_path).read_text(encoding="utf-8"))
-          expected = {pathlib.Path(path).name for path in asset_paths}
-          actual = {asset["name"] for asset in record["assets"]}
-          expected_prerelease = "preview-" in record["tagName"]
-          if (
-              not record["isDraft"]
-              or record["isLatest"]
-              or record["isPrerelease"] != expected_prerelease
-              or not record["tagName"]
-              or actual != expected
-          ):
-              raise SystemExit("staged release read-back differs from the verified asset set")
+          from tooling.release.official_plugin_package import (
+              verify_staged_release_readback,
+          )
+
+          release_path, release_tag, package_id, package_version, source_ref, source_sha, channel, *asset_paths = sys.argv[1:]
+          verify_staged_release_readback(
+              record=json.loads(Path(release_path).read_text(encoding="utf-8")),
+              asset_paths=[Path(path) for path in asset_paths],
+              release_tag=release_tag,
+              package_id=package_id,
+              package_version=package_version,
+              source_ref=source_ref,
+              source_sha=source_sha,
+              channel=channel,
+          )
           PY
