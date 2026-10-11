@@ -37,8 +37,8 @@ PACKAGE_ID = "cyrene.training.llama-factory"
 CAPABILITY_ID = "training.llama-factory.v1"
 INTERFACE_VERSION = "1"
 RUNTIME_DISTRIBUTION = "cyrene-plugin-runtime"
-RUNTIME_VERSION = "0.2.0"
-RUNTIME_WHEEL_NAME = "cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
+RUNTIME_VERSION = "0.2.1"
+RUNTIME_WHEEL_NAME = "cyrene_plugin_runtime-0.2.1-py3-none-any.whl"
 TARGET_ID = "linux-x86_64"
 SUPPORTED_CHANNELS = {"candidate", "preview", "stable"}
 EXPECTED_LOCK_LINES = ("grpcio==1.62.3", "protobuf==4.25.9")
@@ -48,6 +48,7 @@ EXPECTED_BUILD_LOCK_LINES = (
     "pyproject-hooks==1.3.3",
     "setuptools==68.1.2",
     "wheel==0.48.0",
+    "uv==0.13.0",
 )
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 LOCK_PIN_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+==[A-Za-z0-9][A-Za-z0-9_.+!-]*$")
@@ -296,10 +297,11 @@ def _validate_preparer_wheel(path: Path) -> None:
             entrypoints = archive.read(entrypoint_names[0]).decode("utf-8")
             if (
                 "Name: cyrene-plugin-runtime\n" not in metadata
-                or "Version: 0.2.0\n" not in metadata
+                or f"Version: {RUNTIME_VERSION}\n" not in metadata
             ):
                 raise PackageBuildError(
-                    "preparer wheel package identity is not cyrene-plugin-runtime 0.2.0"
+                    "preparer wheel package identity is not "
+                    f"cyrene-plugin-runtime {RUNTIME_VERSION}"
                 )
             if "Tag: py3-none-any\n" not in wheel:
                 raise PackageBuildError("preparer wheel target must be py3-none-any")

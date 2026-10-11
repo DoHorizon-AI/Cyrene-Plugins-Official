@@ -11,19 +11,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import platform
 import re
 import shutil
+import subprocess
 import sys
 import tempfile
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from email.parser import BytesParser
+from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
 import tomllib
 from packaging.requirements import Requirement
-from packaging.utils import canonicalize_name
+from packaging.tags import sys_tags
+from packaging.utils import canonicalize_name, parse_wheel_filename
 
 if __package__ in {None, ""}:
     # Direct script execution starts at tooling/release rather than the repo root.
@@ -54,8 +59,10 @@ TARGET = {
 SUPPORTED_CHANNELS = {"candidate", "preview", "stable"}
 CAPABILITY_PROTOCOL = "cyrene.plugin.runtime.v1"
 PREPARER_DISTRIBUTION = "cyrene-plugin-runtime"
-PREPARER_VERSION = "0.2.0"
-PREPARER_WHEEL = "cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
+PREPARER_VERSION = "0.2.1"
+PREPARER_WHEEL = "cyrene_plugin_runtime-0.2.1-py3-none-any.whl"
+WHEELHOUSE_TARGET = TARGET_ID
+WHEELHOUSE_MANIFEST = "wheelhouse/manifest.json"
 SBOM_SPEC_VERSION = "1.6"
 SBOM_FORMAT = "CycloneDX"
 RELEASE_INDEX_NAME = "component-release-index-v1.json"
@@ -397,6 +404,239 @@ def _lock_lines(payload: bytes, label: str) -> list[str]:
     return pins
 
 
+def _wheel_metadata(payload: bytes, filename: str) -> tuple[str, str]:
+    """Read and validate a wheel's single distribution identity record."""
+
+    try:
+        with zipfile.ZipFile(BytesIO(payload)) as archive:
+            metadata_names = [
+                item
+                for item in archive.namelist()
+                if item.endswith(".dist-info/METADATA")
+            ]
+            if len(metadata_names) != 1:
+                raise PackageBuildError(
+                    f"wheel must contain one METADATA file: {filename}"
+                )
+            metadata = BytesParser().parsebytes(archive.read(metadata_names[0]))
+    except (OSError, UnicodeError, zipfile.BadZipFile) as error:
+        raise PackageBuildError(f"invalid wheel archive: {filename}") from error
+    name = metadata.get("Name")
+    version = metadata.get("Version")
+    if not isinstance(name, str) or not isinstance(version, str):
+        raise PackageBuildError(f"wheel has no distribution identity: {filename}")
+    return canonicalize_name(name), version
+
+
+def _wheelhouse_entries(lock_bytes: bytes, wheel_paths: list[Path]) -> dict[str, bytes]:
+    """Build a lock-bound wheelhouse manifest from one exact wheel per pin."""
+
+    pins = _lock_lines(lock_bytes, "requirements.lock")
+    expected = {
+        canonicalize_name(LOCK_PIN.fullmatch(pin).group(1)): LOCK_PIN.fullmatch(
+            pin
+        ).group(2)
+        for pin in pins
+    }
+    records: list[dict[str, Any]] = []
+    entries: dict[str, bytes] = {}
+    found: dict[str, str] = {}
+    for path in sorted(wheel_paths, key=lambda item: item.name):
+        if path.is_symlink() or not path.is_file() or path.suffix != ".whl":
+            raise PackageBuildError(f"wheelhouse contains an unsafe file: {path}")
+        filename = path.name
+        if "/" in filename or "\\" in filename:
+            raise PackageBuildError(f"wheelhouse filename is unsafe: {filename}")
+        payload = path.read_bytes()
+        try:
+            distribution, version, _build, tags = parse_wheel_filename(filename)
+        except ValueError as error:
+            raise PackageBuildError(f"invalid wheel filename: {filename}") from error
+        normalized = canonicalize_name(str(distribution))
+        locked_version = expected.get(normalized)
+        if locked_version != str(version) or normalized in found:
+            raise PackageBuildError(
+                f"wheelhouse wheel is extra, duplicated, or does not match the lock: {filename}"
+            )
+        metadata_name, metadata_version = _wheel_metadata(payload, filename)
+        if metadata_name != normalized or metadata_version != locked_version:
+            raise PackageBuildError(
+                f"wheel metadata does not match the lock: {filename}"
+            )
+        if tags.isdisjoint(sys_tags()):
+            raise PackageBuildError(f"wheel is incompatible with {TARGET_ID}: {filename}")
+        digest = training_release.sha256_bytes(payload)
+        records.append(
+            {
+                "filename": filename,
+                "name": normalized,
+                "version": locked_version,
+                "sha256": digest,
+                "size": len(payload),
+            }
+        )
+        entries[f"wheelhouse/{filename}"] = payload
+        found[normalized] = filename
+    if set(found) != set(expected):
+        missing = sorted(set(expected).difference(found))
+        raise PackageBuildError(f"wheelhouse is missing exact locked wheels: {missing}")
+    manifest = {
+        "schemaVersion": 1,
+        "target": WHEELHOUSE_TARGET,
+        "requirementsLockSha256": training_release.sha256_bytes(lock_bytes),
+        "wheels": records,
+    }
+    entries[WHEELHOUSE_MANIFEST] = _json_bytes(manifest)
+    _verify_wheelhouse_entries(entries, lock_bytes)
+    return entries
+
+
+def _verify_wheelhouse_entries(
+    entries: dict[str, bytes], lock_bytes: bytes
+) -> dict[str, Any]:
+    """Fail closed unless package wheel files exactly satisfy its bound lock."""
+
+    manifest_bytes = entries.get(WHEELHOUSE_MANIFEST)
+    if manifest_bytes is None:
+        raise PackageBuildError("package archive lacks wheelhouse/manifest.json")
+    try:
+        manifest = json.loads(manifest_bytes.decode("utf-8"))
+    except (UnicodeError, json.JSONDecodeError) as error:
+        raise PackageBuildError("wheelhouse manifest is invalid JSON") from error
+    if (
+        not isinstance(manifest, dict)
+        or set(manifest)
+        != {"schemaVersion", "target", "requirementsLockSha256", "wheels"}
+        or manifest.get("schemaVersion") != 1
+        or manifest.get("target") != WHEELHOUSE_TARGET
+        or manifest.get("requirementsLockSha256")
+        != training_release.sha256_bytes(lock_bytes)
+    ):
+        raise PackageBuildError("wheelhouse manifest is not bound to this lock/target")
+    pins = _lock_lines(lock_bytes, "requirements.lock")
+    expected = {
+        canonicalize_name(LOCK_PIN.fullmatch(pin).group(1)): LOCK_PIN.fullmatch(
+            pin
+        ).group(2)
+        for pin in pins
+    }
+    wheels = manifest.get("wheels")
+    if not isinstance(wheels, list) or len(wheels) != len(expected):
+        raise PackageBuildError("wheelhouse manifest does not enumerate the full lock")
+    seen: dict[str, str] = {}
+    paths: set[str] = {WHEELHOUSE_MANIFEST}
+    for record in wheels:
+        if not isinstance(record, dict) or set(record) != {
+            "filename",
+            "name",
+            "version",
+            "sha256",
+            "size",
+        }:
+            raise PackageBuildError("wheelhouse manifest has an invalid wheel record")
+        filename = record.get("filename")
+        name = record.get("name")
+        version = record.get("version")
+        digest = record.get("sha256")
+        size = record.get("size")
+        if (
+            not isinstance(filename, str)
+            or Path(filename).name != filename
+            or "/" in filename
+            or "\\" in filename
+            or not filename.endswith(".whl")
+            or not isinstance(name, str)
+            or not isinstance(version, str)
+            or not isinstance(digest, str)
+            or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
+            or not isinstance(size, int)
+            or isinstance(size, bool)
+            or size < 1
+        ):
+            raise PackageBuildError("wheelhouse manifest has an unsafe wheel record")
+        normalized = canonicalize_name(name)
+        if normalized in seen or expected.get(normalized) != version:
+            raise PackageBuildError("wheelhouse includes an unpinned or duplicate wheel")
+        payload = entries.get(f"wheelhouse/{filename}")
+        if payload is None:
+            raise PackageBuildError(f"wheelhouse wheel is missing: {filename}")
+        wheel_digest = training_release.sha256_bytes(payload)
+        if wheel_digest != digest or len(payload) != size:
+            raise PackageBuildError(f"wheelhouse wheel digest mismatch: {filename}")
+        try:
+            distribution, wheel_version, _build, tags = parse_wheel_filename(filename)
+        except ValueError as error:
+            raise PackageBuildError(f"invalid wheel filename: {filename}") from error
+        metadata_name, metadata_version = _wheel_metadata(payload, filename)
+        if (
+            canonicalize_name(str(distribution)) != normalized
+            or str(wheel_version) != version
+            or metadata_name != normalized
+            or metadata_version != version
+            or tags.isdisjoint(sys_tags())
+        ):
+            raise PackageBuildError(f"wheel identity mismatch: {filename}")
+        seen[normalized] = filename
+        paths.add(f"wheelhouse/{filename}")
+    if set(seen) != set(expected):
+        raise PackageBuildError("wheelhouse manifest omits one or more locked wheels")
+    if set(entries) != paths:
+        raise PackageBuildError("wheelhouse has missing or unlisted files")
+    return manifest
+
+
+def _download_wheelhouse(
+    root: Path, spec: PackageSpec, lock_bytes: bytes, destination: Path
+) -> dict[str, bytes]:
+    """Resolve and download the complete binary closure for the frozen target."""
+
+    if sys.platform != "linux" or sys.version_info[:2] != (3, 12):
+        raise PackageBuildError(
+            f"wheelhouse generation requires the {TARGET_ID} builder environment"
+        )
+    try:
+        os_release = platform.freedesktop_os_release()
+    except (AttributeError, OSError):
+        os_release = {}
+    if (
+        os_release.get("ID") != "ubuntu"
+        or os_release.get("VERSION_ID") != "24.04"
+        or platform.machine() != "x86_64"
+    ):
+        raise PackageBuildError(
+            f"wheelhouse generation requires the {TARGET_ID} builder environment"
+        )
+    destination.mkdir(parents=True, exist_ok=True)
+    lock = root / spec.source_dir / "requirements.lock"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "download",
+            "--disable-pip-version-check",
+            "--only-binary=:all:",
+            "--requirement",
+            str(lock),
+            "--dest",
+            str(destination),
+        ],
+        cwd=root,
+        stdin=subprocess.DEVNULL,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "").strip()
+        raise PackageBuildError(
+            "could not resolve the locked binary wheel closure"
+            + (f": {detail[-2000:]}" if detail else "")
+        )
+    wheel_paths = sorted(destination.glob("*.whl"), key=lambda item: item.name)
+    return _wheelhouse_entries(lock_bytes, wheel_paths)
+
+
 def _verify_lock_inputs(spec: PackageSpec, source_files: dict[str, bytes]) -> list[str]:
     lock_path = f"{spec.source_dir}/requirements.lock"
     lock = source_files[lock_path]
@@ -498,6 +738,7 @@ def _package_entries(
     source_files: dict[str, bytes],
     spec: PackageSpec,
     sdk_files: dict[str, dict[str, bytes]],
+    wheelhouse_entries: dict[str, bytes] | None = None,
 ) -> dict[str, bytes]:
     entries: dict[str, bytes] = {"LICENSE": source_files["LICENSE"]}
     prefix = f"{spec.source_dir}/"
@@ -521,6 +762,8 @@ def _package_entries(
                 continue
             relative = source[len(sdk_prefix) :]
             entries[f"{sdk.archive_root}/{relative}"] = content
+    if wheelhouse_entries:
+        entries.update(wheelhouse_entries)
     if "src/cyrene_plugin_runtime/bootstrap.py" not in entries:
         raise PackageBuildError("package archive lacks the Python runtime bootstrap")
     return entries
@@ -862,6 +1105,7 @@ def build_release_artifacts(
     run_id: str | None,
     run_attempt: int,
     preparer_wheel: Path | None = None,
+    wheelhouse_source: Path | None = None,
 ) -> dict[str, Path]:
     """Build one explicit official plugin package and its release envelopes."""
 
@@ -894,18 +1138,56 @@ def build_release_artifacts(
 
     source_files, sdk_files = _source_files(root, spec)
     pins = _verify_lock_inputs(spec, source_files)
-    package_entries = _package_entries(source_files, spec, sdk_files)
     lock_bytes = source_files[f"{spec.source_dir}/requirements.lock"]
+
+    wheelhouse_owner = tempfile.TemporaryDirectory(
+        prefix="cyrene-package-wheelhouse-"
+    )
+    wheelhouse_path = Path(wheelhouse_owner.name)
+    try:
+        if wheelhouse_source is None:
+            wheelhouse_entries = _download_wheelhouse(
+                root, spec, lock_bytes, wheelhouse_path
+            )
+        else:
+            if wheelhouse_source.is_symlink():
+                raise PackageBuildError("wheelhouse source must not be a symlink")
+            source_path = wheelhouse_source.resolve(strict=True)
+            if source_path.is_symlink() or not source_path.is_dir():
+                raise PackageBuildError("wheelhouse source must be a regular directory")
+            wheelhouse_entries = _wheelhouse_entries(
+                lock_bytes,
+                [
+                    path
+                    for path in source_path.iterdir()
+                    if path.suffix == ".whl"
+                ],
+            )
+        package_entries = _package_entries(
+            source_files, spec, sdk_files, wheelhouse_entries
+        )
+    except BaseException:
+        wheelhouse_owner.cleanup()
+        raise
 
     output_dir = output_dir.resolve()
     if output_dir.exists() and any(output_dir.iterdir()):
+        wheelhouse_owner.cleanup()
         raise PackageBuildError(f"release output directory must be empty: {output_dir}")
     output_dir.mkdir(parents=True, exist_ok=True)
     wheel_owner: tempfile.TemporaryDirectory[str] | None = None
-    if preparer_wheel is None:
-        wheel_path, wheel_owner = training_release.build_runtime_wheel(root, source_sha)
-    else:
-        wheel_path = preparer_wheel.resolve(strict=True)
+    try:
+        if preparer_wheel is None:
+            wheel_path, wheel_owner = training_release.build_runtime_wheel(
+                root, source_sha
+            )
+        else:
+            wheel_path = preparer_wheel.resolve(strict=True)
+    except BaseException:
+        if wheel_owner is not None:
+            wheel_owner.cleanup()
+        wheelhouse_owner.cleanup()
+        raise
     try:
         training_release._validate_preparer_wheel(wheel_path)
         archive_name = f"{package_id}-{package['version']}-{TARGET_ID}.zip"
@@ -1186,6 +1468,7 @@ def build_release_artifacts(
     finally:
         if wheel_owner is not None:
             wheel_owner.cleanup()
+        wheelhouse_owner.cleanup()
 
 
 def _write_subject_checksums(paths: dict[str, Path], output_dir: Path) -> Path:
@@ -1246,10 +1529,24 @@ def verify_release_artifacts(
         if len(names) != len(set(names)):
             raise PackageBuildError("package ZIP contains duplicate paths")
         entries = {name: archive.read(name) for name in names}
-    if entries != _package_entries(source_files, spec, sdk_files):
+    wheelhouse_entries = {
+        name: content
+        for name, content in entries.items()
+        if name.startswith("wheelhouse/")
+    }
+    source_entries = {
+        name: content
+        for name, content in entries.items()
+        if not name.startswith("wheelhouse/")
+    }
+    if source_entries != _package_entries(source_files, spec, sdk_files):
         raise PackageBuildError(
             "package archive payload differs from the allowlisted source"
         )
+    _verify_wheelhouse_entries(
+        wheelhouse_entries,
+        source_files[f"{spec.source_dir}/requirements.lock"],
+    )
     if entries.get("requirements.lock") != paths["dependency_lock"].read_bytes():
         raise PackageBuildError("package ZIP lock differs from the signed lock asset")
     entry_module = package["entrypoint"].split(":", 1)[0].replace(".", "/")

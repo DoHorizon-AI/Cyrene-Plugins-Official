@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-knowledge-preparation"
-version = "0.1.0"
+version = "0.1.1"
 description = "Deterministic dataset.knowledge.v1 package builder and standalone reference consumer."
 requires-python = ">=3.11"
 dependencies = ["cyrene-plugin-runtime>=0.2,<0.3"]

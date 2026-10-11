@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.tools.dataset-preparation",
   "name": "Dataset Preparation",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Deterministic dataset preparation and resumable training-data curation.",
   "kind": "capability-plugin",
   "capabilities": ["dataset.preparation.v1"],

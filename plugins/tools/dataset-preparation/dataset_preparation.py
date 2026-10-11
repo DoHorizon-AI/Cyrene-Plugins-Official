@@ -66,7 +66,7 @@ class DatasetPreparationPlugin:
     """
 
     plugin_id = "cyrene.tools.dataset-preparation"
-    version = "0.2.0"
+    version = "0.2.1"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(

@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.tools.knowledge-preparation",
   "name": "Knowledge Preparation",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Build and independently query policy-filtered CYRENE_KNOWLEDGE_BUNDLE_V1 packages.",
   "kind": "capability-plugin",
   "capabilities": ["dataset.knowledge.v1"],

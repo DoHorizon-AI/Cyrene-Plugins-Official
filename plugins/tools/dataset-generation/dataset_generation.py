@@ -168,7 +168,7 @@ class DatasetGenerationPlugin:
     """
 
     plugin_id = "cyrene.tools.dataset-generation"
-    version = "0.2.1"
+    version = "0.2.2"
     capabilities = (CAPABILITY_ID,)
 
     def __init__(self, config: GenerationConfig | None = None) -> None:

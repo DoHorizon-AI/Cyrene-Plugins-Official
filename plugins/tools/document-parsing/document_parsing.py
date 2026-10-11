@@ -93,7 +93,7 @@ class DocumentParsingPlugin:
     """
 
     plugin_id = "cyrene.tools.document-parsing"
-    version = "0.2.0"
+    version = "0.2.1"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
