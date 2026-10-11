@@ -48,7 +48,6 @@ EXPECTED_BUILD_LOCK_LINES = (
     "pyproject-hooks==1.3.3",
     "setuptools==68.1.2",
     "wheel==0.48.0",
-    "uv==0.13.0",
 )
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 LOCK_PIN_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+==[A-Za-z0-9][A-Za-z0-9_.+!-]*$")

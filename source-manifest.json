@@ -5437,8 +5437,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/build-requirements.lock",
-      "sha256": "49e8bb012b4ae4c611e1a72fdd767dabd49b341d38b7b2b78e83dd6939384050",
-      "size_bytes": 154
+      "sha256": "7157ec7e22bf1bb5eb5d59763ed4a0fd8c32bf14ed8c9c4a1f978e52d43bc90d",
+      "size_bytes": 143
     },
     {
       "kind": "file",
@@ -5493,8 +5493,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/training_llama_factory_package.py",
-      "sha256": "dc36eafe80f77a6e300632261f699d850badf3c689e41b27aa8e94682357fbc8",
-      "size_bytes": 41126
+      "sha256": "ad3941f8df6b1c9ce677f3500be1a3d9265103b01ccd6073d5cbd98a4c63270d",
+      "size_bytes": 41108
     },
     {
       "kind": "file",
