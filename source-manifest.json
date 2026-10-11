@@ -1895,8 +1895,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/contracts/v1/configuration.schema.json",
-      "sha256": "d24d55acc447c0c1ff475a9504f6c92825a4d9cef07da355fa8acbec7adf0e5c",
-      "size_bytes": 928
+      "sha256": "8aa9dca65539abb7c3d1b23f80b4a9f499f5f145937fa80a1c0de9324573b836",
+      "size_bytes": 968
     },
     {
       "kind": "file",
@@ -1909,21 +1909,21 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/dataset_generation.py",
-      "sha256": "f02a8b1e1c767e769d1830051eabde74f7d3f0572777a79f8ad438d8d204963e",
-      "size_bytes": 73521
+      "sha256": "baa6105d9ab8fa8d3fb3b3993fbd374296b9425ff6bd300541d365aee947f048",
+      "size_bytes": 73854
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/plugin.manifest.json",
-      "sha256": "e567fad1f59362a63bc5ad8453e1b38904b4d002d73a4c14a47818979568979c",
+      "sha256": "990b277cf1e93b0cae01ca9ce45fd32de4b4b7763affe2992b3e4b7aed7bc2a8",
       "size_bytes": 1954
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/pyproject.toml",
-      "sha256": "41cabfabc89f18a13756f1bb38752c70cab88e475a010d88f0a265b7aee3acea",
+      "sha256": "d268f0c41d4c5f3c6eb63008970b927b10c0cbf23a06ded2626b987de1bb84d8",
       "size_bytes": 770
     },
     {
@@ -1944,8 +1944,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/tests/test_dataset_generation.py",
-      "sha256": "c52a505a96c14256dcec1fd02a46d4d653642b19d0c646ad6c5758f17024a5b2",
-      "size_bytes": 22739
+      "sha256": "525357affc944a608a60eeffed251c0aa4e0775d8bfbad8d8c86a7e28a65a973",
+      "size_bytes": 25589
     },
     {
       "kind": "file",
