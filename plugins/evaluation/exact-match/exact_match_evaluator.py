@@ -80,7 +80,7 @@ class ExactMatchEvaluationRunner:
         中文:使用严格字段相等规则评估 JSON 记录并返回测量结果。"""
 
     plugin_id = "cyrene.evaluation.exact-match"
-    version = "0.1.0"
+    version = "0.1.1"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(

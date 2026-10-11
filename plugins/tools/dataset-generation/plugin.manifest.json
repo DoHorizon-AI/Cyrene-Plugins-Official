@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.tools.dataset-generation",
   "name": "Dataset Generation",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Build provenance-preserving SFT bundles from reviewed blocks or streaming training records, and opt-in grounded QA drafts.",
   "kind": "capability-plugin",
   "capabilities": ["dataset.generation.v1"],

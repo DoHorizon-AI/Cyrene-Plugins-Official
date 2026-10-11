@@ -113,6 +113,7 @@ jobs:
           PY
           python -m pip install --disable-pip-version-check --no-deps \
             --requirement "$RUNNER_TEMP/startup-requirements.lock"
+          python -m pip install --disable-pip-version-check uv==0.13.0
 
       - name: Run release contract and clean-process startup tests
         run: |

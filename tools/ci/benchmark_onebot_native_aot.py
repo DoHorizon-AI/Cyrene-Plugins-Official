@@ -23,7 +23,7 @@ import sys
 import tempfile
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, ClassVar
@@ -340,7 +340,7 @@ def _collect_process_evidence(
         return {
             "evidence_kind": "descriptive-native-aot-performance",
             "source_revision": revision,
-            "timestamp_utc": datetime.now(timezone.utc)
+            "timestamp_utc": datetime.now(UTC)
             .replace(microsecond=0)
             .isoformat()
             .replace("+00:00", "Z"),

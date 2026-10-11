@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.evaluation.exact-match",
   "name": "Exact Match Evaluation Runner",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Stateless exact-match evaluation over Product-supplied JSON records.",
   "kind": "capability-plugin",
   "capabilities": [

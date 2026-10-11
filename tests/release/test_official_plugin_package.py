@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import os
 import selectors
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -21,12 +22,12 @@ from tooling.release import training_llama_factory_package as training_release
 
 
 def _write_preparer_wheel(path: Path) -> Path:
-    metadata_root = "cyrene_plugin_runtime-0.2.0.dist-info"
+    metadata_root = "cyrene_plugin_runtime-0.2.1.dist-info"
     path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as archive:
         archive.writestr(
             f"{metadata_root}/METADATA",
-            "Metadata-Version: 2.1\nName: cyrene-plugin-runtime\nVersion: 0.2.0\n",
+            "Metadata-Version: 2.1\nName: cyrene-plugin-runtime\nVersion: 0.2.1\n",
         )
         archive.writestr(
             f"{metadata_root}/WHEEL", "Wheel-Version: 1.0\nTag: py3-none-any\n"
@@ -40,6 +41,34 @@ def _write_preparer_wheel(path: Path) -> Path:
             "cyrene_plugin_runtime/dependency_preparer.py", "def main(): return 0\n"
         )
     return path
+
+
+def _create_wheelhouse_source(repository: Path, spec, destination: Path) -> Path:
+    """Create tiny identity-valid test wheels for the committed exact lock."""
+
+    destination.mkdir(parents=True, exist_ok=True)
+    lock = repository / spec.source_dir / "requirements.lock"
+    for line in lock.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = release.LOCK_PIN.fullmatch(line)
+        if match is None:
+            raise AssertionError(f"test package lock is not exact: {line}")
+        name, version = match.groups()
+        filename = f"{name.replace('-', '_')}-{version}-py3-none-any.whl"
+        wheel_path = destination / filename
+        dist_info = f"{name.replace('-', '_')}-{version}.dist-info"
+        with zipfile.ZipFile(wheel_path, "w", compression=zipfile.ZIP_STORED) as archive:
+            archive.writestr(
+                f"{dist_info}/METADATA",
+                f"Metadata-Version: 2.1\nName: {name}\nVersion: {version}\n",
+            )
+            archive.writestr(
+                f"{dist_info}/WHEEL",
+                "Wheel-Version: 1.0\nGenerator: test fixture\nTag: py3-none-any\n",
+            )
+    return destination
 
 
 class OfficialPluginPackageTests(unittest.TestCase):
@@ -182,6 +211,11 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 run_id="12345",
                 run_attempt=1,
                 preparer_wheel=self.wheel,
+                wheelhouse_source=_create_wheelhouse_source(
+                    self.repository,
+                    spec,
+                    self.temp_root / f"wheelhouse-source-{index}",
+                ),
             )
             release.verify_release_artifacts(
                 root=self.repository,
@@ -212,6 +246,19 @@ class OfficialPluginPackageTests(unittest.TestCase):
             self.assertEqual(
                 package_release["attestation_policy"]["provider"], "github-actions"
             )
+            with zipfile.ZipFile(outputs["package"]) as archive:
+                wheelhouse_manifest = json.loads(
+                    archive.read("wheelhouse/manifest.json")
+                )
+                lock_bytes = archive.read("requirements.lock")
+                self.assertEqual(
+                    wheelhouse_manifest["requirementsLockSha256"],
+                    training_release.sha256_bytes(lock_bytes),
+                )
+                self.assertEqual(
+                    len(wheelhouse_manifest["wheels"]),
+                    len(release._lock_lines(lock_bytes, "requirements.lock")),
+                )
             cases.append(
                 (
                     f"package {package_id}",
@@ -266,6 +313,136 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     entrypoint=entrypoint,
                     capability=capability,
                 )
+
+    def test_dataset_generation_prepares_and_imports_with_uv_offline_and_empty_cache(
+        self,
+    ) -> None:
+        """Exercise the real locked wheelhouse without network or a warm uv cache."""
+
+        uv = shutil.which("uv")
+        self.assertIsNotNone(uv, "the pinned release build environment must provide uv")
+        package_id = "cyrene.tools.dataset-generation"
+        output = self.temp_root / "generation-offline-release"
+        artifacts = release.build_release_artifacts(
+            root=self.repository,
+            output_dir=output,
+            package_id=package_id,
+            source_sha=self.source_sha,
+            source_ref="refs/heads/develop",
+            channel="preview",
+            run_id="12345",
+            run_attempt=1,
+        )
+        release.verify_release_artifacts(
+            root=self.repository,
+            output_dir=output,
+            package_id=package_id,
+            source_sha=self.source_sha,
+            source_ref="refs/heads/develop",
+            channel="preview",
+            run_id="12345",
+            run_attempt=1,
+        )
+        package_root = self.temp_root / "generation-package"
+        package_root.mkdir()
+        with zipfile.ZipFile(artifacts["package"]) as archive:
+            archive.extractall(package_root)
+
+        sdk_target = self.temp_root / "preparer-wheel-install"
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--no-deps",
+                "--target",
+                str(sdk_target),
+                str(artifacts["preparer_wheel"]),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        runtime_root = self.temp_root / "prepared-runtime"
+        empty_uv_cache = self.temp_root / "empty-uv-cache"
+        empty_uv_cache.mkdir()
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PYTHONPATH": str(sdk_target),
+                "UV_OFFLINE": "1",
+                "UV_CACHE_DIR": str(empty_uv_cache),
+            }
+        )
+        lock_digest = training_release.sha256_file(package_root / "requirements.lock")
+        prepared = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "cyrene_plugin_runtime.dependency_preparer",
+                "--package-root",
+                str(package_root),
+                "--runtime-root",
+                str(runtime_root),
+                "--lock-digest",
+                lock_digest,
+                "--python",
+                sys.executable,
+                "--uv",
+                str(uv),
+            ],
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(prepared.returncode, 0, prepared.stderr)
+        self.assertEqual(
+            json.loads(prepared.stdout)["protocol"],
+            "cyrene.package-dependency-preparer.v1",
+        )
+
+        runtime_python = runtime_root / "bin/python"
+        load = subprocess.run(
+            [
+                str(runtime_python),
+                "-I",
+                "-c",
+                (
+                    "import sys; "
+                    f"sys.path.insert(0, {str(package_root / 'src')!r}); "
+                    "import grpc, google.protobuf, dataset_generation; "
+                    "print(dataset_generation.DatasetGenerationPlugin.__name__)"
+                ),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(load.returncode, 0, load.stderr)
+        self.assertEqual(load.stdout.strip(), "DatasetGenerationPlugin")
+
+    def test_wheelhouse_rejects_missing_and_tampered_locked_wheels(self) -> None:
+        spec = release.PACKAGE_SPECS["cyrene.tools.dataset-generation"]
+        source = _create_wheelhouse_source(
+            self.repository, spec, self.temp_root / "generation-wheelhouse"
+        )
+        lock = (self.repository / spec.source_dir / "requirements.lock").read_bytes()
+        entries = release._wheelhouse_entries(
+            lock, sorted(source.glob("*.whl"), key=lambda item: item.name)
+        )
+        missing = dict(entries)
+        missing.pop(next(name for name in missing if name.endswith(".whl")))
+        with self.assertRaisesRegex(release.PackageBuildError, "missing"):
+            release._verify_wheelhouse_entries(missing, lock)
+
+        tampered = dict(entries)
+        wheel_name = next(name for name in tampered if name.endswith(".whl"))
+        tampered[wheel_name] += b"tampered"
+        with self.assertRaisesRegex(release.PackageBuildError, "digest mismatch"):
+            release._verify_wheelhouse_entries(tampered, lock)
 
     def _assert_clean_start(
         self, *, name: str, payload: Path, entrypoint: str, capability: str

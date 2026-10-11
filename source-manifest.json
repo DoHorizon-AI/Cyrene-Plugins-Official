@@ -18,8 +18,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/data-tools-package-release.yml",
-      "sha256": "a01b896cdae0b76c6b3a797a6d8141aa5bd4fd8c3c1d7740d6abd8bda5452f91",
-      "size_bytes": 15262
+      "sha256": "e4c8e152460e9bdbd33357d15c4babdf5c9abe59887b50fb2b4c89f936e1130d",
+      "size_bytes": 15333
     },
     {
       "kind": "file",
@@ -39,7 +39,7 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/training-plugin-package-release.yml",
-      "sha256": "b15e78970314dfa36dd3f843530018294405662d9a8ec8450f77702fea479944",
+      "sha256": "629c3368374b928ad876bac2b7d581844fb5a22e5c82e6d386b2441672a613ef",
       "size_bytes": 16720
     },
     {
@@ -1587,28 +1587,28 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/exact-match/exact_match_evaluator.py",
-      "sha256": "1266becfa0af8c91b0ff33eec539c66021c57da141fd6df0b1c190c01c3c7515",
+      "sha256": "f6019b858d0544ca1c16a749f7f66a51a5a3cc8d05e600ac43caab91f1b70a2a",
       "size_bytes": 8226
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/exact-match/plugin.manifest.json",
-      "sha256": "67396b0d41006e9140cfe60036b91cb6e46670acac233ca37b88f0f7c7db65b5",
+      "sha256": "e276b5ef731e36155eee51d345b7243c21b3d806eae085263a5fe34a65b39c02",
       "size_bytes": 1328
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/exact-match/pyproject.toml",
-      "sha256": "20f0a2cda467050dbb12698e4413e82d5f1b28c2b3187ca7378cffca16d20da9",
+      "sha256": "df42538157e397b680afd440992764fcca9bd2ebd19a3b4c4a86d783fd47507d",
       "size_bytes": 465
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/evaluation/exact-match/requirements.lock",
-      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "sha256": "1060999ddc303abff88c1468b8ec30b9cb82f8a334e028883f5034460039e11b",
       "size_bytes": 176
     },
     {
@@ -1909,28 +1909,28 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/dataset_generation.py",
-      "sha256": "baa6105d9ab8fa8d3fb3b3993fbd374296b9425ff6bd300541d365aee947f048",
+      "sha256": "76070661b5490ad4162548691b5667ba8070d7733723865eb74d7dc5f588b309",
       "size_bytes": 73854
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/plugin.manifest.json",
-      "sha256": "990b277cf1e93b0cae01ca9ce45fd32de4b4b7763affe2992b3e4b7aed7bc2a8",
+      "sha256": "90e40e910e973d90271ca264e2c902ba3d17a5dd198f27d99b645b6df2ebb52d",
       "size_bytes": 1954
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/pyproject.toml",
-      "sha256": "d268f0c41d4c5f3c6eb63008970b927b10c0cbf23a06ded2626b987de1bb84d8",
+      "sha256": "ddbc690fb2359dadd91f36b2593fd90b76cd8d2a862e48c8cba2f481c2d4d6ec",
       "size_bytes": 770
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-generation/requirements.lock",
-      "sha256": "74dee8376b8e1c839dbccadac50934a12dd94a33a6e534e51b0bde24323c9174",
+      "sha256": "cf427a6a1ed737f889ec9b2cd16957c7a1aff2648e03032e1d5904172d266a0e",
       "size_bytes": 299
     },
     {
@@ -1993,28 +1993,28 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/dataset_preparation.py",
-      "sha256": "e11c41877abcfb0b5473a762881d9987750258bf1f2ab342e5859349072b1959",
+      "sha256": "930b687ddb6a05777257b37fa97ae3b21fc9c2f249ee658c44788c0c99d9fded",
       "size_bytes": 30078
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/plugin.manifest.json",
-      "sha256": "8bb6091eff5d0482be80ecbc08e3d47d894d96bb45f02d11e3e73fae71f3ee75",
+      "sha256": "c491c15c2ebe6fe070b367c4949c9a0a52aa06df32ac2931b9f315ede2360b86",
       "size_bytes": 2349
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/pyproject.toml",
-      "sha256": "e34d7eba272d456a6214e1d764314958ce203a0e889a8655095717d9a457a4b0",
+      "sha256": "7aa0d8164cbb57eaa2cffd7b7b69a0b4bff3523436d6aa5d888943466510c464",
       "size_bytes": 683
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/dataset-preparation/requirements.lock",
-      "sha256": "be2adb4084cdab517147e3abd68d6c125ba2647377d3cfd21714d80c5110adbd",
+      "sha256": "bfc96a6c7f76691ad3c432ee6d1e78492f1bbeb0ed77f7d75cf1a2eef85f2abc",
       "size_bytes": 190
     },
     {
@@ -2098,7 +2098,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/document-parsing/document_parsing.py",
-      "sha256": "9c3fbca74e5826f6daa214c706ef2a49a1460e0bf0125d053ea4baccae265099",
+      "sha256": "07e7031b87bbaa4b18b2656da5746f6d0ec0abc148b68388d37d02709580ab3c",
       "size_bytes": 49509
     },
     {
@@ -2126,21 +2126,21 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/document-parsing/plugin.manifest.json",
-      "sha256": "5632da95c35fc8041fc5ea7768ef33291dc59bee206cab29bb5a0657be34c705",
+      "sha256": "17883ed90f222418fd2e961c802f6047c339f06781c2299c13460f63ec9428c1",
       "size_bytes": 1296
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/document-parsing/pyproject.toml",
-      "sha256": "8f8967921629861eaddf62f1e179cebbdbe34406f4bdf8ba63df53986d8226b1",
+      "sha256": "e0ba44081c10e66e6e6f83c264f433dcb60045ad1fd49d5ce50d2d3be792b97f",
       "size_bytes": 1053
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/document-parsing/requirements.lock",
-      "sha256": "e51163f363038ff3716974a627cb44ed1e061464cb29f1f735fe446cd2dbec84",
+      "sha256": "3e8697cd0d1ddd48aece3d3d88046f4ee21941a5175fda3c77b40dc011632cbf",
       "size_bytes": 1109
     },
     {
@@ -2203,7 +2203,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/knowledge-preparation/knowledge_preparation.py",
-      "sha256": "c2e2daf83de304259f783817ed783602643457fb9eebfcf0bdbff8e8332f219d",
+      "sha256": "a69d235f666bbda6522fd8151439fb2b9221655af498bde4800f081fc847e549",
       "size_bytes": 32291
     },
     {
@@ -2217,21 +2217,21 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/knowledge-preparation/plugin.manifest.json",
-      "sha256": "6c8a9acd0ed39843063cc8ece62066a5ba9b09d89628a944d7e35211e962d241",
+      "sha256": "e761870866388a02d7888d5d5eea573c05c3b16864fbebcb45e9aaa3b8b35b21",
       "size_bytes": 1294
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/knowledge-preparation/pyproject.toml",
-      "sha256": "871dfbef17fde9b1586ca78730d583608b2a6df80434dfc20e485574eb9c3db4",
+      "sha256": "ce37957a5eb93722480876b029857a6c3054477fa8eb25cbf4934314ca0b7a7a",
       "size_bytes": 765
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/knowledge-preparation/requirements.lock",
-      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "sha256": "1060999ddc303abff88c1468b8ec30b9cb82f8a334e028883f5034460039e11b",
       "size_bytes": 176
     },
     {
@@ -5192,7 +5192,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/pyproject.toml",
-      "sha256": "3340d4c222c4a5ebfee73d4cf39cced6eb20f60210f6c6c385af816873b0b54b",
+      "sha256": "935c87142dee7a5b0259796ef1c28c667bc572235bd6ad714306cb8f5cd7fd1e",
       "size_bytes": 736
     },
     {
@@ -5262,8 +5262,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/dependency_preparer.py",
-      "sha256": "32109424b2719b6def0dfc10957ca99df9ed4cdc2614805a5031a3e465a6a7b8",
-      "size_bytes": 6414
+      "sha256": "afd84dc30a049fb2d565d59e2f9e6e8980405446e5709080846cc3fbc6dcfd01",
+      "size_bytes": 13864
     },
     {
       "kind": "file",
@@ -5283,8 +5283,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/logging.py",
-      "sha256": "d7d8c3623658ac8620dd016ec6cc5ea457c068601bb46dc48ca3a4f8dc41d1c0",
-      "size_bytes": 6267
+      "sha256": "ed7e82abe204053dbf0038cbb809706406df69aad50da80a783a1caa868bf790",
+      "size_bytes": 6253
     },
     {
       "kind": "file",
@@ -5325,8 +5325,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_dependency_preparer.py",
-      "sha256": "cdc0292734de1655832c44dc51cb58e4a843ed011b8414f549457a1295e0de9d",
-      "size_bytes": 1813
+      "sha256": "2b24baa92a9c458029088548c539d900207a9ecca5c801c60b4363248f8c0357",
+      "size_bytes": 5932
     },
     {
       "kind": "file",
@@ -5374,14 +5374,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "f78eedf11d0d20e5b32da7597688cd78dd2b290c9ede0039f74761b806a3b87c",
-      "size_bytes": 12413
+      "sha256": "95848e4b8dbca613116ce9cc66f879f7f88951ef7667c566c1346be420be19aa",
+      "size_bytes": 19372
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_training_llama_factory_package.py",
-      "sha256": "91717765ba3a0af64053edee50281789b43c7a0b12c0bba5b0afe34fa0603fc9",
+      "sha256": "3bb9327244a0bcd2553df3bc1437dc44be3cc008922f7d7ac60808a732ff8688",
       "size_bytes": 11110
     },
     {
@@ -5444,42 +5444,42 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/official_plugin_package.py",
-      "sha256": "5dabff5365581ea9aeaace7990777e948e8359b22d05753bd2c316644c6617d6",
-      "size_bytes": 67645
+      "sha256": "a1b257bb5cb405d3f7c9b64ab0f30a1792bee0f91b3401b3ae1d1f0f423130dc",
+      "size_bytes": 79478
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/dataset-generation.in",
-      "sha256": "74dee8376b8e1c839dbccadac50934a12dd94a33a6e534e51b0bde24323c9174",
+      "sha256": "cf427a6a1ed737f889ec9b2cd16957c7a1aff2648e03032e1d5904172d266a0e",
       "size_bytes": 299
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/dataset-preparation.in",
-      "sha256": "bd4fd5ac57b62463e1cc8035dd7222bc265c63b73296f5cadae2fbe5d24dfe3a",
+      "sha256": "63a472528f5edc39b0d3cbdf7bcb564ebef64c0e56bee5ac73be84520e1f51c9",
       "size_bytes": 191
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/document-parsing.in",
-      "sha256": "47cf539a6c1e9fbfd44abeee9d77fff234a2b590733b570ab5732ba62ea2b86c",
+      "sha256": "4ca37fe536b9c6267f65122ff66d2880c8b1244b86d50e2af16d6cab9935129b",
       "size_bytes": 338
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/exact-match.in",
-      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "sha256": "1060999ddc303abff88c1468b8ec30b9cb82f8a334e028883f5034460039e11b",
       "size_bytes": 176
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/knowledge-preparation.in",
-      "sha256": "5cbfd7d90d5108f549bcbed86e97695303ec0812be68484fd4b99c112dfce7cd",
+      "sha256": "1060999ddc303abff88c1468b8ec30b9cb82f8a334e028883f5034460039e11b",
       "size_bytes": 176
     },
     {
@@ -5493,8 +5493,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/training_llama_factory_package.py",
-      "sha256": "267872b6948619496e8f6a2ac99e8ccef85deb6b6c013f4b6f89aa0529794bea",
-      "size_bytes": 41059
+      "sha256": "ad3941f8df6b1c9ce677f3500be1a3d9265103b01ccd6073d5cbd98a4c63270d",
+      "size_bytes": 41108
     },
     {
       "kind": "file",
@@ -5535,8 +5535,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tools/ci/benchmark_onebot_native_aot.py",
-      "sha256": "b6a629e80d3bdda5d85158f1639a656ac2bbf49beefb74ca2a070aed4430cd90",
-      "size_bytes": 14929
+      "sha256": "3e902c33c3d27702bd93be0a17fa11d4e8d9ffed59d10aca868071a34b8d0dcd",
+      "size_bytes": 14915
     },
     {
       "kind": "file",

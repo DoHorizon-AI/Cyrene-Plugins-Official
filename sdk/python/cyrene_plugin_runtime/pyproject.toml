@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-plugin-runtime"
-version = "0.2.0"
+version = "0.2.1"
 description = "Plugin-owned direct data-plane runtime for one configured capability instance"
 requires-python = ">=3.11"
 dependencies = [
