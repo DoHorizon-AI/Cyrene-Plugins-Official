@@ -3,6 +3,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": ".gitattributes",
+      "sha256": "e46d3cb6f94d25c3b02b7d692e18eb1b9538717f8f2624e6f3fc48c6ff772596",
+      "size_bytes": 180
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": ".github/workflows/branch-flow.yml",
       "sha256": "1944a686d9992733b0e76998fb7b93385bbb57be2a438e034992ddf92f4f4f36",
       "size_bytes": 688
