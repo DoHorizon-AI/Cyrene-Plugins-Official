@@ -7,6 +7,9 @@
 // └─────────────────────────────────────────────────────────────────────┘
 
 use cyrene_plugin_contracts::workspace_authority_v1::*;
+use cyrene_plugin_contracts::workspace_authority_v2::{
+    CanonicalInvocationEnvelope, ExecutionCredential, InvocationAuthorizationSource,
+};
 use cyrene_plugin_contracts::workspace_product_v2::*;
 use prost::Message;
 
@@ -136,4 +139,31 @@ fn catalog_view_projection_preserves_monotonic_generation() {
     assert!(decoded.operations[0].is_read_only);
     assert!(!decoded.operations[1].is_read_only);
     assert!(decoded.operations[1].requires_idempotency_key);
+}
+
+#[test]
+fn delegated_authority_profile_fields_round_trip_and_change_the_signed_input() {
+    let mut envelope = CanonicalInvocationEnvelope {
+        authorization_source: InvocationAuthorizationSource::Delegation as i32,
+        delegation_id: "grant-test-1".into(),
+        delegation_generation: 7,
+        delegation_audience: "exchange-worker".into(),
+        ..CanonicalInvocationEnvelope::default()
+    };
+    let original_bytes = envelope.encode_to_vec();
+    let decoded = CanonicalInvocationEnvelope::decode(original_bytes.as_slice())
+        .expect("decode delegated profile");
+    assert_eq!(decoded.authorization_source, envelope.authorization_source);
+    assert_eq!(decoded.delegation_id, "grant-test-1");
+    assert_eq!(decoded.delegation_generation, 7);
+    assert_eq!(decoded.delegation_audience, "exchange-worker");
+
+    envelope.delegation_generation += 1;
+    assert_ne!(original_bytes, envelope.encode_to_vec());
+
+    let legacy = ExecutionCredential::decode(&[][..]).expect("empty legacy credential");
+    assert_eq!(legacy.authorization_source, 0);
+    assert!(legacy.delegation_id.is_empty());
+    assert_eq!(legacy.delegation_generation, 0);
+    assert!(legacy.delegation_audience.is_empty());
 }

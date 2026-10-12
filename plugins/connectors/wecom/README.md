@@ -1,27 +1,39 @@
 # Official WeCom Unified Connector / 企业微信统一连接器
 
 The package implements `message.connector.v1` for WeCom application messages
-and the OpenWS smart-bot connection. The bot path emits canonical inbound
-`InboundMessagePayload` events and sends notifications only after the matching
-OpenWS acknowledgement arrives. With same-host Navigator enabled, trusted
+and the OpenWS smart-bot connection. Production bot connections use the
+[official WeCom Python SDK](https://github.com/WecomTeam/wecom-aibot-python-sdk/tree/6bcb59a9a636c566f4c6ea5268b228e3def1611a)
+pinned to commit `6bcb59a9a636c566f4c6ea5268b228e3def1611a` (package version
+1.0.1, MIT).
+The bot path emits canonical inbound `InboundMessagePayload` events and sends
+notifications only after a correlated OpenWS acknowledgement with `errcode=0`.
+An ACK confirms vendor acceptance only; it does not prove delivery or reading.
+The OpenWS request ID is retained in `vendor_extension`, and an absent vendor
+message ID remains empty. Unknown send outcomes are typed as `UNKNOWN` and are
+not retried automatically. With same-host Navigator enabled, trusted
 inbound tasks carry an exact notification route and terminal task results
 return through a leased, receipt-aware outbox worker. The optional
 `tool.provider.v1` surface wraps a bounded set of `@wecom/cli` operations.
 
 本软件包通过 WeCom 应用消息和 OpenWS 智能机器人连接实现
 `message.connector.v1`。bot 路径会发出规范的 `InboundMessagePayload` 入站事件，
-并且只在收到匹配的 OpenWS 确认后报告通知已接受。启用同宿主 Navigator 集成后，可信入站
+生产 bot 长连接使用固定到 commit
+`6bcb59a9a636c566f4c6ea5268b228e3def1611a` 的 WeCom 官方 Python SDK
+（版本 1.0.1，MIT）。bot 路径会发出规范的 `InboundMessagePayload` 入站事件，并且只在收到
+包含 `errcode=0` 的匹配 OpenWS 确认后报告厂商已接受。该确认不证明消息已送达或已读。
+OpenWS 请求 ID 保存在 `vendor_extension`；厂商未返回消息 ID 时保持为空。未知发送结果以
+类型化 `UNKNOWN` 返回，且不会自动重试。启用同宿主 Navigator 集成后，可信入站
 task 会携带精确通知 route；终态 task 结果通过带 lease 和回执语义的 outbox worker 返回。
 可选的 `tool.provider.v1` 能力包装一组受限的 `@wecom/cli` 操作。
 
 | Surface | Status |
 | --- | --- |
 | `send_message` / application | Implemented: text, markdown, image and file; vendor receipt maps to accepted, rate limited or rejected. |
-| `send_message` / bot | Implemented: text response or proactive send; waits for the matching vendor acknowledgement. Missing acknowledgement returns `UNAVAILABLE`, not accepted. |
+| `send_message` / bot | Implemented with the official pinned SDK: text response or proactive send; waits for the correlated ACK with an explicit zero error code. ACK means accepted only. Missing or ambiguous ACK returns typed `UNKNOWN`, not accepted. |
 | `inbound_message` / bot | Implemented: `on_subscribe` starts the WebSocket listener and emits canonical protobuf events. App mode does not provide inbound callbacks. |
 | Bot image/file inbound | Canonical image and file parts accept binding-owned WeCom media IDs or validated absolute HTTP(S) URLs. Unknown attachment shapes fail closed. |
 | Navigator intake | Optional, same-host loopback only. Exact account, conversation kind, conversation ID, sender, owner and session mapping gates task admission. The connector-events endpoint deduplicates by vendor message ID and atomically links the task with a fixed notification route. |
-| Navigator terminal reply | With Navigator configured, the subscribed bot binding claims only `wecom.message` rows for its exact connector and trusted recipient. It persists `started` before canonical `send_message`, records a delivered receipt or explicit rejection, and marks missing/ambiguous receipts uncertain without retry. |
+| Navigator terminal reply | With Navigator configured, the subscribed bot binding claims only `wecom.message` rows for its exact connector and trusted recipient. It persists `started` before canonical `send_message`. A vendor ACK is recorded as `uncertain` under Navigator's legacy finish contract, with `submission_status=accepted`, the transport request ID and optional vendor message reference; this does not claim delivery and is not retried. |
 | `tool.provider.v1` / human CLI | Optional, isolated `cli.config_dir` profile. It exposes specific read operations; writes require the exact operation in binding configuration and the same `write_approval` value in the invocation. There is no general CLI executor. |
 
 Real WeCom credentials, external message sends and a real Navigator runtime were
@@ -77,15 +89,20 @@ uses the workspace bearer and a same-host request to
 `task` is admitted only when the incoming message exactly matches a configured
 trusted sender map. Messages outside that map may still be delivered to an
 authorized canonical event subscriber, but they do not create Navigator work.
+Integration bindings set `navigator.forward_inbound` to `false` to keep
+inbound admission on the Exchange zero-LLM path; the default remains `true` for
+existing bindings.
 
 Trusted task metadata includes a notification descriptor for the same configured
 account, conversation, chat type and sender. When Navigator terminal state
 enqueues a task result, the background worker claims only rows filtered by
 `type=wecom.message`, the configured connector ID, and a stable recipient key
 derived from that trust map. It marks each row started before calling the
-canonical message connector. Vendor success with a matching acknowledgement is
-delivered; an explicit vendor rejection is failed; transport errors or missing
-acknowledgements are uncertain and are not retried automatically. It starts
+canonical message connector. A matching vendor ACK is stored with
+`submission_status=accepted` while the legacy Navigator finish outcome remains
+`uncertain`; this does not claim delivery. An explicit vendor rejection is
+`failed`; transport errors or missing acknowledgements are `uncertain`. Nothing
+is retried automatically. It starts
 alongside the subscribed or explicitly started bot runtime when Navigator is
 enabled, stays active while Navigator owns that intake session, and stops on
 runtime shutdown or close. It is not created when Navigator is disabled.
@@ -107,18 +124,21 @@ CLI executor.
 
 ## Delivery and lifecycle
 
-- Bot mode and hybrid mode use the OpenWS smart-bot identity. A reconnect loop
-  recreates the transport after a disconnect with bounded backoff; runtime
-  cancellation and shutdown close the listener, heartbeat and WebSocket tasks.
+- Bot mode and hybrid mode use the OpenWS smart-bot identity through the pinned
+  official SDK, which manages authentication, heartbeat and reconnect. Runtime
+  shutdown disconnects the SDK client.
 - Application mode and hybrid mode use the configured application agent and
   cached access token. Invalid-token vendor responses refresh once before retry.
 - Bot and application receipts are distinct. Application `errcode=0` returns
-  the vendor `msgid`; bot `send_message` returns accepted only when its request
-  ID receives a successful vendor response. A timeout or broken transport is an
-  unavailable result because acceptance is unknown.
+  the vendor `msgid`; bot `send_message` returns accepted only when the matching
+  OpenWS request ID receives an explicit `errcode=0`. Missing vendor message
+  IDs are not replaced with the request ID. A timeout or broken transport is a
+  typed unknown outcome because acceptance is unknown.
 - Navigator terminal replies use the same canonical `send_message` path and
-  OpenWS receipt. The outbox worker persists `started` before sending; an
-  unknown result is `uncertain` and never automatically resent.
+  OpenWS receipt. The outbox worker persists `started` before sending; an ACK
+  records `submission_status=accepted` inside the legacy `uncertain` finish
+  outcome, while unknown results also remain `uncertain`. Nothing is resent
+  automatically.
 - Image and file parts on the application send path accept a binding-owned
   `vendor_media` reference or a remote HTTP(S) URI. The connector enforces
   WeCom's 2 MiB image and 20 MiB file limits and allows one media part per
@@ -156,11 +176,11 @@ task 会携带精确通知 route；终态 task 结果通过带 lease 和回执�
 | 能力 | 状态 |
 | --- | --- |
 | `send_message` / application | 已实现 text、markdown、image、file；根据厂商回执映射 accepted、rate limited 或 rejected。 |
-| `send_message` / bot | 已实现回复消息和主动发送文本；等待匹配的厂商确认。未收到确认时返回 `UNAVAILABLE`，不会报告 accepted。 |
+| `send_message` / bot | 使用固定版本的官方 SDK 实现回复和主动文本发送；必须收到 request ID 匹配且明确 `errcode=0` 的确认才报告厂商 accepted。该状态不证明送达或已读；缺失或不确定的回执返回 typed `UNKNOWN`。 |
 | `inbound_message` / bot | 已实现。`on_subscribe` 启动 WebSocket listener 并发出规范 protobuf event。app 模式没有入站 callback。 |
 | bot 图片和文件 | 规范 image/file part 支持 binding 持有的 WeCom media ID 或经过校验的绝对 HTTP(S) URL。无法识别的附件格式会失败关闭。 |
 | Navigator intake | 可选，仅限同宿主 loopback。必须精确匹配 account、conversation kind、conversation ID、sender、owner 和 session map 才会 admission task。connector-events endpoint 按厂商 message ID 去重，并原子关联 task。 |
-| Navigator 终态通知 | 配置 Navigator 后，订阅中的 bot binding 只 claim `wecom.message`、当前 connector ID 和可信 recipient 的通知。通过规范 `send_message` 发送前先持久化 `started`；有厂商回执则记录 delivered，明确拒绝则记录 failed，回执未知则记录 uncertain 且不自动重发。 |
+| Navigator 终态通知 | 配置 Navigator 后，订阅中的 bot binding 只 claim `wecom.message`、当前 connector ID 和可信 recipient 的通知。通过规范 `send_message` 发送前先持久化 `started`。因 Navigator 旧 finish contract 不接受 `accepted`，收到厂商 ACK 后记录 `uncertain`，并在 result 中保存 `submission_status=accepted`、transport request ID 和可选 vendor message reference；这不代表已送达，也不会自动重发。 |
 | `tool.provider.v1` / human CLI | 可选，必须配置独立的 `cli.config_dir` profile。只暴露指定读取操作；写操作需要在 binding 配置中批准确切 operation，并在 invocation 中提供相同 `write_approval` 值。不提供通用 CLI executor。 |
 
 离线测试未使用真实 WeCom credentials、未发送外部消息、未连接真实
@@ -186,8 +206,10 @@ trusted sender map 时才会附带并 admission `task`。map 以外的消息仍�
 Trusted task metadata 会包含同一 account、conversation、chat type 与 sender 的 notification
 descriptor。Navigator task 进入终态并 enqueue 结果后，后台 worker 只 claim
 `type=wecom.message`、配置的 connector ID 和来自 trust map 的稳定 recipient key。发送前先
-持久化 `started`，然后通过规范 `send_message` 发送。匹配到厂商确认后记录 delivered；厂商明确
-拒绝后记录 failed；传输错误或缺失确认则记录 uncertain，且不会自动重发。启用 Navigator 后，
+持久化 `started`，然后通过规范 `send_message` 发送。Navigator 旧 finish contract 不接受
+`accepted`，所以匹配厂商确认后仍记录 `uncertain`，同时在 result 中保存
+`submission_status=accepted`、transport request ID 和可选 vendor message reference；这不能证明送达。
+厂商明确拒绝后记录 failed；传输错误或缺失确认也记录 uncertain，且不会自动重发。启用 Navigator 后，
 worker 随已订阅或显式启动的 bot runtime 启动，并在 Navigator 持有 intake session 期间运行，
 在 runtime shutdown 或 close 时停止；关闭 Navigator 时不会创建 worker。
 
@@ -209,8 +231,8 @@ catalog 会列出公开的读取操作和批准要求。connector 不会把调�
 - application 和 hybrid 模式使用配置的 application agent 与缓存的 access token。遇到
   invalid-token 厂商响应时只刷新一次再重试。
 - bot 与应用的回执语义各自独立。应用 `errcode=0` 返回厂商 `msgid`；bot
-  `send_message` 只有在 request ID 收到成功厂商响应后才返回 accepted。超时或连接故障时
-  接受状态未知，因此返回 unavailable。
+  `send_message` 只有在 request ID 收到明确 `errcode=0` 的厂商响应后才返回 accepted；这不证明
+  已送达或已读。超时或连接故障时接受状态未知，因此返回 typed `UNKNOWN`。
 - Navigator 终态回复走同一个规范 `send_message` 路径与 OpenWS 回执。outbox worker 发送前
   持久化 `started`；结果未知会记为 `uncertain`，不会自动重新发送。
 - 应用出站 image/file 支持此 binding 拥有的 `vendor_media` reference 或 remote HTTP(S)
@@ -236,6 +258,18 @@ The generator is pinned to `grpcio-tools==1.62.3`, matching the declared
 Protobuf 4.x runtime, and reads both canonical capability schemas in this repository.
 CI checks that regeneration leaves the checked-in bindings unchanged.
 
+The Navigator receipt compatibility test uses a digest-pinned projection of
+`NotificationFinish.outcome` from Cyrene-Navigator commit
+`33a153a252e03c362eb8b8472e401676fa5c0297`. Public CI checks out that exact
+owner commit and verifies the source OpenAPI file against the projection. A
+Plugins-only test checkout still validates the checked-in projection digest;
+the owner-contract check is never silently skipped.
+
 安装可选的 `bindings` 依赖后，在本包运行上述命令。生成器固定为
 `grpcio-tools==1.62.3`，与声明的 Protobuf 4.x 运行时兼容；消息和工具能力均从本仓库
 的规范 schema 生成，CI 会检查生成结果与已提交文件完全一致。
+
+Navigator 回执兼容性测试使用从 Cyrene-Navigator commit
+`33a153a252e03c362eb8b8472e401676fa5c0297` 生成的固定摘要投影。Public CI 会检出该精确
+owner commit，并对照投影校验 OpenAPI 源文件。仅有 Plugins 的测试工作区仍会校验已提交
+投影的摘要，不会静默跳过 owner contract 检查。

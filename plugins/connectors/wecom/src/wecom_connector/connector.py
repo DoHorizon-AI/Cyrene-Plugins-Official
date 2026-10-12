@@ -31,7 +31,7 @@ import urllib.request
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 from google.protobuf.message import DecodeError
@@ -42,11 +42,20 @@ from .bot_client import (
     InboundMessage,
     WeComBotClient,
     WeComBotRequestError,
+    WeComBotUncertainError,
     WeComWsTransport,
 )
 from .bot_runtime import WeComBotRuntime
 from .cli import WeComCliClient
 from .errors import ConnectorError
+from .integration_forwarder import (
+    HttpTransport as WeComIntegrationHttpTransport,
+)
+from .integration_forwarder import (
+    WeComIntegrationConfig,
+    WeComIntegrationForwarder,
+    load_hmac_key,
+)
 from .navigator import NavigatorIntegrationConfig, NavigatorTaskClient
 from .notification_worker import NavigatorNotificationWorker
 from .tool_provider import (
@@ -168,6 +177,7 @@ class WeComInstanceConfig:
     cli_config_dir: str | None = None
     approved_write_operations: tuple[str, ...] = ()
     navigator: NavigatorIntegrationConfig | None = None
+    integration: WeComIntegrationConfig | None = None
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> WeComInstanceConfig:
@@ -344,6 +354,28 @@ class WeComInstanceConfig:
                         "navigator trusted account_id must match this bot_id",
                     )
 
+        integration_value = value.get("integration")
+        integration: WeComIntegrationConfig | None = None
+        if integration_value is not None:
+            if not isinstance(integration_value, Mapping):
+                raise ConnectorError("INVALID_REQUEST", "integration must be an object")
+            integration_enabled = integration_value.get("enabled", False)
+            if type(integration_enabled) is not bool:
+                raise ConnectorError(
+                    "INVALID_REQUEST", "integration.enabled must be a boolean"
+                )
+            if integration_enabled:
+                if mode not in {"bot", "hybrid"} or not bot_id:
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "Exchange integration requires a configured bot "
+                        "or hybrid binding",
+                    )
+                integration = _integration_config_from_mapping(
+                    integration_value,
+                    account_id=f"bot:{bot_id}",
+                )
+
         return cls(
             binding_id=binding_id,
             corp_id=corp_id,
@@ -367,6 +399,7 @@ class WeComInstanceConfig:
             cli_config_dir=str(cli_config_dir) if cli_config_dir else None,
             approved_write_operations=approved_write_operations,
             navigator=navigator,
+            integration=integration,
         )
 
     @classmethod
@@ -565,6 +598,7 @@ class WeComConnector:
         ws_transport: WeComWsTransport | None = None,
         ws_transport_factory: Callable[[], WeComWsTransport] | None = None,
         cli_client: WeComCliClient | None = None,
+        integration_http_transport: WeComIntegrationHttpTransport | None = None,
     ) -> None:
         self._config: WeComInstanceConfig | None = None
         self._transport: WeComTransport | None = None
@@ -578,6 +612,8 @@ class WeComConnector:
         self._bot_runtime: WeComBotRuntime | None = None
         self._navigator_client: NavigatorTaskClient | None = None
         self._notification_worker: NavigatorNotificationWorker | None = None
+        self._integration_http_transport = integration_http_transport
+        self._integration_forwarder: WeComIntegrationForwarder | None = None
         self._subscriptions: dict[str, _EventSubscription] = {}
         self._event_lock = threading.Lock()
         self._seen_events: OrderedDict[tuple[str, str], None] = OrderedDict()
@@ -593,6 +629,7 @@ class WeComConnector:
                 ws_transport=ws_transport,
                 ws_transport_factory=ws_transport_factory,
                 cli_client=cli_client,
+                integration_http_transport=integration_http_transport,
             )
         else:
             settings = _environment_settings()
@@ -632,6 +669,7 @@ class WeComConnector:
         ws_transport: WeComWsTransport | None = None,
         ws_transport_factory: Callable[[], WeComWsTransport] | None = None,
         cli_client: WeComCliClient | None = None,
+        integration_http_transport: WeComIntegrationHttpTransport | None = None,
     ) -> None:
         """Bind one configuration."""
         if config.cli_enabled and not config.cli_config_dir:
@@ -648,6 +686,10 @@ class WeComConnector:
         if previous_worker is not None:
             previous_worker.stop(timeout_seconds=2.0)
         self._notification_worker = None
+        previous_forwarder = self._integration_forwarder
+        if previous_forwarder is not None:
+            previous_forwarder.close()
+        self._integration_forwarder = None
         previous_runtime = self._bot_runtime
         if previous_runtime is not None:
             previous_runtime.stop(timeout_seconds=2.0)
@@ -668,6 +710,13 @@ class WeComConnector:
                 executable_path=config.cli_path,
                 config_dir=config.cli_config_dir,
             )
+        if integration_http_transport is not None:
+            self._integration_http_transport = integration_http_transport
+        if config.integration is not None:
+            self._integration_forwarder = WeComIntegrationForwarder(
+                config.integration,
+                transport=self._integration_http_transport,
+            )
 
         if config.mode in {"bot", "hybrid"} and config.bot_id and config.bot_secret:
             self._bot_client = WeComBotClient(
@@ -680,8 +729,7 @@ class WeComConnector:
             self._bot_runtime = WeComBotRuntime(
                 self._bot_client,
                 self._handle_bot_inbound,
-                startup_timeout_seconds=config.timeout_seconds
-                + 2.0,
+                startup_timeout_seconds=config.timeout_seconds + 2.0,
             )
         else:
             self._bot_client = None
@@ -696,6 +744,13 @@ class WeComConnector:
             if config.navigator is not None
             else None
         )
+        if config.integration is not None:
+            # Integration bindings use fixed Exchange commands and stay off the
+            # Navigator path, including its separately configured notification loop.
+            self._navigator_client = None
+            if self._notification_worker is not None:
+                self._notification_worker.stop(timeout_seconds=2.0)
+            self._notification_worker = None
         self._tool_provider = WeComToolProvider(
             binding_id=config.binding_id,
             cli_client=self._cli_client,
@@ -751,6 +806,8 @@ class WeComConnector:
             self._bot_runtime.start()
             if self._notification_worker is not None:
                 self._notification_worker.start()
+            if self._integration_forwarder is not None:
+                self._integration_forwarder.start()
             return None
         except ConnectorError as exc:
             self._subscriptions.pop(subscription_id, None)
@@ -769,6 +826,8 @@ class WeComConnector:
         if not self._subscriptions and self._navigator_client is None:
             if self._notification_worker is not None:
                 self._notification_worker.stop()
+            if self._integration_forwarder is not None:
+                self._integration_forwarder.stop()
             self._stop_bot_runtime()
 
     def start_background_services(self) -> None:
@@ -784,18 +843,25 @@ class WeComConnector:
         self._bot_runtime.start()
         if self._notification_worker is not None:
             self._notification_worker.start()
+        if self._integration_forwarder is not None:
+            self._integration_forwarder.start()
 
     def on_shutdown(self, grace_period_ms: int) -> None:
         """Stop the bot WebSocket within the runtime shutdown budget."""
         timeout = max(0.1, min(grace_period_ms / 1000, 5.0))
         if self._notification_worker is not None:
             self._notification_worker.stop(timeout_seconds=timeout)
+        if self._integration_forwarder is not None:
+            self._integration_forwarder.stop(timeout_seconds=timeout)
         self._stop_bot_runtime(timeout_seconds=timeout)
 
     def close(self) -> None:
         """Close bot resources for tests and embedding hosts."""
         if self._notification_worker is not None:
             self._notification_worker.stop()
+        if self._integration_forwarder is not None:
+            self._integration_forwarder.close()
+            self._integration_forwarder = None
         self._stop_bot_runtime()
         self._subscriptions.clear()
 
@@ -812,9 +878,7 @@ class WeComConnector:
             config and config.mode in {"app", "hybrid"} and config.corp_id
         )
         cli_status = (
-            self._cli_client.get_status()
-            if config and config.cli_enabled
-            else None
+            self._cli_client.get_status() if config and config.cli_enabled else None
         )
         bot_client = self._bot_client
         return {
@@ -852,6 +916,12 @@ class WeComConnector:
             },
             "navigator": {
                 "configured": self._navigator_client is not None,
+                "forward_inbound": bool(
+                    config
+                    and config.integration is None
+                    and config.navigator
+                    and config.navigator.forward_inbound
+                ),
                 "outbox_worker_running": (
                     self._notification_worker.is_running
                     if self._notification_worker is not None
@@ -861,6 +931,14 @@ class WeComConnector:
                     len(config.navigator.trusted_conversations)
                     if config and config.navigator
                     else 0
+                ),
+            },
+            "exchange_integration": {
+                "configured": self._integration_forwarder is not None,
+                "outbox": (
+                    self._integration_forwarder.queue_status()
+                    if self._integration_forwarder is not None
+                    else {"PENDING": 0, "ACKED": 0, "RETAINED": 0}
                 ),
             },
         }
@@ -890,6 +968,29 @@ class WeComConnector:
         """
         config = self._require_configured()
         normalized = _normalize_bot_inbound(message, config)
+        encoded = _inbound_message_to_proto(normalized).SerializeToString()
+        if self._integration_forwarder is not None:
+            from_body = message.raw_payload.get("body", {})
+            from_info = (
+                from_body.get("from", {}) if isinstance(from_body, Mapping) else {}
+            )
+            vendor_self_flag = (
+                from_info.get("is_self") if isinstance(from_info, Mapping) else None
+            )
+            if vendor_self_flag is None and isinstance(from_body, Mapping):
+                vendor_self_flag = from_body.get("from_self")
+            from_self = vendor_self_flag is True or (
+                config.bot_id is not None and message.sender_id == config.bot_id
+            )
+            self._integration_forwarder.enqueue(
+                source_event_id=normalized["message_id"],
+                sender_id=normalized["sender_id"],
+                conversation_id=normalized["conversation"]["conversation_id"],
+                conversation_kind=normalized["conversation"]["kind"],
+                from_self=from_self,
+                message_proto=encoded,
+                source_transport_request_id=message.callback_req_id,
+            )
         event_key = (
             normalized["conversation"]["account_id"],
             normalized["message_id"],
@@ -904,7 +1005,6 @@ class WeComConnector:
 
         emitted = 0
         if not already_emitted:
-            encoded = _inbound_message_to_proto(normalized).SerializeToString()
             stale_subscriptions: list[str] = []
             for subscription_id, subscription in tuple(self._subscriptions.items()):
                 if not _event_filter_matches(subscription.filter, normalized):
@@ -926,7 +1026,12 @@ class WeComConnector:
         receipt: Mapping[str, Any] | None = None
         navigator = self._navigator_client
         navigator_config = config.navigator
-        if navigator is not None and navigator_config is not None:
+        if (
+            self._integration_forwarder is None
+            and navigator is not None
+            and navigator_config is not None
+            and navigator_config.forward_inbound
+        ):
             trust = navigator_config.trusted_rule(normalized)
             if trust is not None:
                 receipt = navigator.submit_message(normalized, trust)
@@ -972,6 +1077,29 @@ class WeComConnector:
         )
 
         if use_bot:
+            expected_bot_account = f"bot:{config.bot_id}"
+            if conversation["account_id"] != expected_bot_account:
+                raise ConnectorError(
+                    "INVALID_REQUEST",
+                    "bot send account_id must match this binding's configured bot",
+                )
+            reply_message_id = conversation.get("reply_message_id")
+            if reply_message_id and self._integration_forwarder is not None:
+                callback_req_id = self._integration_forwarder.resolve_reply_context(
+                    message_id=reply_message_id,
+                    account_id=conversation["account_id"],
+                    conversation_id=conversation["conversation_id"],
+                    conversation_kind=kind,
+                )
+                if callback_req_id is None or self._bot_client is None:
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "reply message is not present in this binding's "
+                        "unexpired trusted callback context",
+                    )
+                self._bot_client.restore_callback_request_id(
+                    reply_message_id, callback_req_id
+                )
             return self._send_via_bot(
                 request, conversation, config, cancellation, request_id=request_id
             )
@@ -1014,21 +1142,48 @@ class WeComConnector:
             )
 
         chat_id = conversation["conversation_id"]
+        if conversation["kind"] not in {"private", "group"}:
+            return {
+                "status": "rejected",
+                "vendor": BOT_VENDOR,
+                "vendor_message_id": "",
+                "reason": (
+                    "WeCom OpenWS bot send does not support conversation kind "
+                    f"{conversation['kind']!r}"
+                ),
+            }
         chat_type = "group" if conversation["kind"] == "group" else "single"
         content_parts = request.get("content", [])
+        if not isinstance(content_parts, Sequence) or isinstance(
+            content_parts, (str, bytes)
+        ):
+            raise ConnectorError("INVALID_REQUEST", "content must be an ordered list")
+        if not content_parts:
+            raise ConnectorError("INVALID_REQUEST", "content must be a non-empty list")
+        if any(
+            not isinstance(part, Mapping) or part.get("kind") != "text"
+            for part in content_parts
+        ):
+            return {
+                "status": "rejected",
+                "vendor": BOT_VENDOR,
+                "vendor_message_id": "",
+                "reason": "WeCom OpenWS bot send currently supports text content only",
+            }
         text_lines: list[str] = []
         for p in content_parts:
             if isinstance(p, Mapping) and p.get("kind") == "text":
                 text_lines.append(str(p.get("text", "")))
         content = "".join(text_lines) or " "
 
-        reply_id = conversation.get("reply_message_id")
+        reply = request.get("reply")
+        reply_id = reply.get("message_id") if isinstance(reply, Mapping) else None
         try:
             if self._bot_runtime is None:
                 raise ConnectorError(
                     "UNAVAILABLE", "WeCom bot runtime is not configured"
                 )
-            req_id = self._bot_runtime.send(
+            bot_receipt = self._bot_runtime.send(
                 chat_id,
                 content,
                 chat_type,
@@ -1039,7 +1194,15 @@ class WeComConnector:
             )
             return {
                 "status": "accepted",
-                "vendor_message_id": req_id,
+                "vendor": BOT_VENDOR,
+                "vendor_message_id": bot_receipt.vendor_message_id,
+                "vendor_facts": [
+                    {
+                        "name": "transport_request_id",
+                        "value": bot_receipt.request_id,
+                    },
+                    {"name": "ack_errcode", "value": str(bot_receipt.errcode)},
+                ],
                 "reason": "WeCom OpenWS acknowledged the request",
             }
         except WeComBotRequestError as exc:
@@ -1055,6 +1218,13 @@ class WeComConnector:
             }
         except ConnectorError:
             raise
+        except WeComBotUncertainError as exc:
+            details = (
+                f"transport_request_id={exc.request_id}; {exc}"
+                if exc.request_id
+                else str(exc)
+            )
+            raise ConnectorError("UNKNOWN", details) from exc
         except Exception as exc:
             if cancellation is not None and cancellation.is_cancelled():
                 raise ConnectorError("CANCELLED", "operation cancelled") from exc
@@ -1372,6 +1542,94 @@ def _configured_secret(value: Any, env_ref: str, field: str) -> str:
     return secret
 
 
+def _integration_config_from_mapping(
+    value: Mapping[str, Any], *, account_id: str
+) -> WeComIntegrationConfig:
+    """Resolve one opt-in, fixed Exchange sink from host configuration.
+
+    The configured endpoint contains only the Exchange origin. Scope facts and
+    the HMAC key are fixed before any callback is received.
+    中文：仅从主机配置解析固定 Exchange 入口，不接受回调指定范围或地址。
+    """
+
+    allowed_fields = {
+        "enabled",
+        "exchange_binding_id",
+        "exchange_base_url",
+        "organization_id",
+        "workspace_id",
+        "source_authority",
+        "bot_namespace",
+        "group_conversation_id",
+        "source_hmac_env_ref",
+        "outbox_path",
+        "timeout_seconds",
+    }
+    unknown_fields = set(value) - allowed_fields
+    if unknown_fields:
+        raise ConnectorError(
+            "INVALID_REQUEST",
+            "integration contains unsupported field(s): "
+            f"{sorted(str(field) for field in unknown_fields)}",
+        )
+    exchange_binding_id = _required_text(
+        value.get("exchange_binding_id"), "integration.exchange_binding_id"
+    )
+    exchange_base_url = _required_text(
+        value.get("exchange_base_url"), "integration.exchange_base_url"
+    )
+    organization_id = _required_text(
+        value.get("organization_id"), "integration.organization_id"
+    )
+    workspace_id = _required_text(value.get("workspace_id"), "integration.workspace_id")
+    source_authority = _required_text(
+        value.get("source_authority"), "integration.source_authority"
+    )
+    bot_namespace = _required_text(
+        value.get("bot_namespace"), "integration.bot_namespace"
+    )
+    group_conversation_id = _required_text(
+        value.get("group_conversation_id"), "integration.group_conversation_id"
+    )
+    hmac_env_ref = _secret_env_ref(
+        value.get("source_hmac_env_ref"), "integration.source_hmac_env_ref"
+    )
+    outbox_raw = _required_text(value.get("outbox_path"), "integration.outbox_path")
+    outbox_path = Path(outbox_raw).expanduser()
+    if not outbox_path.is_absolute() or outbox_raw.startswith("//"):
+        raise ConnectorError(
+            "INVALID_REQUEST", "integration.outbox_path must be an absolute local path"
+        )
+    timeout = value.get("timeout_seconds", 5.0)
+    if (
+        isinstance(timeout, bool)
+        or not isinstance(timeout, (int, float))
+        or not 0 < float(timeout) <= 60
+    ):
+        raise ConnectorError(
+            "INVALID_REQUEST",
+            "integration.timeout_seconds must be greater than 0 and at most 60",
+        )
+    try:
+        return WeComIntegrationConfig(
+            binding_id=exchange_binding_id,
+            exchange_base_url=exchange_base_url,
+            organization_id=organization_id,
+            workspace_id=workspace_id,
+            source_authority=source_authority,
+            bot_namespace=bot_namespace,
+            account_id=account_id,
+            group_conversation_id=group_conversation_id,
+            source_hmac_key=load_hmac_key(os.environ, hmac_env_ref),
+            outbox_path=outbox_path,
+            timeout_seconds=float(timeout),
+        )
+    except ValueError as exc:
+        raise ConnectorError(
+            "INVALID_REQUEST", f"invalid integration configuration: {exc}"
+        ) from exc
+
+
 def _decode_event_filter(payload: bytes) -> dict[str, Any]:
     """Decode the bounded event filter accepted by message.connector.v1."""
     if not payload:
@@ -1435,16 +1693,16 @@ def _normalize_bot_inbound(
     body = raw_payload.get("body", {}) if isinstance(raw_payload, Mapping) else {}
     if not isinstance(body, Mapping):
         body = {}
-    message_id = _required_text(message.msg_id or body.get("msg_id"), "message_id")
-    chat_id = _required_text(message.chat_id or body.get("chat_id"), "chat_id")
+    message_id = _required_text(message.msg_id or body.get("msgid"), "message_id")
+    chat_id = _required_text(message.chat_id or body.get("chatid"), "chat_id")
     sender_id = _required_text(message.sender_id, "sender_id")
-    chat_type = message.chat_type or str(body.get("chat_type", "single"))
+    chat_type = message.chat_type or str(body.get("chattype", "single"))
     if chat_type not in {"single", "group"}:
         raise ConnectorError(
             "INVALID_REQUEST", f"unsupported WeCom chat_type {chat_type!r}"
         )
     kind = "group" if chat_type == "group" else "private"
-    msg_type = message.msg_type or str(body.get("msg_type", "text"))
+    msg_type = message.msg_type or str(body.get("msgtype", "text"))
     source = body.get(msg_type, {})
     if not isinstance(source, Mapping):
         source = {}
@@ -1485,10 +1743,14 @@ def _normalize_bot_inbound(
         },
     }
     reply = body.get("reply_to")
-    if isinstance(reply, Mapping) and reply.get("msg_id"):
+    if isinstance(reply, Mapping) and reply.get("msgid"):
         payload["reply"] = {
-            "message_id": _required_text(reply.get("msg_id"), "reply.message_id")
+            "message_id": _required_text(reply.get("msgid"), "reply.message_id")
         }
+    if message.callback_req_id:
+        payload["vendor_extension"]["facts"].append(
+            {"name": "transport_request_id", "value": message.callback_req_id}
+        )
     if msg_type not in {"text", "image", "file", "voice"}:
         payload["vendor_extension"]["facts"].append(
             {"name": "unsupported_message_type", "value": msg_type[:256]}
@@ -1697,14 +1959,26 @@ def _conversation_for_send(
     if not isinstance(conversation, Mapping):
         raise ConnectorError("INVALID_REQUEST", "conversation must be an object")
     vendor = _required_text(conversation.get("vendor"), "conversation.vendor")
-    if vendor != VENDOR:
+    if vendor not in {VENDOR, BOT_VENDOR}:
         raise ConnectorError(
             "INVALID_REQUEST",
-            f"conversation.vendor must be {VENDOR!r} for this connector",
+            f"conversation.vendor must be {VENDOR!r} or {BOT_VENDOR!r}",
         )
     account_id = _required_text(
         conversation.get("account_id"), "conversation.account_id"
     )
+    if vendor == BOT_VENDOR and not account_id.startswith("bot:"):
+        raise ConnectorError(
+            "INVALID_REQUEST", "wecom.bot conversation requires a bot account_id"
+        )
+    if vendor == BOT_VENDOR and config.mode == "app":
+        raise ConnectorError(
+            "UNAVAILABLE", "wecom.bot conversation requires a bot-enabled binding"
+        )
+    if vendor == VENDOR and account_id.startswith("bot:"):
+        raise ConnectorError(
+            "INVALID_REQUEST", "bot account_id requires conversation.vendor wecom.bot"
+        )
     if (
         config.mode in {"app", "hybrid"}
         and config.agent_id
@@ -1963,7 +2237,7 @@ def _apply_delivery_result(target: Any, result: Mapping[str, Any]) -> None:
     target.status = status
     target.vendor_message_id = str(result.get("vendor_message_id", "") or "")
     target.reason = str(result.get("reason", "") or "")
-    target.vendor_extension.vendor = VENDOR
+    target.vendor_extension.vendor = str(result.get("vendor", VENDOR))
     for fact in result.get("vendor_facts", []):
         entry = target.vendor_extension.facts.add()
         entry.name = fact["name"]

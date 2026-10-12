@@ -9,7 +9,7 @@
 #![forbid(unsafe_code)]
 
 use std::path::Path;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 pub use cyrene_plugin_contracts::workspace_authority_v1 as authority;
 pub use cyrene_plugin_contracts::workspace_authority_v2 as authority_v2;
@@ -17,12 +17,14 @@ pub use cyrene_plugin_contracts::workspace_bridge_v1 as bridge;
 pub use cyrene_plugin_contracts::workspace_product_v2 as product;
 
 use authority_v2::workspace_authority_service_client::WorkspaceAuthorityServiceClient;
+use authority_v2::ManagedWorkloadFeatureToken;
 use bridge::workspace_frontend_bridge_service_client::WorkspaceFrontendBridgeServiceClient;
 use cyrene_plugin_contracts::workspace_tunnel_v1::{
     tunnel_frame::Payload as TunnelPayload,
     workspace_tunnel_service_client::WorkspaceTunnelServiceClient, HealthCheckRequest,
     HealthCheckResponse, OpenTunnel, TunnelData, TunnelFrame, TunnelHalfClose, TunnelTarget,
 };
+use prost::Message;
 use thiserror::Error;
 use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
 use tokio::sync::mpsc;
@@ -33,6 +35,7 @@ use tower::service_fn;
 
 const MAX_TUNNEL_MESSAGE_BYTES: usize = 64 * 1024 + 1024;
 const TUNNEL_SEND_QUEUE_CAPACITY: usize = 8;
+const DELEGATED_INVOCATIONS_FEATURE: &str = "delegated_invocations_v1";
 
 #[derive(Debug, Error)]
 pub enum ClientSdkError {
@@ -287,6 +290,8 @@ async fn open_relay_tunnel(
 #[derive(Clone)]
 pub struct AuthorityClient {
     inner: WorkspaceAuthorityServiceClient<Channel>,
+    selected_features: Vec<String>,
+    managed_workload_feature_token: Vec<u8>,
 }
 
 impl AuthorityClient {
@@ -331,6 +336,7 @@ impl AuthorityClient {
             .negotiate_version(authority_v2::NegotiateVersionRequest {
                 minimum_version: 2,
                 maximum_version: 2,
+                requested_features: vec![DELEGATED_INVOCATIONS_FEATURE.to_string()],
             })
             .await?
             .into_inner();
@@ -339,7 +345,11 @@ impl AuthorityClient {
                 selected: negotiated.selected_version,
             });
         }
-        Ok(Self { inner })
+        Ok(Self {
+            inner,
+            selected_features: negotiated.selected_features,
+            managed_workload_feature_token: negotiated.managed_workload_feature_token,
+        })
     }
 
     /// Connect to Authority over a local Unix Domain Socket (UDS).
@@ -363,6 +373,7 @@ impl AuthorityClient {
             .negotiate_version(authority_v2::NegotiateVersionRequest {
                 minimum_version: 2,
                 maximum_version: 2,
+                requested_features: vec![DELEGATED_INVOCATIONS_FEATURE.to_string()],
             })
             .await?;
         let selected_version = negotiated.get_ref().selected_version;
@@ -371,7 +382,24 @@ impl AuthorityClient {
                 selected: selected_version,
             });
         }
-        Ok(Self { inner })
+        let negotiated = negotiated.into_inner();
+        Ok(Self {
+            inner,
+            selected_features: negotiated.selected_features,
+            managed_workload_feature_token: negotiated.managed_workload_feature_token,
+        })
+    }
+
+    /// Returns whether Authority negotiated bounded delegated invocations.
+    pub fn supports_delegated_invocations(&self) -> bool {
+        self.selected_features
+            .iter()
+            .any(|feature| feature == DELEGATED_INVOCATIONS_FEATURE)
+    }
+
+    /// Returns the short-lived token bound to the authenticated workload profile.
+    pub fn managed_workload_feature_token(&self) -> &[u8] {
+        &self.managed_workload_feature_token
     }
 
     pub async fn negotiate_version(
@@ -379,7 +407,10 @@ impl AuthorityClient {
         req: authority_v2::NegotiateVersionRequest,
     ) -> Result<authority_v2::NegotiateVersionResponse, ClientSdkError> {
         let resp = self.inner.negotiate_version(req).await?;
-        Ok(resp.into_inner())
+        let response = resp.into_inner();
+        self.selected_features = response.selected_features.clone();
+        self.managed_workload_feature_token = response.managed_workload_feature_token.clone();
+        Ok(response)
     }
 
     pub async fn verify_identity(
@@ -445,6 +476,81 @@ impl AuthorityClient {
         Ok(resp.into_inner())
     }
 
+    /// Creates one bounded Product delegation using the verified human bearer.
+    pub async fn create_delegation_with_bearer(
+        &mut self,
+        req: authority_v2::CreateDelegationRequest,
+        bearer_token: &str,
+    ) -> Result<authority_v2::CreateDelegationResponse, ClientSdkError> {
+        let resp = self
+            .inner
+            .create_delegation(bearer_request(req, bearer_token)?)
+            .await?;
+        Ok(resp.into_inner())
+    }
+
+    /// Revokes one delegation using the verified human bearer.
+    pub async fn revoke_delegation_with_bearer(
+        &mut self,
+        req: authority_v2::RevokeDelegationRequest,
+        bearer_token: &str,
+    ) -> Result<authority_v2::RevokeDelegationResponse, ClientSdkError> {
+        let resp = self
+            .inner
+            .revoke_delegation(bearer_request(req, bearer_token)?)
+            .await?;
+        Ok(resp.into_inner())
+    }
+
+    /// Enqueues an invocation under the managed workload token and delegation scope.
+    pub async fn approve_and_enqueue_delegated_invocation(
+        &mut self,
+        mut req: authority_v2::ApproveAndEnqueueDelegatedInvocationRequest,
+        expected_audience: &str,
+    ) -> Result<authority_v2::ApproveAndEnqueueDelegatedInvocationResponse, ClientSdkError> {
+        if expected_audience.trim().is_empty() {
+            return Err(ClientSdkError::InvalidCredential(
+                "delegated invocation audience is required".to_string(),
+            ));
+        }
+        // A cached negotiation token can expire while this client stays open.
+        // Refresh it immediately before each delegated enqueue.
+        let negotiated = self
+            .inner
+            .negotiate_version(authority_v2::NegotiateVersionRequest {
+                minimum_version: 2,
+                maximum_version: 2,
+                requested_features: vec![DELEGATED_INVOCATIONS_FEATURE.to_string()],
+            })
+            .await?
+            .into_inner();
+        if negotiated.selected_version != 2 || !negotiated.supported_versions.contains(&2) {
+            self.selected_features.clear();
+            self.managed_workload_feature_token.clear();
+            return Err(ClientSdkError::ProtocolVersionMismatch {
+                selected: negotiated.selected_version,
+            });
+        }
+        self.selected_features = negotiated.selected_features;
+        self.managed_workload_feature_token = negotiated.managed_workload_feature_token;
+        if !self.supports_delegated_invocations() || self.managed_workload_feature_token.is_empty()
+        {
+            return Err(ClientSdkError::InvalidCredential(
+                "Authority did not negotiate delegated invocation support".to_string(),
+            ));
+        }
+        validate_managed_workload_feature_token(
+            &self.managed_workload_feature_token,
+            expected_audience,
+        )?;
+        req.managed_workload_feature_token = self.managed_workload_feature_token.clone();
+        let resp = self
+            .inner
+            .approve_and_enqueue_delegated_invocation(req)
+            .await?;
+        Ok(resp.into_inner())
+    }
+
     pub async fn claim_invocations(
         &mut self,
         req: authority_v2::ClaimInvocationsRequest,
@@ -458,6 +564,18 @@ impl AuthorityClient {
         req: authority_v2::ValidateExecutionAuthorizationRequest,
     ) -> Result<authority_v2::ValidateExecutionAuthorizationResponse, ClientSdkError> {
         let resp = self.inner.validate_execution_authorization(req).await?;
+        Ok(resp.into_inner())
+    }
+
+    /// Revalidates a Product workload execution credential over authenticated mTLS.
+    pub async fn validate_product_execution_authorization(
+        &mut self,
+        req: authority_v2::ValidateProductExecutionAuthorizationRequest,
+    ) -> Result<authority_v2::ValidateProductExecutionAuthorizationResponse, ClientSdkError> {
+        let resp = self
+            .inner
+            .validate_product_execution_authorization(req)
+            .await?;
         Ok(resp.into_inner())
     }
 
@@ -496,6 +614,340 @@ impl AuthorityClient {
             .wait_invocation_result(bearer_request(req, bearer_token)?)
             .await?;
         Ok(resp.into_inner())
+    }
+}
+
+fn validate_managed_workload_feature_token(
+    encoded: &[u8],
+    expected_audience: &str,
+) -> Result<(), ClientSdkError> {
+    let token = ManagedWorkloadFeatureToken::decode(encoded)
+        .map_err(|error| ClientSdkError::InvalidCredential(error.to_string()))?;
+    let issued = token.issued_at.as_ref().ok_or_else(|| {
+        ClientSdkError::InvalidCredential("feature token issue time is missing".into())
+    })?;
+    let expires = token.expires_at.as_ref().ok_or_else(|| {
+        ClientSdkError::InvalidCredential("feature token expiry is missing".into())
+    })?;
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| ClientSdkError::InvalidCredential(error.to_string()))?
+        .as_secs() as i64;
+    if token.audience != expected_audience
+        || token.client_certificate_sha256.len() != 32
+        || token.signing_key_id.is_empty()
+        || token.authority_signature.len() != 64
+        || issued.seconds > now.saturating_add(30)
+        || expires.seconds <= now
+        || expires.seconds <= issued.seconds
+        || expires.seconds.saturating_sub(issued.seconds) > 300
+    {
+        return Err(ClientSdkError::InvalidCredential(
+            "Authority workload feature token is expired or mismatched".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+#[cfg(all(test, unix))]
+mod delegated_workload_token_tests {
+    use super::{authority_v2, AuthorityClient, ClientSdkError};
+    use cyrene_plugin_contracts::workspace_authority_v2::workspace_authority_service_server::{
+        WorkspaceAuthorityService, WorkspaceAuthorityServiceServer,
+    };
+    use prost::Message;
+    use std::collections::VecDeque;
+    use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use std::sync::{Arc, Mutex};
+    use std::time::{SystemTime, UNIX_EPOCH};
+    use tokio::net::UnixListener;
+    use tokio_stream::wrappers::UnixListenerStream;
+    use tonic::transport::Server;
+    use tonic::{Request, Response, Status};
+
+    static NEXT_SOCKET: AtomicU64 = AtomicU64::new(1);
+
+    #[derive(Default)]
+    struct State {
+        feature_tokens: VecDeque<Vec<u8>>,
+        selected: bool,
+        negotiations: usize,
+        enqueued_tokens: Vec<Vec<u8>>,
+    }
+
+    #[derive(Clone)]
+    struct MockAuthority {
+        state: Arc<Mutex<State>>,
+    }
+
+    macro_rules! unimplemented_rpc {
+        ($name:ident, $request:ty, $response:ty) => {
+            fn $name<'life0, 'async_trait>(
+                &'life0 self,
+                _request: Request<$request>,
+            ) -> ::core::pin::Pin<
+                Box<
+                    dyn ::core::future::Future<Output = Result<Response<$response>, Status>>
+                        + Send
+                        + 'async_trait,
+                >,
+            >
+            where
+                'life0: 'async_trait,
+                Self: 'async_trait,
+            {
+                Box::pin(async { Err(Status::unimplemented("RPC is outside the SDK token test")) })
+            }
+        };
+    }
+
+    #[tonic::async_trait]
+    impl WorkspaceAuthorityService for MockAuthority {
+        async fn negotiate_version(
+            &self,
+            _request: Request<authority_v2::NegotiateVersionRequest>,
+        ) -> Result<Response<authority_v2::NegotiateVersionResponse>, Status> {
+            let mut state = self.state.lock().expect("mock Authority state");
+            state.negotiations += 1;
+            let token = state.feature_tokens.pop_front().unwrap_or_default();
+            let selected_features = if state.selected {
+                vec!["delegated_invocations_v1".to_string()]
+            } else {
+                Vec::new()
+            };
+            Ok(Response::new(authority_v2::NegotiateVersionResponse {
+                selected_version: 2,
+                supported_versions: vec![2],
+                selected_features,
+                supported_features: if state.selected {
+                    vec!["delegated_invocations_v1".to_string()]
+                } else {
+                    Vec::new()
+                },
+                managed_workload_feature_token: token,
+            }))
+        }
+
+        async fn approve_and_enqueue_delegated_invocation(
+            &self,
+            request: Request<authority_v2::ApproveAndEnqueueDelegatedInvocationRequest>,
+        ) -> Result<Response<authority_v2::ApproveAndEnqueueDelegatedInvocationResponse>, Status>
+        {
+            self.state
+                .lock()
+                .expect("mock Authority state")
+                .enqueued_tokens
+                .push(request.into_inner().managed_workload_feature_token);
+            Ok(Response::new(
+                authority_v2::ApproveAndEnqueueDelegatedInvocationResponse {
+                    invocation_id: "invocation-test".to_string(),
+                    state: authority_v2::InvocationState::Pending as i32,
+                },
+            ))
+        }
+
+        unimplemented_rpc!(
+            verify_identity,
+            authority_v2::VerifyIdentityRequest,
+            authority_v2::VerifyIdentityResponse
+        );
+        unimplemented_rpc!(
+            get_catalog_snapshot,
+            authority_v2::CatalogSnapshotRequest,
+            authority_v2::CatalogSnapshotResponse
+        );
+        unimplemented_rpc!(
+            approve_and_enqueue_invocation,
+            authority_v2::ApproveAndEnqueueInvocationRequest,
+            authority_v2::ApproveAndEnqueueInvocationResponse
+        );
+        unimplemented_rpc!(
+            create_delegation,
+            authority_v2::CreateDelegationRequest,
+            authority_v2::CreateDelegationResponse
+        );
+        unimplemented_rpc!(
+            revoke_delegation,
+            authority_v2::RevokeDelegationRequest,
+            authority_v2::RevokeDelegationResponse
+        );
+        unimplemented_rpc!(
+            get_delegation,
+            authority_v2::GetDelegationRequest,
+            authority_v2::GetDelegationResponse
+        );
+        unimplemented_rpc!(
+            claim_invocations,
+            authority_v2::ClaimInvocationsRequest,
+            authority_v2::ClaimInvocationsResponse
+        );
+        unimplemented_rpc!(
+            validate_execution_authorization,
+            authority_v2::ValidateExecutionAuthorizationRequest,
+            authority_v2::ValidateExecutionAuthorizationResponse
+        );
+        unimplemented_rpc!(
+            validate_product_execution_authorization,
+            authority_v2::ValidateProductExecutionAuthorizationRequest,
+            authority_v2::ValidateProductExecutionAuthorizationResponse
+        );
+        unimplemented_rpc!(
+            get_product_invocation_status,
+            authority_v2::GetProductInvocationStatusRequest,
+            authority_v2::GetProductInvocationStatusResponse
+        );
+        unimplemented_rpc!(
+            acknowledge_delivery,
+            authority_v2::AcknowledgeDeliveryRequest,
+            authority_v2::AcknowledgeDeliveryResponse
+        );
+        unimplemented_rpc!(
+            submit_invocation_result,
+            authority_v2::SubmitInvocationResultRequest,
+            authority_v2::SubmitInvocationResultResponse
+        );
+        unimplemented_rpc!(
+            wait_invocation_result,
+            authority_v2::WaitInvocationResultRequest,
+            authority_v2::WaitInvocationResultResponse
+        );
+    }
+
+    fn feature_token(serial: u8, expires_at: i64) -> Vec<u8> {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_secs() as i64;
+        authority_v2::ManagedWorkloadFeatureToken {
+            audience: "exchange-product".to_string(),
+            client_certificate_sha256: vec![serial; 32],
+            signing_key_id: format!("key-{serial}"),
+            issued_at: Some(prost_types::Timestamp {
+                seconds: now,
+                nanos: 0,
+            }),
+            expires_at: Some(prost_types::Timestamp {
+                seconds: expires_at,
+                nanos: 0,
+            }),
+            authority_signature: vec![serial; 64],
+        }
+        .encode_to_vec()
+    }
+
+    async fn start_authority(
+        selected: bool,
+        feature_tokens: Vec<Vec<u8>>,
+    ) -> (PathBuf, Arc<Mutex<State>>, tokio::task::JoinHandle<()>) {
+        let socket = std::env::temp_dir().join(format!(
+            "cyrene-authority-sdk-{}-{}.sock",
+            std::process::id(),
+            NEXT_SOCKET.fetch_add(1, Ordering::Relaxed)
+        ));
+        let listener = UnixListener::bind(&socket).expect("bind test Authority socket");
+        let state = Arc::new(Mutex::new(State {
+            feature_tokens: feature_tokens.into(),
+            selected,
+            ..State::default()
+        }));
+        let service = MockAuthority {
+            state: Arc::clone(&state),
+        };
+        let task = tokio::spawn(async move {
+            Server::builder()
+                .add_service(WorkspaceAuthorityServiceServer::new(service))
+                .serve_with_incoming(UnixListenerStream::new(listener))
+                .await
+                .expect("serve test Authority");
+        });
+        (socket, state, task)
+    }
+
+    fn enqueue_request() -> authority_v2::ApproveAndEnqueueDelegatedInvocationRequest {
+        authority_v2::ApproveAndEnqueueDelegatedInvocationRequest {
+            workspace_id: "workspace-test".to_string(),
+            delegation_id: "delegation-test".to_string(),
+            invocation: None,
+            managed_workload_feature_token: b"caller supplied stale token".to_vec(),
+        }
+    }
+
+    #[tokio::test]
+    async fn delegated_enqueue_refreshes_and_transmits_the_current_workload_token() {
+        let expiry = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_secs() as i64
+            + 180;
+        let first = feature_token(1, expiry);
+        let fresh = feature_token(2, expiry);
+        let (socket, state, server) =
+            start_authority(true, vec![first.clone(), fresh.clone()]).await;
+        let mut client = AuthorityClient::connect_uds(&socket)
+            .await
+            .expect("connect SDK");
+        assert_eq!(client.managed_workload_feature_token(), first);
+
+        client
+            .approve_and_enqueue_delegated_invocation(enqueue_request(), "exchange-product")
+            .await
+            .expect("enqueue with freshly negotiated token");
+
+        let state = state.lock().expect("mock Authority state");
+        assert_eq!(state.negotiations, 2);
+        assert_eq!(state.enqueued_tokens, vec![fresh]);
+        assert_ne!(state.enqueued_tokens[0], first);
+        drop(state);
+        drop(client);
+        server.abort();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn delegated_enqueue_rejects_expired_or_unsupported_refreshed_profiles() {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_secs() as i64;
+        let (socket, state, server) = start_authority(
+            true,
+            vec![feature_token(3, now + 180), feature_token(4, now - 1)],
+        )
+        .await;
+        let mut client = AuthorityClient::connect_uds(&socket)
+            .await
+            .expect("connect SDK");
+        assert!(client
+            .approve_and_enqueue_delegated_invocation(enqueue_request(), "exchange-product")
+            .await
+            .is_err());
+        assert!(state
+            .lock()
+            .expect("mock Authority state")
+            .enqueued_tokens
+            .is_empty());
+        drop(client);
+        server.abort();
+        let _ = std::fs::remove_file(socket);
+
+        let (socket, state, server) = start_authority(false, Vec::new()).await;
+        let mut client = AuthorityClient::connect_uds(&socket)
+            .await
+            .expect("connect old profile");
+        assert!(matches!(
+            client
+                .approve_and_enqueue_delegated_invocation(enqueue_request(), "exchange-product")
+                .await,
+            Err(ClientSdkError::InvalidCredential(_))
+        ));
+        let state = state.lock().expect("mock Authority state");
+        assert_eq!(state.negotiations, 2);
+        assert!(state.enqueued_tokens.is_empty());
+        drop(state);
+        drop(client);
+        server.abort();
+        let _ = std::fs::remove_file(socket);
     }
 }
 

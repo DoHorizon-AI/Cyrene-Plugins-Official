@@ -1,6 +1,6 @@
-"""Contract tests for immutable data-tools Plugin package releases.
+"""Contract tests for immutable official Plugin package releases.
 
-中文：验证五个官方插件包、运行时资产和无 PYTHONPATH 启动布局。
+中文：验证官方插件包、运行时资产和无 PYTHONPATH 启动布局。
 """
 
 from __future__ import annotations
@@ -16,8 +16,10 @@ import unittest
 import zipfile
 from copy import deepcopy
 from pathlib import Path
+from unittest.mock import patch
 
 from tooling.release import official_plugin_package as release
+from tooling.release import select_official_plugin_packages as selection
 from tooling.release import training_llama_factory_package as training_release
 
 
@@ -68,11 +70,26 @@ def _create_wheelhouse_source(repository: Path, spec, destination: Path) -> Path
                 f"{dist_info}/WHEEL",
                 "Wheel-Version: 1.0\nGenerator: test fixture\nTag: py3-none-any\n",
             )
+            source_dependency = next(
+                (
+                    dependency
+                    for dependency in spec.source_dependencies
+                    if dependency.distribution == name
+                ),
+                None,
+            )
+            if source_dependency is not None:
+                archive.writestr(
+                    f"{dist_info}/licenses/LICENSE",
+                    (
+                        repository / source_dependency.license_file_path
+                    ).read_bytes(),
+                )
     return destination
 
 
 class OfficialPluginPackageTests(unittest.TestCase):
-    """Exercise the five official packages and the existing training template."""
+    """Exercise official packages and the existing training template."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -96,6 +113,116 @@ class OfficialPluginPackageTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.temporary.cleanup()
+
+    def test_package_release_selection_preserves_push_scope_and_limits_dispatch(
+        self,
+    ) -> None:
+        """Keep existing push drafts and resolve dispatches from fixed package IDs.
+
+        中文：push 保持旧五包 draft，dispatch 只解析固定 package allowlist。
+        """
+
+        push_matrix, push_mode = selection.select_package_release("push", None)
+        self.assertEqual(
+            [row["package_id"] for row in push_matrix["include"]],
+            list(selection.LEGACY_PACKAGE_IDS),
+        )
+        self.assertEqual(push_mode, "draft")
+
+        default_matrix, default_mode = selection.select_package_release(
+            "workflow_dispatch", None
+        )
+        self.assertEqual(default_matrix, push_matrix)
+        self.assertEqual(default_mode, "draft")
+
+        pull_request_matrix, pull_request_mode = selection.select_package_release(
+            "pull_request", "integration-v1"
+        )
+        self.assertEqual(
+            [row["package_id"] for row in pull_request_matrix["include"]],
+            list(selection.ALL_PACKAGE_IDS),
+        )
+        self.assertEqual(pull_request_mode, "none")
+
+        integration_matrix, integration_mode = selection.select_package_release(
+            "workflow_dispatch", "integration-v1"
+        )
+        self.assertEqual(
+            [row["package_id"] for row in integration_matrix["include"]],
+            list(selection.INTEGRATION_V1_PACKAGE_IDS),
+        )
+        self.assertEqual(integration_mode, "immutable")
+
+        account_matrix, account_mode = selection.select_package_release(
+            "workflow_dispatch", "cyrene.accounts.account-center"
+        )
+        self.assertEqual(
+            [row["package_id"] for row in account_matrix["include"]],
+            ["cyrene.accounts.account-center"],
+        )
+        self.assertEqual(account_mode, "immutable")
+
+        legacy_matrix, legacy_mode = selection.select_package_release(
+            "workflow_dispatch", "cyrene.tools.dataset-preparation"
+        )
+        self.assertEqual(
+            [row["package_id"] for row in legacy_matrix["include"]],
+            ["cyrene.tools.dataset-preparation"],
+        )
+        self.assertEqual(legacy_mode, "draft")
+
+        with self.assertRaisesRegex(ValueError, "fixed official package allowlist"):
+            selection.select_package_release("workflow_dispatch", "arbitrary-package")
+
+    def test_wecom_package_refuses_an_unlicensed_manifest(self) -> None:
+        """Do not publish an independent Plugin package without its component grant."""
+
+        spec = release.PACKAGE_SPECS["cyrene.connectors.wecom"]
+        manifest = json.loads(
+            (self.repository / spec.source_dir / "plugin.manifest.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        manifest.pop("licenseExpression")
+        with (
+            patch.object(release, "_read_json", return_value=manifest),
+            self.assertRaisesRegex(
+                release.PackageBuildError,
+                "must declare an SPDX license before release packaging",
+            ),
+        ):
+            release._read_package_spec(self.repository, spec)
+
+    def test_wecom_sdk_wheel_is_built_from_the_pinned_commit_with_its_mit_license(
+        self,
+    ) -> None:
+        """Build the exact public SDK commit and keep its separate license notice."""
+
+        spec = release.PACKAGE_SPECS["cyrene.connectors.wecom"]
+        wheelhouse = self.temp_root / "wecom-source-wheelhouse"
+        release._build_source_dependency_wheels(self.repository, spec, wheelhouse)
+        wheels = list(wheelhouse.glob("*.whl"))
+        self.assertEqual(len(wheels), 1)
+        self.assertEqual(
+            release._wheel_metadata(wheels[0].read_bytes(), wheels[0].name),
+            ("wecom-aibot-python-sdk", "1.0.1"),
+        )
+        with zipfile.ZipFile(wheels[0]) as archive:
+            metadata_path = next(
+                name for name in archive.namelist() if name.endswith(".dist-info/METADATA")
+            )
+            metadata = archive.read(metadata_path).decode("utf-8")
+            license_paths = [
+                name for name in archive.namelist() if name.endswith("/LICENSE")
+            ]
+            self.assertIn("License-Expression: MIT", metadata)
+            self.assertEqual(len(license_paths), 1)
+            self.assertEqual(
+                archive.read(license_paths[0]),
+                (
+                    self.repository / release.WECOM_AIBOT_SDK.license_file_path
+                ).read_bytes(),
+            )
 
     def test_staged_release_readback_checks_github_asset_digests_and_sizes(
         self,
@@ -179,7 +306,105 @@ class OfficialPluginPackageTests(unittest.TestCase):
                         channel="preview",
                     )
 
-    def test_five_packages_and_training_template_start_with_pythonpath_unset(
+    def test_published_release_readback_requires_immutable_assets_and_source_tag(
+        self,
+    ) -> None:
+        """Verify final GitHub release identity, immutable state, and exact assets.
+
+        中文：核验发布后的不可变状态、资产摘要与精确 source tag。
+        """
+
+        source_sha = "a" * 40
+        source_ref = "refs/heads/develop"
+        package_id = "cyrene.tools.dataset-preparation"
+        package_version = "0.2.0"
+        spec = release.PACKAGE_SPECS[package_id]
+        release_tag = f"preview-{spec.component_id}-{package_version}-{source_sha}"
+        asset_paths = [
+            self.temp_root / "package.zip",
+            self.temp_root / "package.zip.attestation.jsonl",
+        ]
+        for index, path in enumerate(asset_paths):
+            path.write_bytes(f"asset-{index}".encode("ascii"))
+        record = {
+            "id": 101,
+            "draft": False,
+            "immutable": True,
+            "prerelease": True,
+            "tag_name": release_tag,
+            "target_commitish": source_sha,
+            "assets": [
+                {
+                    "name": path.name,
+                    "size": path.stat().st_size,
+                    "digest": release.training_release.sha256_file(path),
+                    "state": "uploaded",
+                }
+                for path in asset_paths
+            ],
+        }
+        tag_ref = {
+            "ref": f"refs/tags/{release_tag}",
+            "object": {
+                "sha": source_sha,
+                "type": "commit",
+                "url": "https://api.github.com/repos/DoHorizon-AI/Cyrene-Plugins-Official/git/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+            },
+        }
+        release.verify_published_release_readback(
+            record_by_id=record,
+            record_by_tag=deepcopy(record),
+            tag_ref=tag_ref,
+            asset_paths=asset_paths,
+            release_tag=release_tag,
+            package_id=package_id,
+            package_version=package_version,
+            source_ref=source_ref,
+            source_sha=source_sha,
+            channel="preview",
+        )
+
+        invalid_cases = (
+            (
+                "draft",
+                lambda row, ref: row.update(draft=True),
+            ),
+            (
+                "mutable release",
+                lambda row, ref: row.update(immutable=False),
+            ),
+            (
+                "asset digest",
+                lambda row, ref: row["assets"][0].update(digest="sha256:" + "0" * 64),
+            ),
+            (
+                "source tag target",
+                lambda row, ref: ref["object"].update(sha="b" * 40),
+            ),
+        )
+        for label, mutate in invalid_cases:
+            with self.subTest(label=label):
+                changed_by_id = deepcopy(record)
+                changed_by_tag = deepcopy(record)
+                changed_ref = deepcopy(tag_ref)
+                mutate(changed_by_id, changed_ref)
+                if label != "source tag target":
+                    mutate(changed_by_tag, changed_ref)
+                with self.assertRaises(release.PackageBuildError):
+                    release.verify_published_release_readback(
+                        record_by_id=changed_by_id,
+                        record_by_tag=changed_by_tag,
+                        tag_ref=changed_ref,
+                        asset_paths=asset_paths,
+                        release_tag=release_tag,
+                        package_id=package_id,
+                        package_version=package_version,
+                        source_ref=source_ref,
+                        source_sha=source_sha,
+                        channel="preview",
+                    )
+
+    def test_eight_packages_and_training_template_start_with_pythonpath_unset(
         self,
     ) -> None:
         """Require clean startup from each ZIP's ``src`` tree.
@@ -187,7 +412,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
         中文：清除 PYTHONPATH 并切换到无关工作目录，验证所有入口可启动。
         """
 
-        cases: list[tuple[str, Path, str, str]] = []
+        cases: list[tuple[str, Path, str, str, str | None]] = []
         expected_target = {
             "os": "linux",
             "osVersion": "24.04",
@@ -246,6 +471,13 @@ class OfficialPluginPackageTests(unittest.TestCase):
             self.assertEqual(
                 package_release["attestation_policy"]["provider"], "github-actions"
             )
+            self.assertEqual(
+                package_release["package"]["capabilities"], manifest["capabilities"]
+            )
+            self.assertEqual(
+                package_release["package"]["license_expression"],
+                manifest.get("licenseExpression") or manifest.get("license"),
+            )
             with zipfile.ZipFile(outputs["package"]) as archive:
                 wheelhouse_manifest = json.loads(
                     archive.read("wheelhouse/manifest.json")
@@ -259,12 +491,24 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     len(wheelhouse_manifest["wheels"]),
                     len(release._lock_lines(lock_bytes, "requirements.lock")),
                 )
+                if package_id == "cyrene.connectors.wecom":
+                    self.assertIn("configuration.schema.json", archive.namelist())
+                    self.assertIn("licenses/plugin/LICENSE", archive.namelist())
+                    self.assertIn(
+                        "third_party/licenses/wecom-aibot-python-sdk/LICENSE",
+                        archive.namelist(),
+                    )
+                    self.assertEqual(
+                        package_release["source_dependencies"][0]["source"]["commit"],
+                        release.WECOM_AIBOT_SDK.commit,
+                    )
             cases.append(
                 (
                     f"package {package_id}",
                     outputs["package"],
                     manifest["runtime"]["entrypoint"],
                     manifest["capabilities"][0],
+                    package_id,
                 )
             )
 
@@ -291,10 +535,11 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 training_outputs["package"],
                 training_manifest["runtime"]["entrypoint"],
                 training_manifest["capabilities"][0],
+                None,
             )
         )
 
-        for name, archive_path, entrypoint, capability in cases:
+        for name, archive_path, entrypoint, capability, package_id in cases:
             with self.subTest(name=name):
                 launch_root = (
                     self.temp_root / f"launch-{len(list(self.temp_root.iterdir()))}"
@@ -304,7 +549,10 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 with zipfile.ZipFile(archive_path) as archive:
                     names = archive.namelist()
                     module = entrypoint.split(":", 1)[0].replace(".", "/")
-                    self.assertIn(f"src/{module}.py", names)
+                    self.assertTrue(
+                        f"src/{module}.py" in names
+                        or f"src/{module}/__init__.py" in names
+                    )
                     self.assertNotIn(f"{module}.py", names)
                     archive.extractall(payload)
                 self._assert_clean_start(
@@ -312,6 +560,9 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     payload=payload,
                     entrypoint=entrypoint,
                     capability=capability,
+                    environment_overrides=self._package_activation_environment(
+                        package_id
+                    ),
                 )
 
     def test_dataset_generation_prepares_and_imports_with_uv_offline_and_empty_cache(
@@ -444,12 +695,141 @@ class OfficialPluginPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(release.PackageBuildError, "digest mismatch"):
             release._verify_wheelhouse_entries(tampered, lock)
 
+    def _package_activation_environment(
+        self, package_id: str | None
+    ) -> dict[str, str]:
+        """Build synthetic host activation facts for packages that require them."""
+
+        if package_id == "cyrene.accounts.account-center":
+            storage = self.temp_root / "account-center-package-state"
+            storage.mkdir(mode=0o700)
+            os.chmod(storage, 0o700)
+            callers = {
+                "exchange-service": "account-center/caller-hmac-keys/exchange",
+                "oauth-callback-service": "account-center/caller-hmac-keys/callback",
+                "wecom-source": "account-center/caller-hmac-keys/wecom",
+                "github-provider": "account-center/caller-hmac-keys/github-provider",
+            }
+            secret_refs = {
+                "account-center/encryption-key": "TEST_PACKAGE_ACCOUNT_ENCRYPTION_KEY",
+                "github-app/client-secret": "TEST_PACKAGE_GITHUB_CLIENT_SECRET",
+                **{
+                    reference: f"TEST_PACKAGE_ACCOUNT_CALLER_{index}"
+                    for index, reference in enumerate(callers.values())
+                },
+            }
+            methods = {
+                method: ["exchange-service"]
+                for method in (
+                    "begin_link",
+                    "confirm_wecom_link",
+                    "list_links",
+                    "get_authorization",
+                    "unlink",
+                    "create_credential_lease",
+                    "resolve_linked_sender",
+                )
+            }
+            methods.update(
+                {
+                    "complete_github_link": ["oauth-callback-service"],
+                    "observe_wecom_challenge": ["wecom-source"],
+                    "redeem_credential_lease": ["github-provider"],
+                }
+            )
+            configuration = {
+                "github_callback_uri": "https://exchange.example.test/accounts/callback",
+                "github_client_id": "package-test-client",
+                "github_client_secret_ref": "github-app/client-secret",
+                "encryption_key_ref": "account-center/encryption-key",
+                "caller_key_refs": callers,
+                "hostSecretRefs": secret_refs,
+                "exchange_caller_id": "exchange-service",
+                "github_callback_caller_id": "oauth-callback-service",
+                "github_provider_caller_id": "github-provider",
+                "method_callers": methods,
+                "wecom_sources": {
+                    "wecom-source": {
+                        "source_authority": "wecom:package-test",
+                        "bot_namespaces": ["bot-main"],
+                    }
+                },
+            }
+            environment = {
+                "CYRENE_PLUGIN_STORAGE_PATH": str(storage),
+                "CYRENE_CAPABILITY_BINDING_ID": "account-center-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_GITHUB_CLIENT_SECRET": "synthetic-package-test-client-secret",
+            }
+            for index, environment_name in enumerate(secret_refs.values()):
+                if environment_name == "TEST_PACKAGE_GITHUB_CLIENT_SECRET":
+                    continue
+                environment[environment_name] = (bytes([index + 1]) * 32).hex()
+            return environment
+
+        if package_id == "cyrene.providers.github-issues":
+            references = {
+                "github-issues/exchange-verification-key": "TEST_PACKAGE_GH_EXCHANGE_KEY",
+                "github-issues/webhook-secret": "TEST_PACKAGE_GH_WEBHOOK_SECRET",
+                "github-issues/account-center-provider-signing-key": "TEST_PACKAGE_GH_PROVIDER_KEY",
+            }
+            configuration = {
+                "exchange_caller_id": "exchange-service",
+                "exchange_verification_key_ref": "github-issues/exchange-verification-key",
+                "github_webhook_secret_ref": "github-issues/webhook-secret",
+                "repositories": [
+                    {"repository_id": "12345", "owner": "owner", "name": "project"}
+                ],
+                "allowed_installation_ids": ["99"],
+                "allowed_events": ["issues"],
+                "allowed_actions": ["opened", "closed", "reopened"],
+                "account_center": {
+                    "binding_id": "github-provider-package-test",
+                    "connection_ref": "grpc://127.0.0.1:1",
+                    "transport": "local",
+                    "caller_id": "github-provider",
+                    "signing_key_ref": (
+                        "github-issues/account-center-provider-signing-key"
+                    ),
+                },
+                "hostSecretRefs": references,
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "github-provider-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_GH_EXCHANGE_KEY": (b"\x22" * 32).hex(),
+                "TEST_PACKAGE_GH_WEBHOOK_SECRET": "synthetic-github-webhook-secret-value",
+                "TEST_PACKAGE_GH_PROVIDER_KEY": (b"\x33" * 32).hex(),
+            }
+        return {}
+
     def _assert_clean_start(
-        self, *, name: str, payload: Path, entrypoint: str, capability: str
+        self,
+        *,
+        name: str,
+        payload: Path,
+        entrypoint: str,
+        capability: str,
+        environment_overrides: dict[str, str] | None = None,
     ) -> None:
         bootstrap = payload / "src/cyrene_plugin_runtime/bootstrap.py"
         environment = os.environ.copy()
-        environment.pop("PYTHONPATH", None)
+        for variable in (
+            "PYTHONPATH",
+            "CYRENE_CAPABILITY_BINDING_ID",
+            "CYRENE_CAPABILITY_CONFIGURATION_JSON",
+            "CYRENE_PLUGIN_STORAGE_PATH",
+            "WECOM_CORP_SECRET",
+            "WECOM_BOT_SECRET",
+            "WECOM_NAVIGATOR_BEARER_TOKEN",
+            "TEST_PACKAGE_ACCOUNT_ENCRYPTION_KEY",
+            "TEST_PACKAGE_GITHUB_CLIENT_SECRET",
+            "TEST_PACKAGE_GH_EXCHANGE_KEY",
+            "TEST_PACKAGE_GH_WEBHOOK_SECRET",
+            "TEST_PACKAGE_GH_PROVIDER_KEY",
+        ):
+            environment.pop(variable, None)
+        environment.update(environment_overrides or {})
         self.assertNotIn("PYTHONPATH", environment)
         process = subprocess.Popen(
             [
