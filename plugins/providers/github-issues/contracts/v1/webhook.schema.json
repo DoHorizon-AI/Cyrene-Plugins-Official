@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.github-issues/webhook/v1/schema.json",
+  "title": "GitHub webhook normalization contract",
+  "description": "Closed owner contract for the original-byte HMAC request and direct NormalizedGitHubEvent or sanitized error response.",
+  "$defs": {
+    "WebhookRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["delivery_id", "event", "signature", "raw_body_base64"],
+      "properties": {
+        "delivery_id": {"type": "string", "pattern": "^[A-Za-z0-9-]{1,128}$"},
+        "event": {"type": "string", "enum": ["issues", "issue_comment"]},
+        "signature": {"type": "string", "pattern": "^sha256=[0-9a-f]{64}$"},
+        "raw_body_base64": {
+          "type": "string",
+          "maxLength": 1333336,
+          "pattern": "^[A-Za-z0-9+/]*={0,2}$",
+          "description": "Base64 of the exact bytes covered by X-Hub-Signature-256."
+        }
+      }
+    },
+    "NormalizedGitHubEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_type",
+        "action",
+        "repository_id",
+        "issue_number",
+        "sender_id",
+        "sender_login",
+        "title",
+        "body",
+        "self_authored"
+      ],
+      "properties": {
+        "event_type": {"type": "string", "enum": ["issues", "issue_comment"]},
+        "action": {"type": "string", "minLength": 1, "maxLength": 40},
+        "repository_id": {"type": "string", "pattern": "^[0-9]{1,200}$"},
+        "issue_number": {"type": "integer", "minimum": 1},
+        "sender_id": {"type": "string", "pattern": "^[0-9]{1,200}$"},
+        "sender_login": {"type": "string", "minLength": 1, "maxLength": 200},
+        "title": {"type": "string", "maxLength": 500},
+        "body": {"type": "string", "maxLength": 4000},
+        "self_authored": {
+          "const": false,
+          "description": "The webhook has no bound user actor, so this provider does not assert self-authorship."
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"event_type": {"const": "issues"}}, "required": ["event_type"]},
+          "then": {"properties": {"action": {"enum": ["opened", "edited", "closed", "reopened"]}}}
+        },
+        {
+          "if": {"properties": {"event_type": {"const": "issue_comment"}}, "required": ["event_type"]},
+          "then": {"properties": {"action": {"enum": ["created", "edited", "deleted"]}}}
+        }
+      ]
+    },
+    "WebhookError": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["error"],
+      "properties": {
+        "error": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["code"],
+          "properties": {
+            "code": {
+              "type": "string",
+              "enum": [
+                "INVALID_REQUEST",
+                "INVALID_SIGNATURE",
+                "INVALID_EVENT_BODY",
+                "EVENT_NOT_ALLOWED",
+                "REPOSITORY_NOT_ALLOWED"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "WebhookResponse": {
+      "oneOf": [
+        {"$ref": "#/$defs/NormalizedGitHubEvent"},
+        {"$ref": "#/$defs/WebhookError"}
+      ]
+    }
+  }
+}

@@ -73,6 +73,7 @@ class NavigatorIntegrationConfig:
     bearer_token: str
     timeout_seconds: float
     retry_count: int
+    forward_inbound: bool
     trusted_conversations: tuple[TrustedConversation, ...]
 
     @classmethod
@@ -148,6 +149,11 @@ class NavigatorIntegrationConfig:
                 "INVALID_REQUEST",
                 "navigator.retry_count must be an integer from 0 through 5",
             )
+        forward_inbound = value.get("forward_inbound", True)
+        if not isinstance(forward_inbound, bool):
+            raise ConnectorError(
+                "INVALID_REQUEST", "navigator.forward_inbound must be a boolean"
+            )
         raw_trusted = value.get("trusted_conversations", ())
         if not isinstance(raw_trusted, Sequence) or isinstance(
             raw_trusted, (str, bytes)
@@ -178,6 +184,7 @@ class NavigatorIntegrationConfig:
             bearer_token=bearer_token,
             timeout_seconds=float(timeout_seconds),
             retry_count=retry_count,
+            forward_inbound=forward_inbound,
             trusted_conversations=trusted,
         )
 

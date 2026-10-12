@@ -208,11 +208,11 @@ class TestCatalogCliExecution:
     """Tests `catalog list` and `catalog show` CLI commands."""
 
     def test_catalog_list_all(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test `catalog list` returns all 18 official plugins."""
+        """Test `catalog list` returns all 19 official plugins."""
         rc = main(["catalog", "list"])
         assert rc == 0
         captured = capsys.readouterr()
-        assert "Cyrene Plugin Catalog (18 plugins):" in captured.out
+        assert "Cyrene Plugin Catalog (19 plugins):" in captured.out
         assert "cyrene.connectors.im" in captured.out
         assert "cyrene.tools.computer-runtime" in captured.out
         for plugin_id in DATA_TOOLS_PLUGIN_METADATA:
@@ -289,7 +289,7 @@ class TestCatalogCliExecution:
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert isinstance(data, list)
-        assert len(data) == 18
+        assert len(data) == 19
         plugin_ids = {p["id"] for p in data}
         assert "cyrene.serving.vllm-runtime" in plugin_ids
         _assert_data_tools_plugin_metadata(data)
@@ -577,5 +577,5 @@ class TestExecutableEntryPoint:
         assert proc.returncode == 0
         data = json.loads(proc.stdout)
         assert isinstance(data, list)
-        assert len(data) == 18
+        assert len(data) == 19
         _assert_data_tools_plugin_metadata(data)

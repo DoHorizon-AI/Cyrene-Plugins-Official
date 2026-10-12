@@ -7,7 +7,8 @@
 │  模块职责：通过 WeCom 投递受 workspace、binding 和 trusted route 约束的 │
 │  Navigator 通知。                                                   │
 │  · 只 claim 精确的 connector、recipient 与 wecom.message 通知。       │
-│  · 发送前先持久化 started；未知回执标记 uncertain，绝不自动重发。      │
+│  · 发送前持久化 started；ACK 保留 accepted 证据但不宣称 delivered。  │
+│  · 按旧 Navigator finish contract 记 uncertain，且绝不自动重发。     │
 └─────────────────────────────────────────────────────────────────────┘
 """
 
@@ -195,7 +196,7 @@ class NavigatorNotificationWorker:
 
         request = {
             "conversation": {
-                "vendor": "wecom.app",
+                "vendor": "wecom.bot",
                 "account_id": rule.account_id,
                 "conversation_id": rule.conversation_id,
                 "kind": rule.kind,
@@ -228,12 +229,23 @@ class NavigatorNotificationWorker:
         else:
             status = receipt.get("status")
             if status == "accepted":
-                outcome = "delivered"
+                outcome = "uncertain"
+                facts = receipt.get("vendor_facts", [])
+                transport_request_id = next(
+                    (
+                        str(fact.get("value", ""))[:512]
+                        for fact in facts
+                        if isinstance(fact, Mapping)
+                        and fact.get("name") == "transport_request_id"
+                    ),
+                    "",
+                )
+                vendor_message_id = str(receipt.get("vendor_message_id", ""))[:256]
                 result = {
-                    "status": "accepted",
-                    "vendorMessageId": str(receipt.get("vendor_message_id", ""))[
-                        :256
-                    ],
+                    "status": "uncertain",
+                    "submission_status": "accepted",
+                    "transportRequestId": transport_request_id,
+                    "vendorMessageRef": vendor_message_id or None,
                 }
             elif status in {"rejected", "rate_limited"}:
                 outcome = "failed"

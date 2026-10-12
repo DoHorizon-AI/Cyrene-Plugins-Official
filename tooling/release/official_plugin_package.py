@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,7 +26,6 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-import tomllib
 from packaging.requirements import Requirement
 from packaging.tags import sys_tags
 from packaging.utils import canonicalize_name, parse_wheel_filename
@@ -45,6 +45,12 @@ WORKFLOW_PATH = ".github/workflows/data-tools-package-release.yml"
 PRODUCER_PATH = "tooling/release/official_plugin_package.py"
 TRAINING_PRODUCER_PATH = "tooling/release/training_llama_factory_package.py"
 BUILD_LOCK_PATH = "tooling/release/build-requirements.lock"
+SOURCE_DEPENDENCY_BUILD_LOCK_PATH = "tooling/release/source-build-requirements.lock"
+SOURCE_DEPENDENCY_BUILD_PINS = (
+    "pip==25.2",
+    "setuptools==77.0.3",
+    "wheel==0.48.0",
+)
 JCS_LOCK_PATH = "tools/ci/connection-release-requirements.txt"
 TARGET_ID = "linux-ubuntu-24.04-x86_64-python-3.12"
 TARGET = {
@@ -82,14 +88,30 @@ class VendoredSdk:
 
 
 @dataclass(frozen=True)
+class SourceDependency:
+    """Bind one public source-built wheel to an immutable upstream commit."""
+
+    distribution: str
+    version: str
+    repository: str
+    commit: str
+    license_expression: str
+    lock_path: str
+    license_file_path: str
+
+
+@dataclass(frozen=True)
 class PackageSpec:
     """Bind a dotted package identity to its explicit repository paths."""
 
     package_id: str
     component_id: str
+    primary_capability: str
     source_dir: str
     requirements_input: str
     vendored_sdks: tuple[VendoredSdk, ...]
+    source_dependencies: tuple[SourceDependency, ...] = ()
+    require_spdx_license: bool = False
 
 
 RUNTIME_SDK = VendoredSdk(
@@ -104,6 +126,24 @@ MODEL_PROVIDER_SDK = VendoredSdk(
     source_root="sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts",
     archive_root="src/cyrene_model_provider_contracts",
 )
+ACCOUNT_CENTER_SDK = VendoredSdk(
+    distribution="cyrene-account-center-contracts",
+    project_path="sdk/python/cyrene_account_center_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts",
+    archive_root="src/cyrene_account_center_contracts",
+)
+
+WECOM_AIBOT_SDK = SourceDependency(
+    distribution="wecom-aibot-python-sdk",
+    version="1.0.1",
+    repository="https://github.com/WecomTeam/wecom-aibot-python-sdk.git",
+    commit="6bcb59a9a636c566f4c6ea5268b228e3def1611a",
+    license_expression="MIT",
+    lock_path="plugins/connectors/wecom/uv.lock",
+    license_file_path=(
+        "plugins/connectors/wecom/third_party/licenses/wecom-aibot-python-sdk/LICENSE"
+    ),
+)
 
 # These mappings are explicit contract data. Never derive a package/component
 # identity by replacing punctuation in the other identity.
@@ -111,6 +151,7 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
     "cyrene.tools.dataset-preparation": PackageSpec(
         package_id="cyrene.tools.dataset-preparation",
         component_id="cyrene-tools-dataset-preparation",
+        primary_capability="dataset.preparation.v1",
         source_dir="plugins/tools/dataset-preparation",
         requirements_input="tooling/release/requirements/dataset-preparation.in",
         vendored_sdks=(RUNTIME_SDK,),
@@ -118,6 +159,7 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
     "cyrene.tools.document-parsing": PackageSpec(
         package_id="cyrene.tools.document-parsing",
         component_id="cyrene-tools-document-parsing",
+        primary_capability="document.parsing.v1",
         source_dir="plugins/tools/document-parsing",
         requirements_input="tooling/release/requirements/document-parsing.in",
         vendored_sdks=(RUNTIME_SDK,),
@@ -125,6 +167,7 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
     "cyrene.tools.dataset-generation": PackageSpec(
         package_id="cyrene.tools.dataset-generation",
         component_id="cyrene-tools-dataset-generation",
+        primary_capability="dataset.generation.v1",
         source_dir="plugins/tools/dataset-generation",
         requirements_input="tooling/release/requirements/dataset-generation.in",
         vendored_sdks=(RUNTIME_SDK, MODEL_PROVIDER_SDK),
@@ -132,6 +175,7 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
     "cyrene.tools.knowledge-preparation": PackageSpec(
         package_id="cyrene.tools.knowledge-preparation",
         component_id="cyrene-tools-knowledge-preparation",
+        primary_capability="dataset.knowledge.v1",
         source_dir="plugins/tools/knowledge-preparation",
         requirements_input="tooling/release/requirements/knowledge-preparation.in",
         vendored_sdks=(RUNTIME_SDK,),
@@ -139,15 +183,46 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
     "cyrene.evaluation.exact-match": PackageSpec(
         package_id="cyrene.evaluation.exact-match",
         component_id="cyrene-evaluation-exact-match",
+        primary_capability="evaluation.runner.v1",
         source_dir="plugins/evaluation/exact-match",
         requirements_input="tooling/release/requirements/exact-match.in",
         vendored_sdks=(RUNTIME_SDK,),
+    ),
+    "cyrene.accounts.account-center": PackageSpec(
+        package_id="cyrene.accounts.account-center",
+        component_id="cyrene-accounts-account-center",
+        primary_capability="account.center.v1",
+        source_dir="plugins/accounts/account-center",
+        requirements_input="tooling/release/requirements/account-center.in",
+        vendored_sdks=(RUNTIME_SDK, ACCOUNT_CENTER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.github-issues": PackageSpec(
+        package_id="cyrene.providers.github-issues",
+        component_id="cyrene-providers-github-issues",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/providers/github-issues",
+        requirements_input="tooling/release/requirements/github-issues.in",
+        vendored_sdks=(RUNTIME_SDK, ACCOUNT_CENTER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.connectors.wecom": PackageSpec(
+        package_id="cyrene.connectors.wecom",
+        component_id="cyrene-connectors-wecom",
+        primary_capability="message.connector.v1",
+        source_dir="plugins/connectors/wecom",
+        requirements_input="tooling/release/requirements/wecom-connector.in",
+        vendored_sdks=(RUNTIME_SDK,),
+        source_dependencies=(WECOM_AIBOT_SDK,),
+        require_spdx_license=True,
     ),
 }
 
 PRODUCT_SERVICE_COMPONENTS = {
     "Cyrene-Catalyst": "cyrene-catalyst",
     "Cyrene-Echo": "cyrene-echo",
+    "Cyrene-Exchange": "cyrene-exchange",
+    "Cyrene-Navigator": "cyrene-navigator",
 }
 
 
@@ -238,10 +313,28 @@ def _read_package_spec(
     capabilities = manifest.get("capabilities")
     if (
         not isinstance(capabilities, list)
-        or len(capabilities) != 1
+        or not capabilities
         or not all(isinstance(item, str) and item for item in capabilities)
+        or len(capabilities) != len(set(capabilities))
     ):
-        raise PackageBuildError("each official package must declare one capability")
+        raise PackageBuildError("each official package must declare unique capabilities")
+    if spec.primary_capability not in capabilities:
+        raise PackageBuildError(
+            "explicit primary capability is not declared by the Plugin manifest"
+        )
+    license_expression = manifest.get("licenseExpression") or manifest.get("license")
+    if license_expression is not None and (
+        not isinstance(license_expression, str)
+        or not re.fullmatch(
+            r"[A-Za-z0-9.+-]+(?:\s+(?:AND|OR|WITH)\s+[A-Za-z0-9.+-]+)*",
+            license_expression,
+        )
+    ):
+        raise PackageBuildError("Plugin license must be a valid SPDX expression")
+    if spec.require_spdx_license and not license_expression:
+        raise PackageBuildError(
+            f"{spec.package_id} must declare an SPDX license before release packaging"
+        )
     methods = manifest.get("methods")
     if (
         not isinstance(methods, list)
@@ -291,7 +384,9 @@ def _read_package_spec(
         "package_id": spec.package_id,
         "component_id": spec.component_id,
         "version": version,
-        "capability": capabilities[0],
+        "capability": spec.primary_capability,
+        "capabilities": list(capabilities),
+        "license_expression": license_expression,
         "entrypoint": entrypoint,
         "distribution": distribution,
         "supported_services": services,
@@ -354,19 +449,33 @@ def _source_files(
         root / WORKFLOW_PATH,
     }
     for path in package_root.rglob("*"):
+        relative = path.relative_to(package_root)
+        if any(
+            part in {".venv", "__pycache__", ".pytest_cache", ".ruff_cache", "build", "dist"}
+            for part in relative.parts
+        ):
+            continue
         if path.is_symlink():
             raise PackageBuildError(
                 f"Plugin source tree may not contain a symlink: {path}"
             )
         if not path.is_file():
             continue
-        relative = path.relative_to(package_root)
         if (
             (path.suffix == ".py" and "tests" not in relative.parts)
             or (path.suffix == ".json" and "contracts" in relative.parts)
-            or path.name == "PROVENANCE.md"
+            or path.name
+            in {
+                "LICENSE",
+                "PROVENANCE.md",
+                "configuration.schema.json",
+                "THIRD_PARTY_NOTICES.md",
+            }
         ):
             candidates.add(path)
+    for dependency in spec.source_dependencies:
+        candidates.add(root / dependency.lock_path)
+        candidates.add(root / dependency.license_file_path)
 
     files = {
         path.relative_to(root).as_posix(): _regular_source(path, root)
@@ -608,33 +717,286 @@ def _download_wheelhouse(
         )
     destination.mkdir(parents=True, exist_ok=True)
     lock = root / spec.source_dir / "requirements.lock"
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-m",
-            "pip",
-            "download",
-            "--disable-pip-version-check",
-            "--only-binary=:all:",
-            "--requirement",
-            str(lock),
-            "--dest",
-            str(destination),
-        ],
-        cwd=root,
-        stdin=subprocess.DEVNULL,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    source_names = {
+        canonicalize_name(dependency.distribution)
+        for dependency in spec.source_dependencies
+    }
+    registry_pins = [
+        line
+        for line in _lock_lines(lock_bytes, str(lock))
+        if canonicalize_name(LOCK_PIN.fullmatch(line).group(1)) not in source_names
+    ]
+    if not registry_pins:
+        raise PackageBuildError("runtime lock has no registry wheels to download")
+    with tempfile.TemporaryDirectory(prefix="cyrene-package-lock-filter-") as temp:
+        registry_lock = Path(temp) / "registry-requirements.lock"
+        registry_lock.write_text("\n".join(registry_pins) + "\n", encoding="utf-8")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "download",
+                "--disable-pip-version-check",
+                "--only-binary=:all:",
+                "--no-deps",
+                "--requirement",
+                str(registry_lock),
+                "--dest",
+                str(destination),
+            ],
+            cwd=root,
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "").strip()
         raise PackageBuildError(
             "could not resolve the locked binary wheel closure"
             + (f": {detail[-2000:]}" if detail else "")
         )
+    _build_source_dependency_wheels(root, spec, destination)
     wheel_paths = sorted(destination.glob("*.whl"), key=lambda item: item.name)
     return _wheelhouse_entries(lock_bytes, wheel_paths)
+
+
+def _build_source_dependency_wheels(
+    root: Path, spec: PackageSpec, destination: Path
+) -> None:
+    """Build allowlisted source wheels after verifying exact upstream commits."""
+
+    for dependency in spec.source_dependencies:
+        with tempfile.TemporaryDirectory(prefix="cyrene-source-wheel-") as temp:
+            checkout = Path(temp) / "source"
+            commands = (
+                ["git", "init", str(checkout)],
+                [
+                    "git",
+                    "-C",
+                    str(checkout),
+                    "remote",
+                    "add",
+                    "origin",
+                    dependency.repository,
+                ],
+                [
+                    "git",
+                    "-C",
+                    str(checkout),
+                    "fetch",
+                    "--depth=1",
+                    "origin",
+                    dependency.commit,
+                ],
+                ["git", "-C", str(checkout), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
+            )
+            for command in commands:
+                result = subprocess.run(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode != 0:
+                    detail = (result.stderr or result.stdout or "").strip()
+                    raise PackageBuildError(
+                        "could not fetch the pinned source dependency"
+                        + (f": {detail[-2000:]}" if detail else "")
+                    )
+            actual_commit = subprocess.run(
+                ["git", "-C", str(checkout), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            if actual_commit != dependency.commit:
+                raise PackageBuildError(
+                    f"source dependency checkout differs from its pin: {dependency.distribution}"
+                )
+            try:
+                project = tomllib.loads((checkout / "pyproject.toml").read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
+                raise PackageBuildError(
+                    f"source dependency project metadata is missing: {dependency.distribution}"
+                ) from error
+            project_record = project.get("project", {})
+            if (
+                project_record.get("name") != dependency.distribution
+                or project_record.get("version") != dependency.version
+                or project_record.get("license") != dependency.license_expression
+            ):
+                raise PackageBuildError(
+                    f"source dependency identity or SPDX license changed: {dependency.distribution}"
+                )
+            upstream_license = _regular_source(checkout / "LICENSE", checkout)
+            repository_license = _regular_source(
+                root / dependency.license_file_path, root
+            )
+            if upstream_license != repository_license:
+                raise PackageBuildError(
+                    f"vendored third-party license differs from the pinned source: {dependency.distribution}"
+                )
+            build_environment = Path(temp) / "build-environment"
+            environment_creation = subprocess.run(
+                [sys.executable, "-m", "venv", str(build_environment)],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if environment_creation.returncode != 0:
+                detail = (
+                    environment_creation.stderr or environment_creation.stdout or ""
+                ).strip()
+                raise PackageBuildError(
+                    "could not create the isolated source build environment"
+                    + (f": {detail[-2000:]}" if detail else "")
+                )
+            build_python = build_environment / (
+                "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+            )
+            source_build_lock = root / SOURCE_DEPENDENCY_BUILD_LOCK_PATH
+            source_build_pins = tuple(
+                line.strip()
+                for line in source_build_lock.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")
+            )
+            if source_build_pins != SOURCE_DEPENDENCY_BUILD_PINS or any(
+                LOCK_PIN.fullmatch(line) is None for line in source_build_pins
+            ):
+                raise PackageBuildError(
+                    "source dependency build lock differs from the approved exact pins"
+                )
+            build_tools = subprocess.run(
+                [
+                    str(build_python),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    "--no-deps",
+                    "--requirement",
+                    str(source_build_lock),
+                ],
+                cwd=root,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if build_tools.returncode != 0:
+                detail = (build_tools.stderr or build_tools.stdout or "").strip()
+                raise PackageBuildError(
+                    "could not install the pinned source build tools"
+                    + (f": {detail[-2000:]}" if detail else "")
+                )
+            result = subprocess.run(
+                [
+                    str(build_python),
+                    "-m",
+                    "pip",
+                    "wheel",
+                    "--disable-pip-version-check",
+                    "--no-build-isolation",
+                    "--no-deps",
+                    "--wheel-dir",
+                    str(destination),
+                    str(checkout),
+                ],
+                cwd=root,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode != 0:
+                detail = (result.stderr or result.stdout or "").strip()
+                raise PackageBuildError(
+                    f"could not build pinned source wheel {dependency.distribution}"
+                    + (f": {detail[-2000:]}" if detail else "")
+                )
+            wheels = [
+                path
+                for path in destination.glob("*.whl")
+                if _wheel_metadata(path.read_bytes(), path.name)
+                == (
+                    canonicalize_name(dependency.distribution),
+                    dependency.version,
+                )
+            ]
+            if len(wheels) != 1:
+                raise PackageBuildError(
+                    f"source wheel identity is ambiguous: {dependency.distribution}"
+                )
+            try:
+                with zipfile.ZipFile(wheels[0]) as archive:
+                    license_entries = [
+                        name
+                        for name in archive.namelist()
+                        if name.endswith("/LICENSE")
+                    ]
+                    metadata_entries = [
+                        name
+                        for name in archive.namelist()
+                        if name.endswith(".dist-info/METADATA")
+                    ]
+                    if len(metadata_entries) != 1:
+                        raise PackageBuildError(
+                            f"source dependency wheel metadata is ambiguous: {dependency.distribution}"
+                        )
+                    wheel_metadata = BytesParser().parsebytes(
+                        archive.read(metadata_entries[0])
+                    )
+                    lock_path = root / spec.source_dir / "requirements.lock"
+                    locked_versions = {
+                        canonicalize_name(LOCK_PIN.fullmatch(line).group(1)):
+                        LOCK_PIN.fullmatch(line).group(2)
+                        for line in _lock_lines(lock_path.read_bytes(), str(lock_path))
+                    }
+                    for raw_requirement in wheel_metadata.get_all("Requires-Dist", []):
+                        requirement = Requirement(raw_requirement)
+                        if requirement.marker is not None and not requirement.marker.evaluate():
+                            continue
+                        locked_version = locked_versions.get(
+                            canonicalize_name(requirement.name)
+                        )
+                        if locked_version is None or (
+                            requirement.specifier
+                            and not requirement.specifier.contains(
+                                locked_version, prereleases=True
+                            )
+                        ):
+                            raise PackageBuildError(
+                                "runtime lock does not satisfy pinned source wheel dependency: "
+                                f"{dependency.distribution}/{requirement.name}"
+                            )
+                    if (
+                        wheel_metadata.get("License-Expression")
+                        != dependency.license_expression
+                    ):
+                        raise PackageBuildError(
+                            f"source dependency wheel SPDX expression differs from its pin: {dependency.distribution}"
+                        )
+                    wheel_licenses = [
+                        archive.read(name)
+                        for name in license_entries
+                        if name.endswith("/licenses/LICENSE")
+                    ]
+            except zipfile.BadZipFile as error:
+                raise PackageBuildError(
+                    f"source dependency wheel is invalid: {dependency.distribution}"
+                ) from error
+            if not wheel_licenses:
+                raise PackageBuildError(
+                    f"source dependency wheel omits its license: {dependency.distribution}"
+                )
+            if repository_license not in wheel_licenses:
+                raise PackageBuildError(
+                    f"source dependency wheel license differs from its pinned source: {dependency.distribution}"
+                )
 
 
 def _verify_lock_inputs(spec: PackageSpec, source_files: dict[str, bytes]) -> list[str]:
@@ -678,11 +1040,16 @@ def _verify_lock_inputs(spec: PackageSpec, source_files: dict[str, bytes]) -> li
     sdk_by_name = {
         canonicalize_name(sdk.distribution): sdk for sdk in spec.vendored_sdks
     }
+    source_dependency_by_name = {
+        canonicalize_name(dependency.distribution): dependency
+        for dependency in spec.source_dependencies
+    }
     input_by_name = {
         canonicalize_name(requirement.name): requirement
         for requirement in input_requirements
     }
     input_comments = input_bytes.decode("utf-8")
+    matched_source_dependencies: set[str] = set()
     for requirement in project_requirements:
         name = canonicalize_name(requirement.name)
         sdk = sdk_by_name.get(name)
@@ -714,6 +1081,56 @@ def _verify_lock_inputs(spec: PackageSpec, source_files: dict[str, bytes]) -> li
                     )
             continue
 
+        source_dependency = source_dependency_by_name.get(name)
+        if source_dependency is not None:
+            expected_url = (
+                f"git+{source_dependency.repository}@{source_dependency.commit}"
+            )
+            if requirement.url != expected_url:
+                raise PackageBuildError(
+                    f"Plugin source dependency is not pinned to the approved commit: {name}"
+                )
+            lock_input = input_by_name.get(name)
+            if (
+                lock_input is None
+                or str(lock_input.specifier) != f"=={source_dependency.version}"
+                or pin_versions.get(name) != source_dependency.version
+            ):
+                raise PackageBuildError(
+                    f"runtime lock does not bind the source dependency version: {name}"
+                )
+            uv_lock_path = source_dependency.lock_path
+            try:
+                uv_lock = tomllib.loads(source_files[uv_lock_path].decode("utf-8"))
+            except (KeyError, UnicodeError, tomllib.TOMLDecodeError) as error:
+                raise PackageBuildError(
+                    f"source dependency lock is missing or invalid: {uv_lock_path}"
+                ) from error
+            locked_sources = [
+                item
+                for item in uv_lock.get("package", [])
+                if isinstance(item, dict)
+                and item.get("name") == source_dependency.distribution
+            ]
+            expected_locked_source = (
+                f"{source_dependency.repository}?rev={source_dependency.commit}"
+                f"#{source_dependency.commit}"
+            )
+            if len(locked_sources) != 1 or (
+                locked_sources[0].get("version") != source_dependency.version
+                or locked_sources[0].get("source", {}).get("git")
+                != expected_locked_source
+            ):
+                raise PackageBuildError(
+                    f"source dependency uv lock differs from the approved commit: {name}"
+                )
+            if name not in input_by_name:
+                raise PackageBuildError(
+                    f"runtime lock input omits the source dependency: {name}"
+                )
+            matched_source_dependencies.add(name)
+            continue
+
         lock_input = input_by_name.get(name)
         if (
             lock_input is None
@@ -723,6 +1140,11 @@ def _verify_lock_inputs(spec: PackageSpec, source_files: dict[str, bytes]) -> li
             raise PackageBuildError(
                 f"runtime lock input does not preserve Plugin dependency: {name}"
             )
+
+    if matched_source_dependencies != set(source_dependency_by_name):
+        raise PackageBuildError(
+            "one or more declared source dependencies are not required by the Plugin"
+        )
 
     if not input_requirements:
         raise PackageBuildError("runtime lock input has no external requirements")
@@ -747,13 +1169,21 @@ def _package_entries(
             continue
         relative = source[len(prefix) :]
         if relative.endswith(".py"):
-            entries[f"src/{relative}"] = content
+            archive_path = (
+                relative
+                if relative.startswith("src/")
+                else f"src/{relative}"
+            )
+            entries[archive_path] = content
+        elif relative == "LICENSE":
+            entries["licenses/plugin/LICENSE"] = content
         elif relative in {
             "README.md",
             "PROVENANCE.md",
             "plugin.manifest.json",
             "requirements.lock",
-        } or (relative.startswith("contracts/") and relative.endswith(".json")):
+            "configuration.schema.json",
+        } or (relative.startswith("contracts/") and relative.endswith(".json")) or relative.startswith("third_party/licenses/"):
             entries[relative] = content
     for sdk in spec.vendored_sdks:
         sdk_prefix = f"{sdk.source_root}/"
@@ -812,6 +1242,40 @@ def _sdk_metadata(
     return records
 
 
+def _source_dependency_metadata(
+    spec: PackageSpec, source_files: dict[str, bytes]
+) -> list[dict[str, Any]]:
+    """Describe pinned third-party wheels and their retained SPDX notices."""
+
+    records: list[dict[str, Any]] = []
+    for dependency in spec.source_dependencies:
+        source_path = Path(dependency.license_file_path)
+        try:
+            archive_path = source_path.relative_to(Path(spec.source_dir)).as_posix()
+        except ValueError as error:
+            raise PackageBuildError(
+                f"third-party license must be inside its Plugin source tree: {source_path}"
+            ) from error
+        license_bytes = source_files[dependency.license_file_path]
+        records.append(
+            {
+                "distribution": dependency.distribution,
+                "version": dependency.version,
+                "source": {
+                    "repository": dependency.repository,
+                    "commit": dependency.commit,
+                    "lock": dependency.lock_path,
+                },
+                "license_expression": dependency.license_expression,
+                "license_file": {
+                    "archive_path": archive_path,
+                    "sha256": training_release.sha256_bytes(license_bytes),
+                },
+            }
+        )
+    return records
+
+
 def _sbom_document(
     package: dict[str, Any],
     spec: PackageSpec,
@@ -832,15 +1296,33 @@ def _sbom_document(
         name, version = match.groups()
         reference = f"pkg:pypi/{canonicalize_name(name)}@{version}"
         dependency_refs.append(reference)
-        components.append(
-            {
-                "type": "library",
-                "name": canonicalize_name(name),
-                "version": version,
-                "purl": reference,
-                "bom-ref": reference,
-            }
+        component: dict[str, Any] = {
+            "type": "library",
+            "name": canonicalize_name(name),
+            "version": version,
+            "purl": reference,
+            "bom-ref": reference,
+        }
+        source_dependency = next(
+            (
+                item
+                for item in spec.source_dependencies
+                if canonicalize_name(item.distribution) == canonicalize_name(name)
+            ),
+            None,
         )
+        if source_dependency is not None:
+            component["licenses"] = [
+                {"expression": source_dependency.license_expression}
+            ]
+            component["externalReferences"] = [
+                {"type": "vcs", "url": source_dependency.repository}
+            ]
+            component["properties"] = [
+                {"name": "cyrene:source:commit", "value": source_dependency.commit},
+                {"name": "cyrene:delivery", "value": "wheel-built-from-pinned-source"},
+            ]
+        components.append(component)
     for sdk in spec.vendored_sdks:
         version = tomllib.loads(source_files[sdk.project_path].decode("utf-8"))[
             "project"
@@ -880,6 +1362,10 @@ def _sbom_document(
     package_properties = [
         {"name": "cyrene:component-id", "value": spec.component_id},
         {"name": "cyrene:capability-id", "value": package["capability"]},
+        {
+            "name": "cyrene:capability-ids",
+            "value": json.dumps(package["capabilities"], separators=(",", ":")),
+        },
         {"name": "cyrene:source:repository", "value": SOURCE_REPOSITORY_URL},
         {"name": "cyrene:source:ref", "value": source_ref},
         {"name": "cyrene:source:commit", "value": source_sha},
@@ -888,19 +1374,24 @@ def _sbom_document(
             "value": f"{spec.source_dir}/requirements.lock",
         },
     ]
+    package_component: dict[str, Any] = {
+        "type": "application",
+        "name": spec.package_id,
+        "version": package["version"],
+        "bom-ref": package_ref,
+        "properties": package_properties,
+        "externalReferences": [{"type": "vcs", "url": SOURCE_REPOSITORY_URL}],
+    }
+    if package.get("license_expression"):
+        package_component["licenses"] = [
+            {"expression": package["license_expression"]}
+        ]
     return {
         "bomFormat": SBOM_FORMAT,
         "specVersion": SBOM_SPEC_VERSION,
         "version": 1,
         "metadata": {
-            "component": {
-                "type": "application",
-                "name": spec.package_id,
-                "version": package["version"],
-                "bom-ref": package_ref,
-                "properties": package_properties,
-                "externalReferences": [{"type": "vcs", "url": SOURCE_REPOSITORY_URL}],
-            }
+            "component": package_component
         },
         "components": sorted(components, key=lambda row: row["bom-ref"]),
         "dependencies": [
@@ -1278,6 +1769,7 @@ def build_release_artifacts(
         sdk_records = _sdk_metadata(
             spec, source_ref, source_sha, source_files, sdk_files
         )
+        source_dependency_records = _source_dependency_metadata(spec, source_files)
         sbom = _sbom_document(
             package, spec, source_ref, source_sha, source_files, sdk_files, pins
         )
@@ -1309,7 +1801,9 @@ def build_release_artifacts(
                 "version": package["version"],
                 "component_id": package["component_id"],
                 "capability": package["capability"],
+                "capabilities": package["capabilities"],
                 "interface_version": "1",
+                "license_expression": package["license_expression"],
                 "entrypoint": package["entrypoint"],
                 "distribution": package["distribution"],
                 "supported_services": package["supported_services"],
@@ -1361,6 +1855,7 @@ def build_release_artifacts(
                 "dependency_lock": "requirements.lock",
             },
             "vendored_sdks": sdk_records,
+            "source_dependencies": source_dependency_records,
             "release_tag": release_tag,
             "artifact_uri": package_uri,
             "assets": {
@@ -1550,7 +2045,11 @@ def verify_release_artifacts(
     if entries.get("requirements.lock") != paths["dependency_lock"].read_bytes():
         raise PackageBuildError("package ZIP lock differs from the signed lock asset")
     entry_module = package["entrypoint"].split(":", 1)[0].replace(".", "/")
-    if f"src/{entry_module}.py" not in entries or f"{entry_module}.py" in entries:
+    module_source = f"src/{entry_module}.py"
+    package_source = f"src/{entry_module}/__init__.py"
+    if (module_source not in entries and package_source not in entries) or (
+        f"{entry_module}.py" in entries
+    ):
         raise PackageBuildError(
             "Plugin entrypoint is not under the bootstrap source root"
         )
@@ -1607,6 +2106,9 @@ def verify_release_artifacts(
         or metadata.get("package", {}).get("id") != package_id
         or metadata.get("package", {}).get("version") != package["version"]
         or metadata.get("package", {}).get("capability") != package["capability"]
+        or metadata.get("package", {}).get("capabilities") != package["capabilities"]
+        or metadata.get("package", {}).get("license_expression")
+        != package["license_expression"]
         or metadata.get("release_tag") != release_tag
         or metadata.get("artifact_uri")
         != (
@@ -1627,6 +2129,8 @@ def verify_release_artifacts(
         }
         or metadata.get("vendored_sdks")
         != _sdk_metadata(spec, source_ref, source_sha, source_files, sdk_files)
+        or metadata.get("source_dependencies")
+        != _source_dependency_metadata(spec, source_files)
         or metadata.get("target", {}).get("id") != TARGET_ID
         or metadata.get("runtime", {}).get("protocol")
         != CAPABILITY_PROTOCOL + ".DirectPluginRuntime"
@@ -1694,9 +2198,7 @@ def verify_release_artifacts(
         }
         generated_at = component_index.get("generatedAt")
         try:
-            parsed_generated_at = datetime.fromisoformat(
-                generated_at.replace("Z", "+00:00")
-            )
+            parsed_generated_at = datetime.fromisoformat(generated_at)
         except (AttributeError, TypeError, ValueError):
             parsed_generated_at = None
         if (
@@ -1917,6 +2419,125 @@ def verify_staged_release_readback(
         raise PackageBuildError(
             "staged release read-back differs from verified asset identities "
             f"(missing={missing}, unexpected={unexpected}, mismatched={mismatched})"
+        )
+
+
+def verify_published_release_readback(
+    *,
+    record_by_id: Any,
+    record_by_tag: Any,
+    tag_ref: Any,
+    asset_paths: list[Path],
+    release_tag: str,
+    package_id: str,
+    package_version: str,
+    source_ref: str,
+    source_sha: str,
+    channel: str,
+) -> None:
+    """Verify immutable release records, exact assets, and source tag target.
+
+    中文：核验不可变 release、完整资产摘要以及 source tag 的精确 commit。
+    """
+
+    spec = PACKAGE_SPECS.get(package_id)
+    if spec is None:
+        raise PackageBuildError("published release read-back has an unknown package ID")
+    expected_tag = _channel_identity(
+        channel, source_ref, source_sha, spec.component_id, package_version
+    )
+    if expected_tag is None or release_tag != expected_tag:
+        raise PackageBuildError(
+            "published release read-back tag differs from the source identity"
+        )
+
+    expected_assets: dict[str, dict[str, Any]] = {}
+    for path in asset_paths:
+        if path.is_symlink() or not path.is_file():
+            raise PackageBuildError(
+                f"verified published asset is missing or unsafe: {path}"
+            )
+        name = path.name
+        if name in expected_assets:
+            raise PackageBuildError(
+                f"verified published asset basename is duplicated: {name}"
+            )
+        expected_assets[name] = {
+            "size": path.stat().st_size,
+            "digest": training_release.sha256_file(path),
+        }
+    if not expected_assets:
+        raise PackageBuildError("verified published asset set is empty")
+
+    release_id: int | None = None
+    for record in (record_by_id, record_by_tag):
+        if not isinstance(record, dict):
+            raise PackageBuildError("published release read-back is malformed")
+        current_id = record.get("id")
+        if type(current_id) is not int or current_id < 1:
+            raise PackageBuildError("published release read-back lacks a database ID")
+        if release_id is None:
+            release_id = current_id
+        if (
+            current_id != release_id
+            or record.get("tag_name") != release_tag
+            or record.get("draft") is not False
+            or record.get("immutable") is not True
+            or record.get("prerelease") is not (channel == "preview")
+        ):
+            raise PackageBuildError(
+                "published release read-back identity or immutable state differs"
+            )
+        rows = record.get("assets")
+        if not isinstance(rows, list):
+            raise PackageBuildError("published release read-back assets are missing")
+        actual_assets: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            if not isinstance(row, dict):
+                raise PackageBuildError(
+                    "published release read-back contains a malformed asset"
+                )
+            name = row.get("name")
+            size = row.get("size")
+            digest = row.get("digest")
+            if (
+                not isinstance(name, str)
+                or not name
+                or name in actual_assets
+                or type(size) is not int
+                or size < 0
+                or not isinstance(digest, str)
+                or not re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
+                or row.get("state") != "uploaded"
+            ):
+                raise PackageBuildError(
+                    "published release read-back asset metadata is malformed"
+                )
+            actual_assets[name] = {"size": size, "digest": digest}
+        if actual_assets != expected_assets:
+            missing = sorted(set(expected_assets) - set(actual_assets))
+            unexpected = sorted(set(actual_assets) - set(expected_assets))
+            mismatched = sorted(
+                name
+                for name in set(expected_assets) & set(actual_assets)
+                if expected_assets[name] != actual_assets[name]
+            )
+            raise PackageBuildError(
+                "published release assets differ from verified inputs "
+                f"(missing={missing}, unexpected={unexpected}, mismatched={mismatched})"
+            )
+
+    ref = f"refs/tags/{release_tag}"
+    tag_object = tag_ref.get("object") if isinstance(tag_ref, dict) else None
+    if (
+        not isinstance(tag_ref, dict)
+        or tag_ref.get("ref") != ref
+        or not isinstance(tag_object, dict)
+        or tag_object.get("type") != "commit"
+        or tag_object.get("sha") != source_sha
+    ):
+        raise PackageBuildError(
+            "published package tag does not resolve to the expected source commit"
         )
 
 

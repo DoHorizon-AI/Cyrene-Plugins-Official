@@ -260,11 +260,11 @@
       "execution_mode": "SIMULATED",
       "evidence": [
         {
-          "observed_at": "2026-09-13",
-          "environment": "linux / python 3.12 venv / scripted transport plus a local fake WeCom REST API over loopback HTTP",
-          "command": "python3 -m pytest -q plugins/connectors/wecom/tests",
-          "result": "13 passed; target/content mapping, mentions and markdown, delivery status mapping, token caching and one-shot refresh, typed fail-closed validation, proto round trip, activation environment, and the urllib transport end to end",
-          "notes": "Outbound send_message only; inbound callbacks and approvals are not in v1. No live WeCom tenant has been exercised."
+          "observed_at": "2026-10-12",
+          "environment": "linux / Python 3.12 / pinned WeCom SDK source commit with scripted transport, loopback HTTP, and local Navigator/Exchange fixtures",
+          "command": "uv run --project plugins/connectors/wecom --locked --with pytest pytest -q -o addopts='' plugins/connectors/wecom/tests --ignore=plugins/connectors/wecom/tests/test_wecom_live_smoke.py",
+          "result": "60 passed; bot/application message mapping, canonical inbound events, exact Navigator receipt projection, integration forwarding, tool-provider boundaries, activation, and pinned SDK wrapper behavior verified",
+          "notes": "The suite uses scripted transport and local fixtures; real WeCom login, tenant event intake, and external message send remain NOT_RUN."
         }
       ]
     },
@@ -405,8 +405,23 @@
           "observed_at": "2026-10-12",
           "environment": "linux / Python 3.12 / local DirectPluginRuntime gRPC with synthetic GitHub and WeCom identity facts",
           "command": "uv run --project plugins/accounts/account-center --with-editable sdk/python/cyrene_account_center_contracts --with pytest pytest -q plugins/accounts/account-center/tests sdk/python/cyrene_account_center_contracts/tests",
-          "result": "36 passed; fixed account methods, exact caller roles, OAuth PKCE/state callback handling, encrypted storage, one-use lease semantics, refresh recovery, and no-argument local gRPC startup verified",
+          "result": "36 passed; fixed account methods, exact caller roles, OAuth PKCE/state callback handling, encrypted storage, one-use lease semantics, refresh recovery, unavailable-credential unlink recovery, tuple-safe WeCom identity listing, atomic fresh database initialization, and no-argument local gRPC startup verified",
           "notes": "Provider identity and callback behavior use local test doubles; no real OAuth login, tenant identity, or external account operation was performed."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.github-issues",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-12",
+          "environment": "linux / Python 3.12 / local DirectPluginRuntime gRPC with synthetic Account Center leases and GitHub API responses",
+          "command": "uv run --project plugins/providers/github-issues --with pytest pytest -q plugins/providers/github-issues/tests",
+          "result": "14 passed; fixed tool schemas, actor-bound one-use lease redemption, no-argument hostSecretRefs startup, signed issues and issue_comment normalization, and sanitized API errors verified",
+          "notes": "GitHub API and Account Center use local fakes; no real GitHub login, repository write, or external webhook was performed."
         }
       ]
     }

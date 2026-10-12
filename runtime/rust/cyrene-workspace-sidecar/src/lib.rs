@@ -116,6 +116,7 @@ impl WorkspaceSidecarServiceImpl {
             .negotiate_version(authority::NegotiateVersionRequest {
                 minimum_version: 2,
                 maximum_version: 2,
+                requested_features: vec![],
             })
             .await
             .map_err(|error| {

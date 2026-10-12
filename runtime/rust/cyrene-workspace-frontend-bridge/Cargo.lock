@@ -264,6 +264,7 @@ dependencies = [
  "async-trait",
  "cyrene-plugin-contracts",
  "hyper-util",
+ "prost",
  "prost-types",
  "thiserror",
  "tokio",

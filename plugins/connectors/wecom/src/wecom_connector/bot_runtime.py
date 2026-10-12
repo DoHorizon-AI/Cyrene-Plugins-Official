@@ -20,7 +20,12 @@ from collections.abc import Awaitable, Callable
 from concurrent.futures import Future
 from typing import Any
 
-from .bot_client import InboundMessage, WeComBotClient
+from .bot_client import (
+    InboundMessage,
+    WeComBotClient,
+    WeComBotReceipt,
+    WeComBotUncertainError,
+)
 
 
 class WeComBotRuntime:
@@ -43,7 +48,7 @@ class WeComBotRuntime:
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
         self._handler_registered = False
-        self._pending_sends: dict[str, Future[str]] = {}
+        self._pending_sends: dict[str, Future[WeComBotReceipt]] = {}
 
     @property
     def is_connected(self) -> bool:
@@ -91,7 +96,7 @@ class WeComBotRuntime:
         timeout_seconds: float,
         request_id: str | None = None,
         is_cancelled: Callable[[], bool] | None = None,
-    ) -> str:
+    ) -> WeComBotReceipt:
         """Send one notification through the connected bot and await its receipt.
 
         中文:通过已连接 bot 发送一条通知,并等待厂商确认回执。
@@ -119,7 +124,9 @@ class WeComBotRuntime:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     future.cancel()
-                    raise TimeoutError("WeCom bot send receipt timed out")
+                    raise WeComBotUncertainError(
+                        "", "WeCom bot send outcome is unknown after runtime timeout"
+                    )
                 try:
                     return future.result(timeout=min(0.1, remaining))
                 except TimeoutError:

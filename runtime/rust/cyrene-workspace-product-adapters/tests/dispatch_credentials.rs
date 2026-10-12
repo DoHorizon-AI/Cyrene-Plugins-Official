@@ -7,6 +7,7 @@
 
 #![cfg(unix)]
 
+use base64::Engine as _;
 use cyrene_plugin_contracts::workspace_authority_v2::{
     ExecutionCredential, ExecutionTarget, IdempotencySemantics,
 };
@@ -14,6 +15,7 @@ use cyrene_plugin_contracts::workspace_product_v2::ProductApiInvocationV2;
 use cyrene_workspace_product_adapters::{
     GenericProductHttpAdapter, ProductAdapterError, ProtectedCredentialProvider,
 };
+use prost::Message;
 use serde_json::{json, Value};
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -83,6 +85,10 @@ fn invocation_target_credential_for_resource(
         issued_at: None,
         expires_at: None,
         authority_signature: vec![0x53; 64],
+        authorization_source: 0,
+        delegation_id: String::new(),
+        delegation_generation: 0,
+        delegation_audience: String::new(),
     };
     (invocation, target, credential)
 }
@@ -156,6 +162,7 @@ fn adapter(path: &Path, allowed_origin: &str) -> GenericProductHttpAdapter {
 struct CapturedRequest {
     path: String,
     authorization: String,
+    execution_credential: Option<String>,
 }
 
 async fn serve_http_once(
@@ -190,6 +197,11 @@ async fn serve_http_once(
                 .then(|| value.trim().to_string())
         })
         .unwrap_or_default();
+    let execution_credential = request.lines().find_map(|line| {
+        let (name, value) = line.split_once(':')?;
+        name.eq_ignore_ascii_case("x-cyrene-execution-credential-bin")
+            .then(|| value.trim().to_string())
+    });
     let mut response = format!("HTTP/1.1 {status}\r\ncontent-length: 0\r\nconnection: close\r\n");
     if let Some(location) = location {
         response.push_str(&format!("location: {location}\r\n"));
@@ -199,6 +211,7 @@ async fn serve_http_once(
     CapturedRequest {
         path,
         authorization,
+        execution_credential,
     }
 }
 
@@ -239,6 +252,16 @@ async fn dispatch_sends_only_the_matching_scope_token_and_reloads_after_rotation
     let headers = server.await.unwrap();
     assert!(headers[0].authorization == format!("Bearer {TOKEN_ONE}"));
     assert!(headers[1].authorization == format!("Bearer {TOKEN_TWO}"));
+    let encoded_credential =
+        base64::engine::general_purpose::STANDARD.encode(credential.encode_to_vec());
+    assert_eq!(
+        headers[0].execution_credential.as_deref(),
+        Some(encoded_credential.as_str())
+    );
+    assert_eq!(
+        headers[1].execution_credential,
+        headers[0].execution_credential
+    );
 }
 
 #[tokio::test]
@@ -581,7 +604,12 @@ async fn authorization_header_is_not_forwarded_through_redirects() {
         .await
         .unwrap();
     assert_eq!(response.status_code, 302);
-    assert!(first_server.await.unwrap().authorization == format!("Bearer {TOKEN_ONE}"));
+    let captured = first_server.await.unwrap();
+    assert_eq!(captured.authorization, format!("Bearer {TOKEN_ONE}"));
+    assert_eq!(
+        captured.execution_credential,
+        Some(base64::engine::general_purpose::STANDARD.encode(credential.encode_to_vec()))
+    );
     assert!(
         tokio::time::timeout(Duration::from_millis(250), second_listener.accept())
             .await

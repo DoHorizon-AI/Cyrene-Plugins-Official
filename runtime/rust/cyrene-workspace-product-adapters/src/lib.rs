@@ -15,12 +15,14 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+use base64::Engine as _;
 pub use cyrene_plugin_contracts::workspace_authority_v2::{
     ExecutionCredential, ExecutionTarget, IdempotencySemantics,
 };
 pub use cyrene_plugin_contracts::workspace_product_v2::{
     ProductApiInvocationV2, ProductApiResponseV2,
 };
+use prost::Message;
 use reqwest::{Method, Url};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
@@ -567,6 +569,7 @@ impl GenericProductHttpAdapter {
         let authorization = self
             .credential_provider
             .authorization_for(credential, &endpoint_origin)?;
+        let execution_credential = execution_credential_header(credential)?;
         let timeout = if timeout.is_zero() {
             self.default_timeout
         } else {
@@ -587,7 +590,8 @@ impl GenericProductHttpAdapter {
             .request(method, url)
             .timeout(timeout)
             .header(reqwest::header::CONTENT_TYPE, "application/json")
-            .header(reqwest::header::AUTHORIZATION, authorization);
+            .header(reqwest::header::AUTHORIZATION, authorization)
+            .header("x-cyrene-execution-credential-bin", execution_credential);
 
         match IdempotencySemantics::try_from(target.idempotency_semantics) {
             Ok(IdempotencySemantics::Required) => {
@@ -638,6 +642,19 @@ impl GenericProductHttpAdapter {
             content_type,
         })
     }
+}
+
+fn execution_credential_header(
+    credential: &ExecutionCredential,
+) -> Result<reqwest::header::HeaderValue, ProductAdapterError> {
+    let encoded = base64::engine::general_purpose::STANDARD.encode(credential.encode_to_vec());
+    let mut value = reqwest::header::HeaderValue::from_str(&encoded).map_err(|_| {
+        ProductAdapterError::InvalidInvocation(
+            "Authority execution credential cannot be encoded for the Product request".into(),
+        )
+    })?;
+    value.set_sensitive(true);
+    Ok(value)
 }
 
 fn validate_invocation_binding(
@@ -809,7 +826,8 @@ fn is_disallowed_address(ip: IpAddr) -> bool {
 
 #[cfg(all(test, unix))]
 mod protected_credential_security_tests {
-    use super::{protected_file_metadata_is_valid, SecretToken};
+    use super::{execution_credential_header, protected_file_metadata_is_valid, SecretToken};
+    use cyrene_plugin_contracts::workspace_authority_v2::ExecutionCredential;
 
     #[test]
     fn systemd_readonly_root_group_credential_metadata_is_accepted() {
@@ -899,5 +917,16 @@ mod protected_credential_security_tests {
             .unwrap()
             .is_sensitive());
         assert!(!format!("{headers:?}").contains(DUMMY_TOKEN));
+    }
+
+    #[test]
+    fn execution_credential_header_is_marked_sensitive_and_debug_redacted() {
+        let credential = ExecutionCredential {
+            principal_subject: "synthetic-subject-42".into(),
+            ..ExecutionCredential::default()
+        };
+        let header = execution_credential_header(&credential).unwrap();
+        assert!(header.is_sensitive());
+        assert!(!format!("{header:?}").contains("synthetic-subject-42"));
     }
 }
