@@ -2,6 +2,47 @@ schema_version: cyrene.capabilities.v1
 generated_by: tools/ci/capability_catalog.py
 verification_registry: contracts/capability-verification.json
 capabilities:
+  - id: account.center.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/accounts/account-center/contracts/v1/schema.json
+    contract_methods:
+      - begin_link
+      - complete_github_link
+      - confirm_wecom_link
+      - create_credential_lease
+      - get_authorization
+      - list_links
+      - observe_wecom_challenge
+      - redeem_credential_lease
+      - resolve_linked_sender
+      - unlink
+    implementations:
+      - ref: cyrene.accounts.account-center
+        source: plugins/accounts/account-center/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - begin_link
+          - complete_github_link
+          - confirm_wecom_link
+          - create_credential_lease
+          - get_authorization
+          - list_links
+          - observe_wecom_challenge
+          - redeem_credential_lease
+          - resolve_linked_sender
+          - unlink
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-12
+    tck: []
   - id: agent.runtime.v1
     interface_versions:
       - "1"

@@ -25,8 +25,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "15bf8b10f8c2040b30888e8160d0d1757e25f60ccdae4ace2cda865e0a7390aa",
-      "size_bytes": 38461
+      "sha256": "20ee1ad81ca2e876aab3c4bff24b82ee4929ef0dbf9d270e160bbf804367a018",
+      "size_bytes": 38792
     },
     {
       "kind": "file",
@@ -60,8 +60,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "CONTRIBUTING.md",
-      "sha256": "468583c5c2ac0a4e41241b0a8eb082e19661e36052d07265ef2683d2003d30a0",
-      "size_bytes": 1767
+      "sha256": "aa77ccfb21495b59d7dee5b7f7ab4b782cd6e725a26e42b04a77b049cc2dd2b4",
+      "size_bytes": 2522
     },
     {
       "kind": "file",
@@ -166,15 +166,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "847e46050c56ae64764789b344050007c9bf257a808185435a99605f0ea30261",
-      "size_bytes": 21678
+      "sha256": "996346ff2e8e7a81ea1d12dd89cfa79c965730134cfab0dd23cfa9debc2d1b80",
+      "size_bytes": 22856
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "3d862d757a24bcf0445d254acb71f6e81c1f97249833b85d823c37cc4c60ae82",
-      "size_bytes": 21886
+      "sha256": "3e0a3126ba06443908656923302de4950d928ae176e4353350fd3ddbca45fda8",
+      "size_bytes": 22935
     },
     {
       "kind": "file",
@@ -868,6 +868,104 @@
       "path": "manifests/plugin.manifest.schema.json",
       "sha256": "981082daa9af398fb5e416de3ccf38980476593a9efc37a3aaea8189140c56db",
       "size_bytes": 12557
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/README.md",
+      "sha256": "2392d2a91d60718a490f4b5fceeffdc7b3c0be820a8ef55c92621c2b9ede05d6",
+      "size_bytes": 5816
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/contracts/v1/schema.json",
+      "sha256": "694d590a1647fb729f54f78f0f0cedd51cfac1a500ad60fa35736c29aeac62c1",
+      "size_bytes": 9200
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/plugin.manifest.json",
+      "sha256": "7d04c2b48e1f76a7d1841b193a0c433f6855e7d960039487c1542f35473c5230",
+      "size_bytes": 3645
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/pyproject.toml",
+      "sha256": "71a8cad8e67b602be3c8889e919955c9c684f3d871bfd9223f3fbbd911669bcf",
+      "size_bytes": 770
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/requirements.lock",
+      "sha256": "077ee0654676b01a6cc819643169f4972569be4630770ac7927e213da254600f",
+      "size_bytes": 81
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/README.md",
+      "sha256": "a3c2770663fd11c8b366e6f56aa0cad88ef0852431175da36133ff3e5769be19",
+      "size_bytes": 755
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/__init__.py",
+      "sha256": "7c6c14949fb48254c40a43c52a7156e3185f9c3adf77b300b113960240838e0d",
+      "size_bytes": 131
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/github.py",
+      "sha256": "dfb488b618155167307cb456f3af9cae4ac823788253eb310d4a8a258efa09e2",
+      "size_bytes": 10384
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/models.py",
+      "sha256": "d882959f71d5d0ccb0fded997ba49088da85c5df71285969681ea931ad24d0f2",
+      "size_bytes": 1445
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/plugin.py",
+      "sha256": "2c5185621e11a85da4829fce96bf41fdaaacc74b2866754c87bb69c8465adf52",
+      "size_bytes": 56458
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/security.py",
+      "sha256": "a5784afd68a135dd880ed54eb90e0cbad1e208eae43a9939e9f4d51d39e241f1",
+      "size_bytes": 5113
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/store.py",
+      "sha256": "9f100acb9ce1877b228867679dd0482599ca12cfbb8c34f37b66657982cf687b",
+      "size_bytes": 51412
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/tests/test_account_center.py",
+      "sha256": "8ca83dc4c6ab4d2de49945ab2e0405ff8b381fc43e8add91fa2096807a94c240",
+      "size_bytes": 52346
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/tests/test_github_oauth.py",
+      "sha256": "ee0fd1e484861d630d53f7c6b1320b1a34a4818b980ee5a9e2c214ad344eea0a",
+      "size_bytes": 4828
     },
     {
       "kind": "file",
@@ -5142,6 +5240,55 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/README.md",
+      "sha256": "8bca49c64d3299cdd4ebbc5b2bac79979dedcb6900a27aae1fa408a912bd5bda",
+      "size_bytes": 1930
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/pyproject.toml",
+      "sha256": "c2f08d63cc16f18b1429e521c5c474054fff0bce0a1b866ecaa213c7ed74f745",
+      "size_bytes": 445
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/README.md",
+      "sha256": "00284b8f1f73a2c3aa54c5feba286f8b1623cc59c004dc3864a1559efc74a8d7",
+      "size_bytes": 473
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/__init__.py",
+      "sha256": "9adc3248d99cb2252adec6d9f868f76ca5730e96794b500955283c4f389e459c",
+      "size_bytes": 1063
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/contracts.py",
+      "sha256": "c1ce1e8dafff31abd9ee6cb40e3c603a61820d90b7417bd7fa21cdc1c29e965f",
+      "size_bytes": 8868
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/tests/test_signing.py",
+      "sha256": "d89f09f0bc8a1d8948667246175a7d5740888408faa4542a53e509c2cdd4eb2b",
+      "size_bytes": 4035
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/README.md",
       "sha256": "e2f6f83c415bb740d8dbcd585d6c75016ad6ba99954a4269227ea511d64a9bac",
       "size_bytes": 1193
@@ -5402,14 +5549,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "7abe74f6259d6a8545d39c1d8f4d9b70bc443d517b5f3c688a334c643d4bc6fb",
-      "size_bytes": 15192
+      "sha256": "b08fde1a428155ad6e70524f2c1b242a9f4b9adaf4961562ca8740de0832abdf",
+      "size_bytes": 15945
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "20b800483e90b47d96527ad5c7d840b5ef25902fe62f9dfb9b36237117f130fa",
+      "sha256": "8dcc5e4872caceaeb4fc70e009cf0503901d2fee5444c675d07ba3a80ffc26b5",
       "size_bytes": 26011
     },
     {

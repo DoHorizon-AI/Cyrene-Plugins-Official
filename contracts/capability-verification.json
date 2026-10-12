@@ -394,6 +394,21 @@
           "notes": "The model provider is a deterministic test double; no external model endpoint was called."
         }
       ]
+    },
+    {
+      "capability": "account.center.v1",
+      "implementation": "cyrene.accounts.account-center",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-12",
+          "environment": "linux / Python 3.12 / local DirectPluginRuntime gRPC with synthetic GitHub and WeCom identity facts",
+          "command": "uv run --project plugins/accounts/account-center --with-editable sdk/python/cyrene_account_center_contracts --with pytest pytest -q plugins/accounts/account-center/tests sdk/python/cyrene_account_center_contracts/tests",
+          "result": "36 passed; fixed account methods, exact caller roles, OAuth PKCE/state callback handling, encrypted storage, one-use lease semantics, refresh recovery, and no-argument local gRPC startup verified",
+          "notes": "Provider identity and callback behavior use local test doubles; no real OAuth login, tenant identity, or external account operation was performed."
+        }
+      ]
     }
   ]
 }
