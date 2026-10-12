@@ -1,0 +1,4 @@
+# Isolated tooling for PEP 639 source dependencies (for example, WeCom SDK).
+pip==25.2
+setuptools==77.0.3
+wheel==0.48.0

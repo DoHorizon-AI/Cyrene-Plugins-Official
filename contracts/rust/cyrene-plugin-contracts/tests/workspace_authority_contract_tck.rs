@@ -8,7 +8,8 @@
 
 use cyrene_plugin_contracts::workspace_authority_v1::*;
 use cyrene_plugin_contracts::workspace_authority_v2::{
-    CanonicalInvocationEnvelope, ExecutionCredential, InvocationAuthorizationSource,
+    CanonicalInvocationEnvelope, ExecutionCredential, GetDelegationRequest,
+    InvocationAuthorizationSource,
 };
 use cyrene_plugin_contracts::workspace_product_v2::*;
 use prost::Message;
@@ -166,4 +167,43 @@ fn delegated_authority_profile_fields_round_trip_and_change_the_signed_input() {
     assert!(legacy.delegation_id.is_empty());
     assert_eq!(legacy.delegation_generation, 0);
     assert!(legacy.delegation_audience.is_empty());
+}
+
+#[test]
+fn get_delegation_optional_product_credential_preserves_the_bearer_request_wire() {
+    let bearer_request = GetDelegationRequest {
+        workspace_id: "workspace-e2e".into(),
+        delegation_id: "grant-e2e".into(),
+        execution_credential: None,
+    };
+    let bearer_bytes = bearer_request.encode_to_vec();
+    let bearer_decoded = GetDelegationRequest::decode(bearer_bytes.as_slice())
+        .expect("decode legacy bearer request");
+    assert_eq!(bearer_decoded.workspace_id, "workspace-e2e");
+    assert_eq!(bearer_decoded.delegation_id, "grant-e2e");
+    assert!(bearer_decoded.execution_credential.is_none());
+
+    let signed_request = GetDelegationRequest {
+        execution_credential: Some(ExecutionCredential {
+            authorization_source: InvocationAuthorizationSource::Delegation as i32,
+            workspace_id: "workspace-e2e".into(),
+            delegation_id: "grant-e2e".into(),
+            delegation_generation: 3,
+            delegation_audience: "exchange-product".into(),
+            ..ExecutionCredential::default()
+        }),
+        ..bearer_request
+    };
+    let signed_decoded = GetDelegationRequest::decode(signed_request.encode_to_vec().as_slice())
+        .expect("decode signed Product request");
+    let credential = signed_decoded
+        .execution_credential
+        .expect("optional Product credential is present");
+    assert_eq!(
+        credential.authorization_source,
+        InvocationAuthorizationSource::Delegation as i32
+    );
+    assert_eq!(credential.delegation_id, "grant-e2e");
+    assert_eq!(credential.delegation_generation, 3);
+    assert_eq!(credential.delegation_audience, "exchange-product");
 }

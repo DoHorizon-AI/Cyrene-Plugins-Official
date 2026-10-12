@@ -25,8 +25,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/data-tools-package-release.yml",
-      "sha256": "a1c0ce319384409bb992577e2e6bdde2edde3097239c5b152f9b63a48fa15996",
-      "size_bytes": 19546
+      "sha256": "b8de490516b234d1eb951f2ac1130a192e9ede2e3e34e297f9672da97656eece",
+      "size_bytes": 19622
     },
     {
       "kind": "file",
@@ -404,8 +404,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/workspace/authority/v2/workspace_authority.proto",
-      "sha256": "62ef9cca3a73bc4d484c5e1ea64f40388e3bd2dbe35bede88edc0dd6bf6a182d",
-      "size_bytes": 13202
+      "sha256": "68bbaedcf825393ff17b51b77cd2019dd6e35a682f190f108801754417bfedb1",
+      "size_bytes": 13573
     },
     {
       "kind": "file",
@@ -607,8 +607,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/workspace_authority_contract_tck.rs",
-      "sha256": "b7e54319c4bf7224a354e857f46f69a841bdaa78fc83f8a1eca8a178b32da773",
-      "size_bytes": 7207
+      "sha256": "c62326d67000b76d5533216540562bc989ac6da0984881aa372b62eaef512bd0",
+      "size_bytes": 8915
     },
     {
       "kind": "file",
@@ -845,7 +845,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/workspace-contract-digests.sha256",
-      "sha256": "349df361fb9d6d48e72921212d6f7d6b13a96cc39f6e59f3dc13943e4fe76cfc",
+      "sha256": "8762d33ce51017f11c30256bb2c782310642a3fe37d90e55288e014e95da05d9",
       "size_bytes": 943
     },
     {
@@ -2006,7 +2006,7 @@
     {
       "kind": "file",
       "mode": "100644",
-      "path": "plugins/providers/github-issues/tests/test_direct_runtime.py",
+      "path": "plugins/providers/github-issues/tests/test_github_issues_direct_runtime.py",
       "sha256": "4b40ff470c24572c7ab33da338a3dc609f94c171abb224c5e657c6a89b153bc6",
       "size_bytes": 8459
     },
@@ -3589,8 +3589,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-frontend-bridge/Cargo.lock",
-      "sha256": "b282a80ee789b5132629417f4824826458e9f26e3c8db8c22397b9110ecef0a7",
-      "size_bytes": 42966
+      "sha256": "e6a9e770e50806ecb8d6bcf968022d778087bea790d4214b9c08c86fd2285bf3",
+      "size_bytes": 42976
     },
     {
       "kind": "file",
@@ -3645,8 +3645,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-relay/Cargo.lock",
-      "sha256": "eeef5af02ab63bb8e5e0022efff7c00eafd573c37e473e94a768f6cad20a32c5",
-      "size_bytes": 48909
+      "sha256": "d4c22733012b0fd9a98abf2127dc0f31d20719cad1e879b7b4528c7bdfee644c",
+      "size_bytes": 48919
     },
     {
       "kind": "file",
@@ -3673,8 +3673,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-sidecar/Cargo.lock",
-      "sha256": "532af8c0837076d171ae1c7aad21bd7aae1eacc1a1e135148c710757da636655",
-      "size_bytes": 42943
+      "sha256": "67469645813df173eae02a27bd4c8fa048b6e8dfed19cacece363b8c47537a6a",
+      "size_bytes": 42953
     },
     {
       "kind": "file",
@@ -3687,8 +3687,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-workspace-sidecar/src/lib.rs",
-      "sha256": "4d1a91eb61c22d51a90e4787cf7154825fc5f52c2bf27cc341a31ddf1bf688ce",
-      "size_bytes": 12802
+      "sha256": "97f523c9b8e1437fee6e5b0ed505847b4bc22c78eb73f264e32c36660c0c66f4",
+      "size_bytes": 12846
     },
     {
       "kind": "file",
@@ -5689,8 +5689,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/rust/cyrene-workspace-client-sdk/src/lib.rs",
-      "sha256": "e374655c9c3978b1bfdf34639c7794d311b8f43fefca5f0fe59540a6553fb847",
-      "size_bytes": 41084
+      "sha256": "77c1a30583d39dae7de75c5613f48eb3fd8ca75bc6476629399d8468857ea6a7",
+      "size_bytes": 53050
     },
     {
       "kind": "file",
@@ -5710,8 +5710,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "44876d011049e0d0e82fb96ac79470244c38799ef9279a7878ad9b8822b72284",
-      "size_bytes": 35478
+      "sha256": "cdb1c94118efaf57e37ac5bf8527df5c7d9f13581de8c9fb7ca4499d2efb234f",
+      "size_bytes": 38365
     },
     {
       "kind": "file",
@@ -5780,8 +5780,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/official_plugin_package.py",
-      "sha256": "f41b491ef0bc1c597bfb653c608e173a02b18f62c018fdde70c1a72df83316c1",
-      "size_bytes": 103541
+      "sha256": "d6cc0b96128b19433a15353a9171e139b61193fe56b6d1e30bbc604baa24652b",
+      "size_bytes": 106035
     },
     {
       "kind": "file",
@@ -5845,6 +5845,13 @@
       "path": "tooling/release/select_official_plugin_packages.py",
       "sha256": "430f67ea942267e89e4c62ca231e32f5ace5d0ad8b594ec0bf698bb145c431d1",
       "size_bytes": 4245
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/source-build-requirements.lock",
+      "sha256": "7549ef3e7e99191e87662826c70b7f3ddd7373a29254a9e5ba4dcd73d31b67b6",
+      "size_bytes": 120
     },
     {
       "kind": "file",

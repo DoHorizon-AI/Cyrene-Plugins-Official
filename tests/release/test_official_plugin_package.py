@@ -22,6 +22,13 @@ from tooling.release import official_plugin_package as release
 from tooling.release import select_official_plugin_packages as selection
 from tooling.release import training_llama_factory_package as training_release
 
+LOCK_ISOLATED_STARTUP_PACKAGES = frozenset(
+    {
+        "cyrene.accounts.account-center",
+        "cyrene.connectors.wecom",
+    }
+)
+
 
 def _write_preparer_wheel(path: Path) -> Path:
     metadata_root = "cyrene_plugin_runtime-0.2.1.dist-info"
@@ -426,6 +433,15 @@ class OfficialPluginPackageTests(unittest.TestCase):
         for index, package_id in enumerate(sorted(release.PACKAGE_SPECS)):
             spec = release.PACKAGE_SPECS[package_id]
             output_dir = self.temp_root / f"package-{index}"
+            wheelhouse_source = (
+                None
+                if package_id in LOCK_ISOLATED_STARTUP_PACKAGES
+                else _create_wheelhouse_source(
+                    self.repository,
+                    spec,
+                    self.temp_root / f"wheelhouse-source-{index}",
+                )
+            )
             outputs = release.build_release_artifacts(
                 root=self.repository,
                 output_dir=output_dir,
@@ -436,11 +452,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 run_id="12345",
                 run_attempt=1,
                 preparer_wheel=self.wheel,
-                wheelhouse_source=_create_wheelhouse_source(
-                    self.repository,
-                    spec,
-                    self.temp_root / f"wheelhouse-source-{index}",
-                ),
+                wheelhouse_source=wheelhouse_source,
             )
             release.verify_release_artifacts(
                 root=self.repository,
@@ -555,6 +567,11 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     )
                     self.assertNotIn(f"{module}.py", names)
                     archive.extractall(payload)
+                python_executable = self._lock_bound_startup_python(
+                    package_id=package_id,
+                    package_name=name,
+                    payload=payload,
+                )
                 self._assert_clean_start(
                     name=name,
                     payload=payload,
@@ -563,6 +580,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     environment_overrides=self._package_activation_environment(
                         package_id
                     ),
+                    python_executable=python_executable,
                 )
 
     def test_dataset_generation_prepares_and_imports_with_uv_offline_and_empty_cache(
@@ -803,6 +821,68 @@ class OfficialPluginPackageTests(unittest.TestCase):
             }
         return {}
 
+    def _lock_bound_startup_python(
+        self,
+        *,
+        package_id: str | None,
+        package_name: str,
+        payload: Path,
+    ) -> Path | None:
+        """Create a runtime from an isolated exact wheelhouse where pins differ.
+
+        Account Center and WeCom intentionally require different cryptography
+        versions. Their clean-start checks use the ZIP's real wheelhouse so the
+        test validates each lock independently instead of merging incompatible
+        pins in the release-test environment.
+        中文：为固定密码学版本的 package 独立安装 ZIP 锁定的 wheelhouse。
+        """
+
+        if package_id not in LOCK_ISOLATED_STARTUP_PACKAGES:
+            return None
+        lock_path = payload / "requirements.lock"
+        wheelhouse_path = payload / "wheelhouse"
+        self.assertTrue(lock_path.is_file(), f"{package_name} package lock is missing")
+        self.assertTrue(
+            (wheelhouse_path / "manifest.json").is_file(),
+            f"{package_name} package wheelhouse is missing",
+        )
+        virtual_environment = self.temp_root / (
+            "clean-start-runtime-" + package_name.replace(" ", "-")
+        )
+        subprocess.run(
+            [sys.executable, "-m", "venv", str(virtual_environment)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        python_executable = virtual_environment / (
+            "Scripts/python.exe" if os.name == "nt" else "bin/python"
+        )
+        installation = subprocess.run(
+            [
+                str(python_executable),
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--no-index",
+                "--only-binary=:all:",
+                "--find-links",
+                str(wheelhouse_path),
+                "--requirement",
+                str(lock_path),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(
+            installation.returncode,
+            0,
+            f"{package_name} exact wheelhouse installation failed:\n{installation.stderr}",
+        )
+        return python_executable
+
     def _assert_clean_start(
         self,
         *,
@@ -811,6 +891,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
         entrypoint: str,
         capability: str,
         environment_overrides: dict[str, str] | None = None,
+        python_executable: Path | None = None,
     ) -> None:
         bootstrap = payload / "src/cyrene_plugin_runtime/bootstrap.py"
         environment = os.environ.copy()
@@ -833,7 +914,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
         self.assertNotIn("PYTHONPATH", environment)
         process = subprocess.Popen(
             [
-                sys.executable,
+                str(python_executable or sys.executable),
                 "-B",
                 str(bootstrap),
                 "--entrypoint",

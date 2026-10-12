@@ -502,6 +502,63 @@ impl AuthorityClient {
         Ok(resp.into_inner())
     }
 
+    /// Reads the caller's own delegation using the legacy interactive bearer path.
+    /// The request deliberately carries no Product execution credential.
+    pub async fn get_delegation_with_bearer(
+        &mut self,
+        req: authority_v2::GetDelegationRequest,
+        bearer_token: &str,
+    ) -> Result<authority_v2::GetDelegationResponse, ClientSdkError> {
+        if req.execution_credential.is_some() {
+            return Err(ClientSdkError::InvalidCredential(
+                "bearer delegation reads cannot include a Product execution credential".into(),
+            ));
+        }
+        let resp = self
+            .inner
+            .get_delegation(bearer_request(req, bearer_token)?)
+            .await?;
+        Ok(resp.into_inner())
+    }
+
+    /// Reads a delegation under an already-signed Product execution credential.
+    /// The credential is passed unchanged for Authority validation; this method
+    /// only rejects ambiguous request credentials, mismatched workspaces, and
+    /// incomplete delegated-profile fields. Authority remains responsible for
+    /// validating the signature, principal, active grant, and target grant.
+    pub async fn get_delegation_with_execution_credential(
+        &mut self,
+        mut req: authority_v2::GetDelegationRequest,
+        credential: authority_v2::ExecutionCredential,
+    ) -> Result<authority_v2::GetDelegationResponse, ClientSdkError> {
+        let is_delegated = credential.authorization_source
+            == authority_v2::InvocationAuthorizationSource::Delegation as i32;
+        let is_interactive = matches!(
+            credential.authorization_source,
+            value
+                if value
+                    == authority_v2::InvocationAuthorizationSource::InteractiveSession as i32
+                    || value
+                        == authority_v2::InvocationAuthorizationSource::Unspecified as i32
+        );
+        if req.execution_credential.is_some()
+            || credential.workspace_id != req.workspace_id
+            || (!is_delegated && !is_interactive)
+            || (is_delegated
+                && (credential.delegation_id.is_empty()
+                    || credential.delegation_generation == 0
+                    || credential.delegation_audience.is_empty()))
+        {
+            return Err(ClientSdkError::InvalidCredential(
+                "Product execution credential is ambiguous or incomplete for this delegation read"
+                    .into(),
+            ));
+        }
+        req.execution_credential = Some(credential);
+        let resp = self.inner.get_delegation(req).await?;
+        Ok(resp.into_inner())
+    }
+
     /// Enqueues an invocation under the managed workload token and delegation scope.
     pub async fn approve_and_enqueue_delegated_invocation(
         &mut self,
@@ -674,6 +731,11 @@ mod delegated_workload_token_tests {
         selected: bool,
         negotiations: usize,
         enqueued_tokens: Vec<Vec<u8>>,
+        delegation_reads: Vec<(
+            String,
+            Option<authority_v2::ExecutionCredential>,
+            Option<String>,
+        )>,
     }
 
     #[derive(Clone)]
@@ -747,6 +809,48 @@ mod delegated_workload_token_tests {
             ))
         }
 
+        async fn get_delegation(
+            &self,
+            request: Request<authority_v2::GetDelegationRequest>,
+        ) -> Result<Response<authority_v2::GetDelegationResponse>, Status> {
+            // This local recorder only checks the Authority-owned delegated target
+            // fence; it does not simulate signature verification or authorization.
+            let bearer = request
+                .metadata()
+                .get("authorization")
+                .and_then(|value| value.to_str().ok())
+                .map(str::to_owned);
+            let request = request.into_inner();
+            let target_delegation_id = request.delegation_id.clone();
+            let target_mismatch = request
+                .execution_credential
+                .as_ref()
+                .is_some_and(|credential| {
+                    credential.authorization_source
+                        == authority_v2::InvocationAuthorizationSource::Delegation as i32
+                        && credential.delegation_id != request.delegation_id
+                });
+            self.state
+                .lock()
+                .expect("mock Authority state")
+                .delegation_reads
+                .push((
+                    target_delegation_id.clone(),
+                    request.execution_credential.clone(),
+                    bearer,
+                ));
+            if target_mismatch {
+                return Err(Status::permission_denied(
+                    "requested delegation does not match the signed proof",
+                ));
+            }
+            Ok(Response::new(authority_v2::GetDelegationResponse {
+                delegation_id: target_delegation_id,
+                workspace_id: request.workspace_id,
+                ..authority_v2::GetDelegationResponse::default()
+            }))
+        }
+
         unimplemented_rpc!(
             verify_identity,
             authority_v2::VerifyIdentityRequest,
@@ -771,11 +875,6 @@ mod delegated_workload_token_tests {
             revoke_delegation,
             authority_v2::RevokeDelegationRequest,
             authority_v2::RevokeDelegationResponse
-        );
-        unimplemented_rpc!(
-            get_delegation,
-            authority_v2::GetDelegationRequest,
-            authority_v2::GetDelegationResponse
         );
         unimplemented_rpc!(
             claim_invocations,
@@ -945,6 +1044,192 @@ mod delegated_workload_token_tests {
         assert_eq!(state.negotiations, 2);
         assert!(state.enqueued_tokens.is_empty());
         drop(state);
+        drop(client);
+        server.abort();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn signed_product_proofs_are_forwarded_without_bearer_metadata() {
+        let (socket, state, server) = start_authority(false, Vec::new()).await;
+        let mut client = AuthorityClient::connect_uds(&socket)
+            .await
+            .expect("connect mock Authority");
+        let bearer = authority_v2::GetDelegationRequest {
+            workspace_id: "workspace-test".into(),
+            delegation_id: "grant-test".into(),
+            execution_credential: None,
+        };
+        client
+            .get_delegation_with_bearer(bearer, "human-token")
+            .await
+            .expect("legacy bearer read");
+
+        let interactive = authority_v2::ExecutionCredential {
+            authorization_source: authority_v2::InvocationAuthorizationSource::InteractiveSession
+                as i32,
+            workspace_id: "workspace-test".into(),
+            session_id: "session-test".into(),
+            session_generation: 2,
+            ..authority_v2::ExecutionCredential::default()
+        };
+        let interactive_request = authority_v2::GetDelegationRequest {
+            workspace_id: "workspace-test".into(),
+            delegation_id: "grant-test".into(),
+            execution_credential: None,
+        };
+        client
+            .get_delegation_with_execution_credential(interactive_request, interactive.clone())
+            .await
+            .expect("signed interactive Product read");
+
+        let legacy_interactive = authority_v2::ExecutionCredential {
+            workspace_id: "workspace-test".into(),
+            session_id: "legacy-session-test".into(),
+            session_generation: 1,
+            ..authority_v2::ExecutionCredential::default()
+        };
+        client
+            .get_delegation_with_execution_credential(
+                authority_v2::GetDelegationRequest {
+                    workspace_id: "workspace-test".into(),
+                    delegation_id: "grant-test".into(),
+                    execution_credential: None,
+                },
+                legacy_interactive.clone(),
+            )
+            .await
+            .expect("legacy signed interactive Product read");
+
+        let credential = authority_v2::ExecutionCredential {
+            authorization_source: authority_v2::InvocationAuthorizationSource::Delegation as i32,
+            workspace_id: "workspace-test".into(),
+            delegation_id: "grant-test".into(),
+            delegation_generation: 4,
+            delegation_audience: "exchange-product".into(),
+            ..authority_v2::ExecutionCredential::default()
+        };
+        let signed = authority_v2::GetDelegationRequest {
+            workspace_id: "workspace-test".into(),
+            delegation_id: "grant-test".into(),
+            execution_credential: None,
+        };
+        client
+            .get_delegation_with_execution_credential(signed, credential.clone())
+            .await
+            .expect("signed Product read");
+
+        let mismatched_target = authority_v2::GetDelegationRequest {
+            workspace_id: "workspace-test".into(),
+            delegation_id: "some-other-grant".into(),
+            execution_credential: None,
+        };
+        assert!(matches!(
+            client
+                .get_delegation_with_execution_credential(mismatched_target, credential.clone())
+                .await,
+            Err(ClientSdkError::Rpc(_))
+        ));
+
+        let state = state.lock().expect("mock Authority state");
+        assert_eq!(state.delegation_reads.len(), 5);
+        assert_eq!(
+            state.delegation_reads[0],
+            ("grant-test".into(), None, Some("Bearer human-token".into()))
+        );
+        assert_eq!(
+            state.delegation_reads[1],
+            ("grant-test".into(), Some(interactive), None)
+        );
+        assert_eq!(
+            state.delegation_reads[2],
+            ("grant-test".into(), Some(legacy_interactive), None)
+        );
+        assert_eq!(
+            state.delegation_reads[3],
+            ("grant-test".into(), Some(credential.clone()), None)
+        );
+        assert_eq!(
+            state.delegation_reads[4],
+            ("some-other-grant".into(), Some(credential), None)
+        );
+        drop(state);
+        drop(client);
+        server.abort();
+        let _ = std::fs::remove_file(socket);
+    }
+
+    #[tokio::test]
+    async fn signed_delegation_read_rejects_mismatched_scope_without_sending_identity() {
+        let (socket, state, server) = start_authority(false, Vec::new()).await;
+        let mut client = AuthorityClient::connect_uds(&socket)
+            .await
+            .expect("connect mock Authority");
+        let credential = authority_v2::ExecutionCredential {
+            authorization_source: authority_v2::InvocationAuthorizationSource::Delegation as i32,
+            workspace_id: "workspace-other".into(),
+            delegation_id: "grant-test".into(),
+            delegation_generation: 4,
+            delegation_audience: "exchange-product".into(),
+            ..authority_v2::ExecutionCredential::default()
+        };
+        let request = authority_v2::GetDelegationRequest {
+            workspace_id: "workspace-test".into(),
+            delegation_id: "grant-test".into(),
+            execution_credential: None,
+        };
+        assert!(matches!(
+            client
+                .get_delegation_with_execution_credential(request, credential)
+                .await,
+            Err(ClientSdkError::InvalidCredential(_))
+        ));
+
+        let incomplete_delegation = authority_v2::ExecutionCredential {
+            authorization_source: authority_v2::InvocationAuthorizationSource::Delegation as i32,
+            workspace_id: "workspace-test".into(),
+            ..authority_v2::ExecutionCredential::default()
+        };
+        assert!(matches!(
+            client
+                .get_delegation_with_execution_credential(
+                    authority_v2::GetDelegationRequest {
+                        workspace_id: "workspace-test".into(),
+                        delegation_id: "grant-test".into(),
+                        execution_credential: None,
+                    },
+                    incomplete_delegation,
+                )
+                .await,
+            Err(ClientSdkError::InvalidCredential(_))
+        ));
+
+        let valid_delegation = authority_v2::ExecutionCredential {
+            authorization_source: authority_v2::InvocationAuthorizationSource::Delegation as i32,
+            workspace_id: "workspace-test".into(),
+            delegation_id: "grant-test".into(),
+            delegation_generation: 4,
+            delegation_audience: "exchange-product".into(),
+            ..authority_v2::ExecutionCredential::default()
+        };
+        assert!(matches!(
+            client
+                .get_delegation_with_execution_credential(
+                    authority_v2::GetDelegationRequest {
+                        workspace_id: "workspace-test".into(),
+                        delegation_id: "grant-test".into(),
+                        execution_credential: Some(valid_delegation.clone()),
+                    },
+                    valid_delegation,
+                )
+                .await,
+            Err(ClientSdkError::InvalidCredential(_))
+        ));
+        assert!(state
+            .lock()
+            .expect("mock Authority state")
+            .delegation_reads
+            .is_empty());
         drop(client);
         server.abort();
         let _ = std::fs::remove_file(socket);

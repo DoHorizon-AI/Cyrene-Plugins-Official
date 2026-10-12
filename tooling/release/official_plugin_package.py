@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,7 +26,6 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-import tomllib
 from packaging.requirements import Requirement
 from packaging.tags import sys_tags
 from packaging.utils import canonicalize_name, parse_wheel_filename
@@ -45,6 +45,12 @@ WORKFLOW_PATH = ".github/workflows/data-tools-package-release.yml"
 PRODUCER_PATH = "tooling/release/official_plugin_package.py"
 TRAINING_PRODUCER_PATH = "tooling/release/training_llama_factory_package.py"
 BUILD_LOCK_PATH = "tooling/release/build-requirements.lock"
+SOURCE_DEPENDENCY_BUILD_LOCK_PATH = "tooling/release/source-build-requirements.lock"
+SOURCE_DEPENDENCY_BUILD_PINS = (
+    "pip==25.2",
+    "setuptools==77.0.3",
+    "wheel==0.48.0",
+)
 JCS_LOCK_PATH = "tools/ci/connection-release-requirements.txt"
 TARGET_ID = "linux-ubuntu-24.04-x86_64-python-3.12"
 TARGET = {
@@ -833,9 +839,63 @@ def _build_source_dependency_wheels(
                 raise PackageBuildError(
                     f"vendored third-party license differs from the pinned source: {dependency.distribution}"
                 )
+            build_environment = Path(temp) / "build-environment"
+            environment_creation = subprocess.run(
+                [sys.executable, "-m", "venv", str(build_environment)],
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if environment_creation.returncode != 0:
+                detail = (
+                    environment_creation.stderr or environment_creation.stdout or ""
+                ).strip()
+                raise PackageBuildError(
+                    "could not create the isolated source build environment"
+                    + (f": {detail[-2000:]}" if detail else "")
+                )
+            build_python = build_environment / (
+                "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+            )
+            source_build_lock = root / SOURCE_DEPENDENCY_BUILD_LOCK_PATH
+            source_build_pins = tuple(
+                line.strip()
+                for line in source_build_lock.read_text(encoding="utf-8").splitlines()
+                if line.strip() and not line.lstrip().startswith("#")
+            )
+            if source_build_pins != SOURCE_DEPENDENCY_BUILD_PINS or any(
+                LOCK_PIN.fullmatch(line) is None for line in source_build_pins
+            ):
+                raise PackageBuildError(
+                    "source dependency build lock differs from the approved exact pins"
+                )
+            build_tools = subprocess.run(
+                [
+                    str(build_python),
+                    "-m",
+                    "pip",
+                    "install",
+                    "--disable-pip-version-check",
+                    "--no-deps",
+                    "--requirement",
+                    str(source_build_lock),
+                ],
+                cwd=root,
+                stdin=subprocess.DEVNULL,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if build_tools.returncode != 0:
+                detail = (build_tools.stderr or build_tools.stdout or "").strip()
+                raise PackageBuildError(
+                    "could not install the pinned source build tools"
+                    + (f": {detail[-2000:]}" if detail else "")
+                )
             result = subprocess.run(
                 [
-                    sys.executable,
+                    str(build_python),
                     "-m",
                     "pip",
                     "wheel",
@@ -2138,9 +2198,7 @@ def verify_release_artifacts(
         }
         generated_at = component_index.get("generatedAt")
         try:
-            parsed_generated_at = datetime.fromisoformat(
-                generated_at.replace("Z", "+00:00")
-            )
+            parsed_generated_at = datetime.fromisoformat(generated_at)
         except (AttributeError, TypeError, ValueError):
             parsed_generated_at = None
         if (

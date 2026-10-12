@@ -146,10 +146,9 @@ jobs:
               "protobuf",
               "duckdb",
               "pillow",
-              "cryptography",
-              "cffi",
-              "pycparser",
           }
+          # Crypto-dependent startup checks install each package's own lock.
+          # Account Center and WeCom intentionally use different crypto pins.
           pins = {}
           root = Path.cwd()
           for spec in PACKAGE_SPECS.values():
