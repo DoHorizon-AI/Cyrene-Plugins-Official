@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -50,8 +52,20 @@ def test_wecom_cli_version_parsing(fake_wecom_cli: WeComCliClient) -> None:
         assert version == "1.3.4"
 
 
-def test_wecom_cli_auth_status_authorized(
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        ("authorized\n", "authorized"),
+        ("unauthorized\n", "unauthorized"),
+        ("not authorized\n", "unknown"),
+        ("authorized but expired\n", "unknown"),
+        ("", "unknown"),
+    ],
+)
+def test_wecom_cli_auth_status_requires_exact_output(
     fake_wecom_cli: WeComCliClient,
+    output: str,
+    expected: str,
 ) -> None:
     client = fake_wecom_cli
     with patch.object(
@@ -60,12 +74,66 @@ def test_wecom_cli_auth_status_authorized(
         return_value=subprocess.CompletedProcess(
             args=["wecom-cli", "auth", "show", "--status"],
             returncode=0,
-            stdout="authorized\n",
+            stdout=output,
             stderr="",
         ),
     ):
         status = client.get_auth_status()
-        assert status == "authorized"
+        assert status == expected
+
+
+def test_wecom_cli_profiles_do_not_inherit_another_identity(
+    fake_wecom_cli: WeComCliClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WECOM_CLI_CONFIG_DIR", "ambient-profile")
+    monkeypatch.setenv("WECOM_CLI_ACCESS_TOKEN", "ambient-token")
+    monkeypatch.setenv("WECOM_CLI_ADDITIONAL_HEADERS", '{"Authorization":"other"}')
+    monkeypatch.setenv("WECOM_CLI_ADDITIONAL_HEADERS_OTHER", '{"X-Identity":"other"}')
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:8080")
+    parent_env = os.environ.copy()
+    profiles = [tmp_path / "profile one", tmp_path / "profile two"]
+    with patch.object(
+        subprocess,
+        "run",
+        return_value=subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="unauthorized\n", stderr=""
+        ),
+    ) as run:
+        for profile in profiles:
+            client = WeComCliClient(
+                executable_path=tmp_path / "wecom-cli",
+                config_dir=profile,
+            )
+            assert client.get_auth_status() == "unauthorized"
+            child_env = run.call_args.kwargs["env"]
+            assert run.call_args.args[0][-3:] == ["auth", "show", "--status"]
+            assert "--config" not in run.call_args.args[0]
+            assert child_env["WECOM_CLI_CONFIG_DIR"] == str(profile)
+            assert "WECOM_CLI_ACCESS_TOKEN" not in child_env
+            assert not any(
+                key.startswith("WECOM_CLI_ADDITIONAL_HEADERS") for key in child_env
+            )
+            assert child_env["HTTPS_PROXY"] == parent_env["HTTPS_PROXY"]
+            assert os.environ == parent_env
+
+
+def test_wecom_cli_default_profile_preserves_official_environment(
+    fake_wecom_cli: WeComCliClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("WECOM_CLI_CONFIG_DIR", "ambient-profile")
+    monkeypatch.setenv("WECOM_CLI_ACCESS_TOKEN", "ambient-token")
+    with patch.object(
+        subprocess,
+        "run",
+        return_value=subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="authorized\n", stderr=""
+        ),
+    ) as run:
+        assert fake_wecom_cli.get_auth_status() == "authorized"
+    assert run.call_args.kwargs["env"]["WECOM_CLI_CONFIG_DIR"] == "ambient-profile"
+    assert run.call_args.kwargs["env"]["WECOM_CLI_ACCESS_TOKEN"] == "ambient-token"
 
 
 def test_wecom_cli_execute_json_output(fake_wecom_cli: WeComCliClient) -> None:
@@ -409,34 +477,33 @@ def test_navigator_workbridge_uses_canonical_tool_provider_operations() -> None:
         cli_config_dir="/tmp/wecom-workbridge-human-profile",
     )
     connector = WeComConnector(config)
-    with patch.object(
-        connector.cli_client,
-        "get_status",
-        return_value=MagicMock(
-            available=True,
-            version="1.3.4",
-            auth_status="authorized",
-            executable_path="wecom-cli",
+    with (
+        patch.object(
+            connector.cli_client,
+            "get_status",
+            return_value=MagicMock(
+                available=True,
+                version="1.3.4",
+                auth_status="authorized",
+                executable_path="wecom-cli",
+            ),
         ),
-    ), patch.object(
-        connector.cli_client,
-        "execute",
-        return_value={"users": [{"userid": "member-1"}]},
+        patch.object(
+            connector.cli_client,
+            "execute",
+            return_value={"users": [{"userid": "member-1"}]},
+        ),
     ):
         bridge = create_navigator_wecom_bridge(connector=connector)
         catalog = bridge.list_tools()
         tools = {tool["id"]: tool for tool in catalog["tools"]}
         assert tools["wecom_contact_search"]["readOnly"] is True
         assert tools["wecom_todo_create"]["readOnly"] is False
-        assert tools["wecom_contact_search"]["inputSchema"]["required"] == [
-            "keywords"
-        ]
+        assert tools["wecom_contact_search"]["inputSchema"]["required"] == ["keywords"]
 
         result = bridge.call_tool("wecom_contact_search", {"keywords": "Alex"})
         assert result["isError"] is False
-        assert result["structuredContent"] == {
-            "users": [{"userid": "member-1"}]
-        }
+        assert result["structuredContent"] == {"users": [{"userid": "member-1"}]}
         denied = bridge.call_tool("wecom_todo_create", {"title": "Follow up"})
         assert denied["isError"] is True
         assert "operator approval" in denied["structuredContent"]["error"]
