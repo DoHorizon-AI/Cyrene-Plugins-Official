@@ -1489,8 +1489,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/README.md",
-      "sha256": "158ff8a28268766045d2f452d5c700dee08ec06b2d3d354ec9f2dbd1e869499b",
-      "size_bytes": 18647
+      "sha256": "4cc3f10aea0d69f99071d23851b3c14dcecf360e0a69780e6167eb8bceab77bf",
+      "size_bytes": 20699
     },
     {
       "kind": "file",
@@ -1559,8 +1559,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/cli.py",
-      "sha256": "698d38e4a50a4532763d038fd5f743d2a12ed6583068fb9e8d7b25932ccf3091",
-      "size_bytes": 8220
+      "sha256": "70f4cd8eac2d6184fec2ef983fdcfcbc7c9c337b7f00bbddb256a44249837642",
+      "size_bytes": 8751
     },
     {
       "kind": "file",
@@ -1629,8 +1629,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_cli.py",
-      "sha256": "8df9f7ad77bd34ef343fc009c740400585692218824ebba08bec8a75415cf49d",
-      "size_bytes": 15478
+      "sha256": "bafdb81388fe7bdc4c4521e18f5fb6ff3340624b1157452a47f73ed62825758c",
+      "size_bytes": 18205
     },
     {
       "kind": "file",
@@ -1650,8 +1650,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_live_smoke.py",
-      "sha256": "bad46afad4385d78364a894b16bfd0d24d542142fb5a542f8d495dbbfc368239",
-      "size_bytes": 1966
+      "sha256": "c840d279a64c5a8b05327e41c03069ce93f6932dcc309ef4b2dc080e8e597530",
+      "size_bytes": 2817
     },
     {
       "kind": "file",

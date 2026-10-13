@@ -50,6 +50,15 @@ remain accepted for compatibility. The human `@wecom/cli` identity is separate:
 enable it explicitly and provide its dedicated profile directory. Its login
 state does not share application or bot credentials.
 
+`cli.config_dir` is passed to the official CLI through the child process's
+`WECOM_CLI_CONFIG_DIR` environment variable, not a `--config` argument.
+Configured profiles ignore inherited `WECOM_CLI_ACCESS_TOKEN` and
+`WECOM_CLI_ADDITIONAL_HEADERS` (including suffixed header variables), so ambient
+credentials cannot replace that profile's identity. Other host environment
+settings, including proxy configuration, remain available. Authorize the
+dedicated profile with the same environment variable when running the official
+CLI login flow. See the [official CLI reference](https://github.com/WecomTeam/wecom-cli/blob/f9b2815/docs/cli-reference.md).
+
 ```json
 {
   "mode": "hybrid",
@@ -159,6 +168,13 @@ python3 -m pytest plugins/connectors/wecom/tests \
 python3 plugins/connectors/wecom/tools/generate_message_connector_bindings.py
 ```
 
+The separate `tests/test_wecom_live_smoke.py` suite runs installed CLI status,
+service-schema and canonical tool-provider checks. Set
+`WECOM_LIVE_CLI_CONFIG_DIR` to select an existing authorized profile. It also
+verifies that an empty profile stays unauthorized despite an inherited token.
+It does not send messages, create business data, or validate bot login/inbound
+delivery; those require a separately approved tenant smoke test.
+
 ---
 
 <!-- Chinese Translation / 中文翻译 -->
@@ -195,6 +211,12 @@ activation 使用 `CYRENE_CAPABILITY_BINDING_ID` 和
 仍接受旧的直接 secret 字段。human `@wecom/cli` identity 与 bot/app identity 分开：
 必须显式启用 CLI，并指定专用 profile 目录。CLI 登录状态不会与应用或 bot 凭据共享。
 
+`cli.config_dir` 通过子进程环境变量 `WECOM_CLI_CONFIG_DIR` 传入官方 CLI，
+不使用 `--config` 参数。指定 profile 时会移除宿主继承的 `WECOM_CLI_ACCESS_TOKEN`
+和 `WECOM_CLI_ADDITIONAL_HEADERS`（包括带后缀的请求头变量），防止其他身份的凭据
+覆盖该 profile。代理等其他宿主环境配置保留。运行官方 CLI 登录流程时也应设置同一个
+环境变量，授权该专用 profile。参见[官方 CLI 参考](https://github.com/WecomTeam/wecom-cli/blob/f9b2815/docs/cli-reference.md)。
+
 Navigator URL 必须使用 `localhost`、`127.0.0.1` 或 `::1`，不能包含 URL credentials、
 query 或 path prefix。token 从指定环境变量读取，不会由 health diagnostics 返回。
 Navigator task intake 使用 workspace bearer，通过同宿主请求调用
@@ -223,6 +245,11 @@ worker 随已订阅或显式启动的 bot runtime 启动，并在 Navigator 持�
 operation，并且每次调用需要提供完全匹配的 `write_approval`；否则写入会被拒绝。operation
 catalog 会列出公开的读取操作和批准要求。connector 不会把调用方提供的命令字符串、service
 名称或 subcommand 交给通用 CLI executor。
+
+独立的 `tests/test_wecom_live_smoke.py` 使用宿主已安装的 CLI 验证授权状态、服务 schema
+与规范 tool-provider 调用。可通过 `WECOM_LIVE_CLI_CONFIG_DIR` 选择已授权的 profile；
+同时验证空 profile 不会继承宿主令牌。该测试不发送消息、不创建业务数据，也不验证机器人
+登录与入站投递；这些操作需要单独经过授权的真实租户测试。
 
 ## 交付和生命周期
 
