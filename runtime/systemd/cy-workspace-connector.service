@@ -8,6 +8,8 @@ Type=simple
 User=cyrene
 Group=cyrene
 EnvironmentFile=/etc/cyrene/workspace-connector.env
+LoadCredential=product-credentials.json:/etc/cyrene/workspace-product-credentials.json
+Environment=CYRENE_CONNECTOR_PRODUCT_CREDENTIAL_MAP=%d/product-credentials.json
 ExecStart=/usr/lib/cyrene/components/cy-workspace-connector
 Restart=on-failure
 RestartSec=2s

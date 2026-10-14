@@ -20,6 +20,9 @@ Coverage map / 覆盖说明:
   snapshot semantics it enables.
 - Tool execution: identity pair, opaque JSON arguments, optional catalog-version
   echo, text/JSON content parts, and typed `ToolProviderError` outcomes.
+- GitHub webhook normalization: `plugins/providers/github-issues/contracts/v1/webhook.schema.json`
+  defines a closed original-bytes HMAC request and a direct `NormalizedGitHubEvent`
+  or sanitized error response; its schema-only TCK runs without the consumer checkout.
 
 Provider-level conformance (stdio MCP against this contract) lives in
 `runtime/rust/cyrene-mcp-provider/tests/mcp_provider_tests.rs` and the plugin-server
@@ -43,5 +46,8 @@ cargo test --manifest-path contracts/rust/cyrene-plugin-contracts/Cargo.toml
 - **标识符**：capability ID、interface version、method ID、type URL 和错误码（contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs）。
 - **工具目录**：(binding_id, provider_tool_id) identity、展示事实、输入/输出 schema JSON、不透明 catalog_version，以及其支持的 per-AgentRun 快照语义。
 - **工具执行**：identity pair、不透明 JSON 参数、可选 catalog-version 回显、文本/JSON 内容部分，以及类型化 ToolProviderError 结果。
+- **GitHub webhook 规范化**：`plugins/providers/github-issues/contracts/v1/webhook.schema.json`
+  定义原始字节 HMAC 请求和直接返回的 `NormalizedGitHubEvent` 或脱敏错误；该 schema TCK
+  不依赖 consumer checkout。
 
 Provider 级的一致性验证（针对本契约的 stdio MCP）位于 runtime/rust/cyrene-mcp-provider/tests/mcp_provider_tests.rs 和 plugin-server 分派测试中；两者都会运行通过换行符分隔的 JSON-RPC 通信的真实子进程。

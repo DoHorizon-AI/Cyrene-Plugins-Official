@@ -53,6 +53,24 @@ The handshake must return the exact protected `QQNT_REQUIRED_CLIENT_VERSION` and
 session or an operator-run QR login must establish the account before this
 automated gate.
 
+## Exact API source/build gate
+
+Before reporting real QQ API compatibility, retain the exact Tencent client
+package provenance and version, the exact Host artifact provenance and ABI,
+and the official Tencent source or documentation that supports each native
+operation used by that build. The Host must be configured explicitly and pass
+the `cyrene.qq.host.v1` binding/generation handshake. Do not infer native
+symbols or handshake behavior from another QQ project. The current repository
+does not contain that protected Host artifact or a verified Tencent operation
+source set, so real login, message, and API readiness remain `NOT_CONFIGURED`
+or `NOT_RUN` until the gate has that evidence. Fake Host tests validate only
+the Cyrene protocol boundary.
+
+在报告真实 QQ API 兼容前，必须保留确切的腾讯客户端 package 来源与版本、Host 制品来源与
+ABI，以及能够支持该 build 所用每项原生操作的腾讯官方来源或文档。Host 必须显式配置，并通过
+`cyrene.qq.host.v1` binding/generation handshake。不得从其他 QQ 项目推断原生符号或握手行为。
+当前仓库没有该受保护 Host 制品或经过验证的腾讯 operation 来源集合，因此在该门禁获得证据前，真实登录、消息和 API 就绪状态仍为 `NOT_CONFIGURED` 或 `NOT_RUN`。Fake Host 测试只验证 Cyrene 协议边界。
+
 An authorized operator can dispatch the gate from the repository's default
 `main` branch with the GitHub CLI:
 

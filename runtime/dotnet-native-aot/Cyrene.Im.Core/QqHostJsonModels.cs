@@ -45,6 +45,9 @@ public sealed class QqDirectProfileDocument
     [JsonPropertyName("login_policy")]
     public string? LoginPolicy { get; set; }
 
+    [JsonPropertyName("dedicated_account_confirmed")]
+    public bool DedicatedAccountConfirmed { get; set; }
+
     [JsonPropertyName("platform")]
     public string? Platform { get; set; }
 
@@ -337,6 +340,95 @@ public sealed class QqSubscribeParameters
     public List<string> Events { get; set; } = new();
 }
 
+/// <summary>Normalized bounded QR result from the configured QQ Host.</summary>
+/// <remarks>中文：由已配置 QQ Host 返回的规范化有界 QR 结果。</remarks>
+public sealed class QqLoginQrResult
+{
+    [JsonPropertyName("login_id")]
+    public string LoginId { get; set; } = string.Empty;
+
+    [JsonPropertyName("qr_payload")]
+    public string QrPayload { get; set; } = string.Empty;
+
+    [JsonPropertyName("expires_at_utc")]
+    public string ExpiresAtUtc { get; set; } = string.Empty;
+
+    [JsonPropertyName("state")]
+    public string State { get; set; } = "pending";
+}
+
+/// <summary>Normalized result from one short-lived QR login poll.</summary>
+/// <remarks>中文：一次短时 QR 登录轮询的规范化结果。</remarks>
+public sealed class QqLoginPollResult
+{
+    [JsonPropertyName("login_id")]
+    public string LoginId { get; set; } = string.Empty;
+
+    [JsonPropertyName("state")]
+    public string State { get; set; } = string.Empty;
+
+    [JsonPropertyName("account_id")]
+    public string? AccountId { get; set; }
+
+    [JsonPropertyName("failure_code")]
+    public string? FailureCode { get; set; }
+}
+
+/// <summary>Credential-free live QQ Host and API health report.</summary>
+/// <remarks>中文：不包含凭据的 QQ Host 与 API 实时健康报告。</remarks>
+public sealed class QqDirectHealthReport
+{
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = "NOT_RUN";
+
+    [JsonPropertyName("host_state")]
+    public string HostState { get; set; } = "CREATED";
+
+    [JsonPropertyName("api_ready")]
+    public bool ApiReady { get; set; }
+
+    [JsonPropertyName("dedicated_account_confirmed")]
+    public bool DedicatedAccountConfirmed { get; set; }
+
+    [JsonPropertyName("generation")]
+    public int Generation { get; set; }
+
+    [JsonPropertyName("client_version")]
+    public string? ClientVersion { get; set; }
+
+    [JsonPropertyName("host_abi")]
+    public string? HostAbi { get; set; }
+
+    [JsonPropertyName("failure_code")]
+    public string? FailureCode { get; set; }
+}
+
+/// <summary>Normalized QR login state event shared with binding-local subscribers.</summary>
+/// <remarks>中文：供 binding 本地订阅者共享的规范化 QR 登录状态事件。</remarks>
+public sealed class QqLoginStateEventPayload
+{
+    [JsonPropertyName("event")]
+    public string Event { get; set; } = "login.state";
+
+    [JsonPropertyName("login_id")]
+    public string LoginId { get; set; } = string.Empty;
+
+    [JsonPropertyName("qr_payload")]
+    public string? QrPayload { get; set; }
+
+    [JsonPropertyName("expires_at_utc")]
+    public string? ExpiresAtUtc { get; set; }
+
+    [JsonPropertyName("state")]
+    public string State { get; set; } = string.Empty;
+
+    [JsonPropertyName("account_id")]
+    public string? AccountId { get; set; }
+
+    [JsonPropertyName("failure_code")]
+    public string? FailureCode { get; set; }
+}
+
 /// <summary>JSON request shape for canonical friend/group approval.</summary>
 /// <remarks>中文：规范好友／群组审批的 JSON 请求结构。</remarks>
 public sealed class QqRespondRequestDocument
@@ -526,6 +618,10 @@ public sealed class QqCallbackPayload
 [JsonSerializable(typeof(Dictionary<string, string>))]
 [JsonSerializable(typeof(QqNativeMessageParameters))]
 [JsonSerializable(typeof(QqSubscribeParameters))]
+[JsonSerializable(typeof(QqLoginQrResult))]
+[JsonSerializable(typeof(QqLoginPollResult))]
+[JsonSerializable(typeof(QqDirectHealthReport))]
+[JsonSerializable(typeof(QqLoginStateEventPayload))]
 [JsonSerializable(typeof(QqRespondRequestDocument))]
 [JsonSerializable(typeof(QqRespondParameters))]
 [JsonSerializable(typeof(QqRespondResult))]

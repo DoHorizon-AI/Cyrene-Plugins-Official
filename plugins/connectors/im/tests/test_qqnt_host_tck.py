@@ -188,6 +188,56 @@ def test_qq_host_tck_correlates_callbacks_to_the_current_request(
         client.close()
 
 
+def test_qq_host_tck_carries_bounded_qr_and_confirmed_login_events(
+    tmp_path: Path,
+) -> None:
+    """Exercise QR results and account state through the real stdio TCK.
+
+    中文：通过真实 stdio TCK 验证 QR 结果与账号状态事件。
+    """
+
+    events: list[Mapping[str, Any]] = []
+    event_received = threading.Event()
+
+    def handle_event(event: Mapping[str, Any]) -> None:
+        events.append(event)
+        event_received.set()
+
+    binding_id = "qq-host-tck-login"
+    client = QQHostClient(
+        _launch_config(tmp_path, binding_id, mode="login_authorized"),
+        event_handler=handle_event,
+    )
+    try:
+        client.start()
+        qr = client.request("qq.login.qr", {"account_id": "10001"})
+        assert qr["login_id"] == "fixture-login-1"
+        assert qr["qr_payload"] == "cyrene-fixture-opaque-login-payload"
+        assert qr["state"] == "pending"
+        assert qr["expires_at_utc"].endswith("Z")
+
+        assert event_received.wait(timeout=1.0)
+        assert events[0]["event"] == "login.qr"
+        assert events[0]["binding_id"] == binding_id
+        assert events[0]["generation"] == 1
+
+        event_received.clear()
+        login = client.request(
+            "qq.login.poll",
+            {"account_id": "10001", "login_id": qr["login_id"]},
+        )
+        assert login == {
+            "login_id": "fixture-login-1",
+            "state": "authorized",
+            "account_id": "10001",
+        }
+        assert event_received.wait(timeout=1.0)
+        assert events[-1]["event"] == "login.state"
+        assert events[-1]["payload"]["account_id"] == "10001"
+    finally:
+        client.close()
+
+
 def test_qq_host_tck_cancellation_ignores_late_response(
     tmp_path: Path,
 ) -> None:

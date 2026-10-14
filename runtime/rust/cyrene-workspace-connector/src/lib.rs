@@ -15,7 +15,7 @@ use crate::journal::{DurableJournal, InvocationStage, JournalEntry, JOURNAL_SCHE
 use cyrene_plugin_contracts::workspace_authority_v2 as authority;
 pub use cyrene_plugin_contracts::workspace_authority_v2::{
     ApprovedInvocation, CanonicalInvocationEnvelope, ExecutionCredential, ExecutionOutcomeStatus,
-    ExecutionTarget, IdempotencySemantics,
+    ExecutionTarget, IdempotencySemantics, InvocationAuthorizationSource,
 };
 pub use cyrene_plugin_contracts::workspace_product_v2::{
     ProductApiInvocationV2, ProductApiResponseV2,
@@ -32,8 +32,9 @@ use thiserror::Error;
 use tracing::{error, warn};
 
 const AUTHORITY_PROTOCOL_VERSION: u32 = 2;
-const MAX_CREDENTIAL_TTL_SECONDS: u64 = 900;
+const MAX_CREDENTIAL_TTL_SECONDS: u64 = 300;
 const MAX_CLOCK_SKEW_SECONDS: u64 = 30;
+const DELEGATED_INVOCATIONS_FEATURE: &str = "delegated_invocations_v1";
 
 #[derive(Debug, Error)]
 pub enum ConnectorError {
@@ -53,6 +54,7 @@ pub struct WorkspaceConnectorWorker {
     http_adapter: Arc<GenericProductHttpAdapter>,
     journal: DurableJournal,
     protocol_negotiated: bool,
+    delegated_invocations_negotiated: bool,
     ready: Arc<AtomicBool>,
 }
 
@@ -91,6 +93,7 @@ impl WorkspaceConnectorWorker {
             http_adapter,
             journal: DurableJournal::open(journal_path)?,
             protocol_negotiated: false,
+            delegated_invocations_negotiated: false,
             ready,
         })
     }
@@ -138,6 +141,7 @@ impl WorkspaceConnectorWorker {
             .negotiate_version(authority::NegotiateVersionRequest {
                 minimum_version: AUTHORITY_PROTOCOL_VERSION,
                 maximum_version: AUTHORITY_PROTOCOL_VERSION,
+                requested_features: vec![DELEGATED_INVOCATIONS_FEATURE.to_string()],
             })
             .await
             .map_err(|error| ConnectorError::ClientSdk(error.to_string()))?;
@@ -150,6 +154,10 @@ impl WorkspaceConnectorWorker {
                 "Authority did not negotiate the required v2 protocol".to_string(),
             ));
         }
+        self.delegated_invocations_negotiated = response
+            .selected_features
+            .iter()
+            .any(|feature| feature == DELEGATED_INVOCATIONS_FEATURE);
         self.protocol_negotiated = true;
         Ok(())
     }
@@ -244,6 +252,10 @@ impl WorkspaceConnectorWorker {
             ));
         }
         validate_credential_binding(envelope, credential)?;
+        require_negotiated_profile(
+            credential.authorization_source,
+            self.delegated_invocations_negotiated,
+        )?;
         if envelope.workspace_id != self.workspace_id
             || !self
                 .supported_components
@@ -325,6 +337,7 @@ impl WorkspaceConnectorWorker {
                     ConnectorError::Invocation("canonical invocation body is missing".into())
                 })?,
                 target,
+                credential,
                 Duration::ZERO,
             );
             let result = dispatch.await;
@@ -442,6 +455,37 @@ fn validate_credential_binding(
     let target = envelope.target.as_ref().ok_or_else(|| {
         ConnectorError::Invocation("canonical envelope has no execution target".to_string())
     })?;
+    let authorization_source =
+        InvocationAuthorizationSource::try_from(envelope.authorization_source).map_err(|_| {
+            ConnectorError::Invocation("Authority returned an unknown authorization source".into())
+        })?;
+    let delegated_scope_valid = match authorization_source {
+        InvocationAuthorizationSource::Delegation => {
+            !envelope.delegation_id.is_empty()
+                && envelope.delegation_generation > 0
+                && !envelope.delegation_audience.trim().is_empty()
+                && credential.delegation_id == envelope.delegation_id
+                && credential.delegation_generation == envelope.delegation_generation
+                && credential.delegation_audience == envelope.delegation_audience
+                && envelope.session_id.is_empty()
+                && envelope.session_generation == 0
+                && credential.session_id.is_empty()
+                && credential.session_generation == 0
+        }
+        InvocationAuthorizationSource::Unspecified
+        | InvocationAuthorizationSource::InteractiveSession => {
+            !envelope.session_id.is_empty()
+                && envelope.session_generation > 0
+                && credential.session_id == envelope.session_id
+                && credential.session_generation == envelope.session_generation
+                && envelope.delegation_id.is_empty()
+                && envelope.delegation_generation == 0
+                && envelope.delegation_audience.is_empty()
+                && credential.delegation_id.is_empty()
+                && credential.delegation_generation == 0
+                && credential.delegation_audience.is_empty()
+        }
+    };
     let invocation_digest = Sha256::digest(invocation.encode_to_vec());
     let envelope_digest = Sha256::digest(envelope.encode_to_vec());
     let required = [
@@ -450,7 +494,6 @@ fn validate_credential_binding(
         &envelope.workspace_id,
         &envelope.principal_issuer,
         &envelope.principal_subject,
-        &envelope.session_id,
         &invocation.owner_id,
         &invocation.operation_id,
         &target.target_component,
@@ -473,6 +516,8 @@ fn validate_credential_binding(
         || credential.execution_device_id != envelope.execution_device_id
         || credential.execution_device_generation != envelope.execution_device_generation
         || credential.execution_authorization_id != envelope.execution_authorization_id
+        || credential.authorization_source != envelope.authorization_source
+        || !delegated_scope_valid
         || target.execution_device_id != envelope.execution_device_id
         || target.execution_device_generation != envelope.execution_device_generation
         || target.execution_authorization_id != envelope.execution_authorization_id
@@ -482,8 +527,6 @@ fn validate_credential_binding(
             != envelope.execution_device_certificate_sha256
         || target.execution_authorization_id.is_empty()
         || target.execution_device_generation == 0
-        || credential.session_id != envelope.session_id
-        || credential.session_generation != envelope.session_generation
         || credential.contract_activation_generation != envelope.contract_activation_generation
         || credential.idempotency_key != target.idempotency_key
         || credential.idempotency_semantics != target.idempotency_semantics
@@ -503,9 +546,7 @@ fn validate_credential_binding(
         || target.endpoint.is_empty()
         || target.execution_authorization_id.len() != 16
         || target.execution_device_certificate_sha256.len() != 32
-        || envelope.session_generation == 0
         || envelope.contract_activation_generation == 0
-        || credential.session_generation == 0
         || credential.contract_activation_generation == 0
     {
         return Err(ConnectorError::Invocation(
@@ -551,6 +592,23 @@ fn validate_credential_binding(
     Ok(())
 }
 
+fn require_negotiated_profile(
+    authorization_source: i32,
+    delegated_invocations_negotiated: bool,
+) -> Result<(), ConnectorError> {
+    match InvocationAuthorizationSource::try_from(authorization_source) {
+        Ok(InvocationAuthorizationSource::Delegation) if !delegated_invocations_negotiated => {
+            Err(ConnectorError::Invocation(
+                "Authority profile did not negotiate delegated invocation support".to_string(),
+            ))
+        }
+        Ok(_) => Ok(()),
+        Err(_) => Err(ConnectorError::Invocation(
+            "Authority returned an unknown authorization source".to_string(),
+        )),
+    }
+}
+
 fn target_is_idempotent(target: Option<&ExecutionTarget>) -> bool {
     target.is_some_and(|target| {
         !target.idempotency_key.is_empty()
@@ -581,4 +639,170 @@ fn hex_digest(bytes: &[u8]) -> String {
         let _ = write!(value, "{byte:02x}");
     }
     value
+}
+
+#[cfg(test)]
+mod delegation_credential_tests {
+    use super::{
+        require_negotiated_profile, validate_credential_binding, ConnectorError,
+        InvocationAuthorizationSource,
+    };
+    use crate::{
+        CanonicalInvocationEnvelope, ExecutionCredential, ExecutionTarget, IdempotencySemantics,
+        ProductApiInvocationV2,
+    };
+    use prost::Message;
+    use sha2::{Digest, Sha256};
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn credential_pair(
+        source: InvocationAuthorizationSource,
+    ) -> (CanonicalInvocationEnvelope, ExecutionCredential) {
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock")
+            .as_secs() as i64;
+        let invocation = ProductApiInvocationV2 {
+            owner_id: "exchange".into(),
+            operation_id: "integration.issue.comment".into(),
+            json_body: br#"{"issueNumber":12,"body":"safe test"}"#.to_vec(),
+            resource_id: "repo-12#12".into(),
+            idempotency_key: "integration-op-12".into(),
+        };
+        let target = ExecutionTarget {
+            target_component: "exchange".into(),
+            http_method: "POST".into(),
+            endpoint: "https://exchange.example.test/api/v1/integrations/action".into(),
+            resource_id: "repo-12#12".into(),
+            scope: "organization=org-1;workspace=ws-1;resource=repo-12#12".into(),
+            idempotency_key: "integration-op-12".into(),
+            idempotency_semantics: IdempotencySemantics::Required as i32,
+            execution_device_id: "connector-1".into(),
+            execution_device_generation: 2,
+            execution_authorization_id: vec![0x11; 16],
+            execution_device_certificate_sha256: vec![0x22; 32],
+        };
+        let delegated = source == InvocationAuthorizationSource::Delegation;
+        let envelope = CanonicalInvocationEnvelope {
+            invocation_id: "invocation-12".into(),
+            invocation: Some(invocation),
+            target: Some(target),
+            organization_id: "org-1".into(),
+            workspace_id: "ws-1".into(),
+            principal_issuer: "https://identity.example.test".into(),
+            principal_subject: "actor-12".into(),
+            execution_device_id: "connector-1".into(),
+            execution_device_generation: 2,
+            execution_authorization_id: vec![0x11; 16],
+            execution_device_certificate_sha256: vec![0x22; 32],
+            session_id: if delegated {
+                String::new()
+            } else {
+                "session-12".into()
+            },
+            session_generation: if delegated { 0 } else { 3 },
+            contract_activation_generation: 9,
+            issued_at: Some(prost_types::Timestamp {
+                seconds: now,
+                nanos: 0,
+            }),
+            expires_at: Some(prost_types::Timestamp {
+                seconds: now + 180,
+                nanos: 0,
+            }),
+            authorization_source: source as i32,
+            delegation_id: if delegated {
+                "00000000-0000-0000-0000-000000000012".into()
+            } else {
+                String::new()
+            },
+            delegation_generation: if delegated { 4 } else { 0 },
+            delegation_audience: if delegated {
+                "exchange-worker".into()
+            } else {
+                String::new()
+            },
+        };
+        let invocation_digest = Sha256::digest(
+            envelope
+                .invocation
+                .as_ref()
+                .expect("invocation")
+                .encode_to_vec(),
+        )
+        .to_vec();
+        let request_digest = Sha256::digest(envelope.encode_to_vec()).to_vec();
+        let target = envelope.target.as_ref().expect("target");
+        let credential = ExecutionCredential {
+            invocation_id: envelope.invocation_id.clone(),
+            invocation_digest_sha256: invocation_digest,
+            request_digest_sha256: request_digest,
+            organization_id: envelope.organization_id.clone(),
+            workspace_id: envelope.workspace_id.clone(),
+            principal_issuer: envelope.principal_issuer.clone(),
+            principal_subject: envelope.principal_subject.clone(),
+            operation_owner_id: "exchange".into(),
+            operation_id: "integration.issue.comment".into(),
+            scope: target.scope.clone(),
+            resource_id: target.resource_id.clone(),
+            target_component: target.target_component.clone(),
+            http_method: target.http_method.clone(),
+            endpoint: target.endpoint.clone(),
+            execution_device_id: envelope.execution_device_id.clone(),
+            execution_device_generation: 2,
+            execution_authorization_id: vec![0x11; 16],
+            execution_device_certificate_sha256: vec![0x22; 32],
+            session_id: envelope.session_id.clone(),
+            session_generation: envelope.session_generation,
+            contract_activation_generation: 9,
+            idempotency_key: target.idempotency_key.clone(),
+            idempotency_semantics: target.idempotency_semantics,
+            signing_key_id: "authority-key-1".into(),
+            issued_at: envelope.issued_at,
+            expires_at: envelope.expires_at,
+            authority_signature: vec![0x33; 64],
+            authorization_source: envelope.authorization_source,
+            delegation_id: envelope.delegation_id.clone(),
+            delegation_generation: envelope.delegation_generation,
+            delegation_audience: envelope.delegation_audience.clone(),
+        };
+        (envelope, credential)
+    }
+
+    #[test]
+    fn delegated_signature_digest_binds_grant_source_generation_and_audience() {
+        let (envelope, credential) = credential_pair(InvocationAuthorizationSource::Delegation);
+        validate_credential_binding(&envelope, &credential).expect("valid delegated scope");
+
+        let mut changed = credential.clone();
+        changed.delegation_generation += 1;
+        assert!(validate_credential_binding(&envelope, &changed).is_err());
+
+        let mut changed_audience = credential;
+        changed_audience.delegation_audience = "another-workload".into();
+        assert!(validate_credential_binding(&envelope, &changed_audience).is_err());
+    }
+
+    #[test]
+    fn delegated_credentials_fail_when_negotiation_does_not_advertise_the_profile() {
+        let source = InvocationAuthorizationSource::Delegation as i32;
+        assert!(matches!(
+            require_negotiated_profile(source, false),
+            Err(ConnectorError::Invocation(_))
+        ));
+        assert!(require_negotiated_profile(source, true).is_ok());
+
+        let legacy_interactive = InvocationAuthorizationSource::Unspecified as i32;
+        assert!(require_negotiated_profile(legacy_interactive, false).is_ok());
+    }
+
+    #[test]
+    fn legacy_interactive_credentials_keep_delegation_fields_empty() {
+        let (envelope, credential) = credential_pair(InvocationAuthorizationSource::Unspecified);
+        assert!(envelope.delegation_id.is_empty());
+        assert_eq!(envelope.delegation_generation, 0);
+        assert!(envelope.delegation_audience.is_empty());
+        validate_credential_binding(&envelope, &credential)
+            .expect("legacy interactive envelope remains compatible");
+    }
 }

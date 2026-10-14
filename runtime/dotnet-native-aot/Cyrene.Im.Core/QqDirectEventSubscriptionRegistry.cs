@@ -95,6 +95,11 @@ internal sealed record QqDirectSubscriptionFilter(
     string? Kind,
     string? RequestKind)
 {
+    public bool LoginStateOnly => string.Equals(
+        EventType,
+        QqDirectInvocationDispatcher.LoginStateEventType,
+        StringComparison.Ordinal);
+
     public bool Matches(QqDirectNormalizedEvent value)
     {
         if (EventType is not null
@@ -331,7 +336,8 @@ public sealed class QqDirectEventSubscriptionRegistry : IDisposable
                     case "event_type":
                         if (value is not (
                                 QqDirectMessageMapper.InboundMessageEventType
-                                or QqDirectMessageMapper.InboundRequestEventType))
+                                or QqDirectMessageMapper.InboundRequestEventType
+                                or QqDirectInvocationDispatcher.LoginStateEventType))
                         {
                             throw new QqDirectSubscriptionException(
                                 "INVALID_REQUEST",

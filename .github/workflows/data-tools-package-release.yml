@@ -1,0 +1,473 @@
+name: Official immutable Python Plugin package releases
+
+on:
+  push:
+    branches: [develop, main, release]
+    paths:
+      - "LICENSE"
+      - "plugins/tools/dataset-preparation/**"
+      - "plugins/tools/document-parsing/**"
+      - "plugins/tools/dataset-generation/**"
+      - "plugins/tools/knowledge-preparation/**"
+      - "plugins/evaluation/exact-match/**"
+      - "plugins/training/llama-factory/**"
+      - "plugins/accounts/account-center/**"
+      - "plugins/providers/github-issues/**"
+      - "plugins/connectors/wecom/**"
+      - "sdk/python/cyrene_account_center_contracts/**"
+      - "sdk/python/cyrene_plugin_runtime/**"
+      - "sdk/python/cyrene_model_provider_contracts/**"
+      - "tooling/release/**"
+      - "tests/release/test_official_plugin_package.py"
+      - "tests/release/test_training_llama_factory_package.py"
+      - "tools/ci/connection-release-requirements.txt"
+      - "tools/ci/source-manifest.json"
+      - ".github/workflows/data-tools-package-release.yml"
+      - ".github/workflows/training-plugin-package-release.yml"
+  pull_request:
+    branches: [develop, main, release]
+    paths:
+      - "LICENSE"
+      - "plugins/tools/dataset-preparation/**"
+      - "plugins/tools/document-parsing/**"
+      - "plugins/tools/dataset-generation/**"
+      - "plugins/tools/knowledge-preparation/**"
+      - "plugins/evaluation/exact-match/**"
+      - "plugins/training/llama-factory/**"
+      - "plugins/accounts/account-center/**"
+      - "plugins/providers/github-issues/**"
+      - "plugins/connectors/wecom/**"
+      - "sdk/python/cyrene_account_center_contracts/**"
+      - "sdk/python/cyrene_plugin_runtime/**"
+      - "sdk/python/cyrene_model_provider_contracts/**"
+      - "tooling/release/**"
+      - "tests/release/test_official_plugin_package.py"
+      - "tests/release/test_training_llama_factory_package.py"
+      - "tools/ci/connection-release-requirements.txt"
+      - "tools/ci/source-manifest.json"
+      - ".github/workflows/data-tools-package-release.yml"
+      - ".github/workflows/training-plugin-package-release.yml"
+  workflow_dispatch:
+    inputs:
+      package_set:
+        description: "Choose the existing draft set, Integration v1 immutable set, or one allowlisted package ID."
+        required: true
+        type: choice
+        default: legacy5
+        options:
+          - legacy5
+          - integration-v1
+          - cyrene.tools.dataset-preparation
+          - cyrene.tools.document-parsing
+          - cyrene.tools.dataset-generation
+          - cyrene.tools.knowledge-preparation
+          - cyrene.evaluation.exact-match
+          - cyrene.accounts.account-center
+          - cyrene.providers.github-issues
+          - cyrene.connectors.wecom
+
+permissions:
+  contents: read
+
+concurrency:
+  group: official-plugin-package-release-${{ github.repository }}-${{ github.sha }}-${{ github.event.inputs.package_set || 'automatic' }}
+  cancel-in-progress: false
+
+env:
+  REPOSITORY: DoHorizon-AI/Cyrene-Plugins-Official
+  SOURCE_SHA: ${{ github.sha }}
+  SOURCE_REF: ${{ github.ref }}
+  CHANNEL: ${{ github.event_name == 'pull_request' && 'candidate' || github.ref == 'refs/heads/develop' && 'preview' || 'stable' }}
+  TARGET: linux-ubuntu-24.04-x86_64-python-3.12
+
+jobs:
+  selection:
+    name: Resolve fixed package release set
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      package_matrix: ${{ steps.select.outputs.package_matrix }}
+      publish_mode: ${{ steps.select.outputs.publish_mode }}
+    steps:
+      - name: Check out the requested source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Resolve the event to a constant allowlisted package matrix
+        id: select
+        env:
+          PACKAGE_SET: ${{ inputs.package_set }}
+        run: >-
+          python tooling/release/select_official_plugin_packages.py
+          --event-name "$GITHUB_EVENT_NAME"
+          --github-output "$GITHUB_OUTPUT"
+
+  contract-tests:
+    name: package contract and clean-process startup tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned release build and metadata tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --requirement tooling/release/build-requirements.lock \
+            --requirement tools/ci/connection-release-requirements.txt
+
+      - name: Install exact runtime pins needed by clean-start tests
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from packaging.utils import canonicalize_name
+          from tooling.release.official_plugin_package import PACKAGE_SPECS, LOCK_PIN
+
+          requested = {
+              "grpcio",
+              "protobuf",
+              "duckdb",
+              "pillow",
+          }
+          # Crypto-dependent startup checks install each package's own lock.
+          # Account Center and WeCom intentionally use different crypto pins.
+          pins = {}
+          root = Path.cwd()
+          for spec in PACKAGE_SPECS.values():
+              lock = root / spec.source_dir / "requirements.lock"
+              for line in lock.read_text(encoding="utf-8").splitlines():
+                  if not line.strip() or line.lstrip().startswith("#"):
+                      continue
+                  match = LOCK_PIN.fullmatch(line.strip())
+                  if match is None:
+                      raise SystemExit(f"not an exact lock pin: {line}")
+                  name, version = match.groups()
+                  canonical = canonicalize_name(name)
+                  if canonical not in requested:
+                      continue
+                  previous = pins.setdefault(canonical, f"{name}=={version}")
+                  if previous != f"{name}=={version}":
+                      raise SystemExit(f"conflicting startup pin for {canonical}")
+          if set(pins) != requested:
+              raise SystemExit(f"startup lock pins missing: {sorted(requested - set(pins))}")
+          output = Path(os.environ["RUNNER_TEMP"]) / "startup-requirements.lock"
+          output.write_text("".join(f"{pins[name]}\n" for name in sorted(pins)))
+          print(output)
+          PY
+          python -m pip install --disable-pip-version-check --no-deps \
+            --requirement "$RUNNER_TEMP/startup-requirements.lock"
+          python -m pip install --disable-pip-version-check uv==0.13.0
+
+      - name: Run release contract and clean-process startup tests
+        run: |
+          set -euo pipefail
+          python -m compileall -q \
+            tooling/release/official_plugin_package.py \
+            tooling/release/select_official_plugin_packages.py \
+            tooling/release/training_llama_factory_package.py \
+            tests/release/test_official_plugin_package.py \
+            tests/release/test_training_llama_factory_package.py
+          python -m unittest discover \
+            -s tests/release -p 'test_official_plugin_package.py' -v
+          python -m unittest discover \
+            -s tests/release -p 'test_training_llama_factory_package.py' -v
+
+  build-and-verify:
+    name: build ${{ matrix.name }} Package Runtime release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    needs: [contract-tests, selection]
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.selection.outputs.package_matrix) }}
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned release build and metadata tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --requirement tooling/release/build-requirements.lock \
+            --requirement tools/ci/connection-release-requirements.txt
+
+      - name: Build and verify the source-bound package release
+        env:
+          PACKAGE_ID: ${{ matrix.package_id }}
+        run: |
+          set -euo pipefail
+          PUBLISH_DIR="$RUNNER_TEMP/official-plugin-package-${{ matrix.name }}"
+          mkdir -p "$PUBLISH_DIR"
+          echo "PUBLISH_DIR=$PUBLISH_DIR" >> "$GITHUB_ENV"
+          python tooling/release/official_plugin_package.py build \
+            --output-dir "$PUBLISH_DIR" \
+            --package-id "$PACKAGE_ID" \
+            --source-ref "$SOURCE_REF" \
+            --channel "$CHANNEL" \
+            --target "$TARGET" \
+            --github-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+
+      - name: Upload the verified package release inputs
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-plugin-release-${{ github.sha }}-${{ matrix.name }}
+          path: ${{ runner.temp }}/official-plugin-package-${{ matrix.name }}/*
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+
+  publish:
+    name: attest and release ${{ matrix.name }} package
+    if: github.repository == 'DoHorizon-AI/Cyrene-Plugins-Official' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    needs: [build-and-verify, selection]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: write
+      attestations: write
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.selection.outputs.package_matrix) }}
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned package verifier tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --requirement tooling/release/build-requirements.lock \
+            --requirement tools/ci/connection-release-requirements.txt
+
+      - name: Download the source-gated package bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: official-plugin-release-${{ github.sha }}-${{ matrix.name }}
+          path: ${{ runner.temp }}/official-plugin-package-release
+
+      - name: Verify exact source, lock, payload, SBOM, and component index
+        env:
+          PACKAGE_ID: ${{ matrix.package_id }}
+          PUBLISH_DIR: ${{ runner.temp }}/official-plugin-package-release
+        run: |
+          set -euo pipefail
+          python tooling/release/official_plugin_package.py verify \
+            --output-dir "$PUBLISH_DIR" \
+            --package-id "$PACKAGE_ID" \
+            --source-ref "$SOURCE_REF" \
+            --channel "$CHANNEL" \
+            --target "$TARGET" \
+            --github-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+          python - "$PUBLISH_DIR" <<'PY'
+          import json
+          import os
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          metadata_path = next(root.glob("*-package-release.json"))
+          metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+          if not metadata.get("release_tag"):
+              raise SystemExit("publish job received candidate metadata")
+          with Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8") as stream:
+              stream.write(f"RELEASE_TAG={metadata['release_tag']}\n")
+              stream.write(f"PACKAGE_VERSION={metadata['package']['version']}\n")
+          PY
+
+      - name: Create per-asset GitHub artifact attestations
+        uses: actions/attest@v4
+        with:
+          subject-checksums: ${{ runner.temp }}/official-plugin-package-release/attestation-subjects.sha256
+
+      - name: Download and verify every asset attestation
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          workflow="$REPOSITORY/.github/workflows/data-tools-package-release.yml"
+          while read -r expected_sha asset_name; do
+            subject="$RUNNER_TEMP/official-plugin-package-release/$asset_name"
+            test -f "$subject"
+            digest="$(sha256sum "$subject" | cut -d ' ' -f 1)"
+            test "$digest" = "$expected_sha"
+            (
+              cd "$RUNNER_TEMP/official-plugin-package-release"
+              gh attestation download "$subject" \
+                --repo "$REPOSITORY" \
+                --predicate-type https://slsa.dev/provenance/v1
+            )
+            bundle="$RUNNER_TEMP/official-plugin-package-release/sha256:$digest.jsonl"
+            test -f "$bundle"
+            mv "$bundle" "$subject.attestation.jsonl"
+            gh attestation verify "$subject" \
+              --bundle "$subject.attestation.jsonl" \
+              --repo "$REPOSITORY" \
+              --signer-workflow "$workflow" \
+              --source-ref "$SOURCE_REF" \
+              --source-digest "$SOURCE_SHA" \
+              --predicate-type https://slsa.dev/provenance/v1
+          done < "$RUNNER_TEMP/official-plugin-package-release/attestation-subjects.sha256"
+
+      - name: Refuse reuse of an immutable release tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "immutable release tag already exists: $RELEASE_TAG" >&2
+            exit 1
+          fi
+
+      - name: Stage the verified release draft without advancing latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_ID: ${{ matrix.package_id }}
+        run: |
+          set -euo pipefail
+          notes="$RUNNER_TEMP/official-plugin-package-release-notes.md"
+          {
+            printf 'Immutable Package Runtime release for `%s@%s`.\n\n' \
+              "$PACKAGE_ID" "$PACKAGE_VERSION"
+            printf 'Source commit: `%s`\nTarget: `%s`\n\n' \
+              "$SOURCE_SHA" "$TARGET"
+            printf '%s\n' \
+              'This source-bound release includes the ZIP, Package Spec descriptor, exact dependency lock, Python runtime preparer wheel, CycloneDX SBOM, source-bound package metadata, component release manifest and index, and a detached GitHub artifact attestation for every artifact.'
+          } > "$notes"
+          mapfile -t assets < <(
+            find "$RUNNER_TEMP/official-plugin-package-release" -maxdepth 1 -type f \
+              ! -name 'attestation-subjects.sha256' -print | sort
+          )
+          test "${#assets[@]}" -gt 0
+          release_flags=()
+          if [[ "$CHANNEL" == preview ]]; then
+            release_flags+=(--prerelease)
+          fi
+          gh release create "$RELEASE_TAG" "${assets[@]}" \
+            --repo "$REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "$PACKAGE_ID $PACKAGE_VERSION ($SOURCE_SHA)" \
+            --notes-file "$notes" \
+            --draft \
+            --latest=false \
+            "${release_flags[@]}"
+          gh release view "$RELEASE_TAG" --repo "$REPOSITORY" \
+            --json isDraft,isImmutable,isPrerelease,tagName,targetCommitish,assets \
+            > "$RUNNER_TEMP/release-readback.json"
+          python - "$RUNNER_TEMP/release-readback.json" "$RELEASE_TAG" \
+            "$PACKAGE_ID" "$PACKAGE_VERSION" "$SOURCE_REF" "$SOURCE_SHA" \
+            "$CHANNEL" "${assets[@]}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          from tooling.release.official_plugin_package import (
+              verify_staged_release_readback,
+          )
+
+          release_path, release_tag, package_id, package_version, source_ref, source_sha, channel, *asset_paths = sys.argv[1:]
+          verify_staged_release_readback(
+              record=json.loads(Path(release_path).read_text(encoding="utf-8")),
+              asset_paths=[Path(path) for path in asset_paths],
+              release_tag=release_tag,
+              package_id=package_id,
+              package_version=package_version,
+              source_ref=source_ref,
+              source_sha=source_sha,
+              channel=channel,
+          )
+          PY
+      - name: Publish and verify the immutable release without advancing latest
+        if: needs.selection.outputs.publish_mode == 'immutable'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PACKAGE_ID: ${{ matrix.package_id }}
+        run: |
+          set -euo pipefail
+          release_id="$(gh release view "$RELEASE_TAG" --repo "$REPOSITORY" --json databaseId --jq .databaseId)"
+          expected_prerelease=false
+          [[ "$CHANNEL" == preview ]] && expected_prerelease=true
+          gh api --method PATCH "repos/$REPOSITORY/releases/$release_id" \
+            -F draft=false \
+            -F prerelease="$expected_prerelease" \
+            -f make_latest=false >/dev/null
+          by_id="$RUNNER_TEMP/official-plugin-release-published-by-id.json"
+          by_tag="$RUNNER_TEMP/official-plugin-release-published-by-tag.json"
+          tag_ref="$RUNNER_TEMP/official-plugin-release-tag-ref.json"
+          PUBLISH_DIR="$RUNNER_TEMP/official-plugin-package-release"
+          mapfile -t assets < <(
+            find "$PUBLISH_DIR" -maxdepth 1 -type f \
+              ! -name 'attestation-subjects.sha256' -print | sort
+          )
+          test "${#assets[@]}" -gt 0
+          gh api "repos/$REPOSITORY/releases/$release_id" > "$by_id"
+          gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" > "$by_tag"
+          gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" > "$tag_ref"
+          python - "$by_id" "$by_tag" "$tag_ref" "$RELEASE_TAG" \
+            "$PACKAGE_ID" "$PACKAGE_VERSION" "$SOURCE_REF" "$SOURCE_SHA" \
+            "$CHANNEL" "${assets[@]}" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+
+          from tooling.release.official_plugin_package import (
+              verify_published_release_readback,
+          )
+
+          by_id_path, by_tag_path, tag_ref_path, release_tag, package_id, package_version, source_ref, source_sha, channel, *asset_paths = sys.argv[1:]
+          record_by_id = json.loads(Path(by_id_path).read_text(encoding="utf-8"))
+          verify_published_release_readback(
+              record_by_id=record_by_id,
+              record_by_tag=json.loads(Path(by_tag_path).read_text(encoding="utf-8")),
+              tag_ref=json.loads(Path(tag_ref_path).read_text(encoding="utf-8")),
+              asset_paths=[Path(path) for path in asset_paths],
+              release_tag=release_tag,
+              package_id=package_id,
+              package_version=package_version,
+              source_ref=source_ref,
+              source_sha=source_sha,
+              channel=channel,
+          )
+          print(
+              f"Published immutable release {release_tag} "
+              f"with database ID {record_by_id['id']}"
+          )
+          PY

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "repository": "DoHorizon-AI/Cyrene-Navigator",
+    "commit": "33a153a252e03c362eb8b8472e401676fa5c0297",
+    "path": "contracts/product/v1/work.openapi.json",
+    "sha256": "7d82c7bae03ecaca21ee203ef97fe4239beb9a22e4c705ae0291eefa5ceb0e73"
+  },
+  "projection": {
+    "pointer": "#/components/schemas/NotificationFinish/properties/outcome/enum",
+    "allowed_values": ["delivered", "failed", "uncertain"]
+  },
+  "projectionSha256": "7f6d51b6a0b98c8df597029adf3b8cce0af76b492c43a4445a3b53646959b6be"
+}

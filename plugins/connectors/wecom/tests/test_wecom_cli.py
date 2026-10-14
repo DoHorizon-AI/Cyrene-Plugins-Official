@@ -5,7 +5,9 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,17 +16,28 @@ from wecom_connector import (
     CALL_TOOL_METHOD,
     LIST_TOOLS_METHOD,
     TOOL_PROVIDER_CAPABILITY_ID,
+    ConnectorError,
     WeComCliClient,
     WeComCliError,
     WeComConnector,
     WeComInstanceConfig,
     WeComToolProvider,
+    create_navigator_wecom_bridge,
 )
 from wecom_connector._generated import tool_provider_pb2 as tool_contract
 
 
-def test_wecom_cli_version_parsing() -> None:
-    client = WeComCliClient()
+@pytest.fixture
+def fake_wecom_cli(tmp_path) -> WeComCliClient:
+    """Provide an isolated executable path without searching the host PATH."""
+    executable = tmp_path / "wecom-cli"
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    return WeComCliClient(executable_path=executable)
+
+
+def test_wecom_cli_version_parsing(fake_wecom_cli: WeComCliClient) -> None:
+    client = fake_wecom_cli
     with patch.object(
         client,
         "_run_raw",
@@ -39,24 +52,92 @@ def test_wecom_cli_version_parsing() -> None:
         assert version == "1.3.4"
 
 
-def test_wecom_cli_auth_status_authorized() -> None:
-    client = WeComCliClient()
+@pytest.mark.parametrize(
+    ("output", "expected"),
+    [
+        ("authorized\n", "authorized"),
+        ("unauthorized\n", "unauthorized"),
+        ("not authorized\n", "unknown"),
+        ("authorized but expired\n", "unknown"),
+        ("", "unknown"),
+    ],
+)
+def test_wecom_cli_auth_status_requires_exact_output(
+    fake_wecom_cli: WeComCliClient,
+    output: str,
+    expected: str,
+) -> None:
+    client = fake_wecom_cli
     with patch.object(
         client,
         "_run_raw",
         return_value=subprocess.CompletedProcess(
             args=["wecom-cli", "auth", "show", "--status"],
             returncode=0,
-            stdout="authorized\n",
+            stdout=output,
             stderr="",
         ),
     ):
         status = client.get_auth_status()
-        assert status == "authorized"
+        assert status == expected
 
 
-def test_wecom_cli_execute_json_output() -> None:
-    client = WeComCliClient()
+def test_wecom_cli_profiles_do_not_inherit_another_identity(
+    fake_wecom_cli: WeComCliClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WECOM_CLI_CONFIG_DIR", "ambient-profile")
+    monkeypatch.setenv("WECOM_CLI_ACCESS_TOKEN", "ambient-token")
+    monkeypatch.setenv("WECOM_CLI_ADDITIONAL_HEADERS", '{"Authorization":"other"}')
+    monkeypatch.setenv("WECOM_CLI_ADDITIONAL_HEADERS_OTHER", '{"X-Identity":"other"}')
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.example:8080")
+    parent_env = os.environ.copy()
+    profiles = [tmp_path / "profile one", tmp_path / "profile two"]
+    with patch.object(
+        subprocess,
+        "run",
+        return_value=subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="unauthorized\n", stderr=""
+        ),
+    ) as run:
+        for profile in profiles:
+            client = WeComCliClient(
+                executable_path=tmp_path / "wecom-cli",
+                config_dir=profile,
+            )
+            assert client.get_auth_status() == "unauthorized"
+            child_env = run.call_args.kwargs["env"]
+            assert run.call_args.args[0][-3:] == ["auth", "show", "--status"]
+            assert "--config" not in run.call_args.args[0]
+            assert child_env["WECOM_CLI_CONFIG_DIR"] == str(profile)
+            assert "WECOM_CLI_ACCESS_TOKEN" not in child_env
+            assert not any(
+                key.startswith("WECOM_CLI_ADDITIONAL_HEADERS") for key in child_env
+            )
+            assert child_env["HTTPS_PROXY"] == parent_env["HTTPS_PROXY"]
+            assert os.environ == parent_env
+
+
+def test_wecom_cli_default_profile_preserves_official_environment(
+    fake_wecom_cli: WeComCliClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("WECOM_CLI_CONFIG_DIR", "ambient-profile")
+    monkeypatch.setenv("WECOM_CLI_ACCESS_TOKEN", "ambient-token")
+    with patch.object(
+        subprocess,
+        "run",
+        return_value=subprocess.CompletedProcess(
+            args=[], returncode=0, stdout="authorized\n", stderr=""
+        ),
+    ) as run:
+        assert fake_wecom_cli.get_auth_status() == "authorized"
+    assert run.call_args.kwargs["env"]["WECOM_CLI_CONFIG_DIR"] == "ambient-profile"
+    assert run.call_args.kwargs["env"]["WECOM_CLI_ACCESS_TOKEN"] == "ambient-token"
+
+
+def test_wecom_cli_execute_json_output(fake_wecom_cli: WeComCliClient) -> None:
+    client = fake_wecom_cli
     fake_json = {"items": [{"title": "Review PR"}], "total": 1}
     with patch.object(
         client,
@@ -72,8 +153,8 @@ def test_wecom_cli_execute_json_output() -> None:
         assert res == fake_json
 
 
-def test_wecom_cli_execute_error_handling() -> None:
-    client = WeComCliClient()
+def test_wecom_cli_execute_error_handling(fake_wecom_cli: WeComCliClient) -> None:
+    client = fake_wecom_cli
     with patch.object(
         subprocess,
         "run",
@@ -94,7 +175,7 @@ def test_tool_provider_list_tools() -> None:
     res = provider.list_tools()
     assert "catalog" in res
     catalog = res["catalog"]
-    assert catalog["catalog_version"] == "v1.3.4"
+    assert catalog["catalog_version"] == "v1.4.0"
     tool_ids = [t["provider_tool_id"] for t in catalog["tools"]]
     assert "wecom_auth_status" in tool_ids
     assert "wecom_contact_search" in tool_ids
@@ -103,11 +184,13 @@ def test_tool_provider_list_tools() -> None:
     assert "wecom_todo_create" in tool_ids
     assert "wecom_todo_finish" in tool_ids
     assert "wecom_doc_search" in tool_ids
-    assert "wecom_cli_exec" in tool_ids
+    assert "wecom_operation_catalog" in tool_ids
+    assert "wecom_connection_health" in tool_ids
+    assert "wecom_cli_exec" not in tool_ids
 
 
-def test_tool_provider_call_auth_status() -> None:
-    cli = WeComCliClient()
+def test_tool_provider_call_auth_status(fake_wecom_cli: WeComCliClient) -> None:
+    cli = fake_wecom_cli
     with (
         patch.object(
             cli,
@@ -159,6 +242,146 @@ def test_tool_provider_call_todo_list() -> None:
         assert content == sample_todos
 
 
+def test_tool_provider_write_requires_binding_and_call_approval() -> None:
+    cli = WeComCliClient()
+    provider = WeComToolProvider(
+        binding_id="wecom.binding", cli_client=cli, cli_enabled=True
+    )
+    with patch.object(cli, "execute") as execute:
+        denied = provider.call_tool(
+            {
+                "provider_tool_id": "wecom_todo_create",
+                "arguments_json": json.dumps(
+                    {"title": "Draft", "write_approval": "todo.create"}
+                ),
+            }
+        )
+        assert denied["is_error"] is True
+        assert "operator approval is required" in denied["content_json"]
+        execute.assert_not_called()
+
+        approved = WeComToolProvider(
+            binding_id="wecom.binding",
+            cli_client=cli,
+            cli_enabled=True,
+            approved_write_operations=("todo.create",),
+        )
+        missing_invocation_approval = approved.call_tool(
+            {
+                "provider_tool_id": "wecom_todo_create",
+                "arguments_json": json.dumps({"title": "Draft"}),
+            }
+        )
+        assert missing_invocation_approval["is_error"] is True
+        assert (
+            "write_approval must exactly match"
+            in missing_invocation_approval["content_json"]
+        )
+        execute.assert_not_called()
+
+        with patch.object(cli, "execute", return_value={"id": "todo-1"}) as execute:
+            accepted = approved.call_tool(
+                {
+                    "provider_tool_id": "wecom_todo_create",
+                    "arguments_json": json.dumps(
+                        {"title": "Draft", "write_approval": "todo.create"}
+                    ),
+                }
+            )
+            assert accepted["is_error"] is False
+            execute.assert_called_once_with("todo", "create", ["--title", "Draft"])
+
+
+def test_tool_provider_has_no_arbitrary_cli_executor() -> None:
+    cli = WeComCliClient()
+    provider = WeComToolProvider(
+        binding_id="wecom.binding", cli_client=cli, cli_enabled=True
+    )
+    with patch.object(cli, "execute") as execute:
+        result = provider.call_tool(
+            {
+                "provider_tool_id": "wecom_cli_exec",
+                "arguments_json": json.dumps(
+                    {"service": "shell", "subcommand": "-c", "args": ["whoami"]}
+                ),
+            }
+        )
+    assert result["is_error"] is True
+    execute.assert_not_called()
+
+
+def test_human_cli_requires_an_isolated_config_dir() -> None:
+    with pytest.raises(ConnectorError, match="cli.config_dir is required"):
+        WeComInstanceConfig.from_mapping(
+            {
+                "binding_id": "wecom.cli",
+                "mode": "bot",
+                "bot_id": "bot-1",
+                "bot_secret": "secret-1",
+                "cli": {"enabled": True},
+            }
+        )
+
+
+def test_connection_health_keeps_app_bot_and_human_cli_identities_separate() -> None:
+    config = WeComInstanceConfig(
+        binding_id="wecom.identity-health",
+        mode="hybrid",
+        corp_id="ww-corp",
+        corp_secret="application-secret",
+        agent_id=42,
+        bot_id="bot-7",
+        bot_secret="bot-secret",
+        cli_enabled=True,
+        cli_config_dir="/tmp/wecom-human-identity",
+    )
+    connector = WeComConnector(config)
+    with patch.object(
+        connector.cli_client,
+        "get_status",
+        return_value=MagicMock(
+            available=True,
+            version="1.3.4",
+            auth_status="unauthorized",
+            executable_path="wecom-cli",
+        ),
+    ):
+        health = connector.connection_health()
+    assert health["application"] == {
+        "configured": True,
+        "account_id": "agent:42",
+        "status": "configured",
+    }
+    assert health["bot"]["configured"] is True
+    assert health["bot"]["account_id"] == "bot:bot-7"
+    assert health["bot"]["status"] == "disconnected"
+    assert health["human_cli"]["enabled"] is True
+    assert health["human_cli"]["config_dir_configured"] is True
+    assert health["human_cli"]["auth_status"] == "unauthorized"
+    assert "application-secret" not in json.dumps(health)
+    assert "bot-secret" not in json.dumps(health)
+    connector.close()
+
+
+def test_app_and_bot_secrets_resolve_from_distinct_environment_refs(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("WECOM_CORP_SECRET", "application-secret")
+    monkeypatch.setenv("WECOM_BOT_SECRET", "robot-secret")
+    config = WeComInstanceConfig.from_mapping(
+        {
+            "binding_id": "wecom.hybrid",
+            "mode": "hybrid",
+            "corp_id": "ww-corp",
+            "agent_id": 42,
+            "bot_id": "bot-1",
+        }
+    )
+    assert config.corp_secret == "application-secret"
+    assert config.bot_secret == "robot-secret"
+    assert config.corp_secret != config.bot_secret
+
+
 def test_tool_provider_proto_roundtrip() -> None:
     cli = WeComCliClient()
     with patch.object(
@@ -178,7 +401,7 @@ def test_tool_provider_proto_roundtrip() -> None:
         resp_bytes = provider.list_tools_proto(req_proto.SerializeToString())
         resp_proto = tool_contract.ListToolsResponse()
         resp_proto.ParseFromString(resp_bytes)
-        assert resp_proto.catalog.catalog_version == "v1.3.4"
+        assert resp_proto.catalog.catalog_version == "v1.4.0"
         assert len(resp_proto.catalog.tools) >= 8
 
         # 2. call_tool_proto
@@ -201,6 +424,8 @@ def test_connector_on_invoke_tool_provider() -> None:
         mode="bot",
         bot_id="b1",
         bot_secret="s1",
+        cli_enabled=True,
+        cli_config_dir="/tmp/wecom-test-profile",
     )
     connector = WeComConnector(config)
     with patch.object(
@@ -240,3 +465,56 @@ def test_connector_on_invoke_tool_provider() -> None:
         call_resp = tool_contract.CallToolResponse()
         call_resp.ParseFromString(typed.value)
         assert call_resp.outcome.is_error is False
+
+
+def test_navigator_workbridge_uses_canonical_tool_provider_operations() -> None:
+    config = WeComInstanceConfig(
+        binding_id="wecom.workbridge",
+        mode="bot",
+        bot_id="bot-1",
+        bot_secret="secret-1",
+        cli_enabled=True,
+        cli_config_dir="/tmp/wecom-workbridge-human-profile",
+    )
+    connector = WeComConnector(config)
+    with (
+        patch.object(
+            connector.cli_client,
+            "get_status",
+            return_value=MagicMock(
+                available=True,
+                version="1.3.4",
+                auth_status="authorized",
+                executable_path="wecom-cli",
+            ),
+        ),
+        patch.object(
+            connector.cli_client,
+            "execute",
+            return_value={"users": [{"userid": "member-1"}]},
+        ),
+    ):
+        bridge = create_navigator_wecom_bridge(connector=connector)
+        catalog = bridge.list_tools()
+        tools = {tool["id"]: tool for tool in catalog["tools"]}
+        assert tools["wecom_contact_search"]["readOnly"] is True
+        assert tools["wecom_todo_create"]["readOnly"] is False
+        assert tools["wecom_contact_search"]["inputSchema"]["required"] == ["keywords"]
+
+        result = bridge.call_tool("wecom_contact_search", {"keywords": "Alex"})
+        assert result["isError"] is False
+        assert result["structuredContent"] == {"users": [{"userid": "member-1"}]}
+        denied = bridge.call_tool("wecom_todo_create", {"title": "Follow up"})
+        assert denied["isError"] is True
+        assert "operator approval" in denied["structuredContent"]["error"]
+        with pytest.raises(ConnectorError) as unsupported:
+            bridge.request_qr({})
+        assert unsupported.value.code == "UNSUPPORTED"
+        with pytest.raises(ConnectorError) as unsupported:
+            bridge.poll_login({})
+        assert unsupported.value.code == "UNSUPPORTED"
+        assert bridge.health()["human_cli"]["auth_status"] == "authorized"
+        connector.cli_client.execute.assert_called_once_with(
+            "contact", "users", ["search", "--keywords", "Alex"]
+        )
+        bridge.close()

@@ -21,9 +21,10 @@ CSHARP_TEST_ROOT = REPOSITORY_ROOT / "runtime/dotnet-native-aot/Cyrene.Im.Tests"
 PYTHON_MODULE_COUNTS = {
     "test_im_native_package.py": 1,
     "test_package.py": 4,
+    "test_qq_official_packages.py": 5,
     "test_qqnt_dependency_boundary.py": 2,
-    "test_qqnt_direct.py": 71,
-    "test_qqnt_host_tck.py": 12,
+    "test_qqnt_direct.py": 75,
+    "test_qqnt_host_tck.py": 13,
 }
 EVIDENCE_CATALOG = {
     "ci:public-ci / dotnet-native-aot": {
@@ -53,6 +54,7 @@ FILE_DEFAULT_EVIDENCE = {
         "ci:public-ci / source-hygiene",
     ],
     "test_qqnt_dependency_boundary.py": ["ci:public-ci / source-hygiene"],
+    "test_qq_official_packages.py": ["ci:public-ci / source-hygiene"],
     "test_qqnt_direct.py": [
         "ci:public-ci / im-qq-host-tck",
         "ci:public-ci / im-package",
@@ -124,7 +126,7 @@ def build_matrix() -> dict[str, Any]:
                 "--collect-only -q plugins/connectors/im/tests"
             ),
             "function_count": len(tests),
-            "collected_case_count": 90,
+            "collected_case_count": sum(PYTHON_MODULE_COUNTS.values()),
             "module_case_counts": PYTHON_MODULE_COUNTS,
         },
         "evidence_catalog": EVIDENCE_CATALOG,

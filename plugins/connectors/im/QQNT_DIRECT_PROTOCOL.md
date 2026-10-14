@@ -73,6 +73,40 @@ removed before a `cancel` frame is sent; a late response is ignored.
 `<binding_id>:<generation>:<counter>`。父进程拒绝来自其他 binding 或 generation
 的响应与事件。超时或取消请求会先从关联表移除，再发送 `cancel`；迟到响应直接丢弃。
 
+## QR login and health / QR 登录与健康状态
+
+The fixed `qq.login.qr` and `qq.login.poll` operation IDs remain part of
+`qq.client.v1`. For the Cyrene bridge, a successful QR response has a normalized
+`result` containing `login_id`, opaque UTF-8 `qr_payload`, UTC `expires_at_utc`,
+and `state: "pending"`. The payload is for local rendering and expires within
+ten minutes. Poll requests carry only the configured `account_id` and
+`login_id`; QR contents are never sent back. Login events use event type
+`qq_login_state` and type URL
+`type.cyrene.io/qq.client.v1.LoginStateEvent`. A state event may carry
+`scanned`, `authorized`, `expired`, or `failed`; the account ID is emitted only
+after the configured account has been confirmed. A mismatched account fails the
+attempt closed.
+
+The stable Navigator health object is
+`{status, host_state, api_ready, dedicated_account_confirmed, generation,
+client_version, host_abi, failure_code}`. `HEALTHY` requires an already-running
+Host generation, completed session startup, explicit dedicated-account
+confirmation, and a successful live `qq.login.self_status` response for that
+account. Configuration alone never implies readiness. Missing Host artifacts
+remain `NOT_CONFIGURED` or `NOT_RUN`.
+
+This is the Cyrene-side contract only. It does not establish the exact native
+QQ API source or claim the operation mapping is compatible with an installed
+QQ build; that evidence remains behind the real smoke source/build gate.
+
+规范 `qq.login.qr` 和 `qq.login.poll` operation ID 仍属于 `qq.client.v1`。在 Cyrene
+bridge 中，成功的 QR 响应包含规范化 `result`：`login_id`、不透明 UTF-8 `qr_payload`、UTC
+时间 `expires_at_utc` 和 `state: "pending"`。payload 仅用于本地渲染，十分钟内过期。轮询请求只携带配置的 `account_id` 和 `login_id`；不会再发送 QR 内容。登录事件类型为 `qq_login_state`，type URL 为 `type.cyrene.io/qq.client.v1.LoginStateEvent`。状态事件可以包含 `scanned`、`authorized`、`expired` 或 `failed`；只有确认与配置账号一致后才会发出 account ID。账号不匹配时会 fail closed。
+
+稳定的 Navigator health 对象为 `{status, host_state, api_ready, dedicated_account_confirmed, generation, client_version, host_abi, failure_code}`。只有已经运行的 Host 代次完成 session 启动、明确确认专用账号，且该账号通过实际 `qq.login.self_status` 响应后才会报告 `HEALTHY`。单独存在配置不会意味着就绪。缺少 Host 制品时仍返回 `NOT_CONFIGURED` 或 `NOT_RUN`。
+
+以上仅定义 Cyrene 一侧的合约，不会确立准确的 QQ 原生 API 来源，也不会宣称 operation 映射与已安装 QQ build 兼容；该证据仍由真实 smoke 来源/build 门禁负责。
+
 ## Message shapes / 消息形状
 
 Handshake request:

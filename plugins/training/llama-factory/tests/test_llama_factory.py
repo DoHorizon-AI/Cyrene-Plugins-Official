@@ -12,7 +12,9 @@ from llama_factory import LlamaFactoryTrainingPlugin
 
 def _spec(tmp_path) -> dict:
     dataset = tmp_path / "train.jsonl"
-    dataset.write_text('{"instruction":"q","input":"","output":"a"}\n', encoding="utf-8")
+    dataset.write_text(
+        '{"instruction":"q","input":"","output":"a"}\n', encoding="utf-8"
+    )
     model = tmp_path / "base"
     model.mkdir()
     (model / "config.json").write_text('{"model_type":"llama"}', encoding="utf-8")
@@ -25,7 +27,12 @@ def _spec(tmp_path) -> dict:
         "finetuning_type": "lora",
         "lora": {"r": 8, "lora_alpha": 16},
         "hyperparams": {"learning_rate": 0.0002, "epochs": 1.0},
-        "distributed": {"gpu_count": 1, "world_size": 1, "nnodes": 1, "nproc_per_node": 1},
+        "distributed": {
+            "gpu_count": 1,
+            "world_size": 1,
+            "nnodes": 1,
+            "nproc_per_node": 1,
+        },
         "checkpoint": {},
         "extra": {"template": "qwen", "max_steps": 1, "max_length": 512},
     }
@@ -37,7 +44,9 @@ def test_compile_materializes_a_real_run_directory(tmp_path) -> None:
 
     run_dir = tmp_path / "run"
     arguments = json.loads((run_dir / "train_config.json").read_text(encoding="utf-8"))
-    dataset_info = json.loads((run_dir / "dataset_info.json").read_text(encoding="utf-8"))
+    dataset_info = json.loads(
+        (run_dir / "dataset_info.json").read_text(encoding="utf-8")
+    )
 
     assert arguments["model_name_or_path"] == str(tmp_path / "base")
     assert arguments["output_dir"] == str(run_dir)
@@ -46,6 +55,11 @@ def test_compile_materializes_a_real_run_directory(tmp_path) -> None:
     assert arguments["template"] == "qwen"
     assert arguments["do_train"] is True
     assert dataset_info["cyrene"]["file_name"] == str(tmp_path / "train.jsonl")
+    assert dataset_info["cyrene"]["columns"] == {
+        "prompt": "instruction",
+        "query": "input",
+        "response": "output",
+    }
     assert launch["argv"][-2:] == ["train", str(run_dir / "train_config.json")]
     assert launch["spec_artifact_path"] == str(run_dir / "train_config.json")
     assert launch["mounts"][0]["read_only"] is True
@@ -77,6 +91,105 @@ def test_compile_ignores_unknown_overrides_but_blocks_identity(tmp_path) -> None
         raise AssertionError("identity overrides must be rejected")
 
 
+def test_compile_maps_messages_schema_to_openai_sharegpt_tags(tmp_path) -> None:
+    spec = _spec(tmp_path)
+    spec["dataset"]["schema"] = "messages"
+
+    LlamaFactoryTrainingPlugin().compile(spec)
+    dataset_info = json.loads(
+        (tmp_path / "run" / "dataset_info.json").read_text(encoding="utf-8")
+    )
+
+    assert dataset_info["cyrene"] == {
+        "file_name": str(tmp_path / "train.jsonl"),
+        "formatting": "sharegpt",
+        "columns": {"messages": "messages"},
+        "tags": {
+            "role_tag": "role",
+            "content_tag": "content",
+            "user_tag": "user",
+            "assistant_tag": "assistant",
+            "system_tag": "system",
+        },
+    }
+
+
+def test_compile_maps_sft_history_columns_without_changing_legacy_instruction(
+    tmp_path,
+) -> None:
+    spec = _spec(tmp_path)
+    spec["dataset"]["schema"] = "instruction_history"
+
+    LlamaFactoryTrainingPlugin().compile(spec)
+    dataset_info = json.loads(
+        (tmp_path / "run" / "dataset_info.json").read_text(encoding="utf-8")
+    )
+
+    assert dataset_info["cyrene"]["columns"] == {
+        "prompt": "instruction",
+        "query": "input",
+        "response": "output",
+        "system": "system",
+        "history": "history",
+    }
+
+
+def test_instruction_schema_probes_optional_history_fields_for_yield_compatibility(
+    tmp_path,
+) -> None:
+    spec = _spec(tmp_path)
+    spec["dataset"]["path"] = str(tmp_path / "train.jsonl")
+    (tmp_path / "train.jsonl").write_text(
+        json.dumps(
+            {
+                "instruction": "current",
+                "input": "",
+                "output": "answer",
+                "system": "system prompt",
+                "history": [["older question", "older answer"]],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    LlamaFactoryTrainingPlugin().compile(spec)
+    dataset_info = json.loads(
+        (tmp_path / "run" / "dataset_info.json").read_text(encoding="utf-8")
+    )
+
+    assert dataset_info["cyrene"]["columns"]["history"] == "history"
+    assert dataset_info["cyrene"]["columns"]["system"] == "system"
+
+
+def test_compile_maps_prompt_completion_schema(tmp_path) -> None:
+    spec = _spec(tmp_path)
+    spec["dataset"]["schema"] = "prompt_completion"
+
+    LlamaFactoryTrainingPlugin().compile(spec)
+    dataset_info = json.loads(
+        (tmp_path / "run" / "dataset_info.json").read_text(encoding="utf-8")
+    )
+
+    assert dataset_info["cyrene"]["formatting"] == "alpaca"
+    assert dataset_info["cyrene"]["columns"] == {
+        "prompt": "prompt",
+        "response": "completion",
+    }
+
+
+def test_compile_rejects_unknown_dataset_schema(tmp_path) -> None:
+    spec = _spec(tmp_path)
+    spec["dataset"]["schema"] = "messages_with_tools"
+
+    try:
+        LlamaFactoryTrainingPlugin().compile(spec)
+    except ValueError as exc:
+        assert "dataset.schema" in str(exc)
+    else:  # pragma: no cover - the unsupported schema must be rejected
+        raise AssertionError("unknown dataset schemas must be rejected")
+
+
 def test_parse_event_classifies_progress_lines() -> None:
     plugin = LlamaFactoryTrainingPlugin()
 
@@ -90,7 +203,9 @@ def test_parse_event_classifies_progress_lines() -> None:
 
 def test_direct_endpoint_compiles_over_the_real_runtime(tmp_path) -> None:
     plugin = LlamaFactoryTrainingPlugin()
-    server, connection_ref = serve(plugin, "training.llama-factory.v1", "1", "127.0.0.1:0")
+    server, connection_ref = serve(
+        plugin, "training.llama-factory.v1", "1", "127.0.0.1:0"
+    )
     client = DirectPluginClient.for_local_connection_ref(connection_ref)
     try:
         response = client.invoke(
@@ -108,6 +223,8 @@ def test_direct_endpoint_compiles_over_the_real_runtime(tmp_path) -> None:
         server.stop(grace=None).wait()
 
     payload = json.loads(response.value)
-    assert response.type_url == "type.cyrene.io/training.llama-factory.v1.compile.response"
+    assert (
+        response.type_url == "type.cyrene.io/training.llama-factory.v1.compile.response"
+    )
     assert payload["launch"]["argv"][-2] == "train"
     assert (tmp_path / "run" / "train_config.json").is_file()

@@ -1,0 +1,6 @@
+# Exact tooling used to build the source-bound SDK wheel.
+build==1.6.1
+packaging==26.3
+pyproject-hooks==1.3.3
+setuptools==68.1.2
+wheel==0.48.0

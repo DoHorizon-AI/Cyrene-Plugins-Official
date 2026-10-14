@@ -3,14 +3,15 @@
   "baseline": {
     "suite": "plugins/connectors/im/tests",
     "collection_command": "PYTHONPATH=plugins/connectors/im/src:sdk/python/cyrene_plugin_runtime/src python3 -m pytest --collect-only -q plugins/connectors/im/tests",
-    "function_count": 71,
-    "collected_case_count": 90,
+    "function_count": 80,
+    "collected_case_count": 100,
     "module_case_counts": {
       "test_im_native_package.py": 1,
       "test_package.py": 4,
+      "test_qq_official_packages.py": 5,
       "test_qqnt_dependency_boundary.py": 2,
-      "test_qqnt_direct.py": 71,
-      "test_qqnt_host_tck.py": 12
+      "test_qqnt_direct.py": 75,
+      "test_qqnt_host_tck.py": 13
     }
   },
   "evidence_catalog": {
@@ -69,6 +70,34 @@
       "status": "covered",
       "evidence": [
         "ci:public-ci / im-package",
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_qq_official_packages.py::test_package_lock_rejects_untrusted_sources_and_null_size",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_qq_official_packages.py::test_package_manager_stages_exact_digest_and_rolls_back_atomically",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_qq_official_packages.py::test_package_manager_fails_before_activation_on_digest_or_target_errors",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / source-hygiene"
+      ]
+    },
+    {
+      "id": "test_qq_official_packages.py::test_package_manager_accepts_explicit_cross_target_locks_without_readiness_claim",
+      "status": "covered",
+      "evidence": [
         "ci:public-ci / source-hygiene"
       ]
     },
@@ -272,6 +301,38 @@
     },
     {
       "id": "test_qqnt_direct.py::test_password_login_updates_session_readiness",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_navigator_bridge_health_requires_a_live_host_and_confirmed_account",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_qr_bridge_returns_bounded_opaque_payload_and_events",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_qr_bridge_rejects_expired_payload_and_unconfirmed_account",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_direct.py::test_qr_poll_confirms_exact_account_and_rejects_mismatch",
       "status": "covered",
       "evidence": [
         "ci:public-ci / im-qq-host-tck",
@@ -552,6 +613,14 @@
     },
     {
       "id": "test_qqnt_host_tck.py::test_qq_host_tck_correlates_callbacks_to_the_current_request",
+      "status": "covered",
+      "evidence": [
+        "ci:public-ci / im-qq-host-tck",
+        "ci:public-ci / im-package"
+      ]
+    },
+    {
+      "id": "test_qqnt_host_tck.py::test_qq_host_tck_carries_bounded_qr_and_confirmed_login_events",
       "status": "covered",
       "evidence": [
         "ci:public-ci / im-qq-host-tck",

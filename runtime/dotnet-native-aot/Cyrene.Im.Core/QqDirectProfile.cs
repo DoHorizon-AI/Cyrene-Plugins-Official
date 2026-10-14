@@ -21,6 +21,7 @@ public sealed record QqDirectProfile(
     string RequiredHostAbi,
     string? AccountId,
     string LoginPolicy,
+    bool DedicatedAccountConfirmed,
     string Platform,
     double TimeoutSeconds,
     double StartupTimeoutSeconds,
@@ -175,6 +176,13 @@ public static class QqDirectProfileLoader
                 "login_policy must be existing_session or qr.");
         }
 
+        if (document.DedicatedAccountConfirmed && accountId is null && legacyAccountId is null)
+        {
+            throw new QqDirectConfigurationException(
+                "INVALID_CONFIGURATION",
+                "dedicated_account_confirmed requires account_id.");
+        }
+
         double timeout = PositiveBounded(document.TimeoutSeconds ?? 10, "timeout_seconds", 300);
         double startupTimeout = PositiveBounded(
             document.StartupTimeoutSeconds ?? 30,
@@ -229,6 +237,7 @@ public static class QqDirectProfileLoader
             requiredHostAbi,
             accountId ?? legacyAccountId,
             loginPolicy,
+            document.DedicatedAccountConfirmed,
             platform,
             timeout,
             startupTimeout,

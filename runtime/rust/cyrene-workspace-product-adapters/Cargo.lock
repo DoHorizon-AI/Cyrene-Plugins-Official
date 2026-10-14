@@ -151,14 +151,19 @@ name = "cyrene-workspace-product-adapters"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "cyrene-plugin-contracts",
+ "prost",
  "reqwest",
+ "rustix",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
+ "zeroize",
 ]
 
 [[package]]

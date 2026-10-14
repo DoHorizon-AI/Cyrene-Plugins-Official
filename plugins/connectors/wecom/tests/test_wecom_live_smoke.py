@@ -4,15 +4,18 @@
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
+from pathlib import Path
 
 import pytest
 
 from wecom_connector import (
     WeComCliClient,
-    WeComConnector,
-    WeComInstanceConfig,
+    WeComToolProvider,
 )
+from wecom_connector._generated import tool_provider_pb2 as tool_contract
 
 
 @pytest.fixture
@@ -20,11 +23,15 @@ def cli_available() -> bool:
     return bool(shutil.which("wecom-cli") or shutil.which("wecom"))
 
 
-def test_real_wecom_cli_live_smoke(cli_available: bool) -> None:
+@pytest.fixture
+def live_cli(cli_available: bool) -> WeComCliClient:
     if not cli_available:
         pytest.skip("wecom-cli is not installed on this host")
+    return WeComCliClient(config_dir=os.environ.get("WECOM_LIVE_CLI_CONFIG_DIR"))
 
-    cli = WeComCliClient()
+
+def test_real_wecom_cli_live_smoke(live_cli: WeComCliClient) -> None:
+    cli = live_cli
     status = cli.get_status()
     assert status.available is True
     assert status.version != ""
@@ -42,26 +49,36 @@ def test_real_wecom_cli_live_smoke(cli_available: bool) -> None:
     assert calendar_schema.get("name") == "calendar"
 
 
-def test_real_wecom_connector_tool_provider_smoke(cli_available: bool) -> None:
-    if not cli_available:
-        pytest.skip("wecom-cli is not installed on this host")
-
-    config = WeComInstanceConfig(
-        binding_id="wecom.live.test",
-        mode="bot",
-        bot_id="b-live",
-        bot_secret="s-live",
-        cli_enabled=True,
+def test_real_wecom_cli_tool_provider_smoke(live_cli: WeComCliClient) -> None:
+    # Validate the CLI capability without fabricating a bot login.
+    # 中文:只验证 CLI 能力,不使用虚构机器人凭据代替真实登录。
+    provider = WeComToolProvider(
+        binding_id="wecom.live.test", cli_client=live_cli, cli_enabled=True
     )
-    connector = WeComConnector(config)
-
-    # 1. List tools
-    tools_res = connector.tool_provider.list_tools()
+    tools_res = provider.list_tools()
     assert len(tools_res["catalog"]["tools"]) >= 8
-
-    # 2. Invoke auth status check tool
-    auth_call = connector.tool_provider.call_tool(
-        {"provider_tool_id": "wecom_auth_status", "arguments_json": "{}"}
+    request = tool_contract.CallToolRequest(
+        binding_id="wecom.live.test",
+        provider_tool_id="wecom_auth_status",
+        arguments_json="{}",
     )
-    assert auth_call["is_error"] is False
-    assert "auth_status" in auth_call["content_json"]
+    result = tool_contract.CallToolResponse.FromString(
+        provider.call_tool_proto(request.SerializeToString())
+    )
+    assert result.outcome.is_error is False
+    content = json.loads(result.outcome.content[0].json.json)
+    assert content["auth_status"] in {"authorized", "unauthorized"}
+
+
+def test_real_wecom_cli_empty_profile_does_not_use_host_credentials(
+    live_cli: WeComCliClient,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    executable_path = live_cli.get_status().executable_path
+    monkeypatch.setenv("WECOM_CLI_ACCESS_TOKEN", "not-a-real-profile-token")
+    client = WeComCliClient(
+        executable_path=executable_path,
+        config_dir=tmp_path / "empty-profile",
+    )
+    assert client.get_auth_status() == "unauthorized"

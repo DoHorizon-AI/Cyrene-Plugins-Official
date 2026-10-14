@@ -2,6 +2,47 @@ schema_version: cyrene.capabilities.v1
 generated_by: tools/ci/capability_catalog.py
 verification_registry: contracts/capability-verification.json
 capabilities:
+  - id: account.center.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/accounts/account-center/contracts/v1/schema.json
+    contract_methods:
+      - begin_link
+      - complete_github_link
+      - confirm_wecom_link
+      - create_credential_lease
+      - get_authorization
+      - list_links
+      - observe_wecom_challenge
+      - redeem_credential_lease
+      - resolve_linked_sender
+      - unlink
+    implementations:
+      - ref: cyrene.accounts.account-center
+        source: plugins/accounts/account-center/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - begin_link
+          - complete_github_link
+          - confirm_wecom_link
+          - create_credential_lease
+          - get_authorization
+          - list_links
+          - observe_wecom_challenge
+          - redeem_credential_lease
+          - resolve_linked_sender
+          - unlink
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-12
+    tck: []
   - id: agent.runtime.v1
     interface_versions:
       - "1"
@@ -85,6 +126,56 @@ capabilities:
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/computer_runtime_contract_tck.rs
       - contracts/tck/computer-runtime-v1
+  - id: dataset.generation.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/dataset-generation/contracts/v1/schema.json
+    contract_methods:
+      - generate_qa
+      - prepare_sft
+      - prepare_training_sft
+    implementations:
+      - ref: cyrene.tools.dataset-generation
+        source: plugins/tools/dataset-generation/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - generate_qa
+          - prepare_sft
+          - prepare_training_sft
+        interface_versions:
+          - "1"
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-07
+    tck: []
+  - id: dataset.knowledge.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/knowledge-preparation/contracts/v1/schema.json
+    contract_methods:
+      - build
+    implementations:
+      - ref: cyrene.tools.knowledge-preparation
+        source: plugins/tools/knowledge-preparation/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - build
+        interface_versions:
+          - "1"
+        verification_level: DISPATCH_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-10-07
+    tck: []
   - id: dataset.preparation.v1
     interface_versions:
       - "1"
@@ -93,8 +184,10 @@ capabilities:
       paths:
         - plugins/tools/dataset-preparation/contracts/v1/schema.json
     contract_methods:
+      - curate_training_records
       - inspect
       - prepare
+      - remap_training_record
       - transform
     implementations:
       - ref: cyrene.tools.dataset-preparation
@@ -103,14 +196,39 @@ capabilities:
         language: python
         publication: published
         methods:
+          - curate_training_records
           - inspect
           - prepare
+          - remap_training_record
           - transform
         interface_versions:
           - "1"
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: REAL
         verified_at: 2026-09-13
+    tck: []
+  - id: document.parsing.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: owner-scoped
+      paths:
+        - plugins/tools/document-parsing/contracts/v1/schema.json
+    contract_methods:
+      - parse
+    implementations:
+      - ref: cyrene.tools.document-parsing
+        source: plugins/tools/document-parsing/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - parse
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-10-07
     tck: []
   - id: evaluation.runner.v1
     interface_versions:
@@ -273,12 +391,13 @@ capabilities:
         language: python
         publication: published
         methods:
+          - inbound_message
           - send_message
         interface_versions:
           - "1"
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: SIMULATED
-        verified_at: 2026-09-13
+        verified_at: 2026-10-12
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/message_connector_contract_tck.rs
       - contracts/tck/message-connector-v1
@@ -596,6 +715,20 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: REAL
         verified_at: 2026-10-04
+      - ref: cyrene.providers.github-issues
+        source: plugins/providers/github-issues/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+          - normalize_webhook
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-12
       - ref: cyrene.runtime.mcp-tool-provider
         source: contracts/runtime-implementations.json
         language: rust

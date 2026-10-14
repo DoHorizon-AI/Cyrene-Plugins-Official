@@ -57,7 +57,8 @@ class WeComCliError(RuntimeError):
 class WeComCliStatus:
     available: bool
     version: str
-    auth_status: str  # "authorized" | "unauthorized" | "not_installed" | "error"
+    # "authorized" | "unauthorized" | "not_installed" | "unknown" | "error"
+    auth_status: str
     executable_path: str
 
 
@@ -105,17 +106,15 @@ class WeComCliClient:
         return res.stdout.strip()
 
     def get_auth_status(self) -> str:
-        """Query the authorization status: 'authorized', 'unauthorized', or 'error'."""
+        """Query exact CLI status; unexpected output never authorizes a profile."""
         if not self.is_installed():
             return "not_installed"
         try:
             res = self._run_raw(["auth", "show", "--status"])
             output = res.stdout.strip().lower()
-            if "authorized" in output:
-                return "authorized"
-            if "unauthorized" in output:
-                return "unauthorized"
-            return output or "unknown"
+            if output in {"authorized", "unauthorized"}:
+                return output
+            return "unknown"
         except WeComCliError as exc:
             logger.warning("Failed to query wecom-cli auth status: %s", exc)
             return "error"
@@ -197,10 +196,20 @@ class WeComCliClient:
         if not self._executable_path:
             raise WeComCliError("wecom-cli executable not found")
 
-        full_cmd = [self._executable_path]
+        full_cmd = [self._executable_path, *args]
+        env = os.environ.copy()
         if self._config_dir:
-            full_cmd.extend(["--config", str(self._config_dir)])
-        full_cmd.extend(args)
+            # The official CLI selects profiles via the child environment.
+            # Ambient tokens/headers must not replace this binding's identity.
+            # 中文:官方 CLI 通过子进程环境选择配置;宿主令牌和请求头不可覆盖绑定身份。
+            env["WECOM_CLI_CONFIG_DIR"] = str(self._config_dir)
+            for key in tuple(env):
+                if (
+                    key == "WECOM_CLI_ACCESS_TOKEN"
+                    or key == "WECOM_CLI_ADDITIONAL_HEADERS"
+                    or key.startswith("WECOM_CLI_ADDITIONAL_HEADERS_")
+                ):
+                    env.pop(key)
 
         try:
             result = subprocess.run(
@@ -209,11 +218,11 @@ class WeComCliClient:
                 text=True,
                 timeout=self._timeout,
                 check=False,
+                env=env,
             )
         except subprocess.TimeoutExpired as exc:
-            cmd_str = " ".join(full_cmd)
             raise WeComCliError(
-                f"wecom-cli command timed out after {self._timeout}s: {cmd_str}",
+                f"wecom-cli command timed out after {self._timeout}s",
                 returncode=124,
             ) from exc
         except OSError as exc:

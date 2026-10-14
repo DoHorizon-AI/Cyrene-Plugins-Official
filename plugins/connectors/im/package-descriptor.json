@@ -26,6 +26,27 @@
     "family": "im",
     "type": "qqnt-direct"
   },
+  "official_package_manager": {
+    "manifest_schema_ref": "qq-package-lock.schema.json",
+    "lock_schema": "cyrene.qq.package-lock.v1",
+    "trusted_publisher": "Tencent",
+    "targets": [
+      "linux-x86_64",
+      "linux-aarch64",
+      "windows-x86_64"
+    ],
+    "download_urls_versions_and_checksums": "operator-trusted-lock-only",
+    "redistributes_original_packages": false,
+    "executes_installers_or_remote_shell": false,
+    "rollback_scope": "active-cache-pointer-only",
+    "staging_claims_host_runtime_ready": false
+  },
+  "host_runtime_readiness": {
+    "linux-x86_64": "NOT_CONFIGURED",
+    "linux-aarch64": "NOT_CONFIGURED",
+    "windows-x86_64": "NOT_CONFIGURED",
+    "real_qq_api_smoke": "NOT_RUN"
+  },
   "profiles": [
     {
       "name": "qqnt-direct",

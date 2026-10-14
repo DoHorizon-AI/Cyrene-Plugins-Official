@@ -17,6 +17,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import subprocess
 import sys
 from pathlib import Path
@@ -27,6 +28,9 @@ OUTPUT_PATH = (
     Path(__file__).resolve().parents[1]
     / "src/wecom_connector/_generated/message_connector_pb2.py"
 )
+TOOL_PROTO_RELATIVE_PATH = Path("proto/cyrene/tool/provider/v1/tool_provider.proto")
+TOOL_OUTPUT_PATH = OUTPUT_PATH.with_name("tool_provider_pb2.py")
+GENERATOR_VERSION = "1.62.3"
 
 
 def main() -> int:
@@ -43,24 +47,44 @@ def main() -> int:
         default=OUTPUT_PATH,
         help="generated Python module destination",
     )
+    parser.add_argument(
+        "--tool-output",
+        type=Path,
+        default=TOOL_OUTPUT_PATH,
+        help="canonical tool.provider.v1 generated module destination",
+    )
     args = parser.parse_args()
-
-    proto = args.contract_root.resolve() / PROTO_RELATIVE_PATH
-    if not proto.is_file():
-        parser.error(f"canonical proto does not exist: {proto}")
-    output = args.output.resolve()
-    output.parent.mkdir(parents=True, exist_ok=True)
-    command = [
-        sys.executable,
-        "-m",
-        "grpc_tools.protoc",
-        "-I",
-        str(proto.parent),
-        "--python_out",
-        str(output.parent),
-        str(proto),
-    ]
-    return subprocess.run(command, check=False).returncode
+    if importlib.metadata.version("grpcio-tools") != GENERATOR_VERSION:
+        parser.error(f"binding generation requires grpcio-tools=={GENERATOR_VERSION}")
+    # Match the declared protobuf 4.x runtime; a newer generator requires a
+    # newer runtime and would make clean installations fail during import.
+    # 中文：生成器与已声明的 protobuf 4.x 运行时保持兼容。
+    for relative, destination in (
+        (PROTO_RELATIVE_PATH, args.output),
+        (TOOL_PROTO_RELATIVE_PATH, args.tool_output),
+    ):
+        proto = args.contract_root.resolve() / relative
+        if not proto.is_file():
+            parser.error(f"canonical proto does not exist: {proto}")
+        output = destination.resolve()
+        expected = proto.stem + "_pb2.py"
+        if output.name != expected:
+            parser.error(f"generated module must be named {expected}")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        command = [
+            sys.executable,
+            "-m",
+            "grpc_tools.protoc",
+            "-I",
+            str(proto.parent),
+            "--python_out",
+            str(output.parent),
+            str(proto),
+        ]
+        result = subprocess.run(command, check=False)
+        if result.returncode:
+            return result.returncode
+    return 0
 
 
 if __name__ == "__main__":

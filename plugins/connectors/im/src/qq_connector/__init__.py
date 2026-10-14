@@ -10,7 +10,17 @@
 
 中文:IM 连接器的独立 QQNT 参考实现。"""
 
+from .navigator_bridge import NavigatorQQBridge, create_navigator_qq_bridge
 from .plugin import ConnectorPlugin
+from .qq_official_packages import (
+    PACKAGE_LOCK_SCHEMA,
+    SUPPORTED_PACKAGE_TARGETS,
+    OfficialQQPackage,
+    QQOfficialPackageManager,
+    QQPackageError,
+    load_package_lock,
+    target_for_current_platform,
+)
 from .qqnt_direct import (
     QQ_CALLBACK_TYPE_URL,
     QQ_CAPABILITY_ID,
@@ -59,6 +69,7 @@ __all__ = [
     "CancellationToken",
     "ConnectorError",
     "ConnectorPlugin",
+    "NavigatorQQBridge",
     "INSTALLATION_MANIFEST_SCHEMA",
     "QQ_CALLBACK_TYPE_URL",
     "QQ_CAPABILITY_ID",
@@ -76,11 +87,19 @@ __all__ = [
     "QQInstallationError",
     "QQNTDirectConfig",
     "QQNTDirectConnector",
+    "QQOfficialPackageManager",
     "QQOperation",
+    "QQPackageError",
+    "OfficialQQPackage",
+    "PACKAGE_LOCK_SCHEMA",
     "SUPPORTED_PLATFORM",
+    "SUPPORTED_PACKAGE_TARGETS",
+    "load_package_lock",
+    "target_for_current_platform",
     "discover_explicit",
     "discover_manifest",
     "discover_manifests",
+    "create_navigator_qq_bridge",
     "encode_frame",
     "read_frame",
     "write_frame",

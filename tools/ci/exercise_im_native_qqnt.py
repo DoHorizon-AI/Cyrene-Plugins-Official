@@ -209,6 +209,9 @@ def _exercise(binary: Path, rid: str) -> dict[str, Any]:
             "required_client_version": "qq-test-1",
             "required_host_abi": "fake-qqnt-linux-x86_64",
             "account_id": "10001",
+            # The disposable Host has a dedicated fixture account; no real QQ login.
+            # 中文：临时 Host 使用专用测试账号，不执行真实 QQ 登录。
+            "dedicated_account_confirmed": True,
             "platform": "linux-x86_64",
             "timeout_seconds": 5,
             "startup_timeout_seconds": 5,

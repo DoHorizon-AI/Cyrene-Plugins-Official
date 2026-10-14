@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.github-issues/configuration.schema.json",
+  "title": "GitHub Issues provider activation configuration",
+  "type": "object",
+  "required": [
+    "exchange_caller_id",
+    "exchange_verification_key_ref",
+    "github_webhook_secret_ref",
+    "account_center",
+    "hostSecretRefs",
+    "repositories",
+    "allowed_installation_ids",
+    "allowed_events",
+    "allowed_actions"
+  ],
+  "properties": {
+    "binding_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "exchange_caller_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "exchange_verification_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$", "description": "Stable secret reference mapped to a 32-byte HMAC key encoded as hex or base64 in hostSecretRefs."},
+    "github_webhook_secret_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+    "account_center": {
+      "type": "object",
+      "description": "Host-resolved Account Center capability target and provider caller credentials; never supplied by tool arguments.",
+      "required": ["binding_id", "connection_ref", "transport", "caller_id", "signing_key_ref"],
+      "properties": {
+        "binding_id": {"type": "string", "minLength": 1, "maxLength": 256, "description": "Resolved Account Center capability binding ID used for lease redemption. It may differ from this provider binding ID.", "x-cyrene-host-provided": true},
+        "connection_ref": {"type": "string", "minLength": 1, "maxLength": 512, "description": "Resolved by Platform/host for this activation. Local mode accepts loopback grpc:// only; remote mode requires grpcs:// and mTLS material.", "x-cyrene-host-provided": true},
+        "transport": {"type": "string", "enum": ["local", "mtls"], "default": "local", "x-cyrene-host-provided": true},
+        "caller_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "signing_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$", "description": "Stable secret reference mapped to the provider caller's 32-byte HMAC key in hostSecretRefs."},
+        "mtls": {
+          "type": "object",
+          "properties": {
+            "root_cert_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+            "client_cert_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+            "client_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"if": {"properties": {"transport": {"const": "mtls"}}, "required": ["transport"]},
+         "then": {"properties": {"mtls": {"required": ["root_cert_ref", "client_cert_ref", "client_key_ref"]}}, "required": ["mtls"]}}
+      ]
+    },
+    "hostSecretRefs": {
+      "type": "object",
+      "description": "Maps stable Plugin secret references to environment-variable names injected by the host. Secret values must not appear in activation JSON.",
+      "required": [
+        "github-issues/exchange-verification-key",
+        "github-issues/webhook-secret",
+        "github-issues/account-center-provider-signing-key"
+      ],
+      "properties": {
+        "github-issues/exchange-verification-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "github-issues/webhook-secret": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "github-issues/account-center-provider-signing-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "github-issues/account-center-root-certificate": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "github-issues/account-center-client-certificate": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "github-issues/account-center-client-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}
+      },
+      "additionalProperties": false
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["repository_id", "owner", "name"],
+        "properties": {
+          "repository_id": {"type": "string", "pattern": "^[0-9]+$"},
+          "owner": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"},
+          "name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+$"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "allowed_installation_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "pattern": "^[0-9]+$"}},
+    "allowed_events": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "enum": ["issues", "issue_comment"]}},
+    "allowed_actions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "enum": ["opened", "edited", "closed", "reopened", "created", "deleted"]}},
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 60, "default": 15}
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "account_center": {
+            "properties": {"transport": {"const": "mtls"}},
+            "required": ["transport"]
+          }
+        },
+        "required": ["account_center"]
+      },
+      "then": {
+        "properties": {
+          "hostSecretRefs": {
+            "required": [
+              "github-issues/account-center-root-certificate",
+              "github-issues/account-center-client-certificate",
+              "github-issues/account-center-client-key"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": false
+}

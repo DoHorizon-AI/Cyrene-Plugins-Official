@@ -1,0 +1,2 @@
+# Offline runtime dependencies for the vLLM control/import service only.
+cyrene-artifacts==0.1.0

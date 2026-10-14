@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.training.llama-factory",
   "name": "LLaMA-Factory Trainer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Compiles Product training intent into a LLaMA-Factory run directory and launch description.",
   "kind": "capability-plugin",
   "capabilities": [

@@ -4,10 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-wecom-connector"
-version = "0.1.0"
-description = "WeCom application-message implementation of the Cyrene message connector capability"
+version = "0.3.0"
+description = "Unified WeCom message and tools connector with canonical inbound delivery"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 requires-python = ">=3.11"
-dependencies = ["grpcio>=1.62,<1.63", "protobuf>=4.21,<5"]
+dependencies = [
+  "grpcio>=1.62,<1.63",
+  "protobuf>=4.21,<5",
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "wecom-aibot-python-sdk @ git+https://github.com/WecomTeam/wecom-aibot-python-sdk.git@6bcb59a9a636c566f4c6ea5268b228e3def1611a",
+]
+
+[project.optional-dependencies]
+bindings = ["grpcio-tools==1.62.3"]
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -20,6 +30,9 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.uv.sources]
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -40,7 +40,7 @@ FORBIDDEN_ENV = frozenset(
 class TypedPayload:
     """Typed response consumed by DirectPluginRuntime.
 
-        中文:由 DirectPluginRuntime 使用的有类型响应。"""
+    中文:由 DirectPluginRuntime 使用的有类型响应。"""
 
     def __init__(self, value: bytes, type_url: str) -> None:
         self.value = value
@@ -48,15 +48,15 @@ class TypedPayload:
 
 
 def _canonical_json(value: Any) -> bytes:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode(
-        "utf-8"
-    )
+    return json.dumps(
+        value, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
 
 
 def _entrypoint() -> list[str]:
     """Resolve the trainer entrypoint the operator installed in the runtime.
 
-        中文:解析操作者在运行时中安装的训练器入口。"""
+    中文:解析操作者在运行时中安装的训练器入口。"""
 
     configured = os.environ.get("CYRENE_LLAMA_FACTORY_ENTRYPOINT", "").strip()
     if configured:
@@ -89,7 +89,91 @@ def _text(value: Any, name: str, default: str | None = None) -> str | None:
     return value
 
 
-def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) -> dict[str, Any]:
+def _dataset_info(spec: dict[str, Any], dataset_path: str) -> dict[str, Any]:
+    """Map the public DatasetRef schema to LLaMA-Factory 0.9.5 columns.
+
+    中文:根据公开 DatasetRef.schema 将数据列映射到 LLaMA-Factory 0.9.5。
+    """
+
+    dataset = _mapping(spec.get("dataset"), "dataset")
+    schema = _text(dataset.get("schema"), "dataset.schema", "instruction")
+    if schema == "instruction":
+        columns = {
+            "prompt": "instruction",
+            "query": "input",
+            "response": "output",
+        }
+        available = _first_jsonl_fields(Path(dataset_path))
+        for optional in ("system", "history"):
+            if optional in available:
+                columns[optional] = optional
+        description = {
+            "file_name": dataset_path,
+            "formatting": "alpaca",
+            "columns": columns,
+        }
+    elif schema == "instruction_history":
+        description = {
+            "file_name": dataset_path,
+            "formatting": "alpaca",
+            "columns": {
+                "prompt": "instruction",
+                "query": "input",
+                "response": "output",
+                "system": "system",
+                "history": "history",
+            },
+        }
+    elif schema == "messages":
+        description = {
+            "file_name": dataset_path,
+            "formatting": "sharegpt",
+            "columns": {"messages": "messages"},
+            "tags": {
+                "role_tag": "role",
+                "content_tag": "content",
+                "user_tag": "user",
+                "assistant_tag": "assistant",
+                "system_tag": "system",
+            },
+        }
+    elif schema == "prompt_completion":
+        description = {
+            "file_name": dataset_path,
+            "formatting": "alpaca",
+            "columns": {"prompt": "prompt", "response": "completion"},
+        }
+    else:
+        raise ValueError(
+            "dataset.schema must be instruction, instruction_history, messages, or prompt_completion"
+        )
+    return {DATASET_NAME: description}
+
+
+def _first_jsonl_fields(path: Path) -> set[str]:
+    """Read one bounded JSONL row to map optional fields for older DatasetRefs.
+
+    中文:读取一条有大小限制的 JSONL 记录，为旧 DatasetRef 映射可选字段。
+    """
+
+    try:
+        with path.open("rb") as stream:
+            first_line = stream.readline(1024 * 1024 + 1)
+        if len(first_line) > 1024 * 1024:
+            raise ValueError("the first JSONL row exceeds the 1 MiB schema probe limit")
+        row = json.loads(first_line) if first_line.strip() else {}
+    except FileNotFoundError:
+        return set()
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValueError(f"cannot inspect DatasetRef JSONL schema: {exc}") from exc
+    if not isinstance(row, dict):
+        raise TypeError("DatasetRef JSONL rows must be JSON objects")
+    return set(row)
+
+
+def _trainer_arguments(
+    spec: dict[str, Any], work_dir: Path, dataset_path: str
+) -> dict[str, Any]:
     """Project the Product training intent onto LLaMA-Factory arguments.
 
     The Plugin writes the dataset index and the trainer config into the run
@@ -110,13 +194,7 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
     if output_dir is None:
         raise ValueError("output_dir is required")
 
-    dataset_info = {
-        DATASET_NAME: {
-            "file_name": dataset_path,
-            "formatting": "alpaca",
-            "columns": {"prompt": "instruction", "query": "input", "response": "output"},
-        }
-    }
+    dataset_info = _dataset_info(spec, dataset_path)
     (work_dir / "dataset_info.json").write_text(
         json.dumps(dataset_info, indent=2, sort_keys=True) + "\n", encoding="utf-8"
     )
@@ -126,7 +204,9 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
         "dataset_dir": str(work_dir),
         "dataset": DATASET_NAME,
         "stage": _text(spec.get("stage"), "stage", "sft"),
-        "finetuning_type": _text(spec.get("finetuning_type"), "finetuning_type", "lora"),
+        "finetuning_type": _text(
+            spec.get("finetuning_type"), "finetuning_type", "lora"
+        ),
         "output_dir": output_dir,
         "overwrite_output_dir": True,
         "do_train": True,
@@ -137,7 +217,9 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
             extras.get("per_device_batch_size"), "extra.per_device_batch_size", 1
         ),
         "gradient_accumulation_steps": _positive_int(
-            extras.get("gradient_accumulation_steps"), "extra.gradient_accumulation_steps", 1
+            extras.get("gradient_accumulation_steps"),
+            "extra.gradient_accumulation_steps",
+            1,
         ),
         "learning_rate": hyperparams.get("learning_rate", 2e-4),
         "num_train_epochs": hyperparams.get("epochs", 1.0),
@@ -148,14 +230,20 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
     }
     if arguments["finetuning_type"] == "lora":
         arguments["lora_rank"] = _positive_int(lora.get("r"), "lora.r", 64)
-        arguments["lora_alpha"] = _positive_int(lora.get("lora_alpha"), "lora.lora_alpha", 16)
+        arguments["lora_alpha"] = _positive_int(
+            lora.get("lora_alpha"), "lora.lora_alpha", 16
+        )
         arguments["lora_dropout"] = lora.get("lora_dropout", 0.05)
         if lora.get("target_modules"):
-            arguments["lora_target"] = ",".join(str(item) for item in lora["target_modules"])
+            arguments["lora_target"] = ",".join(
+                str(item) for item in lora["target_modules"]
+            )
     max_steps = _positive_int(extras.get("max_steps"), "extra.max_steps")
     if max_steps is not None:
         arguments["max_steps"] = max_steps
-    max_train_samples = _positive_int(extras.get("max_train_samples"), "extra.max_train_samples")
+    max_train_samples = _positive_int(
+        extras.get("max_train_samples"), "extra.max_train_samples"
+    )
     if max_train_samples is not None:
         arguments["max_samples"] = max_train_samples
     resume_from = _text(checkpoint.get("resume_from"), "checkpoint.resume_from")
@@ -165,10 +253,14 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
     if save_steps is not None:
         arguments["save_strategy"] = "steps"
         arguments["save_steps"] = save_steps
-    save_total_limit = _positive_int(checkpoint.get("save_total_limit"), "checkpoint.save_total_limit")
+    save_total_limit = _positive_int(
+        checkpoint.get("save_total_limit"), "checkpoint.save_total_limit"
+    )
     if save_total_limit is not None:
         arguments["save_total_limit"] = save_total_limit
-    overrides = _mapping(extras.get("llamafactory_args") or {}, "extra.llamafactory_args")
+    overrides = _mapping(
+        extras.get("llamafactory_args") or {}, "extra.llamafactory_args"
+    )
     for key, value in overrides.items():
         if key in {"model_name_or_path", "dataset_dir", "dataset", "output_dir"}:
             raise ValueError(f"extra.llamafactory_args must not override {key}")
@@ -181,10 +273,10 @@ def _trainer_arguments(spec: dict[str, Any], work_dir: Path, dataset_path: str) 
 class LlamaFactoryTrainingPlugin:
     """Stateless LLaMA-Factory launch-contract implementation.
 
-        中文:无状态的 LLaMA-Factory 启动契约实现。"""
+    中文:无状态的 LLaMA-Factory 启动契约实现。"""
 
     plugin_id = "cyrene.training.llama-factory"
-    version = "0.1.0"
+    version = "0.2.0"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(
@@ -199,7 +291,7 @@ class LlamaFactoryTrainingPlugin:
     ) -> tuple[bool, TypedPayload | str]:
         """Dispatch one typed trainer request.
 
-            中文:分发一个有类型的训练器请求。"""
+        中文:分发一个有类型的训练器请求。"""
 
         if capability != CAPABILITY_ID:
             return False, f"INVALID_REQUEST: unsupported capability {capability!r}"
@@ -207,7 +299,10 @@ class LlamaFactoryTrainingPlugin:
             return False, f"METHOD_NOT_FOUND: unsupported method {action!r}"
         expected_type_url = f"{TYPE_PREFIX}.{action}.request"
         if request_type_url != expected_type_url:
-            return False, f"INVALID_REQUEST: request_type_url must be {expected_type_url}"
+            return (
+                False,
+                f"INVALID_REQUEST: request_type_url must be {expected_type_url}",
+            )
         if stream_results:
             return False, "METHOD_NOT_SUPPORTED: trainer methods are not streaming"
         if cancellation is not None and cancellation.is_cancelled():
@@ -232,7 +327,7 @@ class LlamaFactoryTrainingPlugin:
     def inspect(self) -> dict[str, Any]:
         """Report the declared trainer surface without probing devices.
 
-            中文:报告已声明的训练器接口,不探测设备。"""
+        中文:报告已声明的训练器接口,不探测设备。"""
 
         entrypoint = _entrypoint()
         return {
@@ -247,7 +342,7 @@ class LlamaFactoryTrainingPlugin:
     def compile(self, spec: dict[str, Any]) -> dict[str, Any]:
         """Materialize the run directory and return the launch description.
 
-            中文:创建运行目录并返回启动说明。"""
+        中文:创建运行目录并返回启动说明。"""
 
         output_dir = _text(spec.get("output_dir"), "output_dir")
         if output_dir is None:
@@ -269,12 +364,18 @@ class LlamaFactoryTrainingPlugin:
         environment = _mapping(spec.get("environment") or {}, "environment")
         launch_env = {
             str(key): str(value)
-            for key, value in _mapping(environment.get("env") or {}, "environment.env").items()
+            for key, value in _mapping(
+                environment.get("env") or {}, "environment.env"
+            ).items()
         }
         if FORBIDDEN_ENV.intersection(launch_env):
             raise ValueError("environment.env must not assign machine devices")
-        gpu_count = _positive_int(distributed.get("gpu_count"), "distributed.gpu_count", 1) or 1
-        world_size = _positive_int(distributed.get("world_size"), "distributed.world_size", gpu_count)
+        gpu_count = (
+            _positive_int(distributed.get("gpu_count"), "distributed.gpu_count", 1) or 1
+        )
+        world_size = _positive_int(
+            distributed.get("world_size"), "distributed.world_size", gpu_count
+        )
         return {
             "launch": {
                 "engine": "llamafactory",
@@ -288,9 +389,13 @@ class LlamaFactoryTrainingPlugin:
                 "resources": {
                     "gpu_count": gpu_count,
                     "world_size": world_size,
-                    "nnodes": _positive_int(distributed.get("nnodes"), "distributed.nnodes", 1),
+                    "nnodes": _positive_int(
+                        distributed.get("nnodes"), "distributed.nnodes", 1
+                    ),
                     "nproc_per_node": _positive_int(
-                        distributed.get("nproc_per_node"), "distributed.nproc_per_node", gpu_count
+                        distributed.get("nproc_per_node"),
+                        "distributed.nproc_per_node",
+                        gpu_count,
                     ),
                     "gpu_memory_gb": 0.0,
                 },
@@ -311,7 +416,8 @@ class LlamaFactoryTrainingPlugin:
                 "output_layout": {"root": ""},
                 "spec_artifact_path": str(config_path),
                 "extra": {
-                    "config_digest": "sha256:" + hashlib.sha256(config_path.read_bytes()).hexdigest()
+                    "config_digest": "sha256:"
+                    + hashlib.sha256(config_path.read_bytes()).hexdigest()
                 },
             }
         }
@@ -319,12 +425,17 @@ class LlamaFactoryTrainingPlugin:
     def parse_event(self, line: str) -> dict[str, Any]:
         """Classify one trainer output line without owning run state.
 
-            中文:对一行训练器输出进行分类,不持有运行状态。"""
+        中文:对一行训练器输出进行分类,不持有运行状态。"""
 
         try:
             payload = json.loads(line)
         except json.JSONDecodeError:
             payload = None
         if isinstance(payload, dict) and ("loss" in payload or "eval_loss" in payload):
-            return {"kind": "progress", "message": line, "payload": payload, "raw": line}
+            return {
+                "kind": "progress",
+                "message": line,
+                "payload": payload,
+                "raw": line,
+            }
         return {"kind": "log", "message": line, "raw": line}

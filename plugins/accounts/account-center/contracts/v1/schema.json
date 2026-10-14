@@ -1,0 +1,110 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/account.center.v1/schema.json",
+  "title": "account.center.v1",
+  "description": "Typed owner-scoped account linking and credential lease operations.",
+  "$defs": {
+    "TrustedCallerContext": {
+      "type": "object",
+      "required": ["method", "caller_id", "issuer", "subject", "organization_id", "workspace_id", "binding_id", "request_id", "issued_at", "expires_at", "operation_id", "payload_sha256", "signature"],
+      "properties": {
+        "method": {"type": "string", "minLength": 1, "maxLength": 100},
+        "caller_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "issuer": {"type": "string", "minLength": 1, "maxLength": 500},
+        "subject": {"type": "string", "minLength": 1, "maxLength": 500},
+        "organization_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "workspace_id": {"type": ["string", "null"], "maxLength": 200},
+        "binding_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "request_id": {"type": "string", "format": "uuid"},
+        "issued_at": {"type": "integer", "minimum": 0},
+        "expires_at": {"type": "integer", "minimum": 0},
+        "operation_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "signature": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false
+    },
+    "Resource": {
+      "type": "object",
+      "required": ["repository_id", "repository", "issue_number"],
+      "properties": {
+        "repository_id": {"type": "string", "minLength": 1, "maxLength": 100},
+        "repository": {"type": "string", "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", "maxLength": 200},
+        "issue_number": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "BeginLinkRequest": {
+      "type": "object", "required": ["provider", "idempotency_key"],
+      "properties": {"provider": {"enum": ["github", "wecom"]}, "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 200}, "workspace_id": {"type": ["string", "null"]}},
+      "additionalProperties": false
+    },
+    "LinkSessionResponse": {
+      "type": "object", "required": ["link_session_ref", "expires_at"],
+      "properties": {"link_session_ref": {"type": "string", "format": "uuid"}, "authorization_url": {"type": "string", "format": "uri"}, "callback_nonce": {"type": "string", "minLength": 32, "maxLength": 256}, "expires_at": {"type": "integer", "minimum": 0}},
+      "additionalProperties": false
+    },
+    "LinkedAccountResponse": {
+      "type": "object", "required": ["account_ref", "provider", "status"],
+      "properties": {"account_ref": {"type": "string", "format": "uuid"}, "provider": {"enum": ["github", "wecom"]}, "status": {"const": "active"}},
+      "additionalProperties": false
+    },
+    "CompleteGitHubLinkRequest": {
+      "type": "object", "required": ["state", "code"],
+      "properties": {"state": {"type": "string", "minLength": 32, "maxLength": 256}, "code": {"type": "string", "minLength": 1, "maxLength": 4096}},
+      "additionalProperties": false
+    },
+    "ObserveWeComChallengeRequest": {
+      "type": "object", "required": ["bot_namespace", "source_authority", "stable_subject", "challenge_id", "challenge_value", "expires_at"],
+      "properties": {"bot_namespace": {"type": "string", "minLength": 1, "maxLength": 200}, "source_authority": {"type": "string", "minLength": 1, "maxLength": 500}, "stable_subject": {"type": "string", "minLength": 1, "maxLength": 500}, "challenge_id": {"type": "string", "format": "uuid"}, "challenge_value": {"type": "string", "minLength": 16, "maxLength": 128}, "expires_at": {"type": "integer", "minimum": 0}},
+      "additionalProperties": false
+    },
+    "ObserveWeComChallengeResponse": {
+      "type": "object", "required": ["accepted", "challenge_id", "expires_at"],
+      "properties": {"accepted": {"const": true}, "challenge_id": {"type": "string", "format": "uuid"}, "expires_at": {"type": "integer", "minimum": 0}},
+      "additionalProperties": false
+    },
+    "ConfirmWeComLinkRequest": {
+      "type": "object", "required": ["link_session_ref", "challenge_id", "challenge_value", "idempotency_key"],
+      "properties": {"link_session_ref": {"type": "string", "format": "uuid"}, "challenge_id": {"type": "string", "format": "uuid"}, "challenge_value": {"type": "string", "minLength": 16, "maxLength": 128}, "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 200}},
+      "additionalProperties": false
+    },
+    "ListLinksRequest": {"type": "object", "properties": {"workspace_id": {"type": ["string", "null"]}}, "additionalProperties": false},
+    "LinkMetadata": {
+      "type": "object", "required": ["account_ref", "provider", "source_authority", "bot_namespace", "status", "linked_at"],
+      "properties": {"account_ref": {"type": "string", "format": "uuid"}, "provider": {"enum": ["github", "wecom"]}, "source_authority": {"type": "string"}, "bot_namespace": {"type": ["string", "null"]}, "status": {"enum": ["active", "unlinked", "revocation_pending", "revocation_failed", "revocation_unknown", "reauthorization_required"]}, "linked_at": {"type": "integer", "minimum": 0}, "workspace_id": {"type": ["string", "null"]}},
+      "additionalProperties": false
+    },
+    "ListLinksResponse": {"type": "object", "required": ["links"], "properties": {"links": {"type": "array", "items": {"$ref": "#/$defs/LinkMetadata"}}}, "additionalProperties": false},
+    "GetAuthorizationRequest": {
+      "type": "object", "required": ["account_ref", "operation_id", "resource", "arguments_sha256"],
+      "properties": {"account_ref": {"type": "string", "format": "uuid"}, "operation_id": {"type": "string", "enum": ["github.issue.get", "github.issue.comment.create", "github.issue.state.update"]}, "resource": {"$ref": "#/$defs/Resource"}, "arguments_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+      "additionalProperties": false
+    },
+    "AuthorizationResponse": {"type": "object", "required": ["authorized", "account_ref", "provider"], "properties": {"authorized": {"type": "boolean"}, "account_ref": {"type": "string", "format": "uuid"}, "provider": {"enum": ["github", "wecom"]}}, "additionalProperties": false},
+    "UnlinkRequest": {"type": "object", "required": ["account_ref", "idempotency_key"], "properties": {"account_ref": {"type": "string", "format": "uuid"}, "idempotency_key": {"type": "string", "minLength": 1, "maxLength": 200}}, "additionalProperties": false},
+    "UnlinkResponse": {"type": "object", "required": ["unlinked", "status"], "properties": {"unlinked": {"const": true}, "status": {"enum": ["unlinked", "revocation_pending", "revocation_failed", "revocation_unknown"]}}, "additionalProperties": false},
+    "CreateCredentialLeaseRequest": {"$ref": "#/$defs/GetAuthorizationRequest"},
+    "CredentialLeaseResponse": {
+      "type": "object", "required": ["lease_ref", "provider", "operation_id", "resource", "arguments_sha256", "expires_at"],
+      "properties": {"lease_ref": {"type": "string", "format": "uuid"}, "provider": {"enum": ["github", "wecom"]}, "operation_id": {"type": "string"}, "resource": {"$ref": "#/$defs/Resource"}, "arguments_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "expires_at": {"type": "integer", "minimum": 0}},
+      "additionalProperties": false
+    },
+    "RedeemCredentialLeaseRequest": {
+      "type": "object", "required": ["lease_ref", "operation_id", "resource", "arguments_sha256"],
+      "properties": {"lease_ref": {"type": "string", "format": "uuid"}, "operation_id": {"type": "string", "enum": ["github.issue.get", "github.issue.comment.create", "github.issue.state.update"]}, "resource": {"$ref": "#/$defs/Resource"}, "arguments_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},
+      "additionalProperties": false
+    },
+    "RedeemCredentialLeaseResponse": {"type": "object", "required": ["access_token", "token_type", "external_subject", "expires_at"], "properties": {"access_token": {"type": "string", "minLength": 1}, "token_type": {"const": "Bearer"}, "external_subject": {"type": "string", "minLength": 1}, "expires_at": {"type": ["integer", "null"], "minimum": 0}}, "additionalProperties": false},
+    "ResolveLinkedSenderRequest": {
+      "type": "object", "required": ["source_authority", "bot_namespace", "stable_subject"],
+      "properties": {"source_authority": {"type": "string", "minLength": 1, "maxLength": 500}, "bot_namespace": {"type": "string", "minLength": 1, "maxLength": 200}, "stable_subject": {"type": "string", "minLength": 1, "maxLength": 500}},
+      "additionalProperties": false
+    },
+    "ResolveLinkedSenderResponse": {
+      "type": "object", "required": ["linked"],
+      "properties": {"linked": {"type": "boolean"}, "account_ref": {"type": "string", "format": "uuid"}, "provider": {"const": "wecom"}, "issuer": {"type": "string"}, "subject": {"type": "string"}, "organization_id": {"type": "string"}, "workspace_id": {"type": ["string", "null"]}},
+      "additionalProperties": false
+    }
+  }
+}

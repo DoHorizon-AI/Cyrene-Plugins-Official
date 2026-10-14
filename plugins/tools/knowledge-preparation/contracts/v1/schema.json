@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/dataset.knowledge.v1/schema.json",
+  "title": "dataset.knowledge.v1",
+  "$defs": {
+    "AbsolutePath": {"type": "string", "minLength": 1},
+    "Sha256Digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "ArtifactRef": {
+      "type": "object",
+      "required": ["uri", "digest", "size_bytes", "kind"],
+      "properties": {
+        "uri": {"type": "string", "pattern": "^artifact://sha256/[0-9a-f]{64}$"},
+        "digest": {"$ref": "#/$defs/Sha256Digest"},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "kind": {"type": "string", "minLength": 1, "maxLength": 128},
+        "manifest_digest": {"$ref": "#/$defs/Sha256Digest"}
+      },
+      "additionalProperties": false
+    },
+    "SourceRevision": {
+      "type": "object",
+      "required": ["source_id", "source_revision_id", "revision", "digest", "artifact"],
+      "properties": {
+        "source_id": {"type": "string", "format": "uuid"},
+        "source_revision_id": {"type": "string", "format": "uuid"},
+        "revision": {"type": "integer", "minimum": 1},
+        "digest": {"$ref": "#/$defs/Sha256Digest"},
+        "artifact": {"$ref": "#/$defs/ArtifactRef"}
+      },
+      "additionalProperties": false
+    },
+    "BuildPolicy": {
+      "type": "object",
+      "required": ["use_purpose"],
+      "properties": {"use_purpose": {"const": "knowledge_retrieval"}},
+      "additionalProperties": false
+    },
+    "ContentPolicy": {
+      "type": "object",
+      "required": [
+        "allowKnowledge",
+        "allowTraining",
+        "allowedPrincipalRefs",
+        "allowedUsePurposes"
+      ],
+      "properties": {
+        "allowKnowledge": {"type": "boolean"},
+        "allowTraining": {"type": "boolean"},
+        "allowedPrincipalRefs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "allowedUsePurposes": {
+          "type": "array",
+          "items": {"enum": ["knowledge_retrieval", "model_training"]},
+          "uniqueItems": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "BuildRequest": {
+      "type": "object",
+      "required": [
+        "blocks_path",
+        "bundle_path",
+        "result_path",
+        "dataset_id",
+        "content_revision_id",
+        "processing_run_id",
+        "source_revisions",
+        "policy"
+      ],
+      "properties": {
+        "blocks_path": {"$ref": "#/$defs/AbsolutePath"},
+        "bundle_path": {"$ref": "#/$defs/AbsolutePath"},
+        "result_path": {"$ref": "#/$defs/AbsolutePath"},
+        "dataset_id": {"type": "string", "format": "uuid"},
+        "content_revision_id": {"type": "string", "format": "uuid"},
+        "processing_run_id": {"type": "string", "format": "uuid"},
+        "source_revisions": {
+          "type": "array",
+          "items": {"$ref": "#/$defs/SourceRevision"}
+        },
+        "policy": {"$ref": "#/$defs/BuildPolicy"}
+      },
+      "additionalProperties": false
+    },
+    "ConversionReport": {
+      "type": "object",
+      "required": [
+        "inputBlockCount",
+        "chunkCount",
+        "sourceCount",
+        "excludedBlockCount",
+        "emptyTextBlockCount",
+        "warningCount",
+        "splitBlockCount",
+        "skippedByPolicySourceCount",
+        "assetRefCount"
+      ],
+      "properties": {
+        "inputBlockCount": {"type": "integer", "minimum": 0},
+        "chunkCount": {"type": "integer", "minimum": 0},
+        "sourceCount": {"type": "integer", "minimum": 0},
+        "excludedBlockCount": {"type": "integer", "minimum": 0},
+        "emptyTextBlockCount": {"type": "integer", "minimum": 0},
+        "warningCount": {"type": "integer", "minimum": 0},
+        "splitBlockCount": {"type": "integer", "minimum": 0},
+        "skippedByPolicySourceCount": {"type": "integer", "minimum": 0},
+        "assetRefCount": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "BuildResponse": {
+      "type": "object",
+      "required": [
+        "bundle_digest",
+        "bundle_size",
+        "manifest_digest",
+        "result_digest",
+        "result_size",
+        "chunk_count",
+        "source_count",
+        "conversion_report"
+      ],
+      "properties": {
+        "bundle_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "bundle_size": {"type": "integer", "minimum": 0},
+        "manifest_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "result_digest": {"$ref": "#/$defs/Sha256Digest"},
+        "result_size": {"type": "integer", "minimum": 0},
+        "chunk_count": {"type": "integer", "minimum": 0},
+        "source_count": {"type": "integer", "minimum": 0},
+        "conversion_report": {"$ref": "#/$defs/ConversionReport"}
+      },
+      "additionalProperties": false
+    },
+    "PublicLocator": {
+      "type": "object",
+      "properties": {
+        "page": {"type": "integer", "minimum": 1},
+        "sourcePages": {
+          "type": "array",
+          "items": {"type": "integer", "minimum": 1},
+          "uniqueItems": true
+        },
+        "sectionPath": {"type": "array", "items": {"type": "string"}},
+        "itemRef": {"type": "string", "minLength": 1},
+        "treeLevel": {"type": "integer", "minimum": 0},
+        "tableIndex": {"type": "integer", "minimum": 0},
+        "startOffset": {"type": "integer", "minimum": 0},
+        "endOffset": {"type": "integer", "minimum": 0},
+        "provenance": {"type": "array", "items": {"type": "object"}}
+      },
+      "additionalProperties": false
+    },
+    "PublicSourceRevision": {
+      "type": "object",
+      "required": ["sourceId", "sourceRevisionId", "revision", "digest", "artifact"],
+      "properties": {
+        "sourceId": {"type": "string", "format": "uuid"},
+        "sourceRevisionId": {"type": "string", "format": "uuid"},
+        "revision": {"type": "integer", "minimum": 1},
+        "digest": {"$ref": "#/$defs/Sha256Digest"},
+        "artifact": {"$ref": "#/$defs/ArtifactRef"}
+      },
+      "additionalProperties": false
+    },
+    "PublicChunk": {
+      "type": "object",
+      "required": [
+        "chunkId",
+        "text",
+        "sourceId",
+        "sourceRevisionId",
+        "contentRevisionId",
+        "blockId",
+        "blockOrdinal",
+        "blockKind",
+        "origin",
+        "locator",
+        "textRange",
+        "hierarchyPath",
+        "policy",
+        "assetRefs",
+        "partIndex",
+        "partCount"
+      ],
+      "properties": {
+        "chunkId": {"$ref": "#/$defs/Sha256Digest"},
+        "text": {"type": "string", "minLength": 1},
+        "sourceId": {"type": "string", "format": "uuid"},
+        "sourceRevisionId": {"type": "string", "format": "uuid"},
+        "contentRevisionId": {"type": "string", "format": "uuid"},
+        "blockId": {"type": "string", "minLength": 1},
+        "blockOrdinal": {"type": "integer", "minimum": 0},
+        "blockKind": {"type": "string", "minLength": 1},
+        "origin": {"enum": ["EXTRACTED", "NORMALIZED", "HUMAN_EDITED", "GENERATED"]},
+        "locator": {"$ref": "#/$defs/PublicLocator"},
+        "textRange": {
+          "type": "object",
+          "required": ["start", "end"],
+          "properties": {
+            "start": {"type": "integer", "minimum": 0},
+            "end": {"type": "integer", "minimum": 1}
+          },
+          "additionalProperties": false
+        },
+        "hierarchyPath": {"type": "array", "items": {"type": "string"}},
+        "policy": {"$ref": "#/$defs/ContentPolicy"},
+        "assetRefs": {"type": "array", "items": {"type": "object"}},
+        "partIndex": {"type": "integer", "minimum": 0},
+        "partCount": {"type": "integer", "minimum": 1}
+      },
+      "additionalProperties": false
+    },
+    "BundleManifest": {
+      "type": "object",
+      "required": [
+        "schemaVersion",
+        "profile",
+        "profileVersion",
+        "datasetId",
+        "contentRevisionId",
+        "processingRunId",
+        "usePurpose",
+        "sourceRevisionIds",
+        "files",
+        "conversionReport"
+      ],
+      "properties": {
+        "schemaVersion": {"const": "cyrene.knowledge.bundle.v1"},
+        "profile": {"const": "CYRENE_KNOWLEDGE_BUNDLE_V1"},
+        "profileVersion": {"const": 1},
+        "datasetId": {"type": "string", "format": "uuid"},
+        "contentRevisionId": {"type": "string", "format": "uuid"},
+        "processingRunId": {"type": "string", "format": "uuid"},
+        "usePurpose": {"const": "knowledge_retrieval"},
+        "sourceRevisionIds": {
+          "type": "array",
+          "items": {"type": "string", "format": "uuid"},
+          "uniqueItems": true
+        },
+        "files": {
+          "type": "object",
+          "required": ["chunks.jsonl", "sources.jsonl", "hierarchy.json"],
+          "properties": {
+            "chunks.jsonl": {"$ref": "#/$defs/Sha256Digest"},
+            "sources.jsonl": {"$ref": "#/$defs/Sha256Digest"},
+            "hierarchy.json": {"$ref": "#/$defs/Sha256Digest"}
+          },
+          "additionalProperties": false
+        },
+        "conversionReport": {"$ref": "#/$defs/ConversionReport"}
+      },
+      "additionalProperties": false
+    },
+    "Checksums": {
+      "type": "object",
+      "required": ["schemaVersion", "files"],
+      "properties": {
+        "schemaVersion": {"const": "cyrene.knowledge.checksums.v1"},
+        "files": {
+          "type": "object",
+          "required": ["manifest.json", "chunks.jsonl", "sources.jsonl", "hierarchy.json"],
+          "properties": {
+            "manifest.json": {"$ref": "#/$defs/Sha256Digest"},
+            "chunks.jsonl": {"$ref": "#/$defs/Sha256Digest"},
+            "sources.jsonl": {"$ref": "#/$defs/Sha256Digest"},
+            "hierarchy.json": {"$ref": "#/$defs/Sha256Digest"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConsumerRequest": {
+      "type": "object",
+      "required": ["packageDigest", "principalRefs", "usePurpose", "query", "limit"],
+      "properties": {
+        "packageDigest": {"$ref": "#/$defs/Sha256Digest"},
+        "principalRefs": {
+          "type": "array",
+          "items": {"type": "string", "minLength": 1},
+          "uniqueItems": true
+        },
+        "usePurpose": {"const": "knowledge_retrieval"},
+        "query": {"type": "string", "minLength": 1},
+        "limit": {"type": "integer", "minimum": 1, "maximum": 100}
+      },
+      "additionalProperties": false
+    }
+  }
+}
