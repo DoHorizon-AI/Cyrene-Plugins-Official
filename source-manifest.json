@@ -180,8 +180,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "52ea8ec55ed93457ecf1894620b96b6abd9b3ac3de87e956cfc1b205d90cb6dd",
-      "size_bytes": 24899
+      "sha256": "d2166d7a5955b61f546d51cc09ba4d5b874612243df6056e89390c74c736959d",
+      "size_bytes": 24135
     },
     {
       "kind": "file",
