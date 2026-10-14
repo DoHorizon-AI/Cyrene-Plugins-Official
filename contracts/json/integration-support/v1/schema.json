@@ -1,0 +1,267 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/integration-support/v1/schema.json",
+  "title": "Integration support contracts v1",
+  "description": "Typed authorization, cloud observation, email submission, and signed tool-envelope DTOs for tool.provider.v1.",
+  "$defs": {
+    "UtcTimestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(\\.[0-9]{1,6})?Z$",
+      "description": "RFC3339 UTC timestamp; unknown expiry uses null in its owning field."
+    },
+    "LoginState": {
+      "type": "string",
+      "enum": ["PRESENT", "MISSING", "UNKNOWN", "UNAVAILABLE"]
+    },
+    "AuthorizationState": {
+      "type": "string",
+      "enum": ["VALID", "REAUTHORIZATION_REQUIRED", "PERMISSION_DENIED", "UNKNOWN", "UNAVAILABLE"]
+    },
+    "RenewalState": {
+      "type": "string",
+      "enum": ["WAITING_USER", "VERIFYING", "SUCCEEDED", "FAILED", "EXPIRED", "CANCELLED"]
+    },
+    "CloudResourceKind": {
+      "type": "string",
+      "enum": ["azure.vm", "gcp.instance", "hf.model", "hf.dataset", "hf.space", "runpod.pod", "tailscale.device"]
+    },
+    "CloudResourceState": {
+      "type": "string",
+      "enum": ["RUNNING", "STOPPED", "AVAILABLE", "UNAVAILABLE", "DEGRADED", "UNKNOWN"]
+    },
+    "EmailSubmissionStatus": {
+      "type": "string",
+      "enum": ["ACCEPTED", "UNKNOWN", "REJECTED"]
+    },
+    "TrustedCallerContext": {
+      "type": "object",
+      "required": ["method", "operation_id", "caller_workload", "audience", "issuer", "subject", "organization_id", "workspace_id", "binding_id", "request_id", "issued_at", "expires_at", "payload_sha256", "signature"],
+      "properties": {
+        "method": {"type": "string", "enum": ["wecom_authorization_health", "wecom_reauthorization_start", "wecom_reauthorization_status", "cloud_resources_query", "cloud_authorization_health", "email_notification_send", "email_connection_health"]},
+        "operation_id": {"type": "string", "enum": ["wecom.authorization.health.read", "wecom.authorization.renewal.start", "wecom.authorization.renewal.status", "cloud.resources.query", "cloud.authorization.health.read", "email.notification.send", "email.connection.health.read"]},
+        "caller_workload": {"type": "string", "minLength": 1, "maxLength": 200},
+        "audience": {"type": "string", "minLength": 1, "maxLength": 200},
+        "issuer": {"type": "string", "minLength": 1, "maxLength": 500},
+        "subject": {"type": "string", "minLength": 1, "maxLength": 500},
+        "organization_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "workspace_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 200},
+        "binding_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "request_id": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Unique request correlation ID and the replay reference for WeCom renewal start."},
+        "issued_at": {"$ref": "#/$defs/UtcTimestamp"},
+        "expires_at": {"$ref": "#/$defs/UtcTimestamp"},
+        "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "signature": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"if": {"properties": {"method": {"const": "wecom_authorization_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "wecom.authorization.health.read"}}}},
+        {"if": {"properties": {"method": {"const": "wecom_reauthorization_start"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "wecom.authorization.renewal.start"}}}},
+        {"if": {"properties": {"method": {"const": "wecom_reauthorization_status"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "wecom.authorization.renewal.status"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resources_query"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resources.query"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_authorization_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.authorization.health.read"}}}},
+        {"if": {"properties": {"method": {"const": "email_notification_send"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.notification.send"}}}},
+        {"if": {"properties": {"method": {"const": "email_connection_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.connection.health.read"}}}}
+      ]
+    },
+    "CapabilityAuthorizationHealth": {
+      "type": "object",
+      "required": ["capability_id", "state", "last_verified_at", "expires_at", "reason_code"],
+      "properties": {
+        "capability_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "state": {"$ref": "#/$defs/AuthorizationState"},
+        "last_verified_at": {"anyOf": [{"$ref": "#/$defs/UtcTimestamp"}, {"type": "null"}]},
+        "expires_at": {"anyOf": [{"$ref": "#/$defs/UtcTimestamp"}, {"type": "null"}]},
+        "reason_code": {"type": ["string", "null"], "minLength": 1, "maxLength": 200}
+      },
+      "additionalProperties": false
+    },
+    "AuthorizationHealth": {
+      "type": "object",
+      "required": ["schema_version", "authorization_ref", "login_state", "authorization_state", "checked_at", "expires_at", "generation", "capabilities"],
+      "properties": {
+        "schema_version": {"const": 1},
+        "authorization_ref": {"type": "string", "minLength": 1, "maxLength": 200},
+        "login_state": {"$ref": "#/$defs/LoginState"},
+        "authorization_state": {"$ref": "#/$defs/AuthorizationState"},
+        "checked_at": {"$ref": "#/$defs/UtcTimestamp"},
+        "expires_at": {"anyOf": [{"$ref": "#/$defs/UtcTimestamp"}, {"type": "null"}]},
+        "generation": {"type": "integer", "minimum": 0},
+        "capabilities": {"type": "array", "items": {"$ref": "#/$defs/CapabilityAuthorizationHealth"}, "maxItems": 256}
+      },
+      "additionalProperties": false
+    },
+    "RenewalSession": {
+      "type": "object",
+      "required": ["session_ref", "authorization_ref", "state", "created_at", "expires_at", "authorization_url", "qr_attachment_ref", "generation"],
+      "properties": {
+        "session_ref": {"type": "string", "minLength": 1, "maxLength": 200},
+        "authorization_ref": {"type": "string", "minLength": 1, "maxLength": 200},
+        "state": {"$ref": "#/$defs/RenewalState"},
+        "created_at": {"$ref": "#/$defs/UtcTimestamp"},
+        "expires_at": {"anyOf": [{"$ref": "#/$defs/UtcTimestamp"}, {"type": "null"}]},
+        "authorization_url": {"anyOf": [{"type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048}, {"type": "null"}]},
+        "qr_attachment_ref": {"type": ["string", "null"], "minLength": 1, "maxLength": 512},
+        "generation": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "CloudAttributeValue": {
+      "anyOf": [
+        {"type": "string", "maxLength": 1024},
+        {"type": "integer"},
+        {"type": "number"},
+        {"type": "boolean"},
+        {"type": "null"}
+      ]
+    },
+    "CloudObservation": {
+      "type": "object",
+      "required": ["external_ref", "kind", "display_name", "status", "provider_status", "collected_at", "observed_at", "attributes", "platform_resource_ref", "platform_generation"],
+      "properties": {
+        "external_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+        "kind": {"$ref": "#/$defs/CloudResourceKind"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 512},
+        "status": {"$ref": "#/$defs/CloudResourceState"},
+        "provider_status": {"type": ["string", "null"], "minLength": 1, "maxLength": 200},
+        "collected_at": {"$ref": "#/$defs/UtcTimestamp"},
+        "observed_at": {"anyOf": [{"$ref": "#/$defs/UtcTimestamp"}, {"type": "null"}]},
+        "attributes": {"type": "object", "description": "Provider-normalized safe facts selected from an explicit positive metadata allowlist; never raw provider objects, errors, credentials, secrets, private endpoints, or tenant identifiers.", "maxProperties": 32, "propertyNames": {"type": "string", "minLength": 1, "maxLength": 100}, "additionalProperties": {"$ref": "#/$defs/CloudAttributeValue"}},
+        "platform_resource_ref": {"type": ["string", "null"], "minLength": 1, "maxLength": 512},
+        "platform_generation": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "CloudQueryResult": {
+      "type": "object",
+      "required": ["provider", "checked_at", "resources"],
+      "properties": {
+        "provider": {"type": "string", "minLength": 1, "maxLength": 64},
+        "checked_at": {"$ref": "#/$defs/UtcTimestamp"},
+        "resources": {"type": "array", "items": {"$ref": "#/$defs/CloudObservation"}, "maxItems": 10000}
+      },
+      "additionalProperties": false
+    },
+    "EmailSubmission": {
+      "type": "object",
+      "required": ["request_ref", "status", "vendor_receipt_ref", "delivery_confirmed"],
+      "properties": {
+        "request_ref": {"type": "string", "minLength": 1, "maxLength": 200},
+        "status": {"$ref": "#/$defs/EmailSubmissionStatus"},
+        "vendor_receipt_ref": {"type": ["string", "null"], "minLength": 1, "maxLength": 512},
+        "delivery_confirmed": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "WeComAuthorizationHealthArguments": {
+      "type": "object",
+      "required": ["authorization_ref"],
+      "properties": {"authorization_ref": {"type": "string", "minLength": 1, "maxLength": 200}},
+      "additionalProperties": false
+    },
+    "WeComReauthorizationStartArguments": {
+      "type": "object",
+      "description": "Exact renewal-start replay identity uses caller_context.request_id within its verified caller and binding scope.",
+      "required": ["authorization_ref"],
+      "properties": {"authorization_ref": {"type": "string", "minLength": 1, "maxLength": 200}},
+      "additionalProperties": false
+    },
+    "WeComReauthorizationStatusArguments": {
+      "type": "object",
+      "required": ["session_ref"],
+      "properties": {"session_ref": {"type": "string", "minLength": 1, "maxLength": 200}},
+      "additionalProperties": false
+    },
+    "CloudResourcesQueryArguments": {
+      "type": "object",
+      "required": ["target_ref"],
+      "properties": {"target_ref": {"type": "string", "minLength": 1, "maxLength": 200}},
+      "additionalProperties": false
+    },
+    "CloudAuthorizationHealthArguments": {
+      "type": "object",
+      "required": ["target_ref"],
+      "properties": {"target_ref": {"type": "string", "minLength": 1, "maxLength": 200}},
+      "additionalProperties": false
+    },
+    "EmailNotificationSendArguments": {
+      "type": "object",
+      "description": "request_ref is the stable email replay reference within its verified caller and binding scope.",
+      "required": ["recipient_ref", "subject", "text", "request_ref"],
+      "properties": {
+        "recipient_ref": {"type": "string", "minLength": 1, "maxLength": 100},
+        "subject": {"type": "string", "minLength": 1, "maxLength": 500},
+        "text": {"type": "string", "minLength": 1, "maxLength": 10000},
+        "request_ref": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Stable replay reference; changed payload under the same reference must be rejected."}
+      },
+      "additionalProperties": false
+    },
+    "EmailConnectionHealthArguments": {
+      "type": "object",
+      "maxProperties": 0,
+      "additionalProperties": false
+    },
+    "ToolEnvelopeBase": {
+      "type": "object",
+      "required": ["caller_context", "arguments"],
+      "properties": {
+        "caller_context": {"$ref": "#/$defs/TrustedCallerContext"},
+        "arguments": {"type": "object"}
+      },
+      "additionalProperties": false
+    },
+    "WeComAuthorizationHealthEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "wecom_authorization_health"}, "operation_id": {"const": "wecom.authorization.health.read"}}}, "arguments": {"$ref": "#/$defs/WeComAuthorizationHealthArguments"}}}
+      ]
+    },
+    "WeComReauthorizationStartEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "wecom_reauthorization_start"}, "operation_id": {"const": "wecom.authorization.renewal.start"}}}, "arguments": {"$ref": "#/$defs/WeComReauthorizationStartArguments"}}}
+      ]
+    },
+    "WeComReauthorizationStatusEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "wecom_reauthorization_status"}, "operation_id": {"const": "wecom.authorization.renewal.status"}}}, "arguments": {"$ref": "#/$defs/WeComReauthorizationStatusArguments"}}}
+      ]
+    },
+    "CloudResourcesQueryEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "cloud_resources_query"}, "operation_id": {"const": "cloud.resources.query"}}}, "arguments": {"$ref": "#/$defs/CloudResourcesQueryArguments"}}}
+      ]
+    },
+    "CloudAuthorizationHealthEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "cloud_authorization_health"}, "operation_id": {"const": "cloud.authorization.health.read"}}}, "arguments": {"$ref": "#/$defs/CloudAuthorizationHealthArguments"}}}
+      ]
+    },
+    "EmailNotificationSendEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "email_notification_send"}, "operation_id": {"const": "email.notification.send"}}}, "arguments": {"$ref": "#/$defs/EmailNotificationSendArguments"}}}
+      ]
+    },
+    "EmailConnectionHealthEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "email_connection_health"}, "operation_id": {"const": "email.connection.health.read"}}}, "arguments": {"$ref": "#/$defs/EmailConnectionHealthArguments"}}}
+      ]
+    },
+    "ToolEnvelope": {
+      "oneOf": [
+        {"$ref": "#/$defs/WeComAuthorizationHealthEnvelope"},
+        {"$ref": "#/$defs/WeComReauthorizationStartEnvelope"},
+        {"$ref": "#/$defs/WeComReauthorizationStatusEnvelope"},
+        {"$ref": "#/$defs/CloudResourcesQueryEnvelope"},
+        {"$ref": "#/$defs/CloudAuthorizationHealthEnvelope"},
+        {"$ref": "#/$defs/EmailNotificationSendEnvelope"},
+        {"$ref": "#/$defs/EmailConnectionHealthEnvelope"}
+      ]
+    }
+  }
+}

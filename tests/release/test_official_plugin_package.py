@@ -18,6 +18,8 @@ from copy import deepcopy
 from pathlib import Path
 from unittest.mock import patch
 
+from packaging.requirements import Requirement
+
 from tooling.release import official_plugin_package as release
 from tooling.release import select_official_plugin_packages as selection
 from tooling.release import training_llama_factory_package as training_release
@@ -230,6 +232,52 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     self.repository / release.WECOM_AIBOT_SDK.license_file_path
                 ).read_bytes(),
             )
+
+    def test_wecom_vends_integration_sdk_schema_once_from_canonical_source(
+        self,
+    ) -> None:
+        """Bundle the SDK schema once and keep it equal to the public contract.
+
+        中文：WeCom 包内只通过 vendored SDK 携带 schema，且与公开 schema 完全一致。
+        """
+
+        spec = release.PACKAGE_SPECS["cyrene.connectors.wecom"]
+        sdk = release.INTEGRATION_SUPPORT_SDK
+        canonical_schema_path = (
+            self.repository / "contracts/json/integration-support/v1/schema.json"
+        )
+        sdk_schema_path = self.repository / sdk.source_root / "schema.json"
+        canonical_schema = canonical_schema_path.read_bytes()
+
+        self.assertIn(sdk, spec.vendored_sdks)
+        self.assertEqual(sdk.package_data, ("schema.json",))
+        self.assertEqual(sdk_schema_path.read_bytes(), canonical_schema)
+
+        source_files, sdk_files = release._source_files(self.repository, spec)
+        source_schema_path = f"{sdk.source_root}/schema.json"
+        self.assertEqual(
+            sdk_files[sdk.distribution][source_schema_path], canonical_schema
+        )
+        archive_entries = release._package_entries(source_files, spec, sdk_files)
+        archive_schema_path = f"{sdk.archive_root}/schema.json"
+        self.assertEqual(archive_entries[archive_schema_path], canonical_schema)
+        self.assertEqual(
+            [name for name in archive_entries if name.endswith("/schema.json")],
+            [archive_schema_path],
+        )
+        self.assertNotIn(
+            "contracts/json/integration-support/v1/schema.json", archive_entries
+        )
+
+        requirements_input = source_files[spec.requirements_input].decode("utf-8")
+        input_requirements = {
+            release.canonicalize_name(Requirement(line.strip()).name)
+            for line in requirements_input.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        self.assertIn("jsonschema", input_requirements)
+        self.assertNotIn("cyrene-integration-contracts", input_requirements)
+        self.assertIn("cyrene-integration-contracts==0.1.0", requirements_input)
 
     def test_staged_release_readback_checks_github_asset_digests_and_sizes(
         self,
