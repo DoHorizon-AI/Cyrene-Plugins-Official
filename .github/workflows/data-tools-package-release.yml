@@ -13,12 +13,16 @@ on:
       - "plugins/training/llama-factory/**"
       - "plugins/accounts/account-center/**"
       - "plugins/providers/github-issues/**"
+      - "plugins/providers/cloud-resources/**"
+      - "plugins/connectors/email-notification/**"
       - "plugins/connectors/wecom/**"
       - "sdk/python/cyrene_account_center_contracts/**"
+      - "sdk/python/cyrene_integration_contracts/**"
       - "sdk/python/cyrene_plugin_runtime/**"
       - "sdk/python/cyrene_model_provider_contracts/**"
       - "tooling/release/**"
       - "tests/release/test_official_plugin_package.py"
+      - "tests/release/test_select_official_plugin_packages.py"
       - "tests/release/test_training_llama_factory_package.py"
       - "tools/ci/connection-release-requirements.txt"
       - "tools/ci/source-manifest.json"
@@ -36,12 +40,16 @@ on:
       - "plugins/training/llama-factory/**"
       - "plugins/accounts/account-center/**"
       - "plugins/providers/github-issues/**"
+      - "plugins/providers/cloud-resources/**"
+      - "plugins/connectors/email-notification/**"
       - "plugins/connectors/wecom/**"
       - "sdk/python/cyrene_account_center_contracts/**"
+      - "sdk/python/cyrene_integration_contracts/**"
       - "sdk/python/cyrene_plugin_runtime/**"
       - "sdk/python/cyrene_model_provider_contracts/**"
       - "tooling/release/**"
       - "tests/release/test_official_plugin_package.py"
+      - "tests/release/test_select_official_plugin_packages.py"
       - "tests/release/test_training_llama_factory_package.py"
       - "tools/ci/connection-release-requirements.txt"
       - "tools/ci/source-manifest.json"
@@ -50,13 +58,14 @@ on:
   workflow_dispatch:
     inputs:
       package_set:
-        description: "Choose the existing draft set, Integration v1 immutable set, or one allowlisted package ID."
+        description: "Choose legacy drafts, an immutable package set, or one allowlisted package ID."
         required: true
         type: choice
         default: legacy5
         options:
           - legacy5
           - integration-v1
+          - authorization-cloud-v1
           - cyrene.tools.dataset-preparation
           - cyrene.tools.document-parsing
           - cyrene.tools.dataset-generation
@@ -65,6 +74,8 @@ on:
           - cyrene.accounts.account-center
           - cyrene.providers.github-issues
           - cyrene.connectors.wecom
+          - cyrene.providers.cloud-resources
+          - cyrene.connectors.email-notification
 
 permissions:
   contents: read
@@ -141,17 +152,22 @@ jobs:
           from packaging.utils import canonicalize_name
           from tooling.release.official_plugin_package import PACKAGE_SPECS, LOCK_PIN
 
-          requested = {
-              "grpcio",
-              "protobuf",
-              "duckdb",
-              "pillow",
+          requested = {"duckdb", "pillow"}
+          # Keep the shared test process on the runtime/WeCom-compatible gRPC
+          # baseline. Cloud and Email clean-start checks install their own
+          # exact wheelhouse so different component locks are never merged.
+          pins = {
+              "grpcio": "grpcio==1.62.3",
+              "protobuf": "protobuf==4.25.9",
           }
-          # Crypto-dependent startup checks install each package's own lock.
-          # Account Center and WeCom intentionally use different crypto pins.
-          pins = {}
+          lock_isolated_packages = {
+              "cyrene.providers.cloud-resources",
+              "cyrene.connectors.email-notification",
+          }
           root = Path.cwd()
           for spec in PACKAGE_SPECS.values():
+              if spec.package_id in lock_isolated_packages:
+                  continue
               lock = root / spec.source_dir / "requirements.lock"
               for line in lock.read_text(encoding="utf-8").splitlines():
                   if not line.strip() or line.lstrip().startswith("#"):
@@ -166,8 +182,9 @@ jobs:
                   previous = pins.setdefault(canonical, f"{name}=={version}")
                   if previous != f"{name}=={version}":
                       raise SystemExit(f"conflicting startup pin for {canonical}")
-          if set(pins) != requested:
-              raise SystemExit(f"startup lock pins missing: {sorted(requested - set(pins))}")
+          missing = requested.difference(pins)
+          if missing:
+              raise SystemExit(f"startup lock pins missing: {sorted(missing)}")
           output = Path(os.environ["RUNNER_TEMP"]) / "startup-requirements.lock"
           output.write_text("".join(f"{pins[name]}\n" for name in sorted(pins)))
           print(output)
@@ -184,9 +201,12 @@ jobs:
             tooling/release/select_official_plugin_packages.py \
             tooling/release/training_llama_factory_package.py \
             tests/release/test_official_plugin_package.py \
+            tests/release/test_select_official_plugin_packages.py \
             tests/release/test_training_llama_factory_package.py
           python -m unittest discover \
             -s tests/release -p 'test_official_plugin_package.py' -v
+          python -m unittest discover \
+            -s tests/release -p 'test_select_official_plugin_packages.py' -v
           python -m unittest discover \
             -s tests/release -p 'test_training_llama_factory_package.py' -v
 
