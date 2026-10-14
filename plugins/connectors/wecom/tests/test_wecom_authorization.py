@@ -19,6 +19,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
+from urllib.parse import urlencode
 
 import cyrene_integration_contracts as contracts
 import pytest
@@ -29,7 +30,8 @@ from wecom_connector.authorization import (
     AuthorizationTrustConfig,
     WeComAuthorizationSessions,
     owner_fingerprint,
-    profile_authorization_url,
+    profile_activation_url,
+    profile_grant_management_url,
 )
 from wecom_connector.cli import WeComCliClient, WeComCliError, WeComCliStatus
 from wecom_connector.connector import ConnectorError, WeComInstanceConfig
@@ -38,6 +40,22 @@ from wecom_connector.tool_provider import WeComToolProvider
 _QR_URL = (
     "https://work.weixin.qq.com/ai/qc/gen"
     "?source=wecom_cli_external&scode=abcdefgh12345678"
+)
+_GRANT_QUERY = {
+    "aibotid": "12345678901234567",
+    "bar_style_type": "3",
+    "for_native": "true",
+    "forceInnerBrowser": "1",
+    "from": "chat",
+    "hide_more_btn": "true",
+    "pc_bar_bg": "f6f6f7,202021",
+    "str_aibotid": "bot_" + "a" * 31,
+    "type": "6",
+    "ww_vh": "640",
+    "ww_vw": "640",
+}
+_GRANT_URL = "https://work.weixin.qq.com/ai/aiHelper/authorizationList?" + urlencode(
+    tuple(_GRANT_QUERY.items())
 )
 
 
@@ -565,6 +583,11 @@ def test_health_proves_only_the_fixed_read_probe_and_discards_response_data(
             "authorization_expired",
         ),
         (
+            {"errcode": 850003, "errmsg": "当前机器人「消息」使用权限已过期"},
+            "REAUTHORIZATION_REQUIRED",
+            "authorization_expired",
+        ),
+        (
             {"error": {"code": 853004, "message": "cli token expired"}},
             "REAUTHORIZATION_REQUIRED",
             "cli_token_expired",
@@ -627,35 +650,88 @@ def test_network_and_unclassified_errors_remain_unknown(tmp_path: Path) -> None:
     sessions.close()
 
 
-def test_vendor_authorization_url_requires_exact_official_origin_and_shape() -> None:
-    assert profile_authorization_url(f"Open this page: {_QR_URL}") == _QR_URL
+def test_activation_qr_url_is_separate_from_feature_grant_management() -> None:
+    assert profile_activation_url(f"Open this page: {_QR_URL}") == _QR_URL
+    assert profile_activation_url(f"扫码：{_QR_URL}，请完成授权") == _QR_URL
+    assert profile_grant_management_url(_QR_URL) is None
+    assert profile_activation_url(_GRANT_URL) is None
     assert (
-        profile_authorization_url(
+        profile_activation_url(
             "https://work.weixin.qq.com.evil.example/ai/qc/gen"
             "?source=wecom_cli_external&scode=abcdefgh"
         )
         is None
     )
     assert (
-        profile_authorization_url(
+        profile_activation_url(
             "https://work.weixin.qq.com/ai/qc/gen?source=other&scode=abcdefgh"
         )
         is None
     )
     assert (
-        profile_authorization_url(
+        profile_activation_url(
             "https://user@work.weixin.qq.com/ai/qc/gen"
             "?source=wecom_cli_external&scode=abcdefgh"
         )
         is None
     )
     assert (
-        profile_authorization_url(
+        profile_activation_url(
+            "https://work.weixin.qq.com:443/ai/qc/gen"
+            "?source=wecom_cli_external&scode=abcdefgh"
+        )
+        is None
+    )
+    assert (
+        profile_activation_url(
             "https://work.weixin.qq.com/ai/qc/gen"
             "?source=wecom_cli_external&scode=abcdefgh&redirect=https://evil.example"
         )
         is None
     )
+
+
+def test_grant_management_url_requires_exact_origin_path_and_closed_query() -> None:
+    link_text = f"permission expired [click here]({_GRANT_URL})授权当前机器人消息权限"
+    assert profile_grant_management_url(link_text) == _GRANT_URL
+    assert profile_activation_url(link_text) is None
+
+    def url_for(query: dict[str, str] | None = None) -> str:
+        return "https://work.weixin.qq.com/ai/aiHelper/authorizationList?" + urlencode(
+            tuple((query or _GRANT_QUERY).items())
+        )
+
+    malformed_urls = (
+        _GRANT_URL.replace(
+            "https://work.weixin.qq.com/", "https://work.weixin.qq.com.evil.example/"
+        ),
+        _GRANT_URL.replace(
+            "https://work.weixin.qq.com/", "https://open.work.weixin.qq.com/"
+        ),
+        _GRANT_URL.replace(
+            "https://work.weixin.qq.com/",
+            "https://work.weixin.qq.com:443/",
+        ),
+        _GRANT_URL.replace(
+            "/ai/aiHelper/authorizationList", "/ai/aiHelper/authorizationList/other"
+        ),
+        _GRANT_URL + "#redirect",
+        _GRANT_URL + "&redirect=https%3A%2F%2Fevil.example",
+        _GRANT_URL + "&type=6",
+        "https://user@work.weixin.qq.com/ai/aiHelper/authorizationList?"
+        + urlencode(tuple(_GRANT_QUERY.items())),
+        url_for({**_GRANT_QUERY, "from": "other"}),
+        url_for({**_GRANT_QUERY, "forceInnerBrowser": "0"}),
+        url_for({**_GRANT_QUERY, "type": "4"}),
+        url_for({**_GRANT_QUERY, "type": "5"}),
+        url_for({**_GRANT_QUERY, "aibotid": "123"}),
+        url_for({**_GRANT_QUERY, "str_aibotid": "bot/id"}),
+        url_for({**_GRANT_QUERY, "bar_style_type": "99"}),
+        url_for({**_GRANT_QUERY, "pc_bar_bg": "javascript:alert(1)"}),
+        url_for({**_GRANT_QUERY, "ww_vh": "99999"}),
+        url_for({key: value for key, value in _GRANT_QUERY.items() if key != "type"}),
+    )
+    assert all(profile_grant_management_url(value) is None for value in malformed_urls)
 
 
 def test_existing_profile_without_official_grant_url_never_runs_auth_init(
@@ -690,19 +766,22 @@ def test_existing_profile_without_official_grant_url_never_runs_auth_init(
     sessions.close()
 
 
-def test_supported_vendor_grant_url_waits_without_reinitializing_profile(
+def test_flat_850003_error_uses_management_page_without_reinitializing_profile(
     tmp_path: Path,
 ) -> None:
     cli = MagicMock(spec=WeComCliClient)
     cli.get_status.return_value = _cli_status("authorized")
     cli.get_profile_identity_fingerprint.return_value = "profile-fingerprint"
     cli.execute.side_effect = WeComCliError(
-        "permission denied",
+        "wecom-cli failed with vendor authorization expiry",
+        returncode=1,
         stdout=json.dumps(
             {
-                "errcode": 850001,
-                "errmsg": "invalid api key",
-                "authorization_url": _QR_URL,
+                "errcode": 850003,
+                "errmsg": "当前机器人「消息」使用权限已过期",
+                "help_instruction": "请将 help_message 展示给用户",
+                "help_message": (f"当前机器人权限已过期，[点击这里]({_GRANT_URL})授权"),
+                "results_json": "{}",
             }
         ),
     )
@@ -722,8 +801,14 @@ def test_supported_vendor_grant_url_waits_without_reinitializing_profile(
     )
 
     assert result["state"] == "WAITING_USER"
-    assert result["authorization_url"] == _QR_URL
+    assert result["authorization_url"] == _GRANT_URL
     cli.start_auth_init.assert_not_called()
+    assert cli.execute.call_count == 2
+    assert all(
+        call.args == ("message",)
+        and call.kwargs == {"args": ["aibot", "sessions", "list"]}
+        for call in cli.execute.call_args_list
+    )
     sessions.close()
 
 
@@ -741,9 +826,11 @@ def test_grant_poll_fails_when_the_bound_profile_identity_changes(
         "permission denied",
         stdout=json.dumps(
             {
-                "errcode": 850001,
-                "errmsg": "invalid api key",
-                "authorization_url": _QR_URL,
+                "errcode": 850003,
+                "errmsg": "当前机器人「消息」使用权限已过期",
+                "help_instruction": "请将 help_message 展示给用户",
+                "help_message": f"[点击这里]({_GRANT_URL})授权",
+                "results_json": "{}",
             }
         ),
     )
