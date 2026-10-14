@@ -131,9 +131,9 @@ jobs:
           git -C "$navigator_root" remote add origin https://github.com/DoHorizon-AI/Cyrene-Navigator.git
           git -C "$navigator_root" sparse-checkout init --no-cone
           git -C "$navigator_root" sparse-checkout set --no-cone /contracts/product/v1/work.openapi.json
-          git -C "$navigator_root" fetch --depth=1 origin 33a153a252e03c362eb8b8472e401676fa5c0297
+          git -C "$navigator_root" fetch --depth=1 origin 683b36451db0de55e8f01d707b391dd940128d15
           git -C "$navigator_root" checkout --quiet --detach FETCH_HEAD
-          test "$(git -C "$navigator_root" rev-parse HEAD)" = "33a153a252e03c362eb8b8472e401676fa5c0297"
+          test "$(git -C "$navigator_root" rev-parse HEAD)" = "683b36451db0de55e8f01d707b391dd940128d15"
       - name: Verify reproducible WeCom capability bindings
         run: |
           python3 plugins/connectors/wecom/tools/generate_message_connector_bindings.py
