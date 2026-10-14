@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,7 +26,6 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-import tomllib
 from packaging.requirements import Requirement
 from packaging.tags import sys_tags
 from packaging.utils import canonicalize_name, parse_wheel_filename
