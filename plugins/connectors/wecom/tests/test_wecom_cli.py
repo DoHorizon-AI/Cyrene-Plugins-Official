@@ -175,7 +175,7 @@ def test_tool_provider_list_tools() -> None:
     res = provider.list_tools()
     assert "catalog" in res
     catalog = res["catalog"]
-    assert catalog["catalog_version"] == "v1.4.0"
+    assert catalog["catalog_version"] == "v1.5.0"
     tool_ids = [t["provider_tool_id"] for t in catalog["tools"]]
     assert "wecom_auth_status" in tool_ids
     assert "wecom_contact_search" in tool_ids
@@ -186,6 +186,9 @@ def test_tool_provider_list_tools() -> None:
     assert "wecom_doc_search" in tool_ids
     assert "wecom_operation_catalog" in tool_ids
     assert "wecom_connection_health" in tool_ids
+    assert "wecom_authorization_health" in tool_ids
+    assert "wecom_reauthorization_start" in tool_ids
+    assert "wecom_reauthorization_status" in tool_ids
     assert "wecom_cli_exec" not in tool_ids
 
 
@@ -401,7 +404,7 @@ def test_tool_provider_proto_roundtrip() -> None:
         resp_bytes = provider.list_tools_proto(req_proto.SerializeToString())
         resp_proto = tool_contract.ListToolsResponse()
         resp_proto.ParseFromString(resp_bytes)
-        assert resp_proto.catalog.catalog_version == "v1.4.0"
+        assert resp_proto.catalog.catalog_version == "v1.5.0"
         assert len(resp_proto.catalog.tools) >= 8
 
         # 2. call_tool_proto
