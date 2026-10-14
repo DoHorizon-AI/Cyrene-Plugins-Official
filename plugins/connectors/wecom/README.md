@@ -35,6 +35,7 @@ task 会携带精确通知 route；终态 task 结果通过带 lease 和回执�
 | Navigator intake | Optional, same-host loopback only. Exact account, conversation kind, conversation ID, sender, owner and session mapping gates task admission. The connector-events endpoint deduplicates by vendor message ID and atomically links the task with a fixed notification route. |
 | Navigator terminal reply | With Navigator configured, the subscribed bot binding claims only `wecom.message` rows for its exact connector and trusted recipient. It persists `started` before canonical `send_message`. A vendor ACK is recorded as `uncertain` under Navigator's legacy finish contract, with `submission_status=accepted`, the transport request ID and optional vendor message reference; this does not claim delivery and is not retried. |
 | `tool.provider.v1` / human CLI | Optional, isolated `cli.config_dir` profile. It exposes specific read operations; writes require the exact operation in binding configuration and the same `write_approval` value in the invocation. There is no general CLI executor. |
+| Signed CLI authorization | Optional `authorization.enabled` profile health and renewal tools. A fixed read-only `message aibot sessions list` probe proves only that capability; expiry stays null unless the provider supplies it. |
 
 Real WeCom credentials, external message sends and a real Navigator runtime were
 not exercised by the offline tests (`NOT_RUN`).
@@ -49,6 +50,33 @@ the configuration may select other uppercase environment variable names with
 remain accepted for compatibility. The human `@wecom/cli` identity is separate:
 enable it explicitly and provide its dedicated profile directory. Its login
 state does not share application or bot credentials.
+
+An explicit CLI-only binding uses `"mode": "cli"` with `cli_enabled: true` and
+`cli_config_dir`; it needs no application or WebSocket bot secret. Signed
+authorization tools additionally require a binding-owned `authorization`
+configuration with the opaque `authorization_ref`, trusted workload, audience,
+issuer, organization, workspace, operator subject allowlist, and a 32-byte hex HMAC key read through
+`caller_context_key_env_ref` (default `WECOM_AUTHORIZATION_CONTEXT_KEY`). The
+new tools accept only the fixed signed `{caller_context, arguments}` envelope.
+Their arguments name this binding's opaque `authorization_ref`, or one
+actor-owned `session_ref`; callers cannot select a profile, executable, path,
+URL, or CLI command.
+If the start response is lost, status can also resolve the original signed
+start request ID as a read-only alias under the same actor and binding.
+
+The health result covers only `wecom.message.aibot.sessions.list`. It does not
+infer authorization expiry from local CLI login status, and a network or
+unclassified vendor error remains `UNKNOWN`. Expiry fields stay null when the
+official provider does not return a verified expiry. Renewal sessions persist
+inside a private binding-specific directory below the selected CLI profile.
+For an already-authorized profile, the connector never reruns `auth init`: it
+accepts only a matching official grant URL returned by the failed capability
+probe and rechecks the same CLI Bot ID and read grant before success. When the
+profile is missing, a signed operator may start the official
+`auth init --noninteractive --no-browser` onboarding flow. The upstream CLI
+documents that this QR onboarding can create a new bot, so it is restricted to
+the missing-profile path and remains separate from the connector's app and bot
+identities. Unsupported vendor renewal URLs fail with a scoped error.
 
 `cli.config_dir` is passed to the official CLI through the child process's
 `WECOM_CLI_CONFIG_DIR` environment variable, not a `--config` argument.
@@ -85,6 +113,29 @@ CLI login flow. See the [official CLI reference](https://github.com/WecomTeam/we
         "trusted_senders": ["wecom-member-id"]
       }
     ]
+  }
+}
+```
+
+CLI-only profile and signed authorization settings can be configured without
+application or bot credentials:
+
+```json
+{
+  "binding_id": "wecom-cli-tools",
+  "mode": "cli",
+  "cli_enabled": true,
+  "cli_config_dir": "/var/lib/cyrene/wecom-cli-profile",
+  "authorization": {
+    "enabled": true,
+    "authorization_ref": "configured-authorization-ref",
+    "caller_context_key_env_ref": "WECOM_AUTHORIZATION_CONTEXT_KEY",
+    "caller_workload": "cyrene-exchange",
+    "audience": "cyrene.connectors.wecom",
+    "issuer": "cyrene-exchange",
+    "organization_id": "configured-organization",
+    "workspace_id": "configured-workspace",
+    "operator_subjects": ["configured-operator"]
   }
 }
 ```
@@ -198,6 +249,7 @@ task 会携带精确通知 route；终态 task 结果通过带 lease 和回执�
 | Navigator intake | 可选，仅限同宿主 loopback。必须精确匹配 account、conversation kind、conversation ID、sender、owner 和 session map 才会 admission task。connector-events endpoint 按厂商 message ID 去重，并原子关联 task。 |
 | Navigator 终态通知 | 配置 Navigator 后，订阅中的 bot binding 只 claim `wecom.message`、当前 connector ID 和可信 recipient 的通知。通过规范 `send_message` 发送前先持久化 `started`。因 Navigator 旧 finish contract 不接受 `accepted`，收到厂商 ACK 后记录 `uncertain`，并在 result 中保存 `submission_status=accepted`、transport request ID 和可选 vendor message reference；这不代表已送达，也不会自动重发。 |
 | `tool.provider.v1` / human CLI | 可选，必须配置独立的 `cli.config_dir` profile。只暴露指定读取操作；写操作需要在 binding 配置中批准确切 operation，并在 invocation 中提供相同 `write_approval` 值。不提供通用 CLI executor。 |
+| 签名 CLI 授权 | 可选的 `authorization.enabled` 健康检查与续期工具。只读 `message aibot sessions list` 探针仅证明该项能力；除非厂商返回有效期，否则到期时间为空。 |
 
 离线测试未使用真实 WeCom credentials、未发送外部消息、未连接真实
 Navigator 运行时（`NOT_RUN`）。
@@ -216,6 +268,26 @@ activation 使用 `CYRENE_CAPABILITY_BINDING_ID` 和
 和 `WECOM_CLI_ADDITIONAL_HEADERS`（包括带后缀的请求头变量），防止其他身份的凭据
 覆盖该 profile。代理等其他宿主环境配置保留。运行官方 CLI 登录流程时也应设置同一个
 环境变量，授权该专用 profile。参见[官方 CLI 参考](https://github.com/WecomTeam/wecom-cli/blob/f9b2815/docs/cli-reference.md)。
+
+CLI-only binding 使用 `"mode": "cli"`、`cli_enabled: true` 和
+`cli_config_dir`，无需应用或 WebSocket bot secret。签名授权工具还要求 binding
+配置由上游分配的不透明 `authorization_ref`、受信 workload、audience、issuer、
+organization、workspace、operator subject
+allowlist，以及通过 `caller_context_key_env_ref` 指定的 32 字节十六进制 HMAC key
+（默认 `WECOM_AUTHORIZATION_CONTEXT_KEY`）。新工具只接受固定的签名
+`{caller_context, arguments}` envelope，参数只能引用当前 binding 的不透明
+`authorization_ref` 或 actor-owned 的 `session_ref`。若 start 响应丢失，status 也可在相同
+actor 和 binding 范围内通过原始签名 start request ID 只读恢复。
+
+健康结果只覆盖 `wecom.message.aibot.sessions.list`。本地 CLI 登录状态不会被推断为
+授权有效期；网络错误或无法分类的厂商错误保持为 `UNKNOWN`。厂商没有返回可验证的
+到期时间时，到期字段为空。续期 session 保存在所选 CLI profile 下、按 binding 隔离且
+权限受限的目录中。对于已授权 profile，connector 不会重新运行 `auth init`；只有能力
+探针失败时返回的匹配官方授权 URL 才能创建续期 session，并且成功前会复查相同 CLI
+Bot ID 与读取授权。只有 profile 缺失时，经过签名验证的 operator 才能启动官方
+`auth init --noninteractive --no-browser` onboarding。官方 CLI 文档说明该扫码 onboarding
+可能创建新 bot，因此只用于缺失 profile，并与 connector 的 app/bot identity 分开。
+厂商未提供受支持的续期 URL 时，会返回针对当前能力的错误。
 
 Navigator URL 必须使用 `localhost`、`127.0.0.1` 或 `::1`，不能包含 URL credentials、
 query 或 path prefix。token 从指定环境变量读取，不会由 health diagnostics 返回。
