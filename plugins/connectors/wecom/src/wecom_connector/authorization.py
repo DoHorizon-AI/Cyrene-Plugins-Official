@@ -26,7 +26,7 @@ import threading
 import time
 import urllib.parse
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -41,7 +41,22 @@ MAX_URL_LENGTH = 2048
 _VENDOR_QR_HOST = "work.weixin.qq.com"
 _VENDOR_QR_PATH = "/ai/qc/gen"
 _VENDOR_QR_SOURCE = "wecom_cli_external"
-_URL_PATTERN = re.compile(r"https://[^\s<>\"']{1,2048}")
+_VENDOR_GRANT_PATH = "/ai/aiHelper/authorizationList"
+_VENDOR_GRANT_QUERY_KEYS = (
+    "aibotid",
+    "bar_style_type",
+    "for_native",
+    "forceInnerBrowser",
+    "from",
+    "hide_more_btn",
+    "pc_bar_bg",
+    "str_aibotid",
+    "type",
+    "ww_vh",
+    "ww_vw",
+)
+_VENDOR_GRANT_TYPE = "6"
+_URL_PATTERN = re.compile(r"https://[^\s<>\"'()\x7f-\uffff]{1,2048}")
 _VENDOR_CODE_PATTERN = re.compile(r"(?:errcode|code)\s*[:=]\s*(-?\d+)", re.I)
 
 
@@ -694,21 +709,21 @@ class WeComAuthorizationSessions:
                     "PERMISSION_DENIED",
                     "permission_denied",
                     now,
-                    profile_authorization_url(exc.stdout, exc.stderr),
+                    profile_grant_management_url(exc.stdout, exc.stderr),
                 )
-            if code == 850003 and message == "authorization expired":
+            if code == 850003 and _confirmed_authorization_expiry(message):
                 return CapabilityEvidence(
                     "REAUTHORIZATION_REQUIRED",
                     "authorization_expired",
                     now,
-                    profile_authorization_url(exc.stdout, exc.stderr),
+                    profile_grant_management_url(exc.stdout, exc.stderr),
                 )
             if code == 853004:
                 return CapabilityEvidence(
                     "REAUTHORIZATION_REQUIRED",
                     "cli_token_expired",
                     now,
-                    profile_authorization_url(exc.stdout, exc.stderr),
+                    profile_grant_management_url(exc.stdout, exc.stderr),
                 )
             return CapabilityEvidence("UNKNOWN", "probe_result_unknown", None)
         if not _is_successful_observation(result):
@@ -832,7 +847,7 @@ class WeComAuthorizationSessions:
                 break
             if event != "line" or not value:
                 continue
-            url = profile_authorization_url(value)
+            url = profile_activation_url(value)
             if url:
                 self._store.update_session(
                     session_ref,
@@ -932,13 +947,25 @@ def owner_fingerprint(context: Any, binding_id: str) -> str:
     return hashlib.sha256(canonical).hexdigest()
 
 
-def profile_authorization_url(*values: str) -> str | None:
-    """Extract one supported vendor QR page and normalize its fixed query shape."""
+def profile_activation_url(*values: str) -> str | None:
+    """Extract only the fixed official QR onboarding page for a missing profile."""
+    return _extract_vendor_url(values, _sanitize_vendor_qr_url)
+
+
+def profile_grant_management_url(*values: str) -> str | None:
+    """Extract only the fixed official feature-grant management page."""
+    return _extract_vendor_url(values, _sanitize_vendor_grant_url)
+
+
+def _extract_vendor_url(
+    values: tuple[str, ...], sanitizer: Callable[[str], str | None]
+) -> str | None:
+    """Extract a CLI URL only when it matches a fixed vendor path."""
     for value in values:
         if not isinstance(value, str) or not value:
             continue
         for candidate in _URL_PATTERN.findall(value):
-            sanitized = _sanitize_vendor_qr_url(candidate.rstrip('.,;:!?)]"}'))
+            sanitized = sanitizer(candidate.rstrip('.,;:!?]}"'))
             if sanitized:
                 return sanitized
     return None
@@ -949,8 +976,12 @@ def _sanitize_vendor_qr_url(value: str) -> str | None:
         return None
     try:
         parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
         query_pairs = urllib.parse.parse_qsl(
-            parsed.query, keep_blank_values=True, strict_parsing=True
+            parsed.query,
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=2,
         )
     except ValueError:
         return None
@@ -959,7 +990,7 @@ def _sanitize_vendor_qr_url(value: str) -> str | None:
         or parsed.hostname != _VENDOR_QR_HOST
         or parsed.username is not None
         or parsed.password is not None
-        or parsed.port is not None
+        or port is not None
         or parsed.path != _VENDOR_QR_PATH
         or parsed.fragment
         or parsed.netloc != _VENDOR_QR_HOST
@@ -977,6 +1008,67 @@ def _sanitize_vendor_qr_url(value: str) -> str | None:
         f"https://{_VENDOR_QR_HOST}{_VENDOR_QR_PATH}?source="
         f"{_VENDOR_QR_SOURCE}&scode={urllib.parse.quote(scode, safe='-_')}"
     )
+
+
+def _sanitize_vendor_grant_url(value: str) -> str | None:
+    """Validate the observed WeCom grant page with a closed query schema."""
+    if len(value) > MAX_URL_LENGTH:
+        return None
+    try:
+        parsed = urllib.parse.urlsplit(value)
+        port = parsed.port
+        query_pairs = urllib.parse.parse_qsl(
+            parsed.query,
+            keep_blank_values=True,
+            strict_parsing=True,
+            max_num_fields=len(_VENDOR_GRANT_QUERY_KEYS),
+        )
+    except ValueError:
+        return None
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname != _VENDOR_QR_HOST
+        or parsed.username is not None
+        or parsed.password is not None
+        or port is not None
+        or parsed.path != _VENDOR_GRANT_PATH
+        or parsed.fragment
+        or parsed.netloc != _VENDOR_QR_HOST
+    ):
+        return None
+    keys = [key for key, _ in query_pairs]
+    if (
+        len(keys) != len(_VENDOR_GRANT_QUERY_KEYS)
+        or len(set(keys)) != len(keys)
+        or set(keys) != set(_VENDOR_GRANT_QUERY_KEYS)
+    ):
+        return None
+    query = dict(query_pairs)
+    if (
+        query["from"] != "chat"
+        or query["forceInnerBrowser"] != "1"
+        or query["type"] != _VENDOR_GRANT_TYPE
+        or query["bar_style_type"] != "3"
+        or query["for_native"] != "true"
+        or query["hide_more_btn"] != "true"
+        or not re.fullmatch(r"\d{17}", query["aibotid"])
+        or not re.fullmatch(r"[A-Za-z0-9_-]{35}", query["str_aibotid"])
+        or not re.fullmatch(r"[A-Fa-f0-9]{6},[A-Fa-f0-9]{6}", query["pc_bar_bg"])
+        or not _valid_viewport_dimension(query["ww_vh"])
+        or not _valid_viewport_dimension(query["ww_vw"])
+    ):
+        return None
+
+    canonical_pairs = [(key, query[key]) for key in _VENDOR_GRANT_QUERY_KEYS]
+    return (
+        f"https://{_VENDOR_QR_HOST}{_VENDOR_GRANT_PATH}?"
+        f"{urllib.parse.urlencode(canonical_pairs)}"
+    )
+
+
+def _valid_viewport_dimension(value: str) -> bool:
+    """Bound UI-only viewport query values to a positive four-digit range."""
+    return value.isascii() and value.isdigit() and 1 <= int(value) <= 4096
 
 
 def _vendor_error_details(exc: WeComCliError) -> tuple[int | None, str]:
@@ -1015,6 +1107,12 @@ def _vendor_error_details(exc: WeComCliError) -> tuple[int | None, str]:
             )
             return code, message
     return None, ""
+
+
+def _confirmed_authorization_expiry(message: str) -> bool:
+    """Recognize only the known provider authorization-expiry phrases."""
+    normalized = " ".join(message.split()).lower()
+    return normalized == "authorization expired" or "权限已过期" in normalized
 
 
 def _is_successful_observation(value: Any) -> bool:
