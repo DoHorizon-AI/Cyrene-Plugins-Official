@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -129,6 +130,32 @@ def test_manifest_and_activation_schema_are_package_ready() -> None:
     names = [line.split("==", maxsplit=1)[0].lower().replace("_", "-") for line in requirements]
     assert len(names) == len(set(names))
     assert {"grpcio", "protobuf"}.issubset(names)
+
+
+def test_direct_runtime_pins_match_requirements_lock() -> None:
+    """Every registry runtime dependency has the same exact source and wheelhouse pin."""
+
+    project = tomllib.loads((PACKAGE_ROOT / "pyproject.toml").read_text())
+    locked_versions = {
+        line.split("==", maxsplit=1)[0].lower().replace("_", "-"): line.split("==", maxsplit=1)[1]
+        for line in (PACKAGE_ROOT / "requirements.lock").read_text().splitlines()
+    }
+    vendored_distributions = {
+        "cyrene-integration-contracts",
+        "cyrene-plugin-runtime",
+    }
+    exact_dependency = re.compile(
+        r"^([A-Za-z0-9_.-]+)(?:\[[A-Za-z0-9_,.-]+\])?==([A-Za-z0-9_.+!-]+)$"
+    )
+
+    for dependency in project["project"]["dependencies"]:
+        match = exact_dependency.fullmatch(dependency)
+        assert match is not None, f"runtime dependency must be exactly pinned: {dependency}"
+        name, version = match.groups()
+        canonical_name = name.lower().replace("_", "-")
+        if canonical_name in vendored_distributions:
+            continue
+        assert locked_versions[canonical_name] == version
 
 
 def test_activation_schema_rejects_dynamic_urls_and_unimplemented_kinds() -> None:

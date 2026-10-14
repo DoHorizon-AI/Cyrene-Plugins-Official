@@ -73,12 +73,14 @@ class CloudProviderFailure(RuntimeError):
         retryable: bool = False,
         credential_present: bool | None = None,
         expires_at: datetime | None = None,
+        failure_phase: str | None = None,
     ) -> None:
         super().__init__(code)
         self.code = code
         self.retryable = retryable
         self.credential_present = credential_present
         self.expires_at = expires_at
+        self.failure_phase = failure_phase
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,37 +358,42 @@ class DefaultCredentialAcquirer:
             raise CredentialMissingError("configured Tailscale OAuth credential is missing")
         if len(client_secret.encode("utf-8")) > _MAX_BEARER_BYTES:
             raise CloudProviderFailure("INVALID_CREDENTIAL_CONFIGURATION")
-        document = self._transport.post_form(
-            _TAILSCALE_TOKEN_URL,
-            expected_host=TAILSCALE_API_HOST,
-            form={
-                "grant_type": "client_credentials",
-                "client_id": client_id,
-                "client_secret": client_secret,
-                "scope": _TAILSCALE_READ_SCOPE,
-            },
-            timeout=self._settings.timeout_seconds,
-        )
-        token = document.get("access_token")
-        token_type = document.get("token_type")
-        expires_in = document.get("expires_in")
-        scope = document.get("scope")
-        if (
-            not isinstance(token, str)
-            or not token
-            or len(token) > 8192
-            or token_type not in (None, "Bearer")
-            or isinstance(expires_in, bool)
-            or not isinstance(expires_in, int)
-            or not 1 <= expires_in <= 3600
-            or (
-                scope is not None
-                and (not isinstance(scope, str) or scope.split() != [_TAILSCALE_READ_SCOPE])
+        try:
+            document = self._transport.post_form(
+                _TAILSCALE_TOKEN_URL,
+                expected_host=TAILSCALE_API_HOST,
+                form={
+                    "grant_type": "client_credentials",
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "scope": _TAILSCALE_READ_SCOPE,
+                },
+                timeout=self._settings.timeout_seconds,
             )
-        ):
-            raise CloudProviderFailure("INVALID_PROVIDER_RESPONSE")
-        expires_at = datetime.now(UTC).timestamp() + expires_in
-        return BearerCredential(token, _epoch_datetime(expires_at))
+            token = document.get("access_token")
+            token_type = document.get("token_type")
+            expires_in = document.get("expires_in")
+            scope = document.get("scope")
+            if (
+                not isinstance(token, str)
+                or not token
+                or len(token) > 8192
+                or token_type not in (None, "Bearer")
+                or isinstance(expires_in, bool)
+                or not isinstance(expires_in, int)
+                or not 1 <= expires_in <= 3600
+                or (
+                    scope is not None
+                    and (not isinstance(scope, str) or scope.split() != [_TAILSCALE_READ_SCOPE])
+                )
+            ):
+                raise CloudProviderFailure("INVALID_PROVIDER_RESPONSE")
+            expires_at = datetime.now(UTC).timestamp() + expires_in
+            return BearerCredential(token, _epoch_datetime(expires_at))
+        except CloudProviderFailure as error:
+            error.credential_present = True
+            error.failure_phase = "credential_exchange"
+            raise
 
 
 class _BoundedGoogleRequest:
@@ -422,7 +429,7 @@ class _BoundedGoogleRequest:
 
 
 class CloudResourceReader:
-    """Read bounded Azure, Google, and Hugging Face metadata observations."""
+    """Read bounded Azure, Google, Hugging Face, Tailscale, and Runpod observations."""
 
     def __init__(
         self,

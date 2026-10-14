@@ -83,7 +83,7 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         "provider_tool_id": "cloud_resources_query",
         "display_name": "Query Cloud Resource Observation",
         "description": (
-            "Read one Azure VM, GCP instance, or Hugging Face repository metadata target "
+            "Read one configured Azure, GCP, Hugging Face, Tailscale, or Runpod resource "
             "from this binding."
         ),
         "input_schema": _RESOURCE_SCHEMA,
@@ -92,8 +92,8 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         "provider_tool_id": "cloud_authorization_health",
         "display_name": "Check Cloud Authorization Health",
         "description": (
-            "Read one configured target to verify the current authorization scope and report "
-            "its typed health."
+            "Read one configured Azure, GCP, Hugging Face, Tailscale, or Runpod target to verify "
+            "authorization scope and report health."
         ),
         "input_schema": _HEALTH_SCHEMA,
     },
@@ -314,7 +314,14 @@ class CloudResourcesProvider:
                 login_state = "PRESENT"
             elif error.credential_present is False:
                 login_state = "MISSING"
-            if error.code == "AUTHENTICATION_REQUIRED":
+            if error.failure_phase == "credential_exchange":
+                if error.code == "AUTHENTICATION_REQUIRED":
+                    authorization_state = "REAUTHORIZATION_REQUIRED"
+                elif error.code == "PERMISSION_DENIED":
+                    authorization_state = "PERMISSION_DENIED"
+                else:
+                    authorization_state = "UNKNOWN"
+            elif error.code == "AUTHENTICATION_REQUIRED":
                 authorization_state = (
                     "REAUTHORIZATION_REQUIRED" if error.credential_present is True else "UNKNOWN"
                 )
