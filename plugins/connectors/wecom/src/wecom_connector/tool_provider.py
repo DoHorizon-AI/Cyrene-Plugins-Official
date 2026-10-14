@@ -20,6 +20,12 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from ._generated import tool_provider_pb2 as tool_contract
+from .authorization import (
+    AuthorizationSessionError,
+    AuthorizationTrustConfig,
+    WeComAuthorizationSessions,
+    owner_fingerprint,
+)
 from .cli import WeComCliClient, WeComCliError
 
 logger = logging.getLogger(__name__)
@@ -34,6 +40,66 @@ LIST_TOOLS_RESPONSE_TYPE_URL = (
 )
 CALL_TOOL_REQUEST_TYPE_URL = "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest"
 CALL_TOOL_RESPONSE_TYPE_URL = "type.cyrene.io/cyrene.tool.provider.v1.CallToolResponse"
+
+_AUTHORIZATION_TOOL_IDS = frozenset(
+    {
+        "wecom_authorization_health",
+        "wecom_reauthorization_start",
+        "wecom_reauthorization_status",
+    }
+)
+_AUTHORIZATION_CONTEXT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "method": {"type": "string", "minLength": 1},
+        "caller_workload": {"type": "string", "minLength": 1},
+        "audience": {"type": "string", "minLength": 1},
+        "issuer": {"type": "string", "minLength": 1},
+        "subject": {"type": "string", "minLength": 1},
+        "organization_id": {"type": "string", "minLength": 1},
+        "workspace_id": {"type": "string", "minLength": 1},
+        "binding_id": {"type": "string", "minLength": 1},
+        "request_id": {"type": "string", "minLength": 1},
+        "issued_at": {"type": "string", "format": "date-time"},
+        "expires_at": {"type": "string", "format": "date-time"},
+        "operation_id": {"type": "string", "minLength": 1},
+        "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "signature": {"type": "string", "minLength": 1},
+    },
+    "required": [
+        "method",
+        "caller_workload",
+        "audience",
+        "issuer",
+        "subject",
+        "organization_id",
+        "workspace_id",
+        "binding_id",
+        "request_id",
+        "issued_at",
+        "expires_at",
+        "operation_id",
+        "payload_sha256",
+        "signature",
+    ],
+    "additionalProperties": False,
+}
+
+
+def _authorization_envelope_schema(
+    arguments_schema: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build the required signed-caller envelope for one fixed auth tool."""
+    return {
+        "type": "object",
+        "properties": {
+            "caller_context": _AUTHORIZATION_CONTEXT_SCHEMA,
+            "arguments": dict(arguments_schema),
+        },
+        "required": ["caller_context", "arguments"],
+        "additionalProperties": False,
+    }
+
 
 CANONICAL_TOOLS = [
     {
@@ -192,6 +258,60 @@ CANONICAL_TOOLS = [
         ),
         "input_schema": {"type": "object", "properties": {}},
     },
+    {
+        "provider_tool_id": "wecom_authorization_health",
+        "display_name": "WeCom Authorization Health",
+        "description": (
+            "Check the signed binding's human CLI profile and the confirmed "
+            "message-session read grant. Unknown expiry remains null."
+        ),
+        "input_schema": _authorization_envelope_schema(
+            {
+                "type": "object",
+                "properties": {"authorization_ref": {"type": "string", "minLength": 1}},
+                "required": ["authorization_ref"],
+                "additionalProperties": False,
+            }
+        ),
+    },
+    {
+        "provider_tool_id": "wecom_reauthorization_start",
+        "display_name": "Start WeCom Reauthorization",
+        "description": (
+            "Start a signed, actor-owned official WeCom authorization session "
+            "for this binding's native CLI profile."
+        ),
+        "input_schema": _authorization_envelope_schema(
+            {
+                "type": "object",
+                "properties": {"authorization_ref": {"type": "string", "minLength": 1}},
+                "required": ["authorization_ref"],
+                "additionalProperties": False,
+            }
+        ),
+    },
+    {
+        "provider_tool_id": "wecom_reauthorization_status",
+        "display_name": "WeCom Reauthorization Status",
+        "description": (
+            "Poll one actor-owned WeCom authorization session and revalidate "
+            "the same CLI profile and read grant."
+        ),
+        "input_schema": _authorization_envelope_schema(
+            {
+                "type": "object",
+                "properties": {
+                    "session_ref": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                    }
+                },
+                "required": ["session_ref"],
+                "additionalProperties": False,
+            }
+        ),
+    },
 ]
 
 _WRITE_OPERATIONS = {
@@ -224,12 +344,28 @@ class WeComToolProvider:
         cli_enabled: bool = True,
         approved_write_operations: tuple[str, ...] = (),
         health_provider: Callable[[], Mapping[str, Any]] | None = None,
+        authorization_config: AuthorizationTrustConfig | None = None,
+        authorization_profile_dir: str | None = None,
+        authorization_session_ttl_seconds: int = 300,
     ) -> None:
         self._binding_id = binding_id
         self._cli = cli_client or WeComCliClient()
         self._cli_enabled = cli_enabled
         self._approved_write_operations = frozenset(approved_write_operations)
         self._health_provider = health_provider
+        self._authorization_config = authorization_config
+        self._authorization_sessions = (
+            WeComAuthorizationSessions(
+                binding_id,
+                self._cli,
+                cli_enabled=cli_enabled,
+                profile_dir=authorization_profile_dir,
+                authorization_ref=authorization_config.authorization_ref,
+                session_ttl_seconds=authorization_session_ttl_seconds,
+            )
+            if authorization_config is not None
+            else None
+        )
 
     @property
     def binding_id(self) -> str:
@@ -240,7 +376,7 @@ class WeComToolProvider:
         request: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         """Return the dictionary catalog of available tools."""
-        catalog_version = "v1.4.0"
+        catalog_version = "v1.5.0"
         tools: list[dict[str, Any]] = []
 
         for defn in CANONICAL_TOOLS:
@@ -289,6 +425,13 @@ class WeComToolProvider:
                 "is_error": False,
                 "content_json": json.dumps(result, ensure_ascii=False),
             }
+        except AuthorizationToolError as exc:
+            return {
+                "is_error": True,
+                "content_json": json.dumps(
+                    {"error": exc.message, "code": exc.code}, ensure_ascii=False
+                ),
+            }
         except WeComCliError as exc:
             return {
                 "is_error": True,
@@ -310,6 +453,9 @@ class WeComToolProvider:
             }
 
     def _dispatch_tool(self, tool_id: str, args: dict[str, Any]) -> Any:
+        if tool_id in _AUTHORIZATION_TOOL_IDS:
+            return self._dispatch_authorization_tool(tool_id, args)
+
         if tool_id == "wecom_auth_status":
             if not self._cli_enabled:
                 return {
@@ -380,9 +526,7 @@ class WeComToolProvider:
                     *sorted(self._approved_write_operations),
                 ],
                 "available_write_operations": sorted(_WRITE_OPERATIONS.values()),
-                "approved_write_operations": sorted(
-                    self._approved_write_operations
-                ),
+                "approved_write_operations": sorted(self._approved_write_operations),
                 "write_policy": (
                     "A write requires that exact operation in binding configuration "
                     "and the same write_approval value in the invocation."
@@ -402,13 +546,132 @@ class WeComToolProvider:
 
         raise ValueError(f"Unknown WeCom tool: {tool_id!r}")
 
+    def _dispatch_authorization_tool(
+        self, tool_id: str, envelope: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Verify the exact signed payload before touching private session state."""
+        try:
+            if set(envelope) != {"caller_context", "arguments"}:
+                raise AuthorizationSessionError("invalid_request")
+            context_value = envelope.get("caller_context")
+            inner = envelope.get("arguments")
+            if not isinstance(context_value, Mapping) or not isinstance(inner, Mapping):
+                raise AuthorizationSessionError("invalid_request")
+            if tool_id in {
+                "wecom_authorization_health",
+                "wecom_reauthorization_start",
+            }:
+                if set(inner) != {"authorization_ref"} or not isinstance(
+                    inner.get("authorization_ref"), str
+                ):
+                    raise AuthorizationSessionError("invalid_request")
+            elif set(inner) != {"session_ref"} or not isinstance(
+                inner.get("session_ref"), str
+            ):
+                raise AuthorizationSessionError("invalid_request")
+
+            context = self._verify_authorization_context(tool_id, context_value, inner)
+            sessions = self._authorization_sessions
+            if sessions is None:
+                raise AuthorizationSessionError("authorization_not_configured")
+            if (
+                tool_id
+                in {
+                    "wecom_authorization_health",
+                    "wecom_reauthorization_start",
+                }
+                and inner["authorization_ref"] != sessions.authorization_ref
+            ):
+                raise AuthorizationSessionError("authorization_ref_mismatch")
+            if tool_id == "wecom_authorization_health":
+                import cyrene_integration_contracts as contracts
+
+                contracts.parse_wecom_authorization_health_arguments(dict(inner))
+                return _serialize_authorization_health(sessions.health())
+            if tool_id == "wecom_reauthorization_start":
+                import cyrene_integration_contracts as contracts
+
+                contracts.parse_wecom_reauthorization_start_arguments(dict(inner))
+                if context.subject not in self._authorization_config.operator_subjects:
+                    raise AuthorizationSessionError("operator_not_authorized")
+                try:
+                    idempotency_key, payload_hash = contracts.write_replay_identity(
+                        context, dict(inner)
+                    )
+                except (AttributeError, TypeError, ValueError):
+                    raise AuthorizationSessionError(
+                        "authorization_contracts_unavailable"
+                    ) from None
+                record = sessions.start(
+                    owner_fingerprint(context, self._binding_id),
+                    idempotency_key=idempotency_key,
+                    payload_hash=payload_hash,
+                    request_alias=context.request_id,
+                )
+                return _serialize_renewal_session(record, sessions.authorization_ref)
+            import cyrene_integration_contracts as contracts
+
+            contracts.parse_wecom_reauthorization_status_arguments(dict(inner))
+            record = sessions.status(
+                owner_fingerprint(context, self._binding_id),
+                str(inner["session_ref"]),
+            )
+            return _serialize_renewal_session(record, sessions.authorization_ref)
+        except AuthorizationSessionError as exc:
+            raise _safe_authorization_error(exc.code) from None
+        except AuthorizationToolError:
+            raise
+        except Exception:
+            raise _safe_authorization_error("authorization_operation_failed") from None
+
+    def _verify_authorization_context(
+        self,
+        tool_id: str,
+        context_value: Mapping[str, Any],
+        inner: Mapping[str, Any],
+    ) -> Any:
+        config = self._authorization_config
+        if config is None or config.key is None:
+            raise AuthorizationSessionError("authorization_not_configured")
+        expected_context_fields = set(_AUTHORIZATION_CONTEXT_SCHEMA["required"])
+        if set(context_value) != expected_context_fields:
+            raise AuthorizationSessionError("caller_context_invalid")
+        try:
+            import cyrene_integration_contracts as contracts
+
+            context = contracts.parse_trusted_caller_context(dict(context_value))
+            operation_id = contracts.TOOL_OPERATIONS[tool_id]
+            verified = contracts.verify_context(
+                method=tool_id,
+                operation_id=operation_id,
+                payload=dict(inner),
+                context=context,
+                key=config.key,
+                expected_caller_workload=config.caller_workload,
+                expected_audience=config.audience,
+                expected_binding_id=self._binding_id,
+                expected_organization_id=config.organization_id,
+                expected_workspace_id=config.workspace_id,
+                expected_issuer=config.issuer,
+            )
+        except (AttributeError, ImportError, KeyError, TypeError, ValueError):
+            raise AuthorizationSessionError(
+                "authorization_contracts_unavailable"
+            ) from None
+        if not verified:
+            raise AuthorizationSessionError("caller_context_invalid")
+        return context
+
+    def close(self) -> None:
+        """Cancel active official CLI onboarding work during provider shutdown."""
+        if self._authorization_sessions is not None:
+            self._authorization_sessions.close()
+
     def _require_cli_enabled(self) -> None:
         if not self._cli_enabled:
             raise WeComCliError("WeCom human CLI profile is disabled for this binding")
 
-    def _require_write_approval(
-        self, tool_id: str, args: Mapping[str, Any]
-    ) -> None:
+    def _require_write_approval(self, tool_id: str, args: Mapping[str, Any]) -> None:
         operation = _WRITE_OPERATIONS[tool_id]
         if operation not in self._approved_write_operations:
             raise WeComCliError(
@@ -478,3 +741,153 @@ def _argument_text(args: Mapping[str, Any], name: str) -> str:
     if len(value.encode("utf-8")) > 4096 or any(ord(char) < 32 for char in value):
         raise WeComCliError(f"tool argument {name!r} contains invalid text")
     return value
+
+
+class AuthorizationToolError(RuntimeError):
+    """Safe public error for the signed authorization tool family."""
+
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        self.message = message
+        super().__init__(code)
+
+
+def _safe_authorization_error(code: str) -> AuthorizationToolError:
+    """Map private failures to bounded messages with no raw vendor details."""
+    messages = {
+        "invalid_request": "The authorization request shape is invalid.",
+        "caller_context_invalid": "The signed caller context is invalid or expired.",
+        "authorization_contracts_unavailable": (
+            "The shared authorization contract runtime is unavailable."
+        ),
+        "authorization_not_configured": (
+            "Signed authorization tools are not configured for this binding."
+        ),
+        "authorization_ref_mismatch": (
+            "The authorization reference does not match this binding."
+        ),
+        "authorization_operation_failed": (
+            "The authorization operation could not be completed safely."
+        ),
+        "authorization_start_ambiguous": (
+            "An earlier activation outcome is unresolved. Check this profile on its "
+            "host before requesting another start."
+        ),
+        "operator_not_authorized": (
+            "This caller is not an approved operator for the binding."
+        ),
+        "cli_disabled": "The binding has no enabled native WeCom CLI profile.",
+        "cli_unavailable": "The official WeCom CLI is unavailable on this host.",
+        "cli_version_unsupported": (
+            "The installed WeCom CLI version does not support this authorization flow."
+        ),
+        "profile_identity_unknown": (
+            "The existing CLI profile identity could not be verified."
+        ),
+        "profile_identity_changed": (
+            "The CLI profile identity changed; an explicit relink is required."
+        ),
+        "login_state_unknown": "The native CLI login state could not be confirmed.",
+        "authorization_already_valid": (
+            "The configured message-session grant is already valid."
+        ),
+        "renewal_not_confirmed": (
+            "The read-only probe did not confirm an expired or denied grant."
+        ),
+        "official_grant_url_unavailable": (
+            "The official CLI exposed no supported grant URL. Authorize this same "
+            "profile through WeCom's official settings, then retry."
+        ),
+        "session_busy": (
+            "Another actor-owned renewal session is active for this binding."
+        ),
+        "idempotency_conflict": (
+            "This renewal request ID was already used with different signed arguments."
+        ),
+        "session_not_found": (
+            "The renewal session was not found for this caller and binding."
+        ),
+        "provider_closed": "The WeCom authorization provider is shutting down.",
+        "private_store_unavailable": (
+            "The binding's private authorization state is unavailable."
+        ),
+    }
+    return AuthorizationToolError(
+        code if code in messages else "authorization_operation_failed",
+        messages.get(code, messages["authorization_operation_failed"]),
+    )
+
+
+def _serialize_authorization_health(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Construct and serialize the shared typed authorization health DTO."""
+    try:
+        import cyrene_integration_contracts as contracts
+
+        capabilities = tuple(
+            contracts.CapabilityAuthorizationHealth(
+                capability_id=item["capability_id"],
+                state=contracts.AuthorizationState(item["state"]),
+                last_verified_at=item["last_verified_at"],
+                expires_at=item["expires_at"],
+                reason_code=item["reason_code"],
+            )
+            for item in value["capabilities"]
+        )
+        health = contracts.AuthorizationHealth(
+            schema_version=value["schema_version"],
+            authorization_ref=value["authorization_ref"],
+            login_state=contracts.LoginState(value["login_state"]),
+            authorization_state=contracts.AuthorizationState(
+                value["authorization_state"]
+            ),
+            checked_at=value["checked_at"],
+            expires_at=value["expires_at"],
+            generation=value["generation"],
+            capabilities=capabilities,
+        )
+        serialized = contracts.serialize_authorization_health(health)
+    except (ImportError, KeyError, TypeError, ValueError):
+        raise _safe_authorization_error("authorization_contracts_unavailable") from None
+    return _json_mapping(serialized)
+
+
+def _serialize_renewal_session(
+    value: Mapping[str, Any], authorization_ref: str
+) -> dict[str, Any]:
+    """Construct and serialize one typed renewal session without private owners."""
+    try:
+        import cyrene_integration_contracts as contracts
+
+        session = contracts.RenewalSession(
+            session_ref=value["session_ref"],
+            authorization_ref=authorization_ref,
+            state=contracts.RenewalState(value["state"]),
+            created_at=_parse_rfc3339(value["created_at"]),
+            expires_at=_parse_rfc3339(value["expires_at"]),
+            authorization_url=value.get("authorization_url"),
+            qr_attachment_ref=None,
+            generation=value["generation"],
+        )
+        serialized = contracts.serialize_renewal_session(session)
+    except (ImportError, KeyError, TypeError, ValueError):
+        raise _safe_authorization_error("authorization_contracts_unavailable") from None
+    return _json_mapping(serialized)
+
+
+def _json_mapping(value: Any) -> dict[str, Any]:
+    if isinstance(value, Mapping):
+        return dict(value)
+    if isinstance(value, str):
+        parsed = json.loads(value)
+        if isinstance(parsed, Mapping):
+            return dict(parsed)
+    raise _safe_authorization_error("authorization_contracts_unavailable")
+
+
+def _parse_rfc3339(value: str) -> Any:
+    from datetime import datetime
+
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed

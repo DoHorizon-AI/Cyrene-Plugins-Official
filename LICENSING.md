@@ -28,11 +28,15 @@ the maintainers before copying, redistributing, or publishing it.
 - The canonical Protobuf contracts carrying `SPDX-License-Identifier: Apache-2.0` are Apache-2.0 licensed.
 - Rust packages whose `Cargo.toml` declares `license = "Apache-2.0"` are Apache-2.0 licensed.
 - Cyrene-owned code in `plugins/connectors/wecom/` is Apache-2.0 under its component manifest and local `LICENSE`. The upstream `wecom-aibot-python-sdk` remains MIT-licensed at pinned commit `6bcb59a9a636c566f4c6ea5268b228e3def1611a`; its separate notice is retained under `plugins/connectors/wecom/third_party/licenses/`.
-- Python packages, Java packages, the OneBot connector, and protected QQ-side research documents currently receive no additional grant from the root policy.
+- `sdk/python/cyrene_integration_contracts/` is Apache-2.0 under its package metadata and local `LICENSE`. This grant applies to that SDK component only.
+- Other Python packages, Java packages, the OneBot connector, and protected QQ-side research documents currently receive no additional grant from the root policy.
 
-根许可尚未确定前，Python、Java、OneBot Connector 与受保护的 QQ 侧研究文档不会因公开
-可见而获得额外授权。任何仓库级开源授权都需要 operator 明确批准，并同步更新根
-`LICENSE`、本映射与 package metadata。
+根许可尚未确定前，除下述明确授权的 SDK 外，其他 Python、Java、OneBot Connector 与受保护的
+QQ 侧研究文档不会因公开可见而获得额外授权。任何仓库级开源授权都需要 operator 明确批准，
+并同步更新根 `LICENSE`、本映射与 package metadata。
+
+`sdk/python/cyrene_integration_contracts/` 依其 package metadata 与本地 `LICENSE` 采用
+Apache-2.0。此许可仅适用于该 SDK 组件。
 
 `plugins/connectors/wecom/` 中由 Cyrene 编写的代码依该组件 manifest 与本地 `LICENSE`
 采用 Apache-2.0。上游 `wecom-aibot-python-sdk` 仍依固定 commit

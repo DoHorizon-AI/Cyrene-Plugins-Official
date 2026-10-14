@@ -375,7 +375,7 @@ def _parse_timestamp(value: Any) -> datetime:
     if not isinstance(value, str) or _TIMESTAMP_PATTERN.fullmatch(value) is None:
         raise ValueError("timestamp must be an RFC3339 UTC string ending in Z")
     try:
-        parsed = datetime.fromisoformat(value[:-1] + "+00:00")
+        parsed = datetime.fromisoformat(value)
     except ValueError as error:
         raise ValueError("timestamp is invalid") from error
     return parsed.astimezone(UTC)

@@ -3,7 +3,7 @@
   "id": "cyrene.connectors.wecom",
   "name": "Official WeCom Unified Connector",
   "version": "0.3.0",
-  "description": "Unified WeCom application and OpenWS bot connector with canonical inbound events, scoped local Navigator tasks and terminal replies, and bounded tool.provider.v1 @wecom/cli tools.",
+  "description": "Unified WeCom application, OpenWS bot, and isolated official CLI connector with canonical inbound events, scoped local Navigator tasks and terminal replies, bounded tool.provider.v1 tools, and signed authorization health and renewal sessions.",
   "licenseExpression": "Apache-2.0",
   "kind": "capability-plugin",
   "capabilities": [
@@ -65,12 +65,15 @@
     "optionalSecretRefs": [
       "WECOM_CORP_SECRET",
       "WECOM_BOT_SECRET",
-      "WECOM_NAVIGATOR_BEARER_TOKEN"
+      "WECOM_NAVIGATOR_BEARER_TOKEN",
+      "WECOM_AUTHORIZATION_CONTEXT_KEY"
     ]
   },
   "state": {
-    "isStateful": false,
-    "storageCategory": "stateless",
+    "isStateful": true,
+    "storageCategory": "cache",
+    "migrationSupported": false,
+    "downgradeSupported": true,
     "retentionPolicyOnUninstall": "retain"
   }
 }
