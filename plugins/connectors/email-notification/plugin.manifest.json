@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.connectors.email-notification",
+  "name": "Independent SMTP Email Notification Connector",
+  "version": "0.1.0",
+  "description": "Sends bounded notifications through a binding-configured SMTP server using signed tool.provider.v1 calls.",
+  "licenseExpression": "Apache-2.0",
+  "kind": "capability-plugin",
+  "capabilities": ["tool.provider.v1"],
+  "supportedServices": ["Cyrene-Exchange"],
+  "methods": [
+    {
+      "capability": "tool.provider.v1",
+      "name": "list_tools",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "capability": "tool.provider.v1",
+      "name": "call_tool",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "email_notification_connector:EmailNotificationProvider",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "email_notification_connector:EmailNotificationProvider"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11"
+  },
+  "configuration": {
+    "schemaRef": "configuration.schema.json"
+  },
+  "secrets": {
+    "requiredSecretRefs": ["EMAIL_NOTIFICATION_CONTEXT_HMAC_KEY"],
+    "optionalSecretRefs": [
+      "SMTP_USERNAME",
+      "SMTP_PASSWORD"
+    ]
+  },
+  "state": {
+    "isStateful": true,
+    "storageCategory": "relational",
+    "storageDescription": "Private SQLite submission and replay ledger; message bodies and recipient addresses are not retained.",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

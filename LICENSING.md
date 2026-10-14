@@ -27,8 +27,10 @@ the maintainers before copying, redistributing, or publishing it.
 
 - The canonical Protobuf contracts carrying `SPDX-License-Identifier: Apache-2.0` are Apache-2.0 licensed.
 - Rust packages whose `Cargo.toml` declares `license = "Apache-2.0"` are Apache-2.0 licensed.
+- Cyrene Plugins-owned code in `plugins/providers/cloud-resources/` is Apache-2.0 under its component manifest. The provider's Azure, Google, Hugging Face, Tailscale, and Runpod client libraries remain third-party dependencies under their own upstream licenses.
+- Cyrene Plugins-owned code in `plugins/connectors/email-notification/` is Apache-2.0 under its component manifest, project metadata, and local `LICENSE`.
 - Cyrene-owned code in `plugins/connectors/wecom/` is Apache-2.0 under its component manifest and local `LICENSE`. The upstream `wecom-aibot-python-sdk` remains MIT-licensed at pinned commit `6bcb59a9a636c566f4c6ea5268b228e3def1611a`; its separate notice is retained under `plugins/connectors/wecom/third_party/licenses/`.
-- `sdk/python/cyrene_integration_contracts/` is Apache-2.0 under its package metadata and local `LICENSE`. This grant applies to that SDK component only.
+- The Cyrene Plugins-owned shared SDK in `sdk/python/cyrene_integration_contracts/` is Apache-2.0 under its package metadata and local `LICENSE`. This grant covers the SDK's DTOs, signing helpers, and packaged schema; Cloud Resources and Email Notification vendor that same SDK source without changing its ownership or license.
 - Other Python packages, Java packages, the OneBot connector, and protected QQ-side research documents currently receive no additional grant from the root policy.
 
 根许可尚未确定前，除下述明确授权的 SDK 外，其他 Python、Java、OneBot Connector 与受保护的
@@ -36,7 +38,13 @@ QQ 侧研究文档不会因公开可见而获得额外授权。任何仓库级�
 并同步更新根 `LICENSE`、本映射与 package metadata。
 
 `sdk/python/cyrene_integration_contracts/` 依其 package metadata 与本地 `LICENSE` 采用
-Apache-2.0。此许可仅适用于该 SDK 组件。
+Apache-2.0。该 Cyrene Plugins-owned SDK 包含 DTO、签名辅助函数及打包 schema；Cloud Resources
+和 Email Notification 会 vendoring 相同 SDK 源码，不改变其所有权或许可。
+
+`plugins/providers/cloud-resources/` 中由 Cyrene Plugins 维护的代码依组件 manifest 采用
+Apache-2.0。Azure、Google、Hugging Face、Tailscale 和 Runpod 客户端库仍分别遵循其上游许可。
+`plugins/connectors/email-notification/` 中由 Cyrene Plugins 维护的代码依组件 manifest、项目
+metadata 与本地 `LICENSE` 采用 Apache-2.0。
 
 `plugins/connectors/wecom/` 中由 Cyrene 编写的代码依该组件 manifest 与本地 `LICENSE`
 采用 Apache-2.0。上游 `wecom-aibot-python-sdk` 仍依固定 commit

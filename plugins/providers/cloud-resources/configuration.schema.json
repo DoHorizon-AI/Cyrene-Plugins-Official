@@ -1,0 +1,210 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.cloud-resources/configuration.schema.json",
+  "title": "Cloud resource observation provider activation configuration",
+  "type": "object",
+  "required": [
+    "trusted_callers",
+    "azure_auth",
+    "gcp_auth",
+    "targets",
+    "hostSecretRefs"
+  ],
+  "properties": {
+    "authorization_generation": {"type": "integer", "minimum": 0, "default": 0},
+    "trusted_callers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["caller_workload", "audience", "organization_id", "workspace_id", "verification_key_ref"],
+        "properties": {
+          "caller_workload": {"type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,256}$"},
+          "audience": {"type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,256}$"},
+          "organization_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "workspace_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "issuer": {"type": "string", "minLength": 1, "maxLength": 512},
+          "verification_key_ref": {"const": "cloud-resources/exchange-verification-key"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "azure_auth": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {"type": "string", "const": "managed_identity"},
+        "client_id": {"type": "string", "pattern": "^[0-9a-fA-F-]{36}$"}
+      },
+      "additionalProperties": false
+    },
+    "gcp_auth": {
+      "type": "object",
+      "required": ["mode"],
+      "properties": {
+        "mode": {"type": "string", "enum": ["metadata", "service_account_json"]},
+        "credential_ref": {"const": "cloud-resources/gcp-service-account-json"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"mode": {"const": "service_account_json"}}, "required": ["mode"]},
+          "then": {"required": ["credential_ref"]}
+        },
+        {
+          "if": {"properties": {"mode": {"const": "metadata"}}, "required": ["mode"]},
+          "then": {"not": {"required": ["credential_ref"]}}
+        }
+      ],
+      "additionalProperties": false
+    },
+    "hf_token_ref": {"const": "cloud-resources/hf-read-token"},
+    "tailscale_auth": {
+      "type": "object",
+      "required": ["mode", "client_id", "client_secret_ref", "tailnet"],
+      "properties": {
+        "mode": {"const": "oauth_client"},
+        "client_id": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,256}$"},
+        "client_secret_ref": {"const": "cloud-resources/tailscale-client-secret"},
+        "tailnet": {"type": "string", "pattern": "^(?!-$)[A-Za-z0-9._-]{1,200}$"}
+      },
+      "additionalProperties": false
+    },
+    "runpod_auth": {
+      "type": "object",
+      "required": ["mode", "api_key_ref"],
+      "properties": {
+        "mode": {"const": "read_only_api_key"},
+        "api_key_ref": {"const": "cloud-resources/runpod-api-key"}
+      },
+      "additionalProperties": false
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 500,
+      "items": {"oneOf": [
+        {"$ref": "#/$defs/azureVmTarget"},
+        {"$ref": "#/$defs/gcpInstanceTarget"},
+        {"$ref": "#/$defs/hfTarget"},
+        {"$ref": "#/$defs/tailscaleDeviceTarget"},
+        {"$ref": "#/$defs/runpodPodTarget"}
+      ]}
+    },
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 15, "default": 8},
+    "hostSecretRefs": {
+      "type": "object",
+      "description": "Maps stable secret refs to environment variable names; values are injected by the host and never included in tool arguments.",
+      "required": ["cloud-resources/exchange-verification-key"],
+      "properties": {
+        "cloud-resources/exchange-verification-key": {"$ref": "#/$defs/environmentName"},
+        "cloud-resources/gcp-service-account-json": {"$ref": "#/$defs/environmentName"},
+        "cloud-resources/hf-read-token": {"$ref": "#/$defs/environmentName"},
+        "cloud-resources/tailscale-client-secret": {"$ref": "#/$defs/environmentName"},
+        "cloud-resources/runpod-api-key": {"$ref": "#/$defs/environmentName"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "secretRef": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+    "environmentName": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+    "targetCommon": {
+      "type": "object",
+      "required": ["target_ref", "display_name"],
+      "properties": {
+        "target_ref": {"type": "string", "pattern": "^[A-Za-z0-9._-]{1,128}$"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256}
+      }
+    },
+    "azureVmTarget": {
+      "allOf": [{"$ref": "#/$defs/targetCommon"}, {
+        "type": "object",
+        "required": ["provider", "kind", "subscription_id", "resource_group", "vm_name"],
+        "properties": {
+          "provider": {"const": "azure"}, "kind": {"const": "azure.vm"},
+          "subscription_id": {"type": "string", "pattern": "^[0-9a-fA-F-]{36}$"},
+          "resource_group": {"type": "string", "pattern": "^[A-Za-z0-9_.() -]{1,90}$"},
+          "vm_name": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,64}$"}
+        }
+      }],
+      "unevaluatedProperties": false
+    },
+    "gcpInstanceTarget": {
+      "allOf": [{"$ref": "#/$defs/targetCommon"}, {
+        "type": "object",
+        "required": ["provider", "kind", "project_id", "zone", "instance_name"],
+        "properties": {
+          "provider": {"const": "gcp"}, "kind": {"const": "gcp.instance"},
+          "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"},
+          "zone": {"type": "string", "pattern": "^[a-z]+-[a-z0-9]+-[a-z]$"},
+          "instance_name": {"type": "string", "pattern": "^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$"}
+        }
+      }],
+      "unevaluatedProperties": false
+    },
+    "hfTarget": {
+      "allOf": [{"$ref": "#/$defs/targetCommon"}, {
+        "type": "object",
+        "required": ["provider", "kind", "repo_id"],
+        "properties": {
+          "provider": {"const": "hf"},
+          "kind": {"enum": ["hf.model", "hf.dataset", "hf.space"]},
+          "repo_id": {"type": "string", "pattern": "^(?![.]{1,2}/)(?![A-Za-z0-9_.-]+/[.]{1,2}$)[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"}
+        }
+      }],
+      "unevaluatedProperties": false
+    },
+    "tailscaleDeviceTarget": {
+      "allOf": [{"$ref": "#/$defs/targetCommon"}, {
+        "type": "object",
+        "required": ["provider", "kind", "tailnet", "device_id"],
+        "properties": {
+          "provider": {"const": "tailscale"},
+          "kind": {"const": "tailscale.device"},
+          "tailnet": {"type": "string", "pattern": "^(?!-$)[A-Za-z0-9._-]{1,200}$"},
+          "device_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}
+        }
+      }],
+      "unevaluatedProperties": false
+    },
+    "runpodPodTarget": {
+      "allOf": [{"$ref": "#/$defs/targetCommon"}, {
+        "type": "object",
+        "required": ["provider", "kind", "pod_id"],
+        "properties": {
+          "provider": {"const": "runpod"},
+          "kind": {"const": "runpod.pod"},
+          "pod_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}
+        }
+      }],
+      "unevaluatedProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"gcp_auth": {"properties": {"mode": {"const": "service_account_json"}}}}, "required": ["gcp_auth"]},
+      "then": {"properties": {"hostSecretRefs": {"required": ["cloud-resources/gcp-service-account-json"]}}}
+    },
+    {
+      "if": {"required": ["hf_token_ref"]},
+      "then": {"properties": {"hostSecretRefs": {"required": ["cloud-resources/hf-read-token"]}}}
+    },
+    {
+      "if": {"properties": {"targets": {"contains": {"properties": {"provider": {"const": "tailscale"}}, "required": ["provider"]}}}, "required": ["targets"]},
+      "then": {
+        "required": ["tailscale_auth"],
+        "properties": {"hostSecretRefs": {"required": ["cloud-resources/tailscale-client-secret"]}}
+      }
+    },
+    {
+      "if": {"properties": {"targets": {"contains": {"properties": {"provider": {"const": "runpod"}}, "required": ["provider"]}}}, "required": ["targets"]},
+      "then": {
+        "required": ["runpod_auth"],
+        "properties": {"hostSecretRefs": {"required": ["cloud-resources/runpod-api-key"]}}
+      }
+    }
+  ],
+  "additionalProperties": false
+}

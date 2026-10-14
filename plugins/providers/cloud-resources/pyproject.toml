@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-cloud-resources-provider"
+version = "0.1.0"
+description = "Read-only, fixed-scope cloud resource observations for Cyrene"
+requires-python = ">=3.11"
+dependencies = [
+  "azure-identity==1.26.0",
+  "cyrene-integration-contracts==0.1.0",
+  "cyrene-plugin-runtime==0.2.1",
+  "google-auth[requests]==2.62.0",
+  "httpx==0.28.1",
+  "jsonschema==4.26.0",
+  "protobuf==4.25.9",
+  "requests==2.34.2",
+]
+
+[project.optional-dependencies]
+test = ["jsonschema>=4.23,<5", "pytest>=8,<10", "ruff>=0.9,<1"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.providers.cloud-resources" = [
+  "plugin.manifest.json",
+  "configuration.schema.json",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+cyrene-integration-contracts = { path = "../../../sdk/python/cyrene_integration_contracts" }
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/cloud_resources_provider/_generated/*.py" = ["E501", "E712", "I001", "UP009"]

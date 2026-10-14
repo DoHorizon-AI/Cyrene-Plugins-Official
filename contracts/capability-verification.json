@@ -424,6 +424,36 @@
           "notes": "GitHub API and Account Center use local fakes; no real GitHub login, repository write, or external webhook was performed."
         }
       ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.cloud-resources",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-14",
+          "environment": "linux / Python 3.12 / fixture-backed provider tests and exact-wheelhouse Package Runtime ZIP started through DirectPluginRuntime",
+          "command": "uv run --locked --project plugins/providers/cloud-resources --extra test pytest -q -p no:cacheprovider plugins/providers/cloud-resources/tests; python -m unittest tests.release.test_official_plugin_package.OfficialPluginPackageTests.test_cloud_resources_package_builds_and_lists_tools_from_exact_wheelhouse",
+          "result": "35 passed; locked cloud ZIP starts and lists both fixed tools from its isolated wheelhouse, with provider observations exercised only through fixtures",
+          "notes": "No Azure, Google, Hugging Face, Tailscale, or Runpod tenant/API call occurred. Provider authorization and real observation freshness remain unverified."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.connectors.email-notification",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-14",
+          "environment": "linux / Python 3.12 / local SMTP transport fixture and exact-wheelhouse Package Runtime ZIP started through DirectPluginRuntime",
+          "command": "uv run --project plugins/connectors/email-notification --python 3.12 --extra test --refresh-package cyrene-integration-contracts pytest -q -p no:cacheprovider plugins/connectors/email-notification/tests; python -m unittest tests.release.test_official_plugin_package.OfficialPluginPackageTests.test_email_notification_package_builds_and_bootstraps_from_exact_wheelhouse",
+          "result": "24 passed; SMTP submission/replay behavior uses a local fixture, and the locked package ZIP starts and lists its tools",
+          "notes": "No external SMTP server or production credential was used."
+        }
+      ]
     }
   ]
 }

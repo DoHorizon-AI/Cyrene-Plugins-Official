@@ -47,6 +47,26 @@ the workflow input or channel repository variable; when absent, the verifier
 discovers the latest immutable release for the matching channel. It does not
 fall back to mutable branch content.
 
+## Official Python Package Runtime releases
+
+The [`data-tools-package-release.yml`](../.github/workflows/data-tools-package-release.yml)
+workflow builds independently installable Plugin ZIPs from the explicit package
+specifications in `tooling/release/official_plugin_package.py`. A push retains
+the existing `legacy5` draft release. Manual dispatch and pull requests use the
+following fixed selections:
+
+| Selection | Packages | Result |
+| --- | --- | --- |
+| `legacy5` | Dataset Preparation, Document Parsing, Dataset Generation, Knowledge Preparation, Exact Match | Draft package release |
+| `integration-v1` | Account Center, GitHub Issues, WeCom | Immutable package releases |
+| `authorization-cloud-v1` | Cloud Resources, Email Notification, WeCom | Immutable package releases |
+| Pull request | All ten unique package IDs | Build and test only; no publication |
+
+The named sets are closed allowlists. Their releases bind their ZIPs, wheelhouse,
+SBOM, attestations, and immutable `preview-<componentId>-<version>-<sourceSHA>`
+or `stable-<componentId>-<version>-<sourceSHA>` tags to the exact source commit.
+No package selection advances a mutable latest release.
+
 ---
 
 # Workspace 连接组件发布
@@ -90,3 +110,21 @@ workflow、source identity、channel、schema、digest 和 GitHub artifact attes
 源码单独从固定 commit checkout，catalog 数据版本与工具源码版本相互独立。可通过 workflow
 input 或 channel repository variable 指定精确 catalog release tag；未指定时，验证器只会
 发现同 channel 的最新不可变 release，不会回退到可变分支内容。
+
+## 官方 Python Package Runtime 发布
+
+[`data-tools-package-release.yml`](../.github/workflows/data-tools-package-release.yml)
+根据 `tooling/release/official_plugin_package.py` 中的显式 package spec 构建可独立安装的
+Plugin ZIP。自动 push 保持现有 `legacy5` draft 发布。手动 dispatch 和 pull request 使用以下
+固定选择：
+
+| 选择 | Package | 结果 |
+| --- | --- | --- |
+| `legacy5` | Dataset Preparation、Document Parsing、Dataset Generation、Knowledge Preparation、Exact Match | Draft package release |
+| `integration-v1` | Account Center、GitHub Issues、WeCom | 不可变 package release |
+| `authorization-cloud-v1` | Cloud Resources、Email Notification、WeCom | 不可变 package release |
+| Pull request | 全部十个唯一 package ID | 仅构建与测试，不发布 |
+
+命名集合均为固定 allowlist。不可变发布会将 ZIP、wheelhouse、SBOM、attestations 以及
+`preview-<componentId>-<version>-<sourceSHA>` 或 `stable-<componentId>-<version>-<sourceSHA>`
+tag 绑定到精确源码 commit。任何 package 选择都不会推进可变的 latest release。

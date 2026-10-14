@@ -111,6 +111,8 @@ jobs:
             -e plugins/evaluation/llm-judge \
             -e plugins/accounts/account-center \
             -e plugins/providers/github-issues \
+            -e plugins/providers/cloud-resources \
+            -e plugins/connectors/email-notification \
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
             -e plugins/providers/model-api-connector \
@@ -157,8 +159,10 @@ jobs:
             tools/ci/exercise_im_native_qqnt.py \
             tools/ci/im_real_smoke.py \
             plugins/connectors/wecom \
+            plugins/connectors/email-notification \
             plugins/accounts/account-center \
             plugins/providers/github-issues \
+            plugins/providers/cloud-resources \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \
             plugins/evaluation/llm-judge \
@@ -178,6 +182,7 @@ jobs:
             tools/ci/connection_release.py \
             tools/ci/update_source_manifest.py \
             tooling/release/select_official_plugin_packages.py \
+            tests/release/test_select_official_plugin_packages.py \
             tools/ci/validate_manifests.py \
             tests/release/test_connection_release_health.py \
             tools/ci/verify_source_manifest.py
@@ -194,9 +199,11 @@ jobs:
             plugins/connectors/onebot-v11/tests \
             plugins/connectors/im/tests \
             plugins/connectors/wecom/tests \
+            plugins/connectors/email-notification/tests \
             plugins/evaluation/evaluator-pack/tests \
             plugins/evaluation/llm-judge/tests \
             plugins/providers/model-api-connector/tests \
+            plugins/providers/cloud-resources/tests \
             plugins/serving/vllm-runtime/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/document-parsing/tests \
@@ -205,6 +212,7 @@ jobs:
             plugins/tools/dataset-validator/tests \
             plugins/training/llama-factory/tests \
             tests/release/test_connection_release_health.py \
+            tests/release/test_select_official_plugin_packages.py \
             tests/store/test_catalog.py \
             tests/store/test_cli.py
         env:
