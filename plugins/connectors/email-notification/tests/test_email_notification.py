@@ -27,10 +27,12 @@ from cyrene_integration_contracts import (
     schema_for,
     serialize_trusted_caller_context,
     sign_context,
+    verify_context,
     write_replay_identity,
 )
 from jsonschema import Draft202012Validator, FormatChecker
 
+import email_notification_connector.plugin as email_plugin
 from email_notification_connector import EmailNotificationProvider
 from email_notification_connector._generated import tool_provider_pb2 as wire
 from email_notification_connector.ledger import LedgerFailure, ReplayIdentity, SubmissionLedger
@@ -462,10 +464,16 @@ def test_disconnect_after_data_is_unknown_and_not_retried(settings_factory) -> N
             envelope=envelope,
         )
         time.sleep(0.3)
+        replay_envelope = _signed_envelope(
+            settings,
+            tool_id=SEND_TOOL_ID,
+            arguments=arguments,
+            request_id="tool-request-002",
+        )
         replay_response = _invoke(
             EmailNotificationProvider(settings=settings),
             tool_id=SEND_TOOL_ID,
-            envelope=envelope,
+            envelope=replay_envelope,
         )
 
     result = _submission(response)
@@ -550,7 +558,9 @@ def test_inflight_intent_after_restart_becomes_unknown(settings_factory) -> None
     assert smtp.message_data == []
 
 
-def test_changed_content_reusing_request_reference_is_rejected(settings_factory) -> None:
+def test_changed_content_reusing_request_reference_is_rejected(
+    settings_factory, monkeypatch
+) -> None:
     """Reject altered content under the stable scoped request_ref without resending."""
 
     with _SMTPFixtureServer() as smtp:
@@ -563,7 +573,6 @@ def test_changed_content_reusing_request_reference_is_rejected(settings_factory)
             "request_ref": "notification-stable-ref",
         }
         first_envelope = _signed_envelope(settings, tool_id=SEND_TOOL_ID, arguments=arguments)
-        first = _invoke(provider, tool_id=SEND_TOOL_ID, envelope=first_envelope)
         changed_arguments = dict(arguments, text="Changed content under same request_ref")
         changed_envelope = _signed_envelope(
             settings,
@@ -571,18 +580,27 @@ def test_changed_content_reusing_request_reference_is_rejected(settings_factory)
             arguments=changed_arguments,
             request_id="tool-request-002",
         )
-        changed = _invoke(provider, tool_id=SEND_TOOL_ID, envelope=changed_envelope)
         changed_request_arguments = dict(arguments, request_ref="different-request-ref")
         changed_request_envelope = _signed_envelope(
             settings,
             tool_id=SEND_TOOL_ID,
             arguments=changed_request_arguments,
         )
-        reused_request_id = _invoke(
-            provider,
-            tool_id=SEND_TOOL_ID,
-            envelope=changed_request_envelope,
-        )
+
+        def verify_at_issued_at(**kwargs: Any) -> bool:
+            """Run the SDK's full verifier against this fresh signature time."""
+
+            return verify_context(**kwargs, now=kwargs["context"].issued_at)
+
+        with monkeypatch.context() as verifier_clock:
+            verifier_clock.setattr(email_plugin, "verify_context", verify_at_issued_at)
+            first = _invoke(provider, tool_id=SEND_TOOL_ID, envelope=first_envelope)
+            changed = _invoke(provider, tool_id=SEND_TOOL_ID, envelope=changed_envelope)
+            reused_request_id = _invoke(
+                provider,
+                tool_id=SEND_TOOL_ID,
+                envelope=changed_request_envelope,
+            )
 
     assert _submission(first)["status"] == "ACCEPTED"
     assert changed.HasField("error")
@@ -674,7 +692,7 @@ def test_unlisted_address_and_header_injection_are_rejected(settings_factory) ->
         assert smtp.connections == 0
 
 
-def test_expired_context_and_unknown_fields_fail_closed(settings_factory) -> None:
+def test_expired_context_and_unknown_fields_fail_closed(settings_factory, monkeypatch) -> None:
     """Reject expired signed calls and strict-envelope extensions before SMTP."""
 
     with _SMTPFixtureServer() as smtp:
@@ -686,16 +704,24 @@ def test_expired_context_and_unknown_fields_fail_closed(settings_factory) -> Non
             "text": "No SMTP session should start.",
             "request_ref": "notification-expired",
         }
-        issued = datetime.now(UTC)
         expired = _signed_envelope(
             settings,
             tool_id=SEND_TOOL_ID,
             arguments=arguments,
-            issued_at=issued,
-            expires_at=issued + timedelta(seconds=1),
         )
-        time.sleep(1.1)
-        response = _invoke(provider, tool_id=SEND_TOOL_ID, envelope=expired)
+        expired_context = parse_trusted_caller_context(expired["caller_context"])
+
+        def verify_after_expiration(**kwargs: Any) -> bool:
+            """Use an explicit UTC verifier time beyond the signed expiry."""
+
+            return verify_context(
+                **kwargs,
+                now=expired_context.expires_at + timedelta(seconds=1),
+            )
+
+        with monkeypatch.context() as verifier_clock:
+            verifier_clock.setattr(email_plugin, "verify_context", verify_after_expiration)
+            response = _invoke(provider, tool_id=SEND_TOOL_ID, envelope=expired)
         assert response.HasField("error")
         assert response.error.retryable is False
 
