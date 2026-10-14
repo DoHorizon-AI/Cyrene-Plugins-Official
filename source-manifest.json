@@ -1104,8 +1104,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/email-notification/tests/test_email_notification.py",
-      "sha256": "c628fc023ac78ea666630369711a06c5f31fd17417cac203be71ae54410d40d4",
-      "size_bytes": 29872
+      "sha256": "972699dbbe2214611548a32324b17bdf23df9748c3275ebf5dd7282dd80c001a",
+      "size_bytes": 30939
     },
     {
       "kind": "file",
@@ -1671,8 +1671,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/src/wecom_connector/authorization.py",
-      "sha256": "3359c3ac07b1c71b3391cb70a437250ed210bba748ac9fbcd8098512ff244c00",
-      "size_bytes": 41772
+      "sha256": "bba76b06951a6b932608d21e2e02aa23de6ca6b06d8c4591775dbdf764f465e4",
+      "size_bytes": 45025
     },
     {
       "kind": "file",
@@ -1755,8 +1755,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/test_wecom_authorization.py",
-      "sha256": "55ba7040128955a50d52230787bbf7748d74bc05ce4ca9e753679c2ca31177a7",
-      "size_bytes": 36427
+      "sha256": "240b676da173c9e33ecd11027ff1fb489e3e8b64425a318e8136e1d113ebc471",
+      "size_bytes": 40104
     },
     {
       "kind": "file",
