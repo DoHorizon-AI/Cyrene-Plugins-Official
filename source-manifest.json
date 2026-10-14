@@ -3350,9 +3350,86 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/.gitignore",
+      "sha256": "2ebe6cb6f5289849dce5a8a6cdd77e06b1385302c862982f8e181c4782d19214",
+      "size_bytes": 19
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/Cargo.toml",
+      "sha256": "900a17e8b7106c0b995e79c3d39099381e097de49999912f9c534afb7580a57f",
+      "size_bytes": 871
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/app.rs",
+      "sha256": "89c3d61f5eeb59b0de3973c8bc6f7fcba6e653fed7184d0a3a47ad05f3c55e56",
+      "size_bytes": 5316
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/bot.rs",
+      "sha256": "b9829c9daafe59f3be41c2af782cf9b05d296f502c491277f335321e9ccd3c52",
+      "size_bytes": 13493
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/cli.rs",
+      "sha256": "c469a3c2d88eb8ede6bd83e1d4cd5029794883ce95642c584b944e402e07548e",
+      "size_bytes": 4453
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/config.rs",
+      "sha256": "0598289367c1201a27c8d2f3600c661624cd2e82ef3df0335a3a6786cb8fb1ff",
+      "size_bytes": 4468
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/error.rs",
+      "sha256": "847f078cd7ace9c3f702e2a7870d390a308de3f5f8cb1a1396c09afdb3cbe93d",
+      "size_bytes": 1872
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/lib.rs",
+      "sha256": "4498e716cf6c02d1d6be5af20ef8179250985f0c4aa6e0412bcab3e4a5238eb4",
+      "size_bytes": 1091
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/service.rs",
+      "sha256": "5bb19f8c381830808c97cabacdedde77fa9fb927559c0c88ada3b44a9f4d37ad",
+      "size_bytes": 10712
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/src/tool_provider.rs",
+      "sha256": "cab013224c5c57e50d42d4b05df07f4eb52f4942bf3b72f2195fbc4343d9fce0",
+      "size_bytes": 12201
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-connector-wecom/tests/test_wecom.rs",
+      "sha256": "01ff511ea392931e723562674bc4d29b239cbf45b78af02eb8feb4bea5649458",
+      "size_bytes": 8311
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/rust/cyrene-mcp-provider/Cargo.lock",
-      "sha256": "54a44644963caf3c52678db15a0326020375d63ee79a2335518facd4ede46e98",
-      "size_bytes": 18137
+      "sha256": "da4588a079ad5804152fcc505d847e591109dd00e7b30872895487a6d1510370",
+      "size_bytes": 22118
     },
     {
       "kind": "file",
@@ -3491,15 +3568,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.lock",
-      "sha256": "3161d3977bdba887c7348bcd4842565b6305cdcf926671129b685443b37dbfd9",
-      "size_bytes": 39777
+      "sha256": "74b3365f289cf3c753a89adb419181fdcc3b82ad96086a22bc7de11e5d1f9800",
+      "size_bytes": 60818
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.toml",
-      "sha256": "a368cbe71aad03bf5c39a154a3ada6a324507ac8f6d1cc6f9c84e7c432a6cc2a",
-      "size_bytes": 984
+      "sha256": "9b9ddb6bd259d9c5a9c259dab72bb196509580d169dee1e81c3211dd156f4b9c",
+      "size_bytes": 1048
     },
     {
       "kind": "file",
