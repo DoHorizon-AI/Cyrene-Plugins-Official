@@ -279,6 +279,152 @@ class OfficialPluginPackageTests(unittest.TestCase):
         self.assertNotIn("cyrene-integration-contracts", input_requirements)
         self.assertIn("cyrene-integration-contracts==0.1.0", requirements_input)
 
+    def test_email_notification_vends_integration_sdk_schema_once_from_canonical_source(
+        self,
+    ) -> None:
+        """Bundle the shared typed SDK and schema without a second schema copy.
+
+        中文：邮件包复用共享 typed SDK 与 schema，不额外携带第二份 schema。
+        """
+
+        spec = release.PACKAGE_SPECS["cyrene.connectors.email-notification"]
+        sdk = release.INTEGRATION_SUPPORT_SDK
+        canonical_schema_path = (
+            self.repository / "contracts/json/integration-support/v1/schema.json"
+        )
+        sdk_schema_path = self.repository / sdk.source_root / "schema.json"
+        canonical_schema = canonical_schema_path.read_bytes()
+
+        self.assertEqual(spec.vendored_sdks, (release.RUNTIME_SDK, sdk))
+        self.assertEqual(sdk.package_data, ("schema.json",))
+        self.assertEqual(sdk_schema_path.read_bytes(), canonical_schema)
+
+        source_files, sdk_files = release._source_files(self.repository, spec)
+        source_schema_path = f"{sdk.source_root}/schema.json"
+        self.assertEqual(
+            sdk_files[sdk.distribution][source_schema_path], canonical_schema
+        )
+        archive_entries = release._package_entries(source_files, spec, sdk_files)
+        archive_schema_path = f"{sdk.archive_root}/schema.json"
+        self.assertEqual(archive_entries[archive_schema_path], canonical_schema)
+        self.assertEqual(
+            [name for name in archive_entries if name.endswith("/schema.json")],
+            [archive_schema_path],
+        )
+        self.assertNotIn(
+            "contracts/json/integration-support/v1/schema.json", archive_entries
+        )
+        self.assertIn("configuration.schema.json", archive_entries)
+
+        requirements_input = source_files[spec.requirements_input].decode("utf-8")
+        input_requirements = {
+            release.canonicalize_name(Requirement(line.strip()).name)
+            for line in requirements_input.splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        }
+        self.assertEqual(input_requirements, {"grpcio", "jsonschema", "protobuf"})
+        self.assertIn("cyrene-plugin-runtime==0.2.1", requirements_input)
+        self.assertIn("cyrene-integration-contracts==0.1.0", requirements_input)
+        pins = release._verify_lock_inputs(spec, source_files)
+        self.assertEqual(
+            {release.canonicalize_name(line.split("==", 1)[0]) for line in pins},
+            {
+                "attrs",
+                "grpcio",
+                "jsonschema",
+                "jsonschema-specifications",
+                "protobuf",
+                "referencing",
+                "rpds-py",
+                "typing-extensions",
+            },
+        )
+
+    def test_email_notification_package_builds_and_bootstraps_from_exact_wheelhouse(
+        self,
+    ) -> None:
+        """Build the email ZIP and list tools from its isolated locked runtime.
+
+        中文：从精确 wheelhouse 构建邮件包，并在隔离运行时列出固定工具。
+        """
+
+        uv = shutil.which("uv")
+        self.assertIsNotNone(uv, "the pinned release build environment must provide uv")
+        package_id = "cyrene.connectors.email-notification"
+        output_dir = self.temp_root / "email-notification-release"
+        outputs = release.build_release_artifacts(
+            root=self.repository,
+            output_dir=output_dir,
+            package_id=package_id,
+            source_sha=self.source_sha,
+            source_ref="refs/heads/develop",
+            channel="preview",
+            run_id="12345",
+            run_attempt=1,
+            preparer_wheel=self.wheel,
+        )
+        release.verify_release_artifacts(
+            root=self.repository,
+            output_dir=output_dir,
+            package_id=package_id,
+            source_sha=self.source_sha,
+            source_ref="refs/heads/develop",
+            channel="preview",
+            run_id="12345",
+            run_attempt=1,
+        )
+
+        payload = self.temp_root / "email-notification-payload"
+        payload.mkdir()
+        with zipfile.ZipFile(outputs["package"]) as archive:
+            archive.extractall(payload)
+        runtime = self.temp_root / "email-notification-runtime"
+        created = subprocess.run(
+            [str(uv), "venv", "--python", sys.executable, str(runtime)],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(created.returncode, 0, created.stderr)
+        python_executable = runtime / (
+            "Scripts/python.exe" if os.name == "nt" else "bin/python"
+        )
+        installed = subprocess.run(
+            [
+                str(uv),
+                "pip",
+                "install",
+                "--python",
+                str(python_executable),
+                "--offline",
+                "--no-index",
+                "--find-links",
+                str(payload / "wheelhouse"),
+                "--requirement",
+                str(payload / "requirements.lock"),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(installed.returncode, 0, installed.stderr)
+
+        manifest_path = (
+            self.repository
+            / release.PACKAGE_SPECS[package_id].source_dir
+            / "plugin.manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        self._assert_clean_start(
+            name="email notification package with locked wheelhouse",
+            payload=payload,
+            entrypoint=manifest["runtime"]["entrypoint"],
+            capability="tool.provider.v1",
+            environment_overrides=self._package_activation_environment(package_id),
+            python_executable=python_executable,
+            package_id=package_id,
+        )
+
     def test_staged_release_readback_checks_github_asset_digests_and_sizes(
         self,
     ) -> None:
@@ -459,7 +605,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                         channel="preview",
                     )
 
-    def test_eight_packages_and_training_template_start_with_pythonpath_unset(
+    def test_nine_packages_and_training_template_start_with_pythonpath_unset(
         self,
     ) -> None:
         """Require clean startup from each ZIP's ``src`` tree.
@@ -562,6 +708,13 @@ class OfficialPluginPackageTests(unittest.TestCase):
                         package_release["source_dependencies"][0]["source"]["commit"],
                         release.WECOM_AIBOT_SDK.commit,
                     )
+                if package_id == "cyrene.connectors.email-notification":
+                    self.assertIn("configuration.schema.json", archive.namelist())
+                    self.assertIn(
+                        "src/cyrene_integration_contracts/schema.json",
+                        archive.namelist(),
+                    )
+                    self.assertIn("licenses/plugin/LICENSE", archive.namelist())
             cases.append(
                 (
                     f"package {package_id}",
@@ -629,6 +782,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                         package_id
                     ),
                     python_executable=python_executable,
+                    package_id=package_id,
                 )
 
     def test_dataset_generation_prepares_and_imports_with_uv_offline_and_empty_cache(
@@ -761,10 +915,33 @@ class OfficialPluginPackageTests(unittest.TestCase):
         with self.assertRaisesRegex(release.PackageBuildError, "digest mismatch"):
             release._verify_wheelhouse_entries(tampered, lock)
 
-    def _package_activation_environment(
-        self, package_id: str | None
-    ) -> dict[str, str]:
+    def _package_activation_environment(self, package_id: str | None) -> dict[str, str]:
         """Build synthetic host activation facts for packages that require them."""
+
+        if package_id == "cyrene.connectors.email-notification":
+            storage = self.temp_root / "email-notification-package-state"
+            storage.mkdir(mode=0o700)
+            os.chmod(storage, 0o700)
+            configuration = {
+                "smtp_host": "smtp.example.invalid",
+                "smtp_port": 465,
+                "tls_mode": "implicit",
+                "sender": "notifications@example.invalid",
+                "recipients": {"operator": "operator@example.invalid"},
+                "state_db_path": str(storage / "submissions.sqlite3"),
+                "context_hmac_key_env_ref": "TEST_PACKAGE_EMAIL_CONTEXT_KEY",
+                "caller_workload": "cyrene-exchange",
+                "audience": "cyrene.connectors.email-notification",
+                "organization_id": "example-organization",
+                "workspace_id": "example-workspace",
+                "expected_issuer": "cyrene-exchange",
+                "expected_subject": "notification-worker",
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "email-notification-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_EMAIL_CONTEXT_KEY": (b"\x44" * 32).hex(),
+            }
 
         if package_id == "cyrene.accounts.account-center":
             storage = self.temp_root / "account-center-package-state"
@@ -879,9 +1056,8 @@ class OfficialPluginPackageTests(unittest.TestCase):
         """Create a runtime from an isolated exact wheelhouse where pins differ.
 
         Account Center and WeCom intentionally require different cryptography
-        versions. Their clean-start checks use the ZIP's real wheelhouse so the
-        test validates each lock independently instead of merging incompatible
-        pins in the release-test environment.
+        versions. Their clean-start checks install the ZIP wheelhouse to avoid
+        merging incompatible pins into the release-test environment.
         中文：为固定密码学版本的 package 独立安装 ZIP 锁定的 wheelhouse。
         """
 
@@ -940,6 +1116,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
         capability: str,
         environment_overrides: dict[str, str] | None = None,
         python_executable: Path | None = None,
+        package_id: str | None = None,
     ) -> None:
         bootstrap = payload / "src/cyrene_plugin_runtime/bootstrap.py"
         environment = os.environ.copy()
@@ -956,6 +1133,10 @@ class OfficialPluginPackageTests(unittest.TestCase):
             "TEST_PACKAGE_GH_EXCHANGE_KEY",
             "TEST_PACKAGE_GH_WEBHOOK_SECRET",
             "TEST_PACKAGE_GH_PROVIDER_KEY",
+            "EMAIL_NOTIFICATION_CONTEXT_HMAC_KEY",
+            "SMTP_USERNAME",
+            "SMTP_PASSWORD",
+            "TEST_PACKAGE_EMAIL_CONTEXT_KEY",
         ):
             environment.pop(variable, None)
         environment.update(environment_overrides or {})
@@ -1004,6 +1185,14 @@ class OfficialPluginPackageTests(unittest.TestCase):
             self.assertEqual(ready["event"], "direct_plugin_ready")
             self.assertEqual(ready["capability"], capability)
             self.assertTrue(ready["connection_ref"].startswith("grpc://127.0.0.1:"))
+            if package_id == "cyrene.connectors.email-notification":
+                self._assert_email_tool_catalog(
+                    name=name,
+                    payload=payload,
+                    connection_ref=ready["connection_ref"],
+                    environment=environment,
+                    python_executable=python_executable,
+                )
         finally:
             selector.close()
             if process.poll() is None:
@@ -1015,6 +1204,81 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     process.wait(timeout=5)
             process.stdout.close()
             process.stderr.close()
+
+    def _assert_email_tool_catalog(
+        self,
+        *,
+        name: str,
+        payload: Path,
+        connection_ref: str,
+        environment: dict[str, str],
+        python_executable: Path | None,
+    ) -> None:
+        """List email tools through the clean-start runtime and bundled SDK schema.
+
+        中文：通过干净启动的运行时确认 ZIP 中携带的 SDK schema 可用于工具目录。
+        """
+
+        script = """
+import json
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from cyrene_plugin_runtime.client import DirectPayload, DirectPluginClient
+from email_notification_connector._generated import tool_provider_pb2 as wire
+
+request = wire.ListToolsRequest(binding_id="email-notification-package-test")
+with DirectPluginClient.for_local_connection_ref(sys.argv[2]) as client:
+    response_payload = client.invoke(
+        capability="tool.provider.v1",
+        interface_version="1",
+        method="list_tools",
+        request=DirectPayload(
+            type_url="type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest",
+            value=request.SerializeToString(),
+        ),
+        deadline_seconds=10,
+        request_id="email-package-list-tools",
+    )
+response = wire.ListToolsResponse.FromString(response_payload.value)
+print(json.dumps({
+    "type_url": response_payload.type_url,
+    "tool_ids": [tool.provider_tool_id for tool in response.catalog.tools],
+    "input_schemas": [json.loads(tool.input_schema_json) for tool in response.catalog.tools],
+}))
+"""
+        result = subprocess.run(
+            [
+                str(python_executable or sys.executable),
+                "-I",
+                "-c",
+                script,
+                str(payload / "src"),
+                connection_ref,
+            ],
+            cwd=self.temp_root,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+        self.assertEqual(
+            result.returncode, 0, f"{name} tool catalog failed: {result.stderr}"
+        )
+        catalog = json.loads(result.stdout)
+        self.assertEqual(
+            catalog["type_url"],
+            "type.cyrene.io/cyrene.tool.provider.v1.ListToolsResponse",
+        )
+        self.assertEqual(
+            catalog["tool_ids"],
+            ["email_notification_send", "email_connection_health"],
+        )
+        self.assertIn(
+            "EmailNotificationSendArguments",
+            catalog["input_schemas"][0]["$defs"],
+        )
 
 
 if __name__ == "__main__":

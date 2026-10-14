@@ -1,0 +1,6 @@
+# Target: linux-ubuntu-24.04-x86_64-python-3.12
+# Internal runtime source: cyrene-plugin-runtime==0.2.1, vendored at src/cyrene_plugin_runtime.
+# Internal integration support source: cyrene-integration-contracts==0.1.0, vendored at src/cyrene_integration_contracts with schema.json package data.
+grpcio>=1.62,<1.63
+jsonschema>=4.23,<5
+protobuf>=4.21,<5

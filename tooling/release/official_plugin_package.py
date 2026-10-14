@@ -17,7 +17,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,6 +25,7 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import tomllib
 from packaging.requirements import Requirement
 from packaging.tags import sys_tags
 from packaging.utils import canonicalize_name, parse_wheel_filename
@@ -222,6 +222,15 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
         requirements_input="tooling/release/requirements/wecom-connector.in",
         vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
         source_dependencies=(WECOM_AIBOT_SDK,),
+        require_spdx_license=True,
+    ),
+    "cyrene.connectors.email-notification": PackageSpec(
+        package_id="cyrene.connectors.email-notification",
+        component_id="cyrene-connectors-email-notification",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/connectors/email-notification",
+        requirements_input="tooling/release/requirements/email-notification.in",
+        vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
         require_spdx_license=True,
     ),
 }
