@@ -32,7 +32,7 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "b2c3be7c38d2b082b7ffb482949c08fe380a6aa89b4c2e4296e041c8d4df1011",
+      "sha256": "3da75da3393dc3d17e428b75231ed1763ee805727cf2732b907a2dad453a3c23",
       "size_bytes": 40681
     },
     {
@@ -1748,7 +1748,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/tests/fixtures/navigator_notification_finish_projection.json",
-      "sha256": "28ee3e32b76f1ab3c8697f69ea8748b763993d755cc46c37836a1a9a941d632b",
+      "sha256": "8635d5db429f3186514c2e29547e80223ce3b06e771ae8121c50dfe568cf437f",
       "size_bytes": 542
     },
     {

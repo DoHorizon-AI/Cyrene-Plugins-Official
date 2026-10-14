@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "source": {
     "repository": "DoHorizon-AI/Cyrene-Navigator",
-    "commit": "33a153a252e03c362eb8b8472e401676fa5c0297",
+    "commit": "683b36451db0de55e8f01d707b391dd940128d15",
     "path": "contracts/product/v1/work.openapi.json",
-    "sha256": "7d82c7bae03ecaca21ee203ef97fe4239beb9a22e4c705ae0291eefa5ceb0e73"
+    "sha256": "731a4591608109372f042444307ac458fc60fe8ff98b074f84030f142c9106bf"
   },
   "projection": {
     "pointer": "#/components/schemas/NotificationFinish/properties/outcome/enum",
