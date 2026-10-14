@@ -158,6 +158,79 @@ def test_direct_runtime_pins_match_requirements_lock() -> None:
         assert locked_versions[canonical_name] == version
 
 
+def test_official_package_input_vendors_internal_sdks_without_registry_pins() -> None:
+    """Release input binds SDK source versions while locking only runtime wheels."""
+
+    repository_root = PACKAGE_ROOT.parents[2]
+    release_input = (
+        repository_root / "tooling/release/requirements/cloud-resources.in"
+    ).read_text()
+    requirement_lines = [
+        line.strip()
+        for line in release_input.splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    requirements = set(requirement_lines)
+    assert len(requirements) == len(requirement_lines)
+    project = tomllib.loads((PACKAGE_ROOT / "pyproject.toml").read_text())
+    vendored = {
+        "cyrene-integration-contracts": (
+            "sdk/python/cyrene_integration_contracts/pyproject.toml",
+            "src/cyrene_integration_contracts",
+        ),
+        "cyrene-plugin-runtime": (
+            "sdk/python/cyrene_plugin_runtime/pyproject.toml",
+            "src/cyrene_plugin_runtime",
+        ),
+    }
+    direct_external = {
+        dependency
+        for dependency in project["project"]["dependencies"]
+        if not any(dependency.startswith(f"{name}==") for name in vendored)
+    }
+    runtime_project = tomllib.loads(
+        (repository_root / vendored["cyrene-plugin-runtime"][0]).read_text()
+    )
+    runtime_grpcio = next(
+        dependency
+        for dependency in runtime_project["project"]["dependencies"]
+        if dependency.startswith("grpcio")
+    )
+
+    assert requirements == direct_external | {runtime_grpcio}
+    for distribution, (project_path, archive_root) in vendored.items():
+        sdk_project = tomllib.loads((repository_root / project_path).read_text())
+        sdk_version = sdk_project["project"]["version"]
+        assert f"{distribution}=={sdk_version}" in release_input
+        assert archive_root in release_input
+        assert not any(
+            line.split("==", maxsplit=1)[0].lower().replace("_", "-") == distribution
+            for line in requirements
+        )
+
+    integration_project = tomllib.loads(
+        (repository_root / vendored["cyrene-integration-contracts"][0]).read_text()
+    )
+    integration_package_data = integration_project["tool"]["setuptools"]["package-data"][
+        "cyrene_integration_contracts"
+    ]
+    assert "schema.json" in integration_package_data
+
+    lock_names = {
+        line.split("==", maxsplit=1)[0].lower().replace("_", "-")
+        for line in (PACKAGE_ROOT / "requirements.lock").read_text().splitlines()
+    }
+    assert not lock_names.intersection(vendored)
+    assert "protobuf==4.25.9" in requirements
+    assert "protobuf" in lock_names
+
+    data_files = project["tool"]["setuptools"]["data-files"]
+    assert set(data_files["share/cyrene/plugins/cyrene.providers.cloud-resources"]) == {
+        "plugin.manifest.json",
+        "configuration.schema.json",
+    }
+
+
 def test_activation_schema_rejects_dynamic_urls_and_unimplemented_kinds() -> None:
     """Callers cannot smuggle endpoints or claim unsupported resource adapters."""
 

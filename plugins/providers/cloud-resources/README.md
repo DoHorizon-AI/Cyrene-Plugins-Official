@@ -31,6 +31,24 @@ entry, lease, or ready-compute claim. A failed provider read is returned as a
 typed tool error so an owning durable observation store can retain its prior
 observation and freshness evidence.
 
+## Minimum permissions and packaged runtime
+
+Use an Azure managed identity that can read the configured VM's instance view
+only. For Google, use the `compute.readonly` scope and grant the attached or
+service-account identity only the configured instance-read permission. A
+Hugging Face read token is optional for public, non-gated metadata and should be
+restricted to read access for private or gated repositories. Tailscale OAuth
+requires only `devices:core:read`; configure Runpod with a Read Only API key.
+The plugin never needs cloud write, workload-launch, repository-file, or model
+weight permissions.
+
+The official Package Runtime release vendors the Plugin runtime and integration
+contracts source, including the contracts' `schema.json` package data, into the
+prepared `src/` tree. Its wheelhouse requirements contain external runtime
+distributions, `grpcio`, and `protobuf==4.25.9`; they do not require registry
+wheels for the internal Cyrene SDK distributions. The `uv` path sources in
+`pyproject.toml` are for local repository development.
+
 Runtime dependencies are pinned in `pyproject.toml`; local repository checks use
 `uv run --project . --extra test pytest -q tests`. Tests use vendor response
 fixtures and local DirectPluginRuntime endpoints; they never contact a real
@@ -67,6 +85,19 @@ API key，并使用文档中的 Bearer header，不使用 GraphQL 查询字符�
 Hugging Face 仅使用配置的只读令牌，不访问 Jobs、Spaces 运行时、仓库文件或模型权重。
 Azure 托管身份只需获得目标 VM Instance View 的读取权限；Google 服务账号使用
 `compute.readonly` scope 和只读 Compute IAM 权限。
+
+## 最小权限与打包运行时
+
+Azure 托管身份只应读取绑定中配置的 VM Instance View。Google 使用
+`compute.readonly` scope，并只授予附加身份或服务账号读取该目标实例的权限。公开且未受限的
+Hugging Face 元数据可不使用令牌；读取私有或 gated 仓库时，应使用仅具读取权限的受限令牌。
+Tailscale OAuth 仅需 `devices:core:read`；Runpod 使用 Read Only API key。插件不需要云写入、
+启动工作负载、读取仓库文件或下载模型权重的权限。
+
+官方 Package Runtime 发布会将 Plugin runtime 和 integration contracts 源码（包括 contracts 的
+`schema.json` 包数据）放入准备好的 `src/` 目录。wheelhouse 依赖包含外部运行时发行包、
+`grpcio` 和 `protobuf==4.25.9`；内部 Cyrene SDK 不需要从 registry 安装 wheel。
+`pyproject.toml` 中的 `uv` 路径源仅供仓库本地开发。
 
 Azure VM 状态来自 Compute `instanceView`；Google 实例状态来自 Compute Engine Instance
 资源；Hugging Face 结果只描述仓库元数据是否可用。这些观察不会创建 Cyrene Platform
