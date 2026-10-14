@@ -71,6 +71,7 @@ from .contracts import (
     sign_context,
     validate_schema,
     verify_context,
+    write_replay_identity,
 )
 
 __all__ = [
@@ -136,4 +137,5 @@ __all__ = [
     "sign_context",
     "validate_schema",
     "verify_context",
+    "write_replay_identity",
 ]

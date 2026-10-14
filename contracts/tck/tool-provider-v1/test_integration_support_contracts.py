@@ -42,6 +42,7 @@ from cyrene_integration_contracts import (
     sign_context,
     validate_schema,
     verify_context,
+    write_replay_identity,
 )
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -64,6 +65,14 @@ def _context(
     payload: Any = BASE_ARGUMENTS,
     issued_at: datetime = FIXED_NOW - timedelta(seconds=5),
     expires_at: datetime = FIXED_NOW + timedelta(seconds=90),
+    caller_workload: str = "exchange-worker",
+    audience: str = "cloud-resources-provider",
+    issuer: str = "https://identity.example",
+    subject: str = "operator-subject-1",
+    organization_id: str = "org-test-1",
+    workspace_id: str | None = "workspace-test-1",
+    binding_id: str = "cloud-binding-1",
+    request_id: str = "request-test-1",
 ) -> Any:
     """Create deterministic test authorization using a private fixed key."""
 
@@ -71,14 +80,14 @@ def _context(
         method=method,
         operation_id=operation_id or TOOL_OPERATIONS[method],
         payload=payload,
-        caller_workload="exchange-worker",
-        audience="cloud-resources-provider",
-        issuer="https://identity.example",
-        subject="operator-subject-1",
-        organization_id="org-test-1",
-        workspace_id="workspace-test-1",
-        binding_id="cloud-binding-1",
-        request_id="request-test-1",
+        caller_workload=caller_workload,
+        audience=audience,
+        issuer=issuer,
+        subject=subject,
+        organization_id=organization_id,
+        workspace_id=workspace_id,
+        binding_id=binding_id,
+        request_id=request_id,
         key=KEY,
         issued_at=issued_at,
         expires_at=expires_at,
@@ -197,7 +206,12 @@ def test_renewal_and_cloud_result_dtos_round_trip_strictly() -> None:
                 "resources": [
                     {
                         **cloud_wire["resources"][0],
-                        "attributes": {"nested": {"private": "value"}},
+                        "attributes": {
+                            "provider_error": {
+                                "code": "TOKEN_REVOKED",
+                                "message": "raw provider error",
+                            }
+                        },
                     }
                 ],
             }
@@ -336,3 +350,82 @@ def test_all_fixed_tool_envelopes_use_their_allowlisted_operation() -> None:
             "ToolEnvelope",
             {"caller_context": context.as_dict(), "arguments": arguments},
         )
+
+
+def test_write_replay_identity_scopes_stable_refs_and_separates_payload_hash() -> None:
+    """Deduplicate exact writes by trusted scope while rejecting changed bodies."""
+
+    renewal_arguments = {"authorization_ref": "wecom-auth-1"}
+    renewal_context = _context(
+        method="wecom_reauthorization_start",
+        payload=renewal_arguments,
+        request_id="renewal-request-1",
+    )
+    renewal_key, renewal_hash = write_replay_identity(
+        renewal_context, renewal_arguments
+    )
+    assert write_replay_identity(renewal_context, renewal_arguments) == (
+        renewal_key,
+        renewal_hash,
+    )
+    changed_renewal = {"authorization_ref": "wecom-auth-2"}
+    changed_context = _context(
+        method="wecom_reauthorization_start",
+        payload=changed_renewal,
+        request_id="renewal-request-1",
+    )
+    changed_key, changed_hash = write_replay_identity(changed_context, changed_renewal)
+    assert changed_key == renewal_key
+    assert changed_hash != renewal_hash
+    new_request_context = _context(
+        method="wecom_reauthorization_start",
+        payload=renewal_arguments,
+        request_id="renewal-request-2",
+    )
+    assert (
+        write_replay_identity(new_request_context, renewal_arguments)[0] != renewal_key
+    )
+
+    email_arguments = {
+        "recipient_ref": "ops-oncall",
+        "subject": "Connection requires attention",
+        "text": "A configured connection needs operator review.",
+        "request_ref": "notification-request-1",
+    }
+    email_context = _context(method="email_notification_send", payload=email_arguments)
+    email_key, email_hash = write_replay_identity(email_context, email_arguments)
+    email_reissued_context = _context(
+        method="email_notification_send",
+        payload=email_arguments,
+        request_id="email-retry-context-2",
+    )
+    assert write_replay_identity(email_reissued_context, email_arguments) == (
+        email_key,
+        email_hash,
+    )
+    changed_email = {**email_arguments, "text": "Changed notification body."}
+    changed_email_context = _context(
+        method="email_notification_send", payload=changed_email
+    )
+    changed_email_key, changed_email_hash = write_replay_identity(
+        changed_email_context, changed_email
+    )
+    assert changed_email_key == email_key
+    assert changed_email_hash != email_hash
+    different_scope = _context(
+        method="email_notification_send",
+        payload=email_arguments,
+        organization_id="org-test-2",
+    )
+    assert write_replay_identity(different_scope, email_arguments)[0] != email_key
+    different_request_ref = {**email_arguments, "request_ref": "notification-request-2"}
+    different_ref_context = _context(
+        method="email_notification_send", payload=different_request_ref
+    )
+    assert (
+        write_replay_identity(different_ref_context, different_request_ref)[0]
+        != email_key
+    )
+
+    with pytest.raises(ValueError, match="write replay"):
+        write_replay_identity(_context(), BASE_ARGUMENTS)

@@ -47,7 +47,7 @@
         "organization_id": {"type": "string", "minLength": 1, "maxLength": 200},
         "workspace_id": {"type": ["string", "null"], "minLength": 1, "maxLength": 200},
         "binding_id": {"type": "string", "minLength": 1, "maxLength": 200},
-        "request_id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "request_id": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Unique request correlation ID and the replay reference for WeCom renewal start."},
         "issued_at": {"$ref": "#/$defs/UtcTimestamp"},
         "expires_at": {"$ref": "#/$defs/UtcTimestamp"},
         "payload_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
@@ -126,7 +126,7 @@
         "provider_status": {"type": ["string", "null"], "minLength": 1, "maxLength": 200},
         "collected_at": {"$ref": "#/$defs/UtcTimestamp"},
         "observed_at": {"anyOf": [{"$ref": "#/$defs/UtcTimestamp"}, {"type": "null"}]},
-        "attributes": {"type": "object", "maxProperties": 32, "propertyNames": {"type": "string", "minLength": 1, "maxLength": 100}, "additionalProperties": {"$ref": "#/$defs/CloudAttributeValue"}},
+        "attributes": {"type": "object", "description": "Provider-normalized safe facts selected from an explicit positive metadata allowlist; never raw provider objects, errors, credentials, secrets, private endpoints, or tenant identifiers.", "maxProperties": 32, "propertyNames": {"type": "string", "minLength": 1, "maxLength": 100}, "additionalProperties": {"$ref": "#/$defs/CloudAttributeValue"}},
         "platform_resource_ref": {"type": ["string", "null"], "minLength": 1, "maxLength": 512},
         "platform_generation": {"type": ["integer", "null"], "minimum": 0}
       },
@@ -161,6 +161,7 @@
     },
     "WeComReauthorizationStartArguments": {
       "type": "object",
+      "description": "Exact renewal-start replay identity uses caller_context.request_id within its verified caller and binding scope.",
       "required": ["authorization_ref"],
       "properties": {"authorization_ref": {"type": "string", "minLength": 1, "maxLength": 200}},
       "additionalProperties": false
@@ -185,12 +186,13 @@
     },
     "EmailNotificationSendArguments": {
       "type": "object",
+      "description": "request_ref is the stable email replay reference within its verified caller and binding scope.",
       "required": ["recipient_ref", "subject", "text", "request_ref"],
       "properties": {
         "recipient_ref": {"type": "string", "minLength": 1, "maxLength": 100},
         "subject": {"type": "string", "minLength": 1, "maxLength": 500},
         "text": {"type": "string", "minLength": 1, "maxLength": 10000},
-        "request_ref": {"type": "string", "minLength": 1, "maxLength": 200}
+        "request_ref": {"type": "string", "minLength": 1, "maxLength": 200, "description": "Stable replay reference; changed payload under the same reference must be rejected."}
       },
       "additionalProperties": false
     },

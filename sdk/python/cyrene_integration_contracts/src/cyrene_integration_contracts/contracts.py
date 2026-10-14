@@ -878,6 +878,59 @@ def serialize_tool_envelope(value: ToolEnvelope) -> dict[str, Any]:
     return result
 
 
+def write_replay_identity(
+    context: TrustedCallerContext | Mapping[str, Any], payload: Mapping[str, Any]
+) -> tuple[str, str]:
+    """Return the scoped replay key and payload hash for a supported write tool.
+
+    This helper derives identity only; callers must first verify the HMAC context
+    with `verify_context`. Persist the returned replay key and payload hash before
+    side effects. An exact replay returns the stored result; a matching replay key
+    with a different hash is rejected. 中文：先验签，再持久化幂等记录后执行副作用。
+
+    Args:
+        context: Verified trusted caller context or its wire representation.
+        payload: Exact inner argument object covered by the trusted context.
+    Returns:
+        `(replay_key, payload_sha256)` for the caller's private durable ledger.
+    Raises:
+        ValueError: If the tool is not a supported write, or the context is invalid.
+        jsonschema.ValidationError: If the payload violates its write-tool schema.
+    """
+
+    parsed = (
+        context
+        if isinstance(context, TrustedCallerContext)
+        else parse_trusted_caller_context(context)
+    )
+    if parsed.method == "wecom_reauthorization_start":
+        validate_schema("WeComReauthorizationStartArguments", payload)
+        replay_ref = parsed.request_id
+    elif parsed.method == "email_notification_send":
+        validate_schema("EmailNotificationSendArguments", payload)
+        replay_ref = payload["request_ref"]
+    else:
+        raise ValueError("tool does not have a write replay identity")
+    if TOOL_OPERATIONS.get(parsed.method) != parsed.operation_id:
+        raise ValueError("method and operation are not a fixed tool pair")
+    identity = {
+        "binding_id": parsed.binding_id,
+        "caller_workload": parsed.caller_workload,
+        "audience": parsed.audience,
+        "organization_id": parsed.organization_id,
+        "workspace_id": parsed.workspace_id,
+        "issuer": parsed.issuer,
+        "subject": parsed.subject,
+        "method": parsed.method,
+        "operation_id": parsed.operation_id,
+        "replay_ref": replay_ref,
+    }
+    return (
+        hashlib.sha256(canonical_json(identity)).hexdigest(),
+        payload_sha256(payload),
+    )
+
+
 def _signing_claims(
     *,
     method: str,
