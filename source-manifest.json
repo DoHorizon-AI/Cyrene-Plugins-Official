@@ -2139,6 +2139,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/providers/cloud-resources/tests/test_cloud_resources_package.py",
+      "sha256": "0ab72e8dc21b3ff6f407cb630aa0433adae11e252add08e9ec7045892c8c0707",
+      "size_bytes": 9786
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/providers/cloud-resources/tests/test_credentials.py",
       "sha256": "7d580f93a3cdc088b6919e65cd8f674eb377ad828f720e2ed508d0973a957934",
       "size_bytes": 6974
@@ -2149,13 +2156,6 @@
       "path": "plugins/providers/cloud-resources/tests/test_hf_auth_health.py",
       "sha256": "30cfa2f4d7198edb805a53bac19d73da11d2626a13168e78f4ad78d9f3e88e59",
       "size_bytes": 7112
-    },
-    {
-      "kind": "file",
-      "mode": "100644",
-      "path": "plugins/providers/cloud-resources/tests/test_package.py",
-      "sha256": "0ab72e8dc21b3ff6f407cb630aa0433adae11e252add08e9ec7045892c8c0707",
-      "size_bytes": 9786
     },
     {
       "kind": "file",
@@ -6165,15 +6165,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "fa4b9fab85e894b0fe6ba809d9f3f8ee081db2a31d7cbba0cc23b654d832dabc",
-      "size_bytes": 16070
+      "sha256": "bcc011dd793d26d30ee27de64d0bfeb35680decee160bb453f6fac8d137d1bb9",
+      "size_bytes": 18080
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "e93eb33a793abc3c92a0a13f74f2c18d94c914782bddf108c59d5459c8eeff8b",
-      "size_bytes": 26011
+      "sha256": "9cc3d7a934f91ab216b9d8090f5d9e31229e06cdd10597a41c3d504fa46dbb61",
+      "size_bytes": 27862
     },
     {
       "kind": "file",
