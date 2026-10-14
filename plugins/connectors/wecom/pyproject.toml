@@ -13,6 +13,7 @@ dependencies = [
   "grpcio>=1.62,<1.63",
   "protobuf>=4.21,<5",
   "cyrene-plugin-runtime>=0.2,<0.3",
+  "cyrene-integration-contracts>=0.1.0,<0.2",
   "wecom-aibot-python-sdk @ git+https://github.com/WecomTeam/wecom-aibot-python-sdk.git@6bcb59a9a636c566f4c6ea5268b228e3def1611a",
 ]
 
@@ -33,6 +34,7 @@ where = ["src"]
 
 [tool.uv.sources]
 cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+cyrene-integration-contracts = { path = "../../../sdk/python/cyrene_integration_contracts" }
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]

@@ -63,8 +63,8 @@ def _context(
     method: str = "cloud_authorization_health",
     operation_id: str | None = None,
     payload: Any = BASE_ARGUMENTS,
-    issued_at: datetime = FIXED_NOW - timedelta(seconds=5),
-    expires_at: datetime = FIXED_NOW + timedelta(seconds=90),
+    issued_at: datetime | None = None,
+    expires_at: datetime | None = None,
     caller_workload: str = "exchange-worker",
     audience: str = "cloud-resources-provider",
     issuer: str = "https://identity.example",
@@ -254,7 +254,7 @@ def test_signed_tool_envelope_binds_scope_operation_and_raw_arguments() -> None:
         "expected_workspace_id": "workspace-test-1",
         "expected_issuer": "https://identity.example",
         "expected_subject": "operator-subject-1",
-        "now": FIXED_NOW,
+        "now": parsed.caller_context.issued_at,
     }
     assert verify_context(**expected)
 
@@ -271,7 +271,9 @@ def test_signed_tool_envelope_binds_scope_operation_and_raw_arguments() -> None:
     ):
         assert not verify_context(**{**expected, **changed})
 
-    assert not verify_context(**{**expected, "now": FIXED_NOW + timedelta(seconds=91)})
+    assert not verify_context(
+        **{**expected, "now": parsed.caller_context.expires_at + timedelta(seconds=1)}
+    )
     assert not verify_context(**{**expected, "key": b"short"})
 
     wrong_pair = dict(envelope)
@@ -304,7 +306,8 @@ def test_context_lifetime_and_missing_binding_key_fail_closed() -> None:
             expires_at=FIXED_NOW + timedelta(seconds=30),
         )
     with pytest.raises(ValueError, match="lifetime"):
-        _context(expires_at=FIXED_NOW + timedelta(seconds=301))
+        current = datetime.now(UTC)
+        _context(issued_at=current, expires_at=current + timedelta(seconds=301))
 
 
 def test_cloud_authorization_health_uses_configured_target_selector() -> None:

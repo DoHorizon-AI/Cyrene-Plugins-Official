@@ -85,6 +85,7 @@ class VendoredSdk:
     project_path: str
     source_root: str
     archive_root: str
+    package_data: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -131,6 +132,13 @@ ACCOUNT_CENTER_SDK = VendoredSdk(
     project_path="sdk/python/cyrene_account_center_contracts/pyproject.toml",
     source_root="sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts",
     archive_root="src/cyrene_account_center_contracts",
+)
+INTEGRATION_SUPPORT_SDK = VendoredSdk(
+    distribution="cyrene-integration-contracts",
+    project_path="sdk/python/cyrene_integration_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_integration_contracts/src/cyrene_integration_contracts",
+    archive_root="src/cyrene_integration_contracts",
+    package_data=("schema.json",),
 )
 
 WECOM_AIBOT_SDK = SourceDependency(
@@ -212,7 +220,7 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
         primary_capability="message.connector.v1",
         source_dir="plugins/connectors/wecom",
         requirements_input="tooling/release/requirements/wecom-connector.in",
-        vendored_sdks=(RUNTIME_SDK,),
+        vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
         source_dependencies=(WECOM_AIBOT_SDK,),
         require_spdx_license=True,
     ),
@@ -406,23 +414,50 @@ def _regular_source(path: Path, root: Path) -> bytes:
         ) from error
 
 
-def _walk_python_sources(path: Path, root: Path) -> dict[str, bytes]:
+def _walk_python_sources(
+    path: Path, root: Path, *, package_data: tuple[str, ...] = ()
+) -> dict[str, bytes]:
+    """Collect Python source, typing markers, and explicitly declared package data."""
+
     if not path.is_dir() or path.is_symlink():
         raise PackageBuildError(
             f"internal SDK source directory is missing or unsafe: {path}"
         )
+    parsed_data_paths = tuple(PurePosixPath(item) for item in package_data)
+    if any(
+        not item
+        or not path.parts
+        or path.as_posix() != item
+        or path.is_absolute()
+        or ".." in path.parts
+        or "\\" in item
+        for item, path in zip(package_data, parsed_data_paths, strict=True)
+    ):
+        raise PackageBuildError("vendored SDK package data path is invalid")
+    data_paths = {path.as_posix() for path in parsed_data_paths}
     files: dict[str, bytes] = {}
+    found_data_paths: set[str] = set()
     for candidate in sorted(path.rglob("*")):
         if candidate.is_symlink():
             raise PackageBuildError(
                 f"source tree may not contain a symlink: {candidate}"
             )
+        relative = candidate.relative_to(path).as_posix()
         if candidate.is_file() and (
-            candidate.suffix == ".py" or candidate.name == "py.typed"
+            candidate.suffix == ".py"
+            or candidate.name == "py.typed"
+            or relative in data_paths
         ):
             files[candidate.relative_to(root).as_posix()] = _regular_source(
                 candidate, root
             )
+            if relative in data_paths:
+                found_data_paths.add(relative)
+    missing_data_paths = data_paths.difference(found_data_paths)
+    if missing_data_paths:
+        raise PackageBuildError(
+            f"vendored SDK package data is missing: {sorted(missing_data_paths)}"
+        )
     if not files:
         raise PackageBuildError(f"internal SDK has no Python source files: {path}")
     return files
@@ -483,7 +518,9 @@ def _source_files(
     }
     sdk_files: dict[str, dict[str, bytes]] = {}
     for sdk in spec.vendored_sdks:
-        sdk_files[sdk.distribution] = _walk_python_sources(root / sdk.source_root, root)
+        sdk_files[sdk.distribution] = _walk_python_sources(
+            root / sdk.source_root, root, package_data=sdk.package_data
+        )
         project_path = root / sdk.project_path
         files[project_path.relative_to(root).as_posix()] = _regular_source(
             project_path, root

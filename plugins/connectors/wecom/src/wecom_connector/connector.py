@@ -37,6 +37,7 @@ from typing import Any, Protocol
 from google.protobuf.message import DecodeError
 
 from ._generated import message_connector_pb2 as message_contract
+from .authorization import AuthorizationTrustConfig
 from .bot_client import (
     DEFAULT_WS_URL,
     InboundMessage,
@@ -152,7 +153,7 @@ class WeComTransport(Protocol):
 
 @dataclass(frozen=True, slots=True)
 class WeComInstanceConfig:
-    """One configured WeCom binding supporting App, Bot, or Hybrid modes.
+    """One configured WeCom binding supporting App, Bot, Hybrid, or CLI modes.
 
     中文:一个已配置的 WeCom binding,支持应用模式、机器人长连接模式或混合模式。
     """
@@ -165,7 +166,7 @@ class WeComInstanceConfig:
     base_url: str = DEFAULT_BASE_URL
     timeout_seconds: float = 10.0
     token_refresh_skew_seconds: float = 60.0
-    mode: str = "app"  # "app" | "bot" | "hybrid"
+    mode: str = "app"  # "app" | "bot" | "hybrid" | "cli"
     bot_id: str | None = None
     bot_secret: str | None = None
     bot_secret_env_ref: str = "WECOM_BOT_SECRET"
@@ -175,6 +176,8 @@ class WeComInstanceConfig:
     cli_enabled: bool = False
     cli_path: str | None = None
     cli_config_dir: str | None = None
+    authorization: AuthorizationTrustConfig | None = None
+    authorization_session_ttl_seconds: int = 300
     approved_write_operations: tuple[str, ...] = ()
     navigator: NavigatorIntegrationConfig | None = None
     integration: WeComIntegrationConfig | None = None
@@ -191,10 +194,11 @@ class WeComInstanceConfig:
         # Mode resolution: explicit mode or inferred from present keys
         explicit_mode = value.get("mode")
         if explicit_mode:
-            if explicit_mode not in {"app", "bot", "hybrid"}:
+            if explicit_mode not in {"app", "bot", "hybrid", "cli"}:
                 raise ConnectorError(
                     "INVALID_REQUEST",
-                    f"mode must be 'app', 'bot', or 'hybrid'; got {explicit_mode!r}",
+                    "mode must be 'app', 'bot', 'hybrid', or 'cli'; "
+                    f"got {explicit_mode!r}",
                 )
             mode = explicit_mode
         else:
@@ -296,10 +300,19 @@ class WeComInstanceConfig:
             allowed_users = ()
 
         cli_obj = value.get("cli", {})
-        cli_enabled = bool(
-            value.get("cli_enabled")
-            or (isinstance(cli_obj, Mapping) and cli_obj.get("enabled"))
+        raw_cli_enabled = value.get("cli_enabled", False)
+        if type(raw_cli_enabled) is not bool:
+            raise ConnectorError("INVALID_REQUEST", "cli_enabled must be a boolean")
+        nested_cli_enabled = (
+            cli_obj.get("enabled", False) if isinstance(cli_obj, Mapping) else False
         )
+        if type(nested_cli_enabled) is not bool:
+            raise ConnectorError("INVALID_REQUEST", "cli.enabled must be a boolean")
+        if mode == "cli" and raw_cli_enabled is False:
+            raise ConnectorError(
+                "INVALID_REQUEST", "CLI-only mode requires cli_enabled=true"
+            )
+        cli_enabled = mode == "cli" or raw_cli_enabled or nested_cli_enabled
         cli_path = value.get("cli_path")
         if cli_path is None and isinstance(cli_obj, Mapping):
             cli_path = cli_obj.get("executable_path")
@@ -311,6 +324,109 @@ class WeComInstanceConfig:
                 "INVALID_REQUEST",
                 "cli.config_dir is required to isolate the human CLI identity",
             )
+        if cli_enabled and not isinstance(cli_config_dir, str):
+            raise ConnectorError(
+                "INVALID_REQUEST", "cli.config_dir must be non-empty text"
+            )
+        if cli_enabled:
+            cli_config_dir = _required_text(cli_config_dir, "cli.config_dir")
+        authorization_value = value.get("authorization")
+        authorization: AuthorizationTrustConfig | None = None
+        authorization_session_ttl_seconds = 300
+        if authorization_value is not None:
+            if not isinstance(authorization_value, Mapping):
+                raise ConnectorError(
+                    "INVALID_REQUEST", "authorization must be an object"
+                )
+            authorization_enabled = authorization_value.get("enabled", False)
+            if type(authorization_enabled) is not bool:
+                raise ConnectorError(
+                    "INVALID_REQUEST", "authorization.enabled must be a boolean"
+                )
+            if authorization_enabled:
+                if not cli_enabled or not cli_config_dir:
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "authorization tools require the binding-owned CLI profile",
+                    )
+                key_env_ref = _secret_env_ref(
+                    authorization_value.get(
+                        "caller_context_key_env_ref",
+                        "WECOM_AUTHORIZATION_CONTEXT_KEY",
+                    ),
+                    "authorization.caller_context_key_env_ref",
+                )
+                encoded_key = os.environ.get(key_env_ref, "")
+                if not re.fullmatch(r"[0-9a-fA-F]{64}", encoded_key):
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "authorization caller context key must be 32-byte hex",
+                    )
+                try:
+                    verification_key = bytes.fromhex(encoded_key)
+                except ValueError as exc:
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "authorization caller context key must be 32-byte hex",
+                    ) from exc
+                if len(verification_key) != 32:
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "authorization caller context key must be 32-byte hex",
+                    )
+                raw_subjects = authorization_value.get("operator_subjects")
+                if not isinstance(raw_subjects, (list, tuple)) or not raw_subjects:
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "authorization.operator_subjects must be a non-empty list",
+                    )
+                operator_subjects = tuple(
+                    _required_text(subject, "authorization.operator_subjects[]")
+                    for subject in raw_subjects
+                )
+                if len(set(operator_subjects)) != len(operator_subjects):
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "authorization.operator_subjects must be unique",
+                    )
+                raw_session_ttl = authorization_value.get("session_ttl_seconds", 300)
+                if (
+                    isinstance(raw_session_ttl, bool)
+                    or not isinstance(raw_session_ttl, int)
+                    or not 30 <= raw_session_ttl <= 300
+                ):
+                    raise ConnectorError(
+                        "INVALID_REQUEST",
+                        "authorization.session_ttl_seconds must be between 30 and 300",
+                    )
+                authorization_session_ttl_seconds = raw_session_ttl
+                authorization = AuthorizationTrustConfig(
+                    authorization_ref=_required_text(
+                        authorization_value.get("authorization_ref"),
+                        "authorization.authorization_ref",
+                    ),
+                    key=verification_key,
+                    caller_workload=_required_text(
+                        authorization_value.get("caller_workload"),
+                        "authorization.caller_workload",
+                    ),
+                    audience=_required_text(
+                        authorization_value.get("audience"),
+                        "authorization.audience",
+                    ),
+                    issuer=_required_text(
+                        authorization_value.get("issuer"), "authorization.issuer"
+                    ),
+                    organization_id=_required_text(
+                        authorization_value.get("organization_id"),
+                        "authorization.organization_id",
+                    ),
+                    workspace_id=_required_text(
+                        authorization_value.get("workspace_id"),
+                        "authorization.workspace_id",
+                    ),
+                    operator_subjects=operator_subjects,
+                )
         raw_write_approvals = value.get("approved_write_operations", ())
         if not isinstance(raw_write_approvals, (list, tuple, set)):
             raise ConnectorError(
@@ -397,6 +513,8 @@ class WeComInstanceConfig:
             cli_enabled=cli_enabled,
             cli_path=str(cli_path) if cli_path else None,
             cli_config_dir=str(cli_config_dir) if cli_config_dir else None,
+            authorization=authorization,
+            authorization_session_ttl_seconds=authorization_session_ttl_seconds,
             approved_write_operations=approved_write_operations,
             navigator=navigator,
             integration=integration,
@@ -672,6 +790,7 @@ class WeComConnector:
         integration_http_transport: WeComIntegrationHttpTransport | None = None,
     ) -> None:
         """Bind one configuration."""
+        previous_tool_provider = self._tool_provider
         if config.cli_enabled and not config.cli_config_dir:
             raise ConnectorError(
                 "INVALID_REQUEST",
@@ -686,6 +805,7 @@ class WeComConnector:
         if previous_worker is not None:
             previous_worker.stop(timeout_seconds=2.0)
         self._notification_worker = None
+        previous_tool_provider.close()
         previous_forwarder = self._integration_forwarder
         if previous_forwarder is not None:
             previous_forwarder.close()
@@ -757,6 +877,11 @@ class WeComConnector:
             cli_enabled=config.cli_enabled,
             approved_write_operations=config.approved_write_operations,
             health_provider=self.connection_health,
+            authorization_config=config.authorization,
+            authorization_profile_dir=config.cli_config_dir,
+            authorization_session_ttl_seconds=(
+                config.authorization_session_ttl_seconds
+            ),
         )
 
     def on_configure(self, settings: Mapping[str, str]) -> str | None:
@@ -854,6 +979,7 @@ class WeComConnector:
         if self._integration_forwarder is not None:
             self._integration_forwarder.stop(timeout_seconds=timeout)
         self._stop_bot_runtime(timeout_seconds=timeout)
+        self._tool_provider.close()
 
     def close(self) -> None:
         """Close bot resources for tests and embedding hosts."""
@@ -863,6 +989,7 @@ class WeComConnector:
             self._integration_forwarder.close()
             self._integration_forwarder = None
         self._stop_bot_runtime()
+        self._tool_provider.close()
         self._subscriptions.clear()
 
     def connection_health(self) -> dict[str, Any]:
@@ -1054,6 +1181,11 @@ class WeComConnector:
     ) -> dict[str, Any]:
         """Invoke canonical ``message.connector.v1/send_message``."""
         config = self._require_configured()
+        if config.mode == "cli":
+            raise ConnectorError(
+                "UNAVAILABLE",
+                "CLI-only WeCom bindings expose tool.provider.v1 only",
+            )
         if not isinstance(request, Mapping):
             raise ConnectorError(
                 "INVALID_REQUEST", "send_message request must be an object"

@@ -101,6 +101,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_account_center_contracts \
+            -e sdk/python/cyrene_integration_contracts \
             -e sdk/python/cyrene_plugin_runtime \
             -e plugins/connectors/onebot-v11 \
             -e plugins/connectors/im \
@@ -141,6 +142,7 @@ jobs:
             --exclude '**/_generated/**' \
             sdk/python/cyrene_model_provider_contracts/src \
             sdk/python/cyrene_account_center_contracts/src \
+            sdk/python/cyrene_integration_contracts/src \
             sdk/python/cyrene_plugin_runtime/src \
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
@@ -171,6 +173,7 @@ jobs:
             plugins/tools/dataset-validator \
             plugins/training/llama-factory \
             contracts/tck/tool-provider-v1/test_github_webhook_schema_tck.py \
+            contracts/tck/tool-provider-v1/test_integration_support_contracts.py \
             tools/ci/capability_catalog.py \
             tools/ci/connection_release.py \
             tools/ci/update_source_manifest.py \
