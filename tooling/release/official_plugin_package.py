@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -25,7 +26,6 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-import tomllib
 from packaging.requirements import Requirement
 from packaging.tags import sys_tags
 from packaging.utils import canonicalize_name, parse_wheel_filename
@@ -214,6 +214,15 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
         vendored_sdks=(RUNTIME_SDK, ACCOUNT_CENTER_SDK),
         require_spdx_license=True,
     ),
+    "cyrene.providers.cloud-resources": PackageSpec(
+        package_id="cyrene.providers.cloud-resources",
+        component_id="cyrene-providers-cloud-resources",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/providers/cloud-resources",
+        requirements_input="tooling/release/requirements/cloud-resources.in",
+        vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
+        require_spdx_license=True,
+    ),
     "cyrene.connectors.wecom": PackageSpec(
         package_id="cyrene.connectors.wecom",
         component_id="cyrene-connectors-wecom",
@@ -334,7 +343,9 @@ def _read_package_spec(
         or not all(isinstance(item, str) and item for item in capabilities)
         or len(capabilities) != len(set(capabilities))
     ):
-        raise PackageBuildError("each official package must declare unique capabilities")
+        raise PackageBuildError(
+            "each official package must declare unique capabilities"
+        )
     if spec.primary_capability not in capabilities:
         raise PackageBuildError(
             "explicit primary capability is not declared by the Plugin manifest"
@@ -495,7 +506,8 @@ def _source_files(
     for path in package_root.rglob("*"):
         relative = path.relative_to(package_root)
         if any(
-            part in {".venv", "__pycache__", ".pytest_cache", ".ruff_cache", "build", "dist"}
+            part
+            in {".venv", "__pycache__", ".pytest_cache", ".ruff_cache", "build", "dist"}
             for part in relative.parts
         ):
             continue
@@ -619,7 +631,9 @@ def _wheelhouse_entries(lock_bytes: bytes, wheel_paths: list[Path]) -> dict[str,
                 f"wheel metadata does not match the lock: {filename}"
             )
         if tags.isdisjoint(sys_tags()):
-            raise PackageBuildError(f"wheel is incompatible with {TARGET_ID}: {filename}")
+            raise PackageBuildError(
+                f"wheel is incompatible with {TARGET_ID}: {filename}"
+            )
         digest = training_release.sha256_bytes(payload)
         records.append(
             {
@@ -711,7 +725,9 @@ def _verify_wheelhouse_entries(
             raise PackageBuildError("wheelhouse manifest has an unsafe wheel record")
         normalized = canonicalize_name(name)
         if normalized in seen or expected.get(normalized) != version:
-            raise PackageBuildError("wheelhouse includes an unpinned or duplicate wheel")
+            raise PackageBuildError(
+                "wheelhouse includes an unpinned or duplicate wheel"
+            )
         payload = entries.get(f"wheelhouse/{filename}")
         if payload is None:
             raise PackageBuildError(f"wheelhouse wheel is missing: {filename}")
@@ -836,7 +852,15 @@ def _build_source_dependency_wheels(
                     "origin",
                     dependency.commit,
                 ],
-                ["git", "-C", str(checkout), "checkout", "--quiet", "--detach", "FETCH_HEAD"],
+                [
+                    "git",
+                    "-C",
+                    str(checkout),
+                    "checkout",
+                    "--quiet",
+                    "--detach",
+                    "FETCH_HEAD",
+                ],
             )
             for command in commands:
                 result = subprocess.run(
@@ -863,7 +887,9 @@ def _build_source_dependency_wheels(
                     f"source dependency checkout differs from its pin: {dependency.distribution}"
                 )
             try:
-                project = tomllib.loads((checkout / "pyproject.toml").read_text(encoding="utf-8"))
+                project = tomllib.loads(
+                    (checkout / "pyproject.toml").read_text(encoding="utf-8")
+                )
             except (OSError, UnicodeError, tomllib.TOMLDecodeError) as error:
                 raise PackageBuildError(
                     f"source dependency project metadata is missing: {dependency.distribution}"
@@ -980,9 +1006,7 @@ def _build_source_dependency_wheels(
             try:
                 with zipfile.ZipFile(wheels[0]) as archive:
                     license_entries = [
-                        name
-                        for name in archive.namelist()
-                        if name.endswith("/LICENSE")
+                        name for name in archive.namelist() if name.endswith("/LICENSE")
                     ]
                     metadata_entries = [
                         name
@@ -998,13 +1022,17 @@ def _build_source_dependency_wheels(
                     )
                     lock_path = root / spec.source_dir / "requirements.lock"
                     locked_versions = {
-                        canonicalize_name(LOCK_PIN.fullmatch(line).group(1)):
-                        LOCK_PIN.fullmatch(line).group(2)
+                        canonicalize_name(
+                            LOCK_PIN.fullmatch(line).group(1)
+                        ): LOCK_PIN.fullmatch(line).group(2)
                         for line in _lock_lines(lock_path.read_bytes(), str(lock_path))
                     }
                     for raw_requirement in wheel_metadata.get_all("Requires-Dist", []):
                         requirement = Requirement(raw_requirement)
-                        if requirement.marker is not None and not requirement.marker.evaluate():
+                        if (
+                            requirement.marker is not None
+                            and not requirement.marker.evaluate()
+                        ):
                             continue
                         locked_version = locked_versions.get(
                             canonicalize_name(requirement.name)
@@ -1216,20 +1244,23 @@ def _package_entries(
         relative = source[len(prefix) :]
         if relative.endswith(".py"):
             archive_path = (
-                relative
-                if relative.startswith("src/")
-                else f"src/{relative}"
+                relative if relative.startswith("src/") else f"src/{relative}"
             )
             entries[archive_path] = content
         elif relative == "LICENSE":
             entries["licenses/plugin/LICENSE"] = content
-        elif relative in {
-            "README.md",
-            "PROVENANCE.md",
-            "plugin.manifest.json",
-            "requirements.lock",
-            "configuration.schema.json",
-        } or (relative.startswith("contracts/") and relative.endswith(".json")) or relative.startswith("third_party/licenses/"):
+        elif (
+            relative
+            in {
+                "README.md",
+                "PROVENANCE.md",
+                "plugin.manifest.json",
+                "requirements.lock",
+                "configuration.schema.json",
+            }
+            or (relative.startswith("contracts/") and relative.endswith(".json"))
+            or relative.startswith("third_party/licenses/")
+        ):
             entries[relative] = content
     for sdk in spec.vendored_sdks:
         sdk_prefix = f"{sdk.source_root}/"
@@ -1429,16 +1460,12 @@ def _sbom_document(
         "externalReferences": [{"type": "vcs", "url": SOURCE_REPOSITORY_URL}],
     }
     if package.get("license_expression"):
-        package_component["licenses"] = [
-            {"expression": package["license_expression"]}
-        ]
+        package_component["licenses"] = [{"expression": package["license_expression"]}]
     return {
         "bomFormat": SBOM_FORMAT,
         "specVersion": SBOM_SPEC_VERSION,
         "version": 1,
-        "metadata": {
-            "component": package_component
-        },
+        "metadata": {"component": package_component},
         "components": sorted(components, key=lambda row: row["bom-ref"]),
         "dependencies": [
             {"ref": package_ref, "dependsOn": sorted(set(dependency_refs))}
@@ -1677,9 +1704,7 @@ def build_release_artifacts(
     pins = _verify_lock_inputs(spec, source_files)
     lock_bytes = source_files[f"{spec.source_dir}/requirements.lock"]
 
-    wheelhouse_owner = tempfile.TemporaryDirectory(
-        prefix="cyrene-package-wheelhouse-"
-    )
+    wheelhouse_owner = tempfile.TemporaryDirectory(prefix="cyrene-package-wheelhouse-")
     wheelhouse_path = Path(wheelhouse_owner.name)
     try:
         if wheelhouse_source is None:
@@ -1694,11 +1719,7 @@ def build_release_artifacts(
                 raise PackageBuildError("wheelhouse source must be a regular directory")
             wheelhouse_entries = _wheelhouse_entries(
                 lock_bytes,
-                [
-                    path
-                    for path in source_path.iterdir()
-                    if path.suffix == ".whl"
-                ],
+                [path for path in source_path.iterdir() if path.suffix == ".whl"],
             )
         package_entries = _package_entries(
             source_files, spec, sdk_files, wheelhouse_entries
