@@ -10,7 +10,7 @@ requires-python = ">=3.11"
 dependencies = [
   "azure-identity==1.26.0",
   "cyrene-integration-contracts==0.1.0",
-  "cyrene-plugin-runtime==0.2.1",
+  "cyrene-plugin-runtime==0.2.2",
   "google-auth[requests]==2.62.0",
   "httpx==0.28.1",
   "jsonschema==4.26.0",
