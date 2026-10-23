@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/teams/v1.28/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.28",
+  "version": "1.0.0",
+  "id": "<TEAMS_PACKAGE_ID>",
+  "developer": {
+    "name": "Cyrene",
+    "websiteUrl": "https://example.invalid",
+    "privacyUrl": "https://example.invalid/privacy",
+    "termsOfUseUrl": "https://example.invalid/terms"
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "name": {
+    "short": "Cyrene",
+    "full": "Cyrene Teams Assistant"
+  },
+  "description": {
+    "short": "Talk to Cyrene in an approved team channel.",
+    "full": "Cyrene receives messages only in teams where this app is installed and consented. Channel replies in an active Cyrene thread continue without another mention."
+  },
+  "accentColor": "#2563EB",
+  "webApplicationInfo": {
+    "id": "<BOT_APP_CLIENT_ID>",
+    "resource": "https://RscBasedStoreApp"
+  },
+  "authorization": {
+    "permissions": {
+      "resourceSpecific": [
+        {
+          "name": "ChannelMessage.Read.Group",
+          "type": "Application"
+        }
+      ]
+    }
+  },
+  "bots": [
+    {
+      "botId": "<BOT_APP_CLIENT_ID>",
+      "scopes": [
+        "team"
+      ],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": [
+    "identity"
+  ],
+  "validDomains": []
+}

@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.connectors.teams",
+  "name": "Cyrene Microsoft Teams Connector",
+  "version": "0.1.0",
+  "description": "Microsoft Teams channel transport for message.connector.v1 with verified Bot Framework ingress and bounded channel reply delivery.",
+  "licenseExpression": "Apache-2.0",
+  "kind": "capability-plugin",
+  "capabilities": [
+    "message.connector.v1"
+  ],
+  "supportedServices": [
+    "Cyrene-Exchange",
+    "Cyrene-Navigator"
+  ],
+  "methods": [
+    {
+      "name": "send_message",
+      "capability": "message.connector.v1",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "teams_connector.plugin:TeamsConnectorPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "teams_connector.plugin:TeamsConnectorPlugin"
+      ]
+    }
+  },
+  "distribution": {
+    "specVersion": "0.1",
+    "descriptorRef": "package-descriptor.json",
+    "publicationStatus": "CANDIDATE"
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": [
+      "linux"
+    ],
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  "configuration": {
+    "schemaRef": "configuration.schema.json"
+  },
+  "secrets": {
+    "requiredSecretRefs": [
+      "TEAMS_BOT_APP_SECRET"
+    ],
+    "optionalSecretRefs": []
+  },
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "migrationSupported": true,
+    "downgradeSupported": true,
+    "retentionPolicyOnUninstall": "purge"
+  }
+}

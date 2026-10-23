@@ -1,0 +1,10 @@
+{
+  "binding_id": "<HOST_ASSIGNED_BINDING_ID>",
+  "bot_app_id": "<BOT_APP_CLIENT_ID>",
+  "tenant_id": "<ENTRA_TENANT_ID>",
+  "allowed_team_ids": [
+    "<APPROVED_TEAMS_TEAM_ID>"
+  ],
+  "client_secret_env_ref": "TEAMS_BOT_APP_SECRET",
+  "timeout_seconds": 10
+}

@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-teams-connector"
+version = "0.1.0"
+description = "Verified Microsoft Teams transport for Cyrene message.connector.v1"
+license = "Apache-2.0"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "httpx==0.28.1",
+  "microsoft-teams-apps==2.1.1",
+  "protobuf==4.25.9",
+]
+
+[project.optional-dependencies]
+dev = [
+  "grpcio-tools==1.62.3",
+  "jsonschema>=4.23,<5",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.24,<1",
+  "ruff>=0.9,<1",
+]
+
+[project.scripts]
+cyrene-teams-ingress = "teams_connector.ingress:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.connectors.teams" = [
+  "plugin.manifest.json",
+  "package-descriptor.json",
+  "configuration.schema.json",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+exclude = ["src/teams_connector/_generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
