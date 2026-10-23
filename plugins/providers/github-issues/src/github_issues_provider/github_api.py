@@ -11,7 +11,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 
 from .settings import ProviderSettings, Repository
 
@@ -121,6 +121,158 @@ class GitHubApi:
             "issue": _issue_projection(readback, expected_number=issue_number),
         }
 
+    def list_repositories(self, token: str) -> dict[str, Any]:
+        """List only binding-allowlisted repositories visible to the installation."""
+
+        response = self._request(
+            "GET", "/installation/repositories?per_page=100", token, None
+        )
+        value = _json_object(response)
+        items = value.get("repositories")
+        if not isinstance(items, list) or len(items) > 100:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        available: dict[str, Mapping[str, Any]] = {}
+        for item in items:
+            if isinstance(item, Mapping) and isinstance(item.get("id"), int):
+                available[str(item["id"])] = item
+        results = []
+        for configured in self._settings.repositories:
+            item = available.get(configured.repository_id)
+            if item is None:
+                continue
+            self._verify_repository(item, configured)
+            results.append(_repository_projection(item, configured))
+        return {"repositories": results}
+
+    def get_repository(self, repository: Repository, token: str) -> dict[str, Any]:
+        """Read one repository and verify the configured numeric ID and slug."""
+
+        path = self._repository_path(repository)
+        value = _json_object(self._request("GET", path, token, None))
+        self._verify_repository(value, repository)
+        return _repository_projection(value, repository)
+
+    def list_branches(self, repository: Repository, token: str) -> dict[str, Any]:
+        """Return bounded branch names and commit SHAs for one allowlisted repo."""
+
+        self._verify_configured_repository(repository, token)
+        path = f"{self._repository_path(repository)}/branches?per_page=100"
+        value = _json_array(self._request("GET", path, token, None))
+        branches = []
+        for item in value:
+            commit = item.get("commit")
+            name = item.get("name")
+            sha = commit.get("sha") if isinstance(commit, Mapping) else None
+            if not isinstance(name, str) or not isinstance(sha, str):
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            branches.append({"name": name[:255], "commit_sha": sha[:64]})
+        return {"branches": branches}
+
+    def list_pull_requests(
+        self, repository: Repository, state: str, token: str
+    ) -> dict[str, Any]:
+        """Read a bounded pull-request page with a fixed state query value."""
+
+        self._verify_configured_repository(repository, token)
+        query = urlencode({"state": state.lower(), "per_page": 100})
+        path = f"{self._repository_path(repository)}/pulls?{query}"
+        values = _json_array(self._request("GET", path, token, None))
+        return {"pull_requests": [_pull_request_projection(item) for item in values]}
+
+    def get_pull_request(
+        self, repository: Repository, pull_number: int, token: str
+    ) -> dict[str, Any]:
+        """Read one pull request and project status and commit identifiers."""
+
+        self._verify_configured_repository(repository, token)
+        path = f"{self._repository_path(repository)}/pulls/{pull_number}"
+        value = _json_object(self._request("GET", path, token, None))
+        self._verify_repository(value, repository)
+        result = _pull_request_projection(value)
+        if result["number"] != pull_number:
+            raise GitHubApiFailure("PULL_REQUEST_IDENTITY_MISMATCH")
+        return {"pull_request": result}
+
+    def list_workflow_runs(
+        self,
+        repository: Repository,
+        token: str,
+        *,
+        branch: str | None = None,
+        commit_sha: str | None = None,
+    ) -> dict[str, Any]:
+        """Read bounded Actions runs for an optional fixed branch or commit."""
+
+        self._verify_configured_repository(repository, token)
+        query: dict[str, str | int] = {"per_page": 100}
+        if branch is not None:
+            query["branch"] = branch
+        if commit_sha is not None:
+            query["head_sha"] = commit_sha
+        path = f"{self._repository_path(repository)}/actions/runs?{urlencode(query)}"
+        value = _json_object(self._request("GET", path, token, None))
+        runs = value.get("workflow_runs")
+        if not isinstance(runs, list) or len(runs) > 100:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        return {"workflow_runs": [_workflow_run_projection(item) for item in runs]}
+
+    def get_ci_status(
+        self, repository: Repository, commit_sha: str, token: str
+    ) -> dict[str, Any]:
+        """Combine commit status contexts and check-runs without hiding API errors."""
+
+        self._verify_configured_repository(repository, token)
+        quoted_sha = quote(commit_sha, safe="")
+        status = _json_object(
+            self._request(
+                "GET",
+                f"{self._repository_path(repository)}/commits/{quoted_sha}/status",
+                token,
+                None,
+            )
+        )
+        checks = _json_object(
+            self._request(
+                "GET",
+                f"{self._repository_path(repository)}/commits/{quoted_sha}/check-runs?per_page=100",
+                token,
+                None,
+            )
+        )
+        contexts = status.get("statuses")
+        check_runs = checks.get("check_runs")
+        if not isinstance(contexts, list) or not isinstance(check_runs, list):
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        if len(contexts) > 100 or len(check_runs) > 100:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        projected_contexts = []
+        for item in contexts:
+            if not isinstance(item, Mapping) or not isinstance(item.get("context"), str):
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            projected_contexts.append(
+                {"context": item["context"][:256], "state": _check_state(item.get("state"))}
+            )
+        projected_checks = []
+        for item in check_runs:
+            if not isinstance(item, Mapping) or not isinstance(item.get("name"), str):
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            projected_checks.append(
+                {
+                    "name": item["name"][:256],
+                    "status": _check_status(item.get("status")),
+                    "conclusion": _optional_check_conclusion(item.get("conclusion")),
+                }
+            )
+        state = status.get("state")
+        if state not in {"pending", "success", "failure", "error"}:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        return {
+            "commit_sha": commit_sha,
+            "state": state.upper(),
+            "statuses": projected_contexts,
+            "check_runs": projected_checks,
+        }
+
     def _verify_configured_repository(self, repository: Repository, token: str) -> None:
         """Correlate stable repository ID and owner/name against GitHub."""
 
@@ -140,6 +292,12 @@ class GitHubApi:
         owner = quote(repository.owner, safe="")
         name = quote(repository.name, safe="")
         return f"/repos/{owner}/{name}/issues/{issue_number}"
+
+    @staticmethod
+    def _repository_path(repository: Repository) -> str:
+        """Build a fixed repository API path from validated binding settings."""
+
+        return f"/repos/{quote(repository.owner, safe='')}/{quote(repository.name, safe='')}"
 
     def _request(
         self,
@@ -232,6 +390,11 @@ class GitHubApi:
             full_name = repo.get("full_name")
             if str(repo_id) != repository.repository_id or full_name != repository.slug:
                 raise GitHubApiFailure("REPOSITORY_IDENTITY_MISMATCH")
+        elif "full_name" in issue and (
+            str(issue.get("id")) != repository.repository_id
+            or issue.get("full_name") != repository.slug
+        ):
+            raise GitHubApiFailure("REPOSITORY_IDENTITY_MISMATCH")
         # Issue GET/PATCH often omit nested repository; the API path was built
         # from configured owner/name and the lease is separately repo-ID bound.
 
@@ -246,6 +409,167 @@ def _json_object(response: HttpResponse) -> dict[str, Any]:
     if not isinstance(decoded, dict):
         raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
     return decoded
+
+
+def _json_array(response: HttpResponse) -> list[dict[str, Any]]:
+    """Decode one bounded array response containing only JSON objects."""
+
+    try:
+        decoded = json.loads(response.body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE") from error
+    if not isinstance(decoded, list) or any(not isinstance(item, dict) for item in decoded):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return decoded
+
+
+def _repository_projection(
+    value: Mapping[str, Any], repository: Repository
+) -> dict[str, Any]:
+    """Return the stable, minimal repository fields needed by the caller."""
+
+    repository_id = value.get("id")
+    full_name = value.get("full_name")
+    private = value.get("private")
+    if (
+        str(repository_id) != repository.repository_id
+        or full_name != repository.slug
+        or not isinstance(private, bool)
+    ):
+        raise GitHubApiFailure("REPOSITORY_IDENTITY_MISMATCH")
+    return {
+        "repository_id": repository.repository_id,
+        "repository": repository.slug,
+        "private": private,
+        "default_branch": value.get("default_branch")
+        if isinstance(value.get("default_branch"), str)
+        else None,
+        "html_url": value.get("html_url") if isinstance(value.get("html_url"), str) else None,
+    }
+
+
+def _pull_request_projection(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Project one pull request while excluding arbitrary provider fields."""
+
+    number = value.get("number")
+    state = value.get("state")
+    title = value.get("title")
+    head = value.get("head")
+    base = value.get("base")
+    head_sha = head.get("sha") if isinstance(head, Mapping) else None
+    base_ref = base.get("ref") if isinstance(base, Mapping) else None
+    if (
+        isinstance(number, bool)
+        or not isinstance(number, int)
+        or number < 1
+        or state not in {"open", "closed"}
+        or not isinstance(title, str)
+        or not isinstance(head_sha, str)
+        or not isinstance(base_ref, str)
+    ):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return {
+        "number": number,
+        "state": state.upper(),
+        "title": title[:500],
+        "head_sha": head_sha[:64],
+        "base_branch": base_ref[:255],
+        "html_url": value.get("html_url") if isinstance(value.get("html_url"), str) else None,
+        "draft": value.get("draft") if isinstance(value.get("draft"), bool) else False,
+    }
+
+
+def _workflow_run_projection(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Project one Actions run with bounded status and commit metadata."""
+
+    run_id = value.get("id")
+    name = value.get("name")
+    status = value.get("status")
+    conclusion = value.get("conclusion")
+    head_sha = value.get("head_sha")
+    if (
+        isinstance(run_id, bool)
+        or not isinstance(run_id, int)
+        or not isinstance(name, str)
+        or status
+        not in {
+            "queued",
+            "in_progress",
+            "completed",
+            "waiting",
+            "requested",
+            "pending",
+            "action_required",
+        }
+        or conclusion
+        not in {
+            None,
+            "success",
+            "failure",
+            "neutral",
+            "cancelled",
+            "skipped",
+            "timed_out",
+            "action_required",
+            "startup_failure",
+            "stale",
+        }
+        or not isinstance(head_sha, str)
+    ):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return {
+        "run_id": str(run_id),
+        "name": name[:256],
+        "status": status.upper(),
+        "conclusion": conclusion.upper() if isinstance(conclusion, str) else None,
+        "head_sha": head_sha[:64],
+        "html_url": value.get("html_url") if isinstance(value.get("html_url"), str) else None,
+        "updated_at": value.get("updated_at") if isinstance(value.get("updated_at"), str) else None,
+    }
+
+
+def _check_state(value: Any) -> str:
+    """Validate one GitHub commit-status state."""
+
+    if value not in {"pending", "success", "failure", "error"}:
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return str(value).upper()
+
+
+def _check_status(value: Any) -> str:
+    """Validate one GitHub check-run status."""
+
+    if value not in {
+        "queued",
+        "in_progress",
+        "completed",
+        "waiting",
+        "requested",
+        "pending",
+        "action_required",
+    }:
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return str(value).upper()
+
+
+def _optional_check_conclusion(value: Any) -> str | None:
+    """Validate a nullable GitHub check conclusion."""
+
+    allowed = {
+        None,
+        "success",
+        "failure",
+        "neutral",
+        "cancelled",
+        "skipped",
+        "timed_out",
+        "action_required",
+        "startup_failure",
+        "stale",
+    }
+    if value not in allowed:
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return value.upper() if isinstance(value, str) else None
 
 
 def _issue_projection(

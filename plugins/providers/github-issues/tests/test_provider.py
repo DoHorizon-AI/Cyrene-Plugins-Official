@@ -72,6 +72,20 @@ class FakeAccountCenter:
             "secret-token-must-not-escape", "Bearer", "github-user-42", None
         )
 
+    def redeem_provider_credential_lease(
+        self,
+        payload: Mapping[str, object],
+        trusted_context: Mapping[str, str | int],
+    ) -> AuthMaterial:
+        lease_ref = str(payload["lease_ref"])
+        if lease_ref in self.used:
+            raise AccountCenterUnavailable("lease is already used")
+        self.used.add(lease_ref)
+        self.calls.append((dict(payload), dict(trusted_context)))
+        return AuthMaterial(
+            "installation-token-must-not-escape", "Bearer", "acme", int(time.time()) + 3600
+        )
+
 
 class FakeGitHubApi:
     """Record methods and return response shapes consumed by tool methods."""
@@ -112,16 +126,23 @@ class FakeGitHubApi:
             },
         }
 
+    def get_pull_request(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("pull_request", args))
+        return {"pull_request": {"number": args[1], "state": "OPEN"}}
+
 
 def signed_context(
     settings: ProviderSettings,
     arguments: Mapping[str, Any],
     lease_ref: str,
     operation_id: str,
+    profile_ref: str | None = None,
 ) -> dict[str, Any]:
     """Sign the private Exchange envelope using the configured canonical form."""
 
     protected = {"payload": dict(arguments), "lease_ref": lease_ref}
+    if profile_ref is not None:
+        protected["profile_ref"] = profile_ref
     value: dict[str, Any] = {
         "method": "call_tool",
         "payload_sha256": hashlib.sha256(canonical_json(protected)).hexdigest(),
@@ -151,6 +172,7 @@ def invoke_tool(
     arguments: Mapping[str, Any],
     *,
     lease_ref: str = "12345678-1234-1234-1234-123456789abc",
+    profile_ref: str | None = None,
     context: Mapping[str, Any] | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """Call through the same protobuf boundary used by DirectPluginRuntime."""
@@ -160,6 +182,12 @@ def invoke_tool(
         "lease_ref": lease_ref,
         "trusted_context": dict(context or signed_context(settings, arguments, lease_ref, tool_id)),
     }
+    if profile_ref is not None:
+        envelope["profile_ref"] = profile_ref
+        envelope["trusted_context"] = dict(
+            context
+            or signed_context(settings, arguments, lease_ref, tool_id, profile_ref=profile_ref)
+        )
     request = wire.CallToolRequest(
         binding_id=settings.binding_id,
         provider_tool_id=tool_id,
@@ -187,6 +215,13 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
         "github.issue.get",
         "github.issue.comment.create",
         "github.issue.state.update",
+        "github.repository.list",
+        "github.repository.get",
+        "github.branches.list",
+        "github.pull_requests.list",
+        "github.pull_request.get",
+        "github.actions.runs.list",
+        "github.ci.status",
     ]
     schemas = [json.loads(tool.input_schema_json) for tool in catalog.tools]
     assert all(schema["additionalProperties"] is False for schema in schemas)
@@ -290,6 +325,46 @@ def test_user_token_stays_private_and_lease_payload_is_actor_operation_scoped() 
     assert trusted_context["caller_id"] == settings.provider_caller_id
     assert trusted_context["binding_id"] == settings.account_center_binding_id
     assert api.calls[0][0] == "get"
+
+
+def test_profile_lease_binds_exact_target_and_reads_pull_request() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    arguments = {
+        "repository_id": "12345",
+        "repository": "owner/project",
+        "pull_number": 4,
+    }
+    lease_ref = "12345678-1234-1234-1234-123456789abc"
+    profile_ref = "00000000-0000-4000-8000-000000000001"
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "github.pull_request.get",
+        arguments,
+        lease_ref=lease_ref,
+        profile_ref=profile_ref,
+    )
+
+    assert is_error is False
+    assert result["pull_request"]["number"] == 4
+    lease_payload, trusted_context = account.calls[0]
+    assert lease_payload == {
+        "lease_ref": lease_ref,
+        "profile_ref": profile_ref,
+        "operation_id": "github.pull_request.get",
+        "target": {
+            "repository_id": "12345",
+            "repository": "owner/project",
+            "pull_number": 4,
+        },
+        "arguments_sha256": hashlib.sha256(canonical_json(arguments)).hexdigest(),
+    }
+    assert trusted_context["method"] == "redeem_provider_credential_lease"
+    assert api.calls[0][0] == "pull_request"
 
 
 def test_lease_reference_is_one_use_and_not_redeemed_again_after_replay() -> None:
@@ -498,6 +573,84 @@ def test_github_transport_uses_only_fixed_host_and_sanitizes_token_and_errors() 
     assert observed[0][2] == "/repos/owner/project"
     assert observed[1][2] == "/repos/owner/project/issues/7"
     assert observed[0][3]["Authorization"] == "Bearer private-token-value"
+
+
+def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    observed: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        assert host == "api.github.com"
+        assert method == "GET"
+        observed.append(path)
+        if path == "/installation/repositories?per_page=100":
+            return HttpResponse(
+                200,
+                {},
+                b'{"repositories":[{"id":12345,"full_name":"owner/project","private":true,"default_branch":"main","html_url":"https://github.com/owner/project"}]}',
+            )
+        if path == "/repos/owner/project":
+            return HttpResponse(
+                200,
+                {},
+                b'{"id":12345,"full_name":"owner/project","private":true,"default_branch":"main","html_url":"https://github.com/owner/project"}',
+            )
+        if path.endswith("/branches?per_page=100"):
+            return HttpResponse(200, {}, b'[{"name":"main","commit":{"sha":"abc1234567890"}}]')
+        if path.endswith("/pulls?state=open&per_page=100"):
+            return HttpResponse(
+                200,
+                {},
+                b'[{"number":4,"state":"open","title":"Review","head":{"sha":"deadbeef1234567"},"base":{"ref":"main"},"html_url":"https://github.com/owner/project/pull/4","draft":false}]',
+            )
+        if path.endswith("/pulls/4"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"number":4,"state":"open","title":"Review","head":{"sha":"deadbeef1234567"},"base":{"ref":"main"},"repository":{"id":12345,"full_name":"owner/project"}}',
+            )
+        if path.endswith("/actions/runs?per_page=100&branch=main"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"workflow_runs":[{"id":99,"name":"CI","status":"completed","conclusion":"success","head_sha":"deadbeef1234567"}]}',
+            )
+        if path.endswith("/commits/deadbeef1234567/status"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"state":"success","statuses":[{"context":"tests","state":"success"}]}',
+            )
+        if path.endswith("/commits/deadbeef1234567/check-runs?per_page=100"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"check_runs":[{"name":"unit","status":"completed","conclusion":"success"}]}',
+            )
+        raise AssertionError(path)
+
+    api = GitHubApi(settings, transport=transport)
+    assert api.list_repositories("token")["repositories"][0]["repository_id"] == "12345"
+    assert api.get_repository(repository, "token")["default_branch"] == "main"
+    assert api.list_branches(repository, "token")["branches"][0]["name"] == "main"
+    assert api.list_pull_requests(repository, "OPEN", "token")["pull_requests"][0]["number"] == 4
+    pull_request = api.get_pull_request(repository, 4, "token")
+    assert pull_request["pull_request"]["head_sha"] == "deadbeef1234567"
+    workflow_runs = api.list_workflow_runs(repository, "token", branch="main")
+    assert workflow_runs["workflow_runs"][0]["status"] == "COMPLETED"
+    assert api.get_ci_status(repository, "deadbeef1234567", "token")["state"] == "SUCCESS"
+    assert observed.count("/repos/owner/project") == 6
+    assert all(
+        path.startswith(("/repos/owner/project", "/installation/repositories"))
+        for path in observed
+    )
 
 
 def test_rate_limit_and_server_failures_are_bounded_and_retry_hints_are_preserved() -> None:

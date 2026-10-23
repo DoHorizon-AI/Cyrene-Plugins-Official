@@ -18,7 +18,15 @@
     {"name": "unlink", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/UnlinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/UnlinkResponse"},
     {"name": "create_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CreateCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/CredentialLeaseResponse"},
     {"name": "redeem_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RedeemCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/RedeemCredentialLeaseResponse"},
-    {"name": "resolve_linked_sender", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ResolveLinkedSenderRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ResolveLinkedSenderResponse"}
+    {"name": "resolve_linked_sender", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ResolveLinkedSenderRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ResolveLinkedSenderResponse"},
+    {"name": "link_github_app_installation", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/LinkGitHubAppInstallationRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "link_huggingface_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/LinkHuggingFaceProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "rotate_huggingface_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RotateHuggingFaceProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "register_host_identity_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RegisterHostIdentityProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ProviderProfile"},
+    {"name": "list_provider_profiles", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ListProviderProfilesRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ListProviderProfilesResponse"},
+    {"name": "unlink_provider_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/UnlinkProviderProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/UnlinkProviderProfileResponse"},
+    {"name": "create_provider_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CreateProviderCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ProviderCredentialLease"},
+    {"name": "redeem_provider_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RedeemProviderCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/RedeemCredentialLeaseResponse"}
   ],
   "runtime": {
     "language": "python",
@@ -27,7 +35,21 @@
     "launch": {"executable": "prepared-runtime", "args": ["-B", "src/cyrene_plugin_runtime/bootstrap.py", "--entrypoint", "account_center.plugin:AccountCenterPlugin"]}
   },
   "compatibility": {"platformVersion": ">=0.1.0", "requiresPython": ">=3.11", "os": ["linux"]},
-  "secrets": {"requiredSecretRefs": ["account-center/encryption-key", "account-center/caller-hmac-keys/exchange", "account-center/caller-hmac-keys/callback", "account-center/caller-hmac-keys/wecom", "account-center/caller-hmac-keys/github-provider", "github-app/client-secret"]},
+  "secrets": {
+    "requiredSecretRefs": [
+      "account-center/encryption-key",
+      "account-center/caller-hmac-keys/exchange",
+      "account-center/caller-hmac-keys/github-provider"
+    ],
+    "optionalSecretRefs": [
+      "account-center/caller-hmac-keys/callback",
+      "account-center/caller-hmac-keys/wecom",
+      "account-center/caller-hmac-keys/huggingface-provider",
+      "github-app/client-secret",
+      "github-app/private-key",
+      "huggingface/fine-grained-token"
+    ]
+  },
   "state": {"isStateful": true, "storageCategory": "relational", "migrationSupported": true, "downgradeSupported": false, "retentionPolicyOnUninstall": "prompt"},
   "profiles": ["core", "all"]
 }

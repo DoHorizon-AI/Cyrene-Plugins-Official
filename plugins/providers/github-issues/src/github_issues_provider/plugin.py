@@ -13,7 +13,7 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-from cyrene_account_center_contracts import canonical_json
+from cyrene_account_center_contracts import payload_sha256
 from cyrene_plugin_runtime.configuration import read_environment_settings
 
 from ._generated import tool_provider_pb2 as wire
@@ -62,6 +62,10 @@ _COMMON_PROPERTIES = {
     },
     "issue_number": {"type": "integer", "minimum": 1},
 }
+_REPOSITORY_PROPERTIES = {
+    "repository_id": _COMMON_PROPERTIES["repository_id"],
+    "repository": _COMMON_PROPERTIES["repository"],
+}
 
 CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
     {
@@ -100,6 +104,91 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
                 "state": {"type": "string", "enum": ["OPEN", "CLOSED"]},
             },
             "required": ["repository_id", "repository", "issue_number", "state"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.repository.list",
+        "display_name": "List GitHub Repositories",
+        "description": "List repositories within this binding's configured allowlist.",
+        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+    },
+    {
+        "provider_tool_id": "github.repository.get",
+        "display_name": "Get GitHub Repository",
+        "description": "Read metadata for one configured repository.",
+        "input_schema": {
+            "type": "object",
+            "properties": dict(_REPOSITORY_PROPERTIES),
+            "required": ["repository_id", "repository"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.branches.list",
+        "display_name": "List GitHub Branches",
+        "description": "List branch names and commit SHAs for one configured repository.",
+        "input_schema": {
+            "type": "object",
+            "properties": dict(_REPOSITORY_PROPERTIES),
+            "required": ["repository_id", "repository"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.pull_requests.list",
+        "display_name": "List GitHub Pull Requests",
+        "description": "List a bounded page of pull requests for one configured repository.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "state": {"type": "string", "enum": ["OPEN", "CLOSED", "ALL"]},
+            },
+            "required": ["repository_id", "repository", "state"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.pull_request.get",
+        "display_name": "Get GitHub Pull Request",
+        "description": "Read one pull request from a configured repository.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "pull_number": {"type": "integer", "minimum": 1},
+            },
+            "required": ["repository_id", "repository", "pull_number"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.actions.runs.list",
+        "display_name": "List GitHub Actions Runs",
+        "description": "Read recent workflow runs for one configured repository.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "branch": {"type": "string", "minLength": 1, "maxLength": 255},
+                "commit_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,64}$"},
+            },
+            "required": ["repository_id", "repository"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.ci.status",
+        "display_name": "Get GitHub CI Status",
+        "description": "Read GitHub commit statuses and check runs for one configured commit.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "commit_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,64}$"},
+            },
+            "required": ["repository_id", "repository", "commit_sha"],
             "additionalProperties": False,
         },
     },
@@ -206,54 +295,139 @@ class GitHubIssuesProvider:
         tool_id = request.provider_tool_id
         if tool_id not in _TOOL_BY_ID:
             return False, "METHOD_NOT_FOUND: provider tool is not available"
-        if not isinstance(envelope, Mapping) or set(envelope) != {
-            "payload",
-            "lease_ref",
-            "trusted_context",
+        legacy_fields = {"payload", "lease_ref", "trusted_context"}
+        profile_fields = {"payload", "profile_ref", "lease_ref", "trusted_context"}
+        if not isinstance(envelope, Mapping) or frozenset(envelope) not in {
+            frozenset(legacy_fields),
+            frozenset(profile_fields),
         }:
             return False, "INVALID_REQUEST: trusted invocation envelope is required"
         arguments = envelope.get("payload")
         lease_ref = envelope.get("lease_ref")
         if not isinstance(arguments, Mapping) or not isinstance(lease_ref, str):
             return False, "INVALID_REQUEST: tool arguments and lease reference are required"
+        profile_ref = envelope.get("profile_ref")
+        if profile_ref is not None and (
+            not isinstance(profile_ref, str)
+            or not re.fullmatch(
+                r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                profile_ref,
+            )
+        ):
+            return False, "INVALID_REQUEST: provider profile reference is invalid"
         if not _valid_arguments(tool_id, arguments):
             return False, "INVALID_ARGUMENTS: tool arguments do not match the schema"
         try:
             context_payload = {"payload": dict(arguments), "lease_ref": lease_ref}
+            if profile_ref is not None:
+                context_payload["profile_ref"] = profile_ref
             actor = verify_exchange_context(settings, context_payload, envelope["trusted_context"])
             if envelope["trusted_context"].get("operation_id") != tool_id:
                 raise TrustedContextError("trusted operation does not match provider tool")
-            repository = settings.repository(
-                str(arguments["repository_id"]), str(arguments["repository"])
-            )
-            issue_number = int(arguments["issue_number"])
-            lease_payload = _validate_lease(lease_ref, tool_id, repository, issue_number, arguments)
-            account_context = account_center_context(settings, actor, lease_payload)
+            if tool_id == "github.repository.list":
+                repository = None
+            else:
+                repository = settings.repository(
+                    str(arguments["repository_id"]), str(arguments["repository"])
+                )
+            target = _github_target(tool_id, arguments, repository)
+            if profile_ref is not None:
+                if not re.fullmatch(
+                    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+                    lease_ref,
+                ):
+                    raise ValueError("profile lease reference is invalid")
+                lease_payload = {
+                    "lease_ref": lease_ref,
+                    "profile_ref": profile_ref,
+                    "operation_id": tool_id,
+                    "target": target,
+                    "arguments_sha256": payload_sha256(dict(arguments)),
+                }
+                account_context = account_center_context(
+                    settings,
+                    actor,
+                    lease_payload,
+                    method="redeem_provider_credential_lease",
+                )
+            else:
+                if tool_id not in {
+                    "github.issue.get",
+                    "github.issue.comment.create",
+                    "github.issue.state.update",
+                } or repository is None:
+                    raise TrustedContextError("provider profile lease is required")
+                issue_number = int(arguments["issue_number"])
+                lease_payload = _validate_lease(
+                    lease_ref, tool_id, repository, issue_number, arguments
+                )
+                account_context = account_center_context(settings, actor, lease_payload)
             if self._account_center is None:
                 raise AccountCenterUnavailable(
                     self._account_center_error
                     or "resolved Account Center capability is unavailable"
                 )
-            credential = require_credential(
-                self._account_center.redeem_credential_lease(lease_payload, account_context)
-            )
+            if profile_ref is not None:
+                credential = require_credential(
+                    self._account_center.redeem_provider_credential_lease(
+                        lease_payload, account_context
+                    )
+                )
+            else:
+                credential = require_credential(
+                    self._account_center.redeem_credential_lease(
+                        lease_payload, account_context
+                    )
+                )
             api = self._require_api()
-            if tool_id == "github.issue.get":
+            if tool_id == "github.repository.list":
+                result = api.list_repositories(credential.access_token)
+            elif tool_id == "github.repository.get" and repository is not None:
+                result = api.get_repository(repository, credential.access_token)
+            elif tool_id == "github.branches.list" and repository is not None:
+                result = api.list_branches(repository, credential.access_token)
+            elif tool_id == "github.pull_requests.list" and repository is not None:
+                result = api.list_pull_requests(
+                    repository, str(arguments["state"]), credential.access_token
+                )
+            elif tool_id == "github.pull_request.get" and repository is not None:
+                result = api.get_pull_request(
+                    repository, int(arguments["pull_number"]), credential.access_token
+                )
+            elif tool_id == "github.actions.runs.list" and repository is not None:
+                result = api.list_workflow_runs(
+                    repository,
+                    credential.access_token,
+                    branch=str(arguments["branch"]) if "branch" in arguments else None,
+                    commit_sha=(
+                        str(arguments["commit_sha"]) if "commit_sha" in arguments else None
+                    ),
+                )
+            elif tool_id == "github.ci.status" and repository is not None:
+                result = api.get_ci_status(
+                    repository, str(arguments["commit_sha"]), credential.access_token
+                )
+            elif tool_id == "github.issue.get" and repository is not None:
+                issue_number = int(arguments["issue_number"])
                 result = api.get_issue(repository, issue_number, credential.access_token)
-            elif tool_id == "github.issue.comment.create":
+            elif tool_id == "github.issue.comment.create" and repository is not None:
+                issue_number = int(arguments["issue_number"])
                 result = api.create_comment(
                     repository,
                     issue_number,
                     str(arguments["body"]),
                     credential.access_token,
                 )
-            else:
+            elif tool_id == "github.issue.state.update" and repository is not None:
+                issue_number = int(arguments["issue_number"])
                 result = api.update_state(
                     repository,
                     issue_number,
                     str(arguments["state"]),
                     credential.access_token,
                 )
+            else:
+                raise ValueError("provider tool dispatch is incomplete")
             return True, _tool_response(result)
         except TrustedContextError:
             return True, _tool_error("AUTHENTICATION_DENIED")
@@ -441,29 +615,77 @@ def _parse_json(data: bytes | str) -> Any:
 def _valid_arguments(tool_id: str, arguments: Mapping[str, Any]) -> bool:
     """Enforce the static input contract before hashing or provider access."""
 
-    common = {"repository_id", "repository", "issue_number"}
-    required = set(_TOOL_BY_ID[tool_id]["input_schema"]["required"])
-    if set(arguments) != required:
+    schema = _TOOL_BY_ID[tool_id]["input_schema"]
+    required = set(schema["required"])
+    allowed = set(schema["properties"])
+    supplied = set(arguments)
+    if not required.issubset(supplied) or supplied - allowed:
         return False
+    if tool_id == "github.repository.list":
+        return not arguments
     if not isinstance(arguments.get("repository_id"), str) or not re.fullmatch(
-        r"[0-9]+", arguments["repository_id"]
+        r"[0-9]+", str(arguments["repository_id"])
     ):
         return False
     if not isinstance(arguments.get("repository"), str) or not re.fullmatch(
-        r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", arguments["repository"]
+        r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}", arguments["repository"]
     ):
         return False
-    issue_number = arguments.get("issue_number")
-    if isinstance(issue_number, bool) or not isinstance(issue_number, int) or issue_number < 1:
-        return False
-    if not common.issubset(arguments):
-        return False
+    for number_field in ("issue_number", "pull_number"):
+        number = arguments.get(number_field)
+        if number_field in arguments and (
+            isinstance(number, bool) or not isinstance(number, int) or number < 1
+        ):
+            return False
     if tool_id == "github.issue.comment.create":
         body = arguments.get("body")
         return isinstance(body, str) and 1 <= len(body) <= 65_536
     if tool_id == "github.issue.state.update":
         return arguments.get("state") in {"OPEN", "CLOSED"}
-    return True
+    if tool_id == "github.pull_requests.list":
+        return arguments.get("state") in {"OPEN", "CLOSED", "ALL"}
+    if "branch" in arguments and (
+        not isinstance(arguments["branch"], str)
+        or not re.fullmatch(r"[A-Za-z0-9._/-]{1,255}", arguments["branch"])
+        or ".." in arguments["branch"].split("/")
+    ):
+        return False
+    return not (
+        "commit_sha" in arguments
+        and (
+            not isinstance(arguments["commit_sha"], str)
+            or not re.fullmatch(r"[0-9a-fA-F]{7,64}", arguments["commit_sha"])
+        )
+    )
+
+
+def _github_target(
+    tool_id: str,
+    arguments: Mapping[str, Any],
+    repository: Any | None,
+) -> dict[str, Any]:
+    """Derive the exact provider target from validated arguments and binding data."""
+
+    if tool_id == "github.repository.list":
+        return {}
+    if repository is None:
+        raise ValueError("configured repository is required")
+    target: dict[str, Any] = {
+        "repository_id": repository.repository_id,
+        "repository": repository.slug,
+    }
+    if tool_id.startswith("github.issue."):
+        target["issue_number"] = int(arguments["issue_number"])
+    if tool_id == "github.pull_request.get":
+        target["pull_number"] = int(arguments["pull_number"])
+    if tool_id == "github.actions.runs.list":
+        if "branch" in arguments:
+            target["branch"] = str(arguments["branch"])
+        if "commit_sha" in arguments:
+            target["commit_sha"] = str(arguments["commit_sha"])
+    if tool_id == "github.ci.status":
+        target["commit_sha"] = str(arguments["commit_sha"])
+    return target
 
 
 def _validate_lease(
@@ -475,7 +697,7 @@ def _validate_lease(
 ) -> dict[str, Any]:
     """Bind lease metadata to the exact tool, resource, and canonical args."""
 
-    digest = hashlib.sha256(canonical_json(dict(arguments))).hexdigest()
+    digest = payload_sha256(dict(arguments))
     expected_resource = {
         "repository_id": repository.repository_id,
         "repository": repository.slug,

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.huggingface/configuration.schema.json",
+  "title": "Hugging Face provider activation configuration",
+  "type": "object",
+  "required": [
+    "exchange_caller_id",
+    "exchange_verification_key_ref",
+    "account_center",
+    "repositories",
+    "hostSecretRefs"
+  ],
+  "properties": {
+    "binding_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "exchange_caller_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "exchange_verification_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+    "account_center": {
+      "type": "object",
+      "required": ["binding_id", "connection_ref", "transport", "caller_id", "signing_key_ref"],
+      "properties": {
+        "binding_id": {"type": "string", "minLength": 1, "maxLength": 256, "x-cyrene-host-provided": true},
+        "connection_ref": {"type": "string", "minLength": 1, "maxLength": 512, "x-cyrene-host-provided": true},
+        "transport": {"type": "string", "enum": ["local", "mtls"], "default": "local", "x-cyrene-host-provided": true},
+        "caller_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "signing_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+        "mtls": {
+          "type": "object",
+          "properties": {
+            "root_cert_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+            "client_cert_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+            "client_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"if": {"properties": {"transport": {"const": "mtls"}}, "required": ["transport"]}, "then": {"properties": {"mtls": {"required": ["root_cert_ref", "client_cert_ref", "client_key_ref"]}}, "required": ["mtls"]}}
+      ]
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["repo_type", "repo_id", "permissions"],
+        "properties": {
+          "repo_type": {"enum": ["model", "dataset", "space"]},
+          "repo_id": {"type": "string", "pattern": "^[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}$"},
+          "permissions": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"enum": ["read", "write"]}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 60, "default": 15},
+    "max_artifact_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576, "default": 1048576},
+    "hostSecretRefs": {
+      "type": "object",
+      "description": "Maps service signing and optional mTLS references to host-injected environment names; no token values appear in activation JSON.",
+      "required": ["huggingface/exchange-verification-key", "huggingface/account-center-provider-signing-key"],
+      "properties": {
+        "huggingface/exchange-verification-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "huggingface/account-center-provider-signing-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "huggingface/account-center-root-certificate": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "huggingface/account-center-client-certificate": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "huggingface/account-center-client-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"account_center": {"properties": {"transport": {"const": "mtls"}}, "required": ["transport"]}}, "required": ["account_center"]},
+      "then": {"properties": {"hostSecretRefs": {"required": ["huggingface/account-center-root-certificate", "huggingface/account-center-client-certificate", "huggingface/account-center-client-key"]}}}
+    }
+  ],
+  "additionalProperties": false
+}
