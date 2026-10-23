@@ -7,13 +7,16 @@ from __future__ import annotations
 import argparse
 import importlib
 import inspect
+import ipaddress
 import json
 import queue
 import signal
+import stat
 import threading
 import uuid
 from collections.abc import Iterable, Mapping, Sequence
 from concurrent import futures
+from pathlib import Path
 from typing import Any
 
 import grpc
@@ -31,7 +34,7 @@ _MAX_PAYLOAD_BYTES = 64 * 1024 * 1024
 class _ContextCancellation:
     """Expose gRPC termination as a thread-safe Plugin cancellation signal.
 
-        中文:将 gRPC 终止状态作为线程安全的 Plugin 取消信号提供。"""
+    中文:将 gRPC 终止状态作为线程安全的 Plugin 取消信号提供。"""
 
     def __init__(self, context: grpc.ServicerContext) -> None:
         self._context = context
@@ -67,7 +70,7 @@ class _SubscriptionEmitter:
 class DirectPluginService(wire_grpc.DirectPluginRuntimeServicer):
     """A direct endpoint bound to exactly one Plugin implementation.
 
-        中文:一个只绑定到单个 Plugin 实现的直连端点。"""
+    中文:一个只绑定到单个 Plugin 实现的直连端点。"""
 
     def __init__(
         self,
@@ -292,7 +295,7 @@ def _interface_version_map(
 ) -> dict[str, frozenset[str]]:
     """Normalize single- and multi-capability version declarations.
 
-        中文:规范化单能力和多能力的版本声明。"""
+    中文:规范化单能力和多能力的版本声明。"""
 
     if isinstance(interface_versions, Mapping):
         result: dict[str, frozenset[str]] = {}
@@ -418,7 +421,41 @@ def serve(
     listen: str,
     *,
     workers: int = 8,
+    tls_cert_file: str | Path | None = None,
+    tls_key_file: str | Path | None = None,
+    tls_client_ca_file: str | Path | None = None,
 ) -> tuple[grpc.Server, str]:
+    """Serve one Plugin locally or on a mutual-TLS endpoint.
+
+    Supplying any TLS path requires the full server certificate, private key,
+    and client CA set. TLS mode always requires a client certificate signed by
+    that CA; the no-TLS default remains limited to existing local deployments.
+
+    中文：在本地明文端点或双向 TLS 端点上提供一个 Plugin。只要提供任意 TLS
+    路径，就必须同时提供服务端证书、私钥和客户端 CA；TLS 模式始终要求客户端证书。
+    无 TLS 默认值保留给现有本地部署。
+    """
+
+    tls_values = (tls_cert_file, tls_key_file, tls_client_ca_file)
+    if any(value is not None for value in tls_values) and not all(
+        value is not None for value in tls_values
+    ):
+        raise ValueError(
+            "mTLS requires --tls-cert-file, --tls-key-file, and --tls-client-ca-file"
+        )
+    if all(value is None for value in tls_values) and not _is_local_listen(listen):
+        raise ValueError(
+            "plaintext DirectPluginRuntime is limited to loopback or Unix sockets"
+        )
+    credentials = (
+        _load_mutual_tls_credentials(
+            tls_cert_file,
+            tls_key_file,
+            tls_client_ca_file,  # type: ignore[arg-type]
+        )
+        if all(value is not None for value in tls_values)
+        else None
+    )
     server = grpc.server(
         futures.ThreadPoolExecutor(max_workers=max(1, workers)),
         options=(
@@ -429,17 +466,77 @@ def serve(
     wire_grpc.add_DirectPluginRuntimeServicer_to_server(
         DirectPluginService(plugin, capability, interface_versions), server
     )
-    bound_port = server.add_insecure_port(listen)
+    bound_port = (
+        server.add_secure_port(listen, credentials)
+        if credentials is not None
+        else server.add_insecure_port(listen)
+    )
     if bound_port == 0:
         raise RuntimeError(f"could not bind direct Plugin endpoint {listen!r}")
     host, separator, configured_port = listen.rpartition(":")
+    scheme = "grpcs" if credentials is not None else "grpc"
     connection = (
-        f"grpc://{host}:{bound_port}"
+        f"{scheme}://{host}:{bound_port}"
         if separator and configured_port == "0"
-        else f"grpc://{listen}"
+        else f"{scheme}://{listen}"
     )
     server.start()
     return server, connection
+
+
+def _load_mutual_tls_credentials(
+    tls_cert_file: str | Path,
+    tls_key_file: str | Path,
+    tls_client_ca_file: str | Path,
+) -> grpc.ServerCredentials:
+    """Read bounded PEM files and require clients to authenticate to the server."""
+
+    certificate = _read_pem_file(tls_cert_file, "TLS certificate")
+    private_key = _read_pem_file(tls_key_file, "TLS private key")
+    client_ca = _read_pem_file(tls_client_ca_file, "TLS client CA")
+    try:
+        return grpc.ssl_server_credentials(
+            ((private_key, certificate),),
+            root_certificates=client_ca,
+            require_client_auth=True,
+        )
+    except (TypeError, ValueError) as error:
+        raise ValueError("mTLS certificate material is invalid") from error
+
+
+def _read_pem_file(value: str | Path, label: str) -> bytes:
+    """Read one absolute regular PEM file without surfacing its contents."""
+
+    path = Path(value)
+    if not path.is_absolute():
+        raise ValueError(f"{label} path must be absolute")
+    try:
+        resolved = path.resolve(strict=True)
+        if not stat.S_ISREG(resolved.stat().st_mode):
+            raise ValueError(f"{label} path must name a regular file")
+        data = resolved.read_bytes()
+    except OSError as error:
+        raise ValueError(f"{label} file is unavailable") from error
+    if not data or len(data) > 2 * 1024 * 1024 or b"-----BEGIN " not in data:
+        raise ValueError(f"{label} file is empty or exceeds its limit")
+    return data
+
+
+def _is_local_listen(listen: str) -> bool:
+    """Allow the no-TLS compatibility mode only on loopback or Unix sockets."""
+
+    lowered = listen.casefold()
+    if lowered.startswith(("unix:", "unix-abstract:")):
+        return True
+    host = listen.rpartition(":")[0]
+    if host.startswith("[") and host.endswith("]"):
+        host = host[1:-1]
+    if host.casefold() == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 def main(arguments: list[str] | None = None) -> int:
@@ -449,6 +546,9 @@ def main(arguments: list[str] | None = None) -> int:
     parser.add_argument("--interface-version", required=True, action="append")
     parser.add_argument("--listen", default="127.0.0.1:0")
     parser.add_argument("--workers", type=int, default=8)
+    parser.add_argument("--tls-cert-file")
+    parser.add_argument("--tls-key-file")
+    parser.add_argument("--tls-client-ca-file")
     options = parser.parse_args(arguments)
 
     plugin = load_entrypoint(options.entrypoint)
@@ -458,6 +558,9 @@ def main(arguments: list[str] | None = None) -> int:
         options.interface_version,
         options.listen,
         workers=options.workers,
+        tls_cert_file=options.tls_cert_file,
+        tls_key_file=options.tls_key_file,
+        tls_client_ca_file=options.tls_client_ca_file,
     )
     print(
         json.dumps(

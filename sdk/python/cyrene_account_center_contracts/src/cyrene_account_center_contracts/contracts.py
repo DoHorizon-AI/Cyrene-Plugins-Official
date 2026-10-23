@@ -8,26 +8,27 @@ from __future__ import annotations
 
 import hashlib
 import hmac
-import json
 import time
 from dataclasses import asdict, dataclass
 from typing import Any
 
+import rfc8785
+
 
 def canonical_json(value: Any) -> bytes:
-    """Encode JSON values using the capability's canonical UTF-8 form."""
+    """Encode a JSON value with the shared RFC 8785/JCS UTF-8 representation.
 
-    return json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
+    中文：跨语言签名和参数摘要统一使用 RFC 8785 规范化字节。
+    """
+
+    return rfc8785.dumps(value)
 
 
 def payload_sha256(value: Any) -> str:
-    """Return a SHA-256 digest for exact canonical JSON payload semantics."""
+    """Return a SHA-256 digest over exact RFC 8785 payload bytes.
+
+    中文：对统一的 JCS 字节计算 SHA-256，供所有 capability 调用方复用。
+    """
 
     return hashlib.sha256(canonical_json(value)).hexdigest()
 
@@ -160,6 +161,63 @@ class ResolveLinkedSenderResponse:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderProfile:
+    """Non-secret provider identity metadata scoped to one owner and workspace."""
+
+    profile_ref: str
+    provider: str
+    identity_ref: str
+    target_scope: dict[str, Any]
+    auth_status: str
+    external_subject: str | None = None
+    expires_at: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LinkedProviderProfileResponse:
+    """Non-secret result returned after a provider profile is linked or rotated."""
+
+    profile_ref: str
+    provider: str
+    auth_status: str
+    external_subject: str
+    expires_at: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class CreateProviderCredentialLeaseRequest:
+    """Exact operation and target bound to one short-lived provider lease."""
+
+    profile_ref: str
+    operation_id: str
+    target: dict[str, Any]
+    arguments_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class RedeemProviderCredentialLeaseRequest:
+    """One-time redemption fields that must match the original lease exactly."""
+
+    lease_ref: str
+    operation_id: str
+    target: dict[str, Any]
+    arguments_sha256: str
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderCredentialLease:
+    """Opaque one-use lease metadata; it never carries credential material."""
+
+    lease_ref: str
+    profile_ref: str
+    provider: str
+    operation_id: str
+    target: dict[str, Any]
+    arguments_sha256: str
+    expires_at: int
+
+
+@dataclass(frozen=True, slots=True)
 class CredentialLease:
     lease_ref: str
     provider: str
@@ -177,6 +235,66 @@ class AuthMaterial:
     token_type: str
     external_subject: str
     expires_at: int | None
+
+
+@dataclass(frozen=True, slots=True)
+class LinkGitHubAppInstallationRequest:
+    """Verified GitHub App installation and explicitly bounded repositories."""
+
+    profile_ref: str
+    installation_id: str
+    repositories: list[dict[str, str]]
+    idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class LinkHuggingFaceProfileRequest:
+    """HF token reference resolved by the host, never passed as a credential."""
+
+    profile_ref: str
+    credential_secret_ref: str
+    scopes: dict[str, Any]
+    idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class RotateHuggingFaceProfileRequest:
+    """Replace the stored HF token from a host secret reference."""
+
+    profile_ref: str
+    credential_secret_ref: str
+    idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class RegisterHostIdentityProfileRequest:
+    """Register non-secret Azure, GCP, or RunPod host identity metadata."""
+
+    profile_ref: str
+    provider: str
+    identity_ref: str
+    target_scope: dict[str, Any]
+    idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class ListProviderProfilesResponse:
+    """Owner-visible profile metadata and authorization health only."""
+
+    profiles: list[ProviderProfile]
+
+
+@dataclass(frozen=True, slots=True)
+class ListProviderProfilesRequest:
+    """List profile metadata visible to the signed owner anchor."""
+
+
+@dataclass(frozen=True, slots=True)
+class UnlinkProviderProfileRequest:
+    """Remove a profile binding and invalidate its outstanding leases."""
+
+    profile_ref: str
+    idempotency_key: str
 
 
 def sign_context(

@@ -7,6 +7,17 @@
 | `bootstrap.py` | Start the vendored server from an unpacked source package. | 从已解包源码包启动随包分发的服务。 |
 | `dependency_preparer.py` | Build a lock-addressed Python runtime through the generic Platform adapter protocol. | 通过 Platform 通用适配协议构建按依赖锁寻址的 Python 运行时。 |
 
+The `server.py` entrypoint accepts `--tls-cert-file`, `--tls-key-file`, and
+`--tls-client-ca-file` together. This enables gRPC mutual TLS and requires a
+client certificate issued by the configured CA. The key and certificates are
+read from absolute mounted file paths; the server never prints their contents.
+When omitted, plaintext is restricted to loopback or Unix-domain listeners for
+local compatibility.
+
+`server.py` entrypoint 可同时接收 `--tls-cert-file`、`--tls-key-file` 和
+`--tls-client-ca-file`，启用 gRPC 双向 TLS，并要求客户端证书由配置的 CA 签发。服务端从绝对路径读取只读挂载的
+文件，不会输出证书或私钥内容。省略这些参数时，明文兼容模式仅允许 loopback 或 Unix-domain listener。
+
 Read the generated wire contract first, then `server.py` and `client.py`.
 Package lifecycle integrations should read `dependency_preparer.py` and
 `bootstrap.py` together.

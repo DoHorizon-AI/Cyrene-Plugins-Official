@@ -38,8 +38,8 @@
       "type": "object",
       "required": ["method", "operation_id", "caller_workload", "audience", "issuer", "subject", "organization_id", "workspace_id", "binding_id", "request_id", "issued_at", "expires_at", "payload_sha256", "signature"],
       "properties": {
-        "method": {"type": "string", "enum": ["wecom_authorization_health", "wecom_reauthorization_start", "wecom_reauthorization_status", "cloud_resources_query", "cloud_authorization_health", "email_notification_send", "email_connection_health"]},
-        "operation_id": {"type": "string", "enum": ["wecom.authorization.health.read", "wecom.authorization.renewal.start", "wecom.authorization.renewal.status", "cloud.resources.query", "cloud.authorization.health.read", "email.notification.send", "email.connection.health.read"]},
+        "method": {"type": "string", "enum": ["wecom_authorization_health", "wecom_reauthorization_start", "wecom_reauthorization_status", "cloud_resources_query", "cloud_authorization_health", "cloud_provider_health", "cloud_resources_list", "cloud_resource_get", "cloud_resource_create", "cloud_resource_deploy", "cloud_resource_start", "cloud_resource_stop", "cloud_resource_restart", "cloud_resource_update", "cloud_resource_delete", "cloud_operation_status", "cloud_operation_logs", "cloud_operation_cancel", "cloud_vendor_cli", "email_notification_send", "email_connection_health"]},
+        "operation_id": {"type": "string", "enum": ["wecom.authorization.health.read", "wecom.authorization.renewal.start", "wecom.authorization.renewal.status", "cloud.resources.query", "cloud.authorization.health.read", "cloud.provider.health.read", "cloud.resources.list", "cloud.resource.get", "cloud.resource.create", "cloud.resource.deploy", "cloud.resource.start", "cloud.resource.stop", "cloud.resource.restart", "cloud.resource.update", "cloud.resource.delete", "cloud.operation.status.read", "cloud.operation.logs.read", "cloud.operation.cancel", "cloud.vendor.cli.execute", "email.notification.send", "email.connection.health.read"]},
         "caller_workload": {"type": "string", "minLength": 1, "maxLength": 200},
         "audience": {"type": "string", "minLength": 1, "maxLength": 200},
         "issuer": {"type": "string", "minLength": 1, "maxLength": 500},
@@ -60,6 +60,20 @@
         {"if": {"properties": {"method": {"const": "wecom_reauthorization_status"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "wecom.authorization.renewal.status"}}}},
         {"if": {"properties": {"method": {"const": "cloud_resources_query"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resources.query"}}}},
         {"if": {"properties": {"method": {"const": "cloud_authorization_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.authorization.health.read"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_provider_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.provider.health.read"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resources_list"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resources.list"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_get"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.get"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_create"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.create"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_deploy"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.deploy"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_start"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.start"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_stop"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.stop"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_restart"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.restart"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_update"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.update"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_resource_delete"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.resource.delete"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_operation_status"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.operation.status.read"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_operation_logs"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.operation.logs.read"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_operation_cancel"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.operation.cancel"}}}},
+        {"if": {"properties": {"method": {"const": "cloud_vendor_cli"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.vendor.cli.execute"}}}},
         {"if": {"properties": {"method": {"const": "email_notification_send"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.notification.send"}}}},
         {"if": {"properties": {"method": {"const": "email_connection_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.connection.health.read"}}}}
       ]
@@ -240,6 +254,12 @@
         {"properties": {"caller_context": {"properties": {"method": {"const": "cloud_authorization_health"}, "operation_id": {"const": "cloud.authorization.health.read"}}}, "arguments": {"$ref": "#/$defs/CloudAuthorizationHealthArguments"}}}
       ]
     },
+    "CloudManagementToolEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"enum": ["cloud_provider_health", "cloud_resources_list", "cloud_resource_get", "cloud_resource_create", "cloud_resource_deploy", "cloud_resource_start", "cloud_resource_stop", "cloud_resource_restart", "cloud_resource_update", "cloud_resource_delete", "cloud_operation_status", "cloud_operation_logs", "cloud_operation_cancel", "cloud_vendor_cli"]}, "operation_id": {"enum": ["cloud.provider.health.read", "cloud.resources.list", "cloud.resource.get", "cloud.resource.create", "cloud.resource.deploy", "cloud.resource.start", "cloud.resource.stop", "cloud.resource.restart", "cloud.resource.update", "cloud.resource.delete", "cloud.operation.status.read", "cloud.operation.logs.read", "cloud.operation.cancel", "cloud.vendor.cli.execute"]}}}, "arguments": {"type": "object"}}}
+      ]
+    },
     "EmailNotificationSendEnvelope": {
       "allOf": [
         {"$ref": "#/$defs/ToolEnvelopeBase"},
@@ -259,6 +279,7 @@
         {"$ref": "#/$defs/WeComReauthorizationStatusEnvelope"},
         {"$ref": "#/$defs/CloudResourcesQueryEnvelope"},
         {"$ref": "#/$defs/CloudAuthorizationHealthEnvelope"},
+        {"$ref": "#/$defs/CloudManagementToolEnvelope"},
         {"$ref": "#/$defs/EmailNotificationSendEnvelope"},
         {"$ref": "#/$defs/EmailConnectionHealthEnvelope"}
       ]
