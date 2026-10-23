@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import unittest
 
+from tooling.release import official_plugin_package as package_release
 from tooling.release import select_official_plugin_packages as selection
 
 
@@ -25,7 +26,7 @@ class OfficialPackageSelectionTests(unittest.TestCase):
         self.assertEqual(len(selection.LEGACY_PACKAGE_IDS), 5)
         self.assertEqual(publish_mode, "draft")
 
-    def test_pull_request_validates_all_ten_packages_without_publishing(self) -> None:
+    def test_pull_request_validates_all_registered_packages_without_publishing(self) -> None:
         """Pull requests cover all packages while keeping publication disabled."""
 
         matrix, publish_mode = selection.select_package_release(
@@ -34,9 +35,17 @@ class OfficialPackageSelectionTests(unittest.TestCase):
         package_ids = [row["package_id"] for row in matrix["include"]]
 
         self.assertEqual(package_ids, list(selection.ALL_PACKAGE_IDS))
-        self.assertEqual(len(package_ids), 10)
-        self.assertEqual(len(set(package_ids)), 10)
+        self.assertEqual(len(package_ids), 13)
+        self.assertEqual(len(set(package_ids)), 13)
         self.assertEqual(publish_mode, "none")
+
+    def test_release_allowlist_and_package_producers_have_the_same_identities(self) -> None:
+        """Every released identity has one explicit package producer mapping."""
+
+        self.assertEqual(
+            set(selection.ALL_PACKAGE_IDS), set(package_release.PACKAGE_SPECS)
+        )
+        self.assertEqual(set(selection.PACKAGE_NAMES), set(package_release.PACKAGE_SPECS))
 
     def test_authorization_cloud_named_set_is_immutable_and_exact(self) -> None:
         """Only cloud resources, email notification, and WeCom join this set."""
@@ -75,6 +84,38 @@ class OfficialPackageSelectionTests(unittest.TestCase):
             ],
         )
         self.assertEqual(publish_mode, "immutable")
+
+    def test_teams_cloud_v1_is_an_exact_immutable_package_set(self) -> None:
+        """The Teams/cloud release adds only its five reviewed package IDs."""
+
+        matrix, publish_mode = selection.select_package_release(
+            "workflow_dispatch", "teams-cloud-v1"
+        )
+
+        self.assertEqual(
+            [row["package_id"] for row in matrix["include"]],
+            [
+                "cyrene.connectors.teams",
+                "cyrene.providers.cloud-management",
+                "cyrene.providers.huggingface",
+                "cyrene.accounts.account-center",
+                "cyrene.providers.github-issues",
+            ],
+        )
+        self.assertEqual(publish_mode, "immutable")
+
+    def test_teams_cloud_packages_are_single_package_immutable_dispatches(self) -> None:
+        """Each new package identity can be selected without broadening the set."""
+
+        for package_id in selection.TEAMS_CLOUD_V1_PACKAGE_IDS:
+            with self.subTest(package_id=package_id):
+                matrix, publish_mode = selection.select_package_release(
+                    "workflow_dispatch", package_id
+                )
+                self.assertEqual(
+                    [row["package_id"] for row in matrix["include"]], [package_id]
+                )
+                self.assertEqual(publish_mode, "immutable")
 
     def test_new_single_package_dispatches_are_allowlisted_immutable_releases(
         self,

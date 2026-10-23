@@ -29,8 +29,19 @@ AUTHORIZATION_CLOUD_V1_PACKAGE_IDS = (
     "cyrene.connectors.email-notification",
     "cyrene.connectors.wecom",
 )
+TEAMS_CLOUD_V1_PACKAGE_IDS = (
+    "cyrene.connectors.teams",
+    "cyrene.providers.cloud-management",
+    "cyrene.providers.huggingface",
+    "cyrene.accounts.account-center",
+    "cyrene.providers.github-issues",
+)
 ALL_PACKAGE_IDS = LEGACY_PACKAGE_IDS + tuple(
-    dict.fromkeys(INTEGRATION_V1_PACKAGE_IDS + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS)
+    dict.fromkeys(
+        INTEGRATION_V1_PACKAGE_IDS
+        + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
+        + TEAMS_CLOUD_V1_PACKAGE_IDS
+    )
 )
 PACKAGE_NAMES = {
     "cyrene.tools.dataset-preparation": "dataset-preparation",
@@ -42,12 +53,16 @@ PACKAGE_NAMES = {
     "cyrene.providers.github-issues": "github-issues",
     "cyrene.connectors.wecom": "wecom-connector",
     "cyrene.providers.cloud-resources": "cloud-resources",
+    "cyrene.connectors.teams": "teams-connector",
+    "cyrene.providers.cloud-management": "cloud-management",
+    "cyrene.providers.huggingface": "huggingface-provider",
     "cyrene.connectors.email-notification": "email-notification",
 }
 PACKAGE_SET_CHOICES = (
     "legacy5",
     "integration-v1",
     "authorization-cloud-v1",
+    "teams-cloud-v1",
     *ALL_PACKAGE_IDS,
 )
 
@@ -59,9 +74,9 @@ def select_package_release(
     """Return a static package matrix and publication mode for one event.
 
     Pushes retain the pre-existing five-package draft publication. Pull
-    pull requests validate all ten package producers without publishing.
+    pull requests validate all registered package producers without publishing.
     Manual dispatch accepts only named sets or package IDs in the fixed
-    allowlist; the Integration v1 and Authorization/cloud v1 sets publish
+    allowlist; named integration, cloud, and Teams sets publish
     their approved packages as immutable releases.
     中文：push 保持旧五包 draft 行为，PR 验证全部包而不发布；手动 dispatch
     只接受固定集合或 allowlist 中的单个 package ID。
@@ -84,12 +99,17 @@ def select_package_release(
         elif selection == "authorization-cloud-v1":
             selected = AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
             publish_mode = "immutable"
+        elif selection == "teams-cloud-v1":
+            selected = TEAMS_CLOUD_V1_PACKAGE_IDS
+            publish_mode = "immutable"
         elif selection in PACKAGE_NAMES:
             selected = (selection,)
             publish_mode = (
                 "immutable"
                 if selection
-                in INTEGRATION_V1_PACKAGE_IDS + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
+                in INTEGRATION_V1_PACKAGE_IDS
+                + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
+                + TEAMS_CLOUD_V1_PACKAGE_IDS
                 else "draft"
             )
         else:

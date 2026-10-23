@@ -26,7 +26,8 @@ fail-closed。
 - `sdk/`: Java/Spring and Python client/runtime SDKs.
 - `runtime/`: Rust runtimes and .NET Native AOT hosts/providers.
 - `plugins/`: official capability Plugins across connectors, evaluation, models,
-  policy, and tools, including the Plugins-owned OneBot v11 connector.
+  policy, and tools, including the Plugins-owned OneBot v11 connector, the
+  GitHub Issues/repository status provider, and the Hugging Face Hub provider.
 - `contracts/capabilities.yaml`: the generated capability index covering contracts,
   implementations, TCK coverage, and maturity.
 - `docs/plans/`: reviewed implementation plans and their evidence.
@@ -87,7 +88,7 @@ mvn --batch-mode --no-transfer-progress clean verify -f sdk/java/pom.xml
 - contracts/：版本化 Protobuf、JSON、C ABI、TCK 和生成的契约投影。
 - sdk/：Java/Spring 和 Python 客户端及 runtime SDK。
 - runtime/：Rust runtime 以及 .NET Native AOT host/provider。
-- plugins/：涵盖 connector、评估、模型、策略和工具的官方 capability Plugin，也包括由本仓库维护的 OneBot v11 connector。
+- plugins/：涵盖 connector、评估、模型、策略和工具的官方 capability Plugin，也包括由本仓库维护的 OneBot v11 connector、GitHub Issues/仓库状态提供方和 Hugging Face Hub 提供方。
 - contracts/capabilities.yaml：生成的 capability 索引，涵盖契约、实现、TCK 覆盖和 maturity。
 - docs/plans/：经过审查的实现计划及其证据。
 - docs/component-releases.md：Workspace connection 组件的独立选择规则与发布资产。
