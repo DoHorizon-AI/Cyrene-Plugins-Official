@@ -24,6 +24,7 @@ OPERATIONS = {
     "huggingface.repo.get",
     "huggingface.file.download",
     "huggingface.file.upload",
+    "huggingface.vendor.cli.execute",
 }
 
 

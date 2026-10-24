@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
+import hmac
 import json
 import re
 from collections.abc import Mapping
@@ -14,6 +16,11 @@ from typing import Any
 
 from cyrene_account_center_contracts import payload_sha256
 from cyrene_plugin_runtime.configuration import read_environment_settings
+from cyrene_plugin_runtime.vendor_cli import (
+    VendorCliConfigurationError,
+    VendorCliResult,
+    VendorCliRunner,
+)
 
 from ._generated import tool_provider_pb2 as wire
 from .account_center import (
@@ -22,8 +29,9 @@ from .account_center import (
     AccountCenterUnavailable,
 )
 from .huggingface_api import HuggingFaceApi, HuggingFaceApiFailure
-from .settings import ConfigurationError, ProviderSettings
+from .settings import ConfigurationError, ProviderSettings, repository_scope_sha256
 from .trust import TrustedContextError, account_center_context, verify_exchange_context
+from .vendor_cli import HUGGINGFACE_CLI_EXECUTABLE, validate_huggingface_cli_argv
 
 CAPABILITY_ID = "tool.provider.v1"
 PLUGIN_ID = "cyrene.providers.huggingface"
@@ -126,6 +134,29 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
             "additionalProperties": False,
         },
     },
+    {
+        "provider_tool_id": "hf_vendor_cli",
+        "display_name": "Run Hugging Face CLI Command",
+        "description": (
+            "Run an authorized Hugging Face CLI command with this profile's fine-grained token. "
+            "Target one configured model, dataset, or Space; unscoped search, Jobs, inference, "
+            "and bucket commands are unsupported. Prefer the API tools for query results; this "
+            "tool returns only a bounded command receipt and suppresses all CLI output."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "argv": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 128,
+                    "items": {"type": "string", "maxLength": 4096},
+                }
+            },
+            "required": ["argv"],
+            "additionalProperties": False,
+        },
+    },
 )
 _TOOLS_BY_ID = {item["provider_tool_id"]: item for item in CANONICAL_TOOLS}
 _LIST_OPERATION_TYPE = {
@@ -133,6 +164,13 @@ _LIST_OPERATION_TYPE = {
     "huggingface.datasets.list": "dataset",
     "huggingface.spaces.list": "space",
 }
+_OPERATION_ID_BY_TOOL = {
+    "hf_vendor_cli": "huggingface.vendor.cli.execute",
+}
+
+
+class ProfileScopeMismatch(ValueError):
+    """Account Center and host repository scopes do not match exactly."""
 
 
 class HuggingFaceProvider:
@@ -148,6 +186,7 @@ class HuggingFaceProvider:
         settings: ProviderSettings | None = None,
         account_center: AccountCenterLeaseClient | None = None,
         hub_api: HuggingFaceApi | None = None,
+        cli_runner: VendorCliRunner | None = None,
     ) -> None:
         self._settings = settings
         loaded_from_environment = False
@@ -159,6 +198,7 @@ class HuggingFaceProvider:
             loaded_from_environment = True
         self._account_center = account_center
         self._hub_api = hub_api
+        self._cli_runner = cli_runner or VendorCliRunner()
         if self._account_center is None and loaded_from_environment:
             try:
                 self._account_center = AccountCenterDirectLeaseClient(self._require_settings())
@@ -174,6 +214,7 @@ class HuggingFaceProvider:
         payload: bytes,
         *,
         request_type_url: str | None = None,
+        cancellation: Any = None,
         **_: Any,
     ) -> tuple[bool, Any]:
         """Dispatch provider catalog or one signed Hub tool invocation."""
@@ -188,7 +229,7 @@ class HuggingFaceProvider:
             if action == CALL_TOOL_METHOD:
                 if request_type_url not in (None, CALL_TOOL_REQUEST_TYPE_URL):
                     return False, "INVALID_REQUEST: tool payload type mismatch"
-                return self._call_tool(payload)
+                return self._call_tool(payload, cancellation=cancellation)
             return False, "METHOD_NOT_FOUND: unsupported provider method"
         except ConfigurationError:
             return False, "INVALID_CONFIGURATION: provider binding is unavailable"
@@ -217,7 +258,12 @@ class HuggingFaceProvider:
             )
         return True, _TypedPayload(response.SerializeToString(), LIST_TOOLS_RESPONSE_TYPE_URL)
 
-    def _call_tool(self, payload: bytes) -> tuple[bool, Any]:
+    def _call_tool(
+        self,
+        payload: bytes,
+        *,
+        cancellation: Any = None,
+    ) -> tuple[bool, Any]:
         """Validate signed actor/target claims, redeem once, then call the fixed API."""
 
         request = wire.CallToolRequest()
@@ -233,7 +279,10 @@ class HuggingFaceProvider:
         if tool_id not in _TOOLS_BY_ID:
             return False, "METHOD_NOT_FOUND: provider tool is not available"
         if not isinstance(envelope, Mapping) or set(envelope) != {
-            "payload", "profile_ref", "lease_ref", "trusted_context"
+            "payload",
+            "profile_ref",
+            "lease_ref",
+            "trusted_context",
         }:
             return False, "INVALID_REQUEST: signed profile lease is required"
         arguments = envelope.get("payload")
@@ -252,16 +301,15 @@ class HuggingFaceProvider:
                 "profile_ref": profile_ref,
                 "lease_ref": lease_ref,
             }
-            actor = verify_exchange_context(
-                settings, signed_payload, envelope["trusted_context"]
-            )
-            if envelope["trusted_context"].get("operation_id") != tool_id:
+            actor = verify_exchange_context(settings, signed_payload, envelope["trusted_context"])
+            operation_id = _OPERATION_ID_BY_TOOL.get(tool_id, tool_id)
+            if envelope["trusted_context"].get("operation_id") != operation_id:
                 raise TrustedContextError("trusted operation does not match the selected tool")
             target = _target(tool_id, arguments)
             lease_payload = {
                 "lease_ref": lease_ref,
                 "profile_ref": profile_ref,
-                "operation_id": tool_id,
+                "operation_id": operation_id,
                 "target": target,
                 "arguments_sha256": payload_sha256(dict(arguments)),
             }
@@ -273,6 +321,23 @@ class HuggingFaceProvider:
             )
             if not isinstance(credential.access_token, str) or not credential.access_token:
                 raise AccountCenterUnavailable("Account Center returned invalid auth material")
+            if tool_id == "hf_vendor_cli":
+                scope_digest = getattr(credential, "profile_scope_sha256", None)
+                expected_scope_digest = repository_scope_sha256(settings.repositories)
+                if (
+                    not isinstance(scope_digest, str)
+                    or re.fullmatch(r"[0-9a-f]{64}", scope_digest) is None
+                    or not hmac.compare_digest(scope_digest, expected_scope_digest)
+                ):
+                    raise ProfileScopeMismatch("profile scope digest does not match host binding")
+                return True, _tool_response(
+                    self._run_vendor_cli(
+                        arguments,
+                        credential.access_token,
+                        trusted_context=envelope["trusted_context"],
+                        cancellation=cancellation,
+                    )
+                )
             api = self._require_api()
             if tool_id in _LIST_OPERATION_TYPE:
                 result = api.list_repositories(
@@ -311,6 +376,12 @@ class HuggingFaceProvider:
             return True, _tool_error("AUTHENTICATION_DENIED")
         except AccountCenterUnavailable:
             return True, _tool_error("AUTHORIZATION_UNAVAILABLE", retryable=True)
+        except ProfileScopeMismatch:
+            return True, _tool_error("PROFILE_SCOPE_MISMATCH")
+        except FileNotFoundError:
+            return True, _tool_error("CLI_UNAVAILABLE")
+        except VendorCliConfigurationError:
+            return True, _tool_error("CLI_REJECTED")
         except (HuggingFaceApiFailure, ValueError) as error:
             if isinstance(error, HuggingFaceApiFailure):
                 return True, _tool_error(
@@ -339,6 +410,36 @@ class HuggingFaceProvider:
             self._hub_api = HuggingFaceApi(self._require_settings())
         return self._hub_api
 
+    def _run_vendor_cli(
+        self,
+        arguments: Mapping[str, Any],
+        token: str,
+        *,
+        trusted_context: Mapping[str, Any],
+        cancellation: Any,
+    ) -> dict[str, Any]:
+        """Run Hugging Face CLI with a profile token and return only metadata."""
+
+        argv = arguments["argv"]
+        try:
+            read_only = validate_huggingface_cli_argv(argv, self._require_settings().repositories)
+        except ValueError as error:
+            raise ValueError("CLI arguments are not authorized") from error
+        result = self._cli_runner.run(
+            HUGGINGFACE_CLI_EXECUTABLE,
+            argv,
+            credential_environment={"HF_TOKEN": token},
+            timeout_seconds=self._require_settings().timeout_seconds,
+            cancellation=cancellation,
+        )
+        return _vendor_cli_receipt(
+            "hf_vendor_cli",
+            arguments,
+            result,
+            read_only=read_only,
+            request_id=trusted_context.get("request_id"),
+        )
+
     def on_shutdown(self, timeout_ms: int) -> None:
         """Close the private Account Center channel during runtime shutdown."""
 
@@ -360,6 +461,20 @@ def _valid_arguments(
     required = set(schema.get("required", []))
     if not required.issubset(arguments) or set(arguments) - fields:
         return False
+    if tool_id == "hf_vendor_cli":
+        argv = arguments.get("argv")
+        if (
+            not isinstance(argv, list)
+            or not argv
+            or len(argv) > 128
+            or not all(isinstance(item, str) and len(item) <= 4096 for item in argv)
+        ):
+            return False
+        try:
+            validate_huggingface_cli_argv(argv, settings.repositories)
+        except ValueError:
+            return False
+        return True
     if tool_id in _LIST_OPERATION_TYPE:
         search = arguments.get("search")
         limit = arguments.get("limit", 20)
@@ -400,6 +515,8 @@ def _valid_arguments(
 def _target(tool_id: str, arguments: Mapping[str, Any]) -> dict[str, Any]:
     """Derive the exact non-secret Hub resource target for the credential lease."""
 
+    if tool_id == "hf_vendor_cli":
+        return {}
     if tool_id in _LIST_OPERATION_TYPE:
         return {"repo_type": _LIST_OPERATION_TYPE[tool_id]}
     target = {"repo_type": str(arguments["repo_type"]), "repo_id": str(arguments["repo_id"])}
@@ -446,10 +563,14 @@ def _valid_revision(value: Any) -> bool:
 def _uuid_text(value: Any) -> bool:
     """Return whether a value is a canonical opaque UUID reference."""
 
-    return isinstance(value, str) and re.fullmatch(
-        r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
-        value,
-    ) is not None
+    return (
+        isinstance(value, str)
+        and re.fullmatch(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}",
+            value,
+        )
+        is not None
+    )
 
 
 def _parse_json(payload: bytes | str) -> Any:
@@ -480,6 +601,49 @@ def _tool_response(result: Mapping[str, Any]) -> Any:
     return _TypedPayload(response.SerializeToString(), CALL_TOOL_RESPONSE_TYPE_URL)
 
 
+def _vendor_cli_receipt(
+    tool_id: str,
+    arguments: Mapping[str, Any],
+    result: VendorCliResult,
+    *,
+    read_only: bool,
+    request_id: Any,
+) -> dict[str, Any]:
+    """Report local command evidence without implying remote mutation success."""
+
+    if result.cancelled:
+        command_state = "COMMAND_CANCELLED"
+    elif result.timed_out or result.exit_code is None:
+        command_state = "COMMAND_INTERRUPTED"
+    else:
+        command_state = "COMMAND_COMPLETED" if result.exit_code == 0 else "COMMAND_FAILED"
+
+    receipt: dict[str, Any] = {
+        "state": command_state
+        if read_only
+        else (
+            "REMOTE_STATE_UNVERIFIED" if command_state == "COMMAND_COMPLETED" else "UNKNOWN_RESULT"
+        ),
+        "command_state": command_state,
+        "remote_state": "NOT_APPLICABLE" if read_only else "UNKNOWN_RESULT",
+        "exit_code": result.exit_code,
+        "argv_count": len(arguments["argv"]),
+        "arguments_sha256": payload_sha256(dict(arguments)),
+        "stdout_bytes": result.stdout_bytes,
+        "stderr_bytes": result.stderr_bytes,
+        "stdout_suppressed": True,
+        "stderr_suppressed": True,
+        "duration_ms": result.duration_ms,
+        "timed_out": result.timed_out,
+        "cancelled": result.cancelled,
+        "reconciliation_available": False,
+    }
+    if not read_only and isinstance(request_id, str) and request_id:
+        reference = hashlib.sha256(f"{tool_id}\0{request_id}".encode()).hexdigest()[:32]
+        receipt["operation_ref"] = f"hfcli_{reference}"
+    return receipt
+
+
 def _tool_error(
     code: str,
     *,
@@ -496,9 +660,7 @@ def _tool_error(
         error["outcome"] = "UNKNOWN"
     response = wire.CallToolResponse()
     response.outcome.is_error = True
-    response.outcome.content.add().json.json = json.dumps(
-        {"error": error}, separators=(",", ":")
-    )
+    response.outcome.content.add().json.json = json.dumps({"error": error}, separators=(",", ":"))
     return _TypedPayload(response.SerializeToString(), CALL_TOOL_RESPONSE_TYPE_URL)
 
 

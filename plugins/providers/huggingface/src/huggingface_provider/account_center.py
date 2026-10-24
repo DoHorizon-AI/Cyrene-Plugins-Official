@@ -185,12 +185,14 @@ def _parse_object(data: bytes) -> dict[str, Any]:
 def _auth_material(value: Mapping[str, Any]) -> AuthMaterial:
     """Validate the memory-only bearer token response before returning it."""
 
-    if set(value) != {"access_token", "token_type", "external_subject", "expires_at"}:
+    required = {"access_token", "token_type", "external_subject", "expires_at"}
+    if not required.issubset(value) or set(value) - required - {"profile_scope_sha256"}:
         raise AccountCenterUnavailable("Account Center auth response shape is invalid")
     token = value["access_token"]
     token_type = value["token_type"]
     subject = value["external_subject"]
     expires_at = value["expires_at"]
+    profile_scope_sha256 = value.get("profile_scope_sha256")
     if (
         not isinstance(token, str)
         or not token
@@ -200,12 +202,25 @@ def _auth_material(value: Mapping[str, Any]) -> AuthMaterial:
         or not isinstance(subject, str)
         or not subject
         or (
+            profile_scope_sha256 is not None
+            and (
+                not isinstance(profile_scope_sha256, str)
+                or re.fullmatch(r"[0-9a-f]{64}", profile_scope_sha256) is None
+            )
+        )
+        or (
             expires_at is not None
             and (isinstance(expires_at, bool) or not isinstance(expires_at, int))
         )
     ):
         raise AccountCenterUnavailable("Account Center auth response is invalid")
-    return AuthMaterial(token, token_type, subject, expires_at)
+    return AuthMaterial(
+        token,
+        token_type,
+        subject,
+        expires_at,
+        profile_scope_sha256=profile_scope_sha256,
+    )
 
 
 def _uuid(value: object) -> str:

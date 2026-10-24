@@ -6,7 +6,12 @@
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from cyrene_integration_contracts import TOOL_OPERATIONS, sign_context, verify_context
+from cyrene_integration_contracts import (
+    TOOL_OPERATIONS,
+    parse_tool_envelope,
+    sign_context,
+    verify_context,
+)
 
 _CLOUD_MANAGEMENT_OPERATIONS = {
     "cloud_provider_health": "cloud.provider.health.read",
@@ -59,6 +64,10 @@ def test_cloud_management_operation_is_fixed_and_signs_exact_arguments(
     )
 
     assert TOOL_OPERATIONS[method] == operation_id
+    envelope = parse_tool_envelope(
+        {"caller_context": context.as_dict(), "arguments": payload}
+    )
+    assert dict(envelope.arguments) == payload
     assert verify_context(
         method=method,
         operation_id=operation_id,
@@ -110,3 +119,66 @@ def test_cloud_management_signature_rejects_wrong_operation_pair() -> None:
             issued_at=now,
             expires_at=now + timedelta(seconds=240),
         )
+
+
+@pytest.mark.parametrize(
+    ("method", "operation_id"),
+    [
+        ("github_vendor_cli", "github.vendor.cli.execute"),
+        ("hf_vendor_cli", "huggingface.vendor.cli.execute"),
+    ],
+)
+def test_vendor_cli_operation_ids_are_fixed_and_bind_exact_argv(
+    method: str, operation_id: str
+) -> None:
+    """Bind provider-native CLI arguments to one immutable operation ID."""
+
+    key = b"v" * 32
+    payload = {"argv": ["repo", "view", "--json", "name"]}
+    now = datetime.now(UTC)
+    context = sign_context(
+        method=method,
+        operation_id=operation_id,
+        payload=payload,
+        caller_workload="exchange",
+        audience="provider-runtime",
+        issuer="https://directory.example",
+        subject="actor-1",
+        organization_id="org-1",
+        workspace_id="workspace-1",
+        binding_id="binding-1",
+        request_id="request-1",
+        key=key,
+        issued_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+
+    assert TOOL_OPERATIONS[method] == operation_id
+    assert verify_context(
+        method=method,
+        operation_id=operation_id,
+        payload=payload,
+        context=context,
+        key=key,
+        expected_caller_workload="exchange",
+        expected_audience="provider-runtime",
+        expected_binding_id="binding-1",
+        expected_organization_id="org-1",
+        expected_workspace_id="workspace-1",
+        expected_issuer="https://directory.example",
+        expected_subject="actor-1",
+    )
+    assert not verify_context(
+        method=method,
+        operation_id=operation_id,
+        payload={"argv": ["repo", "delete", "--yes"]},
+        context=context,
+        key=key,
+        expected_caller_workload="exchange",
+        expected_audience="provider-runtime",
+        expected_binding_id="binding-1",
+        expected_organization_id="org-1",
+        expected_workspace_id="workspace-1",
+        expected_issuer="https://directory.example",
+        expected_subject="actor-1",
+    )

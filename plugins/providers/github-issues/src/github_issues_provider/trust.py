@@ -56,6 +56,7 @@ def verify_exchange_context(
         "github.pull_request.get",
         "github.actions.runs.list",
         "github.ci.status",
+        "github.vendor.cli.execute",
     }:
         raise TrustedContextError("trusted operation is invalid")
     if context.get("binding_id") != settings.binding_id:

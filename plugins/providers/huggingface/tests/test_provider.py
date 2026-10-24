@@ -12,18 +12,26 @@ import hmac
 import json
 import time
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any
 
-from cyrene_account_center_contracts import AuthMaterial, canonical_json
+import pytest
+from cyrene_account_center_contracts import canonical_json
+from cyrene_plugin_runtime.vendor_cli import VendorCliResult
 
 from huggingface_provider._generated import tool_provider_pb2 as wire
-from huggingface_provider.account_center import AccountCenterUnavailable
+from huggingface_provider.account_center import AccountCenterUnavailable, _auth_material
 from huggingface_provider.huggingface_api import HuggingFaceApiFailure
 from huggingface_provider.plugin import (
     CALL_TOOL_RESPONSE_TYPE_URL,
     HuggingFaceProvider,
 )
-from huggingface_provider.settings import ProviderSettings, RepositoryScope
+from huggingface_provider.settings import (
+    ProviderSettings,
+    RepositoryScope,
+    repository_scope_sha256,
+)
+from huggingface_provider.vendor_cli import validate_huggingface_cli_argv
 
 EXCHANGE_KEY = b"x" * 32
 PROVIDER_KEY = b"p" * 32
@@ -62,21 +70,39 @@ def make_settings() -> ProviderSettings:
 class FakeAccountCenter:
     """Record generic lease redemptions and return a memory-only HF token."""
 
-    def __init__(self) -> None:
+    def __init__(self, profile_scope_sha256: str | None = None) -> None:
         self.calls: list[tuple[dict[str, object], dict[str, Any]]] = []
         self.used: set[str] = set()
+        self.profile_scope_sha256 = profile_scope_sha256
 
     def redeem_provider_credential_lease(
         self,
         payload: Mapping[str, object],
         trusted_context: Mapping[str, str | int | None],
-    ) -> AuthMaterial:
+    ) -> Any:
         lease_ref = str(payload["lease_ref"])
         if lease_ref in self.used:
             raise AccountCenterUnavailable("lease already used")
         self.used.add(lease_ref)
         self.calls.append((dict(payload), dict(trusted_context)))
-        return AuthMaterial("hf_private_test_token", "Bearer", "derek-li", None)
+        return _FakeAuthMaterial(
+            "hf_private_test_token",
+            "Bearer",
+            "derek-li",
+            None,
+            self.profile_scope_sha256,
+        )
+
+
+@dataclass(frozen=True)
+class _FakeAuthMaterial:
+    """Expose only private token and optional trusted profile-scope metadata."""
+
+    access_token: str
+    token_type: str
+    external_subject: str
+    expires_at: int | None
+    profile_scope_sha256: str | None
 
 
 class FakeHubApi:
@@ -111,6 +137,18 @@ class FakeHubApi:
         return {"status": "CONFIRMED", "repo_id": args[1], "path": args[3]}
 
 
+class FakeCliRunner:
+    """Capture exact invocation metadata without running a vendor binary."""
+
+    def __init__(self, result: VendorCliResult | None = None) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.result = result or VendorCliResult(0, 9, False, False, 64, 3)
+
+    def run(self, executable: str, argv: list[str], **kwargs: Any) -> VendorCliResult:
+        self.calls.append({"executable": executable, "argv": list(argv), **kwargs})
+        return self.result
+
+
 def signed_context(
     settings: ProviderSettings,
     arguments: Mapping[str, Any],
@@ -137,7 +175,9 @@ def signed_context(
         "request_id": "request-123",
         "issued_at": int(time.time()),
         "expires_at": int(time.time()) + 60,
-        "operation_id": operation_id,
+        "operation_id": (
+            "huggingface.vendor.cli.execute" if operation_id == "hf_vendor_cli" else operation_id
+        ),
     }
     value["signature"] = hmac.new(
         settings.exchange_verification_key, canonical_json(value), hashlib.sha256
@@ -198,18 +238,14 @@ def invoke_invalid_tool(
         provider_tool_id=tool_id,
         arguments_json=json.dumps(envelope, separators=(",", ":")),
     )
-    return provider.on_invoke(
-        "tool.provider.v1", "call_tool", request.SerializeToString()
-    )
+    return provider.on_invoke("tool.provider.v1", "call_tool", request.SerializeToString())
 
 
 def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
     settings = make_settings()
     account_center = FakeAccountCenter()
     api = FakeHubApi()
-    provider = HuggingFaceProvider(
-        settings=settings, account_center=account_center, hub_api=api
-    )
+    provider = HuggingFaceProvider(settings=settings, account_center=account_center, hub_api=api)
     request = wire.ListToolsRequest(binding_id=settings.binding_id)
 
     ok, result = provider.on_invoke("tool.provider.v1", "list_tools", request.SerializeToString())
@@ -222,12 +258,11 @@ def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
         "huggingface.repo.get",
         "huggingface.file.download",
         "huggingface.file.upload",
+        "hf_vendor_cli",
     ]
 
     arguments = {"search": "bert", "limit": 5}
-    is_error, response = invoke_tool(
-        provider, settings, "huggingface.models.list", arguments
-    )
+    is_error, response = invoke_tool(provider, settings, "huggingface.models.list", arguments)
     assert is_error is False
     assert response["repositories"][0]["repo_id"] == "public/model"
     assert "hf_private_test_token" not in json.dumps(response)
@@ -244,6 +279,180 @@ def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
     assert api.calls[0][1][1] == "hf_private_test_token"
 
 
+def test_account_center_profile_scope_digest_is_validated_before_provider_use() -> None:
+    response = {
+        "access_token": "hf_private_test_token",
+        "token_type": "Bearer",
+        "external_subject": "derek-li",
+        "expires_at": None,
+        "profile_scope_sha256": "a" * 64,
+    }
+
+    credential = _auth_material(response)
+
+    assert credential.profile_scope_sha256 == "a" * 64
+    with pytest.raises(AccountCenterUnavailable, match="auth response is invalid"):
+        _auth_material({**response, "profile_scope_sha256": "not-a-digest"})
+    with pytest.raises(AccountCenterUnavailable, match="auth response shape is invalid"):
+        _auth_material({**response, "unexpected": "value"})
+
+
+def test_vendor_cli_uses_profile_lease_and_returns_only_a_safe_read_receipt() -> None:
+    settings = make_settings()
+    account_center = FakeAccountCenter(repository_scope_sha256(settings.repositories))
+    runner = FakeCliRunner()
+    provider = HuggingFaceProvider(
+        settings=settings,
+        account_center=account_center,
+        cli_runner=runner,
+    )
+    arguments = {"argv": ["models", "info", "owner/model"]}
+
+    is_error, result = invoke_tool(provider, settings, "hf_vendor_cli", arguments)
+
+    assert is_error is False
+    assert result["state"] == "COMMAND_COMPLETED"
+    assert result["remote_state"] == "NOT_APPLICABLE"
+    assert result["stdout_suppressed"] is True
+    assert result["stderr_suppressed"] is True
+    assert "hf_private_test_token" not in json.dumps(result)
+    lease_payload, _context = account_center.calls[0]
+    assert lease_payload == {
+        "lease_ref": "00000000-0000-4000-8000-000000000002",
+        "profile_ref": "00000000-0000-4000-8000-000000000001",
+        "operation_id": "huggingface.vendor.cli.execute",
+        "target": {},
+        "arguments_sha256": hashlib.sha256(canonical_json(arguments)).hexdigest(),
+    }
+    assert runner.calls[0]["executable"] == "/usr/local/bin/hf"
+    assert runner.calls[0]["argv"] == arguments["argv"]
+    assert runner.calls[0]["credential_environment"] == {"HF_TOKEN": "hf_private_test_token"}
+
+
+def test_vendor_cli_mutation_exit_zero_stays_remote_state_unverified() -> None:
+    settings = make_settings()
+    account_center = FakeAccountCenter(repository_scope_sha256(settings.repositories))
+    runner = FakeCliRunner(VendorCliResult(0, 12, False, False, 0, 0))
+    provider = HuggingFaceProvider(
+        settings=settings,
+        account_center=account_center,
+        cli_runner=runner,
+    )
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "hf_vendor_cli",
+        {"argv": ["repos", "delete", "owner/model", "--type", "model", "--yes"]},
+    )
+
+    assert is_error is False
+    assert result["state"] == "REMOTE_STATE_UNVERIFIED"
+    assert result["command_state"] == "COMMAND_COMPLETED"
+    assert result["remote_state"] == "UNKNOWN_RESULT"
+    assert result["operation_ref"].startswith("hfcli_")
+    assert result["reconciliation_available"] is False
+
+
+@pytest.mark.parametrize("scope_digest", [None, "0" * 64])
+def test_vendor_cli_fails_closed_when_account_center_scope_digest_is_missing_or_differs(
+    scope_digest: str | None,
+) -> None:
+    settings = make_settings()
+    account_center = FakeAccountCenter(scope_digest)
+    runner = FakeCliRunner()
+    provider = HuggingFaceProvider(
+        settings=settings,
+        account_center=account_center,
+        cli_runner=runner,
+    )
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "hf_vendor_cli",
+        {"argv": ["models", "info", "owner/model"]},
+    )
+
+    assert is_error is True
+    assert result["error"]["code"] == "PROFILE_SCOPE_MISMATCH"
+    assert runner.calls == []
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["auth", "login", "--token", "hf_fixture_token_12345678901234567890"],
+        ["models", "info", "owner/model", "--endpoint", "https://attacker.invalid"],
+        ["download", "owner/model", "--local-dir", "/tmp/private"],
+        ["upload", "owner/model", "./private.bin"],
+        ["jobs", "run", "--secrets", "TOKEN=secret"],
+        ["jobs", "run", "-e", "HF_TOKEN=hf_fixture_token_12345678901234567890"],
+        ["jobs", "uv", "run", "private_training.py"],
+    ],
+)
+def test_vendor_cli_rejects_credential_endpoint_and_local_file_commands(
+    argv: list[str],
+) -> None:
+    settings = make_settings()
+    account_center = FakeAccountCenter()
+    runner = FakeCliRunner()
+    provider = HuggingFaceProvider(
+        settings=settings,
+        account_center=account_center,
+        cli_runner=runner,
+    )
+
+    ok, result = invoke_invalid_tool(provider, settings, "hf_vendor_cli", {"argv": argv})
+
+    assert ok is False
+    assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
+    assert account_center.calls == []
+    assert runner.calls == []
+
+
+@pytest.mark.parametrize(
+    ("argv", "read_only"),
+    [
+        (["models", "info", "owner/model"], True),
+        (["models", "info", "hf://models/owner/model@refs%2Fheads%2Frelease"], True),
+        (["models", "list", "--limit", "10", "owner/model"], True),
+        (["datasets", "info", "https://huggingface.co/datasets/owner/data"], True),
+        (["spaces", "card", "hf://spaces/owner/demo"], True),
+        (["repos", "delete", "owner/model", "--type", "model", "--yes"], False),
+        (["repos", "tag", "list", "owner/model", "v1", "--type", "model"], True),
+        (["--help"], True),
+        (["version"], True),
+    ],
+)
+def test_vendor_cli_only_allows_explicit_scoped_repository_commands(
+    argv: list[str], read_only: bool
+) -> None:
+    settings = make_settings()
+
+    assert validate_huggingface_cli_argv(argv, settings.repositories) is read_only
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["models", "list"],
+        ["models", "info", "other/model"],
+        ["models", "info", "https://huggingface.co/datasets/owner/data"],
+        ["repos", "delete", "owner/data", "--type", "dataset", "--yes"],
+        ["repos", "list", "--type", "model"],
+        ["models", "info", "https://attacker.invalid/owner/model"],
+    ],
+)
+def test_vendor_cli_rejects_unscoped_wrong_type_and_read_only_targets(
+    argv: list[str],
+) -> None:
+    settings = make_settings()
+
+    with pytest.raises(ValueError):
+        validate_huggingface_cli_argv(argv, settings.repositories)
+
+
 def test_private_file_targets_and_upload_hash_are_bound_to_profile_lease() -> None:
     settings = make_settings()
     account_center = FakeAccountCenter()
@@ -257,9 +466,7 @@ def test_private_file_targets_and_upload_hash_are_bound_to_profile_lease() -> No
         "content_base64": base64.b64encode(b"small artifact").decode("ascii"),
     }
 
-    is_error, result = invoke_tool(
-        provider, settings, "huggingface.file.upload", arguments
-    )
+    is_error, result = invoke_tool(provider, settings, "huggingface.file.upload", arguments)
     assert is_error is False
     assert result["status"] == "CONFIRMED"
     lease_payload, _context = account_center.calls[0]
@@ -269,9 +476,9 @@ def test_private_file_targets_and_upload_hash_are_bound_to_profile_lease() -> No
         "path": "reports/model.bin",
         "revision": "main",
     }
-    assert lease_payload["arguments_sha256"] == hashlib.sha256(
-        canonical_json(arguments)
-    ).hexdigest()
+    assert (
+        lease_payload["arguments_sha256"] == hashlib.sha256(canonical_json(arguments)).hexdigest()
+    )
     assert api.calls[0][0] == "upload"
     assert api.calls[0][1][4] == b"small artifact"
     assert "hf_private_test_token" not in json.dumps(result)
@@ -290,9 +497,7 @@ def test_invalid_base64_and_unconfigured_resources_are_rejected_before_lease() -
         "path": "config.json",
         "content_base64": "%%%",
     }
-    ok, result = invoke_invalid_tool(
-        provider, settings, "huggingface.file.upload", invalid_content
-    )
+    ok, result = invoke_invalid_tool(provider, settings, "huggingface.file.upload", invalid_content)
     assert ok is False
     assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
     assert account_center.calls == []

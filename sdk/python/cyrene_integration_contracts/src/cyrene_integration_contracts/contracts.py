@@ -52,6 +52,8 @@ TOOL_OPERATIONS: Mapping[str, str] = MappingProxyType(
         "cloud_operation_logs": "cloud.operation.logs.read",
         "cloud_operation_cancel": "cloud.operation.cancel",
         "cloud_vendor_cli": "cloud.vendor.cli.execute",
+        "github_vendor_cli": "github.vendor.cli.execute",
+        "hf_vendor_cli": "huggingface.vendor.cli.execute",
         "email_notification_send": "email.notification.send",
         "email_connection_health": "email.connection.health.read",
     }

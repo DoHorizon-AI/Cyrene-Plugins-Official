@@ -13,6 +13,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from cyrene_account_center_contracts import payload_sha256
+
 
 class ConfigurationError(ValueError):
     """The binding lacks a required host-resolved setting."""
@@ -181,6 +183,22 @@ class ProviderSettings:
             timeout_seconds=timeout,
             max_artifact_bytes=maximum,
         )
+
+
+def repository_scope_sha256(repositories: tuple[RepositoryScope, ...]) -> str:
+    """Hash normalized host repository scopes using the shared JCS contract."""
+
+    normalized = {
+        "repositories": [
+            {
+                "repo_type": item.repo_type,
+                "repo_id": item.repo_id,
+                "permissions": sorted(item.permissions),
+            }
+            for item in sorted(repositories, key=lambda scope: (scope.repo_type, scope.repo_id))
+        ]
+    }
+    return payload_sha256(normalized)
 
 
 def _repository_scopes(value: Any) -> tuple[RepositoryScope, ...]:

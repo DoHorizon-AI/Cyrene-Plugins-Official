@@ -9,7 +9,12 @@ import json
 
 import pytest
 
-from huggingface_provider.settings import ConfigurationError, ProviderSettings
+from huggingface_provider.settings import (
+    ConfigurationError,
+    ProviderSettings,
+    RepositoryScope,
+    repository_scope_sha256,
+)
 
 
 def valid_config() -> tuple[dict[str, str], dict[str, object]]:
@@ -74,3 +79,15 @@ def test_activation_rejects_write_permission_for_duplicate_or_unknown_scope() ->
 
     with pytest.raises(ConfigurationError, match="Hub repository scope is invalid"):
         ProviderSettings.from_environment(environ)
+
+
+def test_repository_scope_digest_is_order_independent_and_permission_sensitive() -> None:
+    model = RepositoryScope("model", "owner/model", frozenset({"write", "read"}))
+    dataset = RepositoryScope("dataset", "owner/data", frozenset({"read"}))
+
+    assert repository_scope_sha256((model, dataset)) == repository_scope_sha256(
+        (dataset, model)
+    )
+    assert repository_scope_sha256((model,)) != repository_scope_sha256(
+        (RepositoryScope("model", "owner/model", frozenset({"read"})),)
+    )

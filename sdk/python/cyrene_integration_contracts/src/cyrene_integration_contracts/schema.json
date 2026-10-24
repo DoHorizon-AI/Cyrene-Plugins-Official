@@ -38,8 +38,8 @@
       "type": "object",
       "required": ["method", "operation_id", "caller_workload", "audience", "issuer", "subject", "organization_id", "workspace_id", "binding_id", "request_id", "issued_at", "expires_at", "payload_sha256", "signature"],
       "properties": {
-        "method": {"type": "string", "enum": ["wecom_authorization_health", "wecom_reauthorization_start", "wecom_reauthorization_status", "cloud_resources_query", "cloud_authorization_health", "cloud_provider_health", "cloud_resources_list", "cloud_resource_get", "cloud_resource_create", "cloud_resource_deploy", "cloud_resource_start", "cloud_resource_stop", "cloud_resource_restart", "cloud_resource_update", "cloud_resource_delete", "cloud_operation_status", "cloud_operation_logs", "cloud_operation_cancel", "cloud_vendor_cli", "email_notification_send", "email_connection_health"]},
-        "operation_id": {"type": "string", "enum": ["wecom.authorization.health.read", "wecom.authorization.renewal.start", "wecom.authorization.renewal.status", "cloud.resources.query", "cloud.authorization.health.read", "cloud.provider.health.read", "cloud.resources.list", "cloud.resource.get", "cloud.resource.create", "cloud.resource.deploy", "cloud.resource.start", "cloud.resource.stop", "cloud.resource.restart", "cloud.resource.update", "cloud.resource.delete", "cloud.operation.status.read", "cloud.operation.logs.read", "cloud.operation.cancel", "cloud.vendor.cli.execute", "email.notification.send", "email.connection.health.read"]},
+        "method": {"type": "string", "enum": ["wecom_authorization_health", "wecom_reauthorization_start", "wecom_reauthorization_status", "cloud_resources_query", "cloud_authorization_health", "cloud_provider_health", "cloud_resources_list", "cloud_resource_get", "cloud_resource_create", "cloud_resource_deploy", "cloud_resource_start", "cloud_resource_stop", "cloud_resource_restart", "cloud_resource_update", "cloud_resource_delete", "cloud_operation_status", "cloud_operation_logs", "cloud_operation_cancel", "cloud_vendor_cli", "github_vendor_cli", "hf_vendor_cli", "email_notification_send", "email_connection_health"]},
+        "operation_id": {"type": "string", "enum": ["wecom.authorization.health.read", "wecom.authorization.renewal.start", "wecom.authorization.renewal.status", "cloud.resources.query", "cloud.authorization.health.read", "cloud.provider.health.read", "cloud.resources.list", "cloud.resource.get", "cloud.resource.create", "cloud.resource.deploy", "cloud.resource.start", "cloud.resource.stop", "cloud.resource.restart", "cloud.resource.update", "cloud.resource.delete", "cloud.operation.status.read", "cloud.operation.logs.read", "cloud.operation.cancel", "cloud.vendor.cli.execute", "github.vendor.cli.execute", "huggingface.vendor.cli.execute", "email.notification.send", "email.connection.health.read"]},
         "caller_workload": {"type": "string", "minLength": 1, "maxLength": 200},
         "audience": {"type": "string", "minLength": 1, "maxLength": 200},
         "issuer": {"type": "string", "minLength": 1, "maxLength": 500},
@@ -74,6 +74,8 @@
         {"if": {"properties": {"method": {"const": "cloud_operation_logs"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.operation.logs.read"}}}},
         {"if": {"properties": {"method": {"const": "cloud_operation_cancel"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.operation.cancel"}}}},
         {"if": {"properties": {"method": {"const": "cloud_vendor_cli"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "cloud.vendor.cli.execute"}}}},
+        {"if": {"properties": {"method": {"const": "github_vendor_cli"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "github.vendor.cli.execute"}}}},
+        {"if": {"properties": {"method": {"const": "hf_vendor_cli"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "huggingface.vendor.cli.execute"}}}},
         {"if": {"properties": {"method": {"const": "email_notification_send"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.notification.send"}}}},
         {"if": {"properties": {"method": {"const": "email_connection_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.connection.health.read"}}}}
       ]
@@ -224,6 +226,19 @@
       },
       "additionalProperties": false
     },
+    "VendorCliArguments": {
+      "type": "object",
+      "required": ["argv"],
+      "properties": {
+        "argv": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 128,
+          "items": {"type": "string", "maxLength": 4096}
+        }
+      },
+      "additionalProperties": false
+    },
     "WeComAuthorizationHealthEnvelope": {
       "allOf": [
         {"$ref": "#/$defs/ToolEnvelopeBase"},
@@ -260,6 +275,18 @@
         {"properties": {"caller_context": {"properties": {"method": {"enum": ["cloud_provider_health", "cloud_resources_list", "cloud_resource_get", "cloud_resource_create", "cloud_resource_deploy", "cloud_resource_start", "cloud_resource_stop", "cloud_resource_restart", "cloud_resource_update", "cloud_resource_delete", "cloud_operation_status", "cloud_operation_logs", "cloud_operation_cancel", "cloud_vendor_cli"]}, "operation_id": {"enum": ["cloud.provider.health.read", "cloud.resources.list", "cloud.resource.get", "cloud.resource.create", "cloud.resource.deploy", "cloud.resource.start", "cloud.resource.stop", "cloud.resource.restart", "cloud.resource.update", "cloud.resource.delete", "cloud.operation.status.read", "cloud.operation.logs.read", "cloud.operation.cancel", "cloud.vendor.cli.execute"]}}}, "arguments": {"type": "object"}}}
       ]
     },
+    "GitHubVendorCliEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "github_vendor_cli"}, "operation_id": {"const": "github.vendor.cli.execute"}}}, "arguments": {"$ref": "#/$defs/VendorCliArguments"}}}
+      ]
+    },
+    "HuggingFaceVendorCliEnvelope": {
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"const": "hf_vendor_cli"}, "operation_id": {"const": "huggingface.vendor.cli.execute"}}}, "arguments": {"$ref": "#/$defs/VendorCliArguments"}}}
+      ]
+    },
     "EmailNotificationSendEnvelope": {
       "allOf": [
         {"$ref": "#/$defs/ToolEnvelopeBase"},
@@ -280,6 +307,8 @@
         {"$ref": "#/$defs/CloudResourcesQueryEnvelope"},
         {"$ref": "#/$defs/CloudAuthorizationHealthEnvelope"},
         {"$ref": "#/$defs/CloudManagementToolEnvelope"},
+        {"$ref": "#/$defs/GitHubVendorCliEnvelope"},
+        {"$ref": "#/$defs/HuggingFaceVendorCliEnvelope"},
         {"$ref": "#/$defs/EmailNotificationSendEnvelope"},
         {"$ref": "#/$defs/EmailConnectionHealthEnvelope"}
       ]
