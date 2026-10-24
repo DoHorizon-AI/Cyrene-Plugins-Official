@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "932faba44dd35d468f35a33fad7ae8be7873a225b8b5cedc44b0d1efd678276b",
-      "size_bytes": 41138
+      "sha256": "7a4e9c7191bf1724864382bd4266457b6e222009579bfbe18a6011fb0b94e169",
+      "size_bytes": 41162
     },
     {
       "kind": "file",
@@ -6725,15 +6725,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "bcc011dd793d26d30ee27de64d0bfeb35680decee160bb453f6fac8d137d1bb9",
-      "size_bytes": 18080
+      "sha256": "a6df467887eace57745686042934825d3f7975d5ea63fd7bdac89486ec540026",
+      "size_bytes": 19100
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "9cc3d7a934f91ab216b9d8090f5d9e31229e06cdd10597a41c3d504fa46dbb61",
-      "size_bytes": 27862
+      "sha256": "68db99d507e46f174ccabfed7657a4720fa2344fa213db2b3310d675928d673a",
+      "size_bytes": 28334
     },
     {
       "kind": "file",

@@ -194,7 +194,7 @@ jobs:
             tools/ci/verify_source_manifest.py
       - name: Run Python runtime and official Plugin tests
         run: |
-          python3 -m pytest -q \
+          python3 -m pytest -q --import-mode=importlib \
             sdk/python/cyrene_plugin_runtime/tests \
             sdk/python/cyrene_account_center_contracts/tests \
             plugins/accounts/account-center/tests \
