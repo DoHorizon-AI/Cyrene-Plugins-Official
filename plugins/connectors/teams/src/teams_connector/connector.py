@@ -361,7 +361,9 @@ async def _create_official_app(config: TeamsBindingConfig, secret: str) -> Any:
     }
     if config.service_url is not None:
         options["service_url"] = config.service_url
-    return App(**options)
+    app = App(**options)
+    await app.initialize()
+    return app
 
 
 async def _create_injected_app(

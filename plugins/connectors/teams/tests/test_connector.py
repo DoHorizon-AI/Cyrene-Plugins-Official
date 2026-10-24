@@ -13,6 +13,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import httpx
+import microsoft_teams.apps
 import pytest
 
 from teams_connector._generated import message_connector_pb2 as message_wire
@@ -47,6 +48,45 @@ class FakeTeamsApp:
         if self.exception is not None:
             raise self.exception
         return SimpleNamespace(id=self.response_id)
+
+
+class StrictOfficialSdkApp:
+    """Require official SDK initialization before a reply can be sent.
+
+    中文：要求官方 SDK app 完成初始化后才能发送回复。
+    """
+
+    instances = []
+
+    def __init__(self, **options):
+        self.options = options
+        self.initialize_calls = 0
+        self.initialized = False
+        self.calls = []
+        self.instances.append(self)
+
+    async def initialize(self):
+        self.initialize_calls += 1
+        self.initialized = True
+
+    async def reply(self, conversation_id, root_thread_id, text, *, service_url=None):
+        if not self.initialized:
+            raise ValueError("app not initialized - call app.initialize() first")
+        self.calls.append((conversation_id, root_thread_id, text, service_url))
+        return SimpleNamespace(id=f"outbound-{len(self.calls)}")
+
+
+class FailingInitializationApp(StrictOfficialSdkApp):
+    """Model an SDK app that fails before it can become send-ready.
+
+    中文：模拟尚未准备好发送时初始化失败的 SDK app。
+    """
+
+    instances = []
+
+    async def initialize(self):
+        self.initialize_calls += 1
+        raise RuntimeError("initialization failed before send")
 
 
 def _config():
@@ -137,6 +177,69 @@ def test_send_message_uses_configured_bot_and_root_thread_without_network(monkey
             SERVICE_URL,
         )
     ]
+
+
+def test_official_sdk_app_is_initialized_once_and_cached(monkeypatch):
+    """Initialize the real SDK construction path before replies and reuse it.
+
+    中文：正式 SDK 创建路径在回复前完成一次初始化并复用 app。
+    """
+
+    monkeypatch.setenv("TEAMS_BOT_APP_SECRET", "test-secret-value-not-config")
+    StrictOfficialSdkApp.instances.clear()
+    monkeypatch.setattr(microsoft_teams.apps, "App", StrictOfficialSdkApp)
+    connector = TeamsConnector(_config())
+    try:
+        first_ok, first_result = _invoke(connector, _request())
+        second_ok, second_result = _invoke(connector, _request())
+        app = StrictOfficialSdkApp.instances[0]
+        assert connector._sdk_app is app
+    finally:
+        connector.on_shutdown()
+
+    assert first_ok is True
+    assert second_ok is True
+    assert message_wire.DeliveryResult.FromString(first_result.value).status == (
+        message_wire.DELIVERY_STATUS_ACCEPTED
+    )
+    assert message_wire.DeliveryResult.FromString(second_result.value).status == (
+        message_wire.DELIVERY_STATUS_ACCEPTED
+    )
+    assert len(StrictOfficialSdkApp.instances) == 1
+    assert app.initialize_calls == 1
+    assert app.initialized is True
+    assert app.calls == [
+        (CONVERSATION_ID, "1749000000000", "Repository scan completed.", SERVICE_URL),
+        (CONVERSATION_ID, "1749000000000", "Repository scan completed.", SERVICE_URL),
+    ]
+
+
+def test_failed_official_sdk_initialization_does_not_cache_or_send(monkeypatch):
+    """Do not cache a half-initialized SDK app or call its reply method.
+
+    中文：初始化失败时不缓存未就绪的 SDK app，也不调用 reply。
+    """
+
+    monkeypatch.setenv("TEAMS_BOT_APP_SECRET", "test-secret-value-not-config")
+    FailingInitializationApp.instances.clear()
+    monkeypatch.setattr(microsoft_teams.apps, "App", FailingInitializationApp)
+    connector = TeamsConnector(_config())
+    try:
+        first_ok, first_error = _invoke(connector, _request())
+        assert connector._sdk_app is None
+        second_ok, second_error = _invoke(connector, _request())
+        assert connector._sdk_app is None
+    finally:
+        connector.on_shutdown()
+
+    assert first_ok is False
+    assert second_ok is False
+    assert first_error.startswith("DELIVERY_UNCERTAIN:")
+    assert second_error.startswith("DELIVERY_UNCERTAIN:")
+    assert len(FailingInitializationApp.instances) == 2
+    assert all(app.initialize_calls == 1 for app in FailingInitializationApp.instances)
+    assert all(app.initialized is False for app in FailingInitializationApp.instances)
+    assert all(app.calls == [] for app in FailingInitializationApp.instances)
 
 
 def test_send_message_rejects_unbound_team_before_sdk_call(monkeypatch):
