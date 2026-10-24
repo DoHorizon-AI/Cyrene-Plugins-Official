@@ -127,15 +127,17 @@ def normalize_activity(
     except ServiceUrlError as exc:
         raise ActivityRejected("service_url_not_allowed") from exc
 
-    direct_parent = _optional_text(_get(activity, "replyToId", "reply_to_id"))
-    thread_parent = direct_parent or message_id
+    direct_parent = _optional_thread_id(_get(activity, "replyToId", "reply_to_id"))
+    conversation_root = _conversation_root_thread_id(conversation_id)
     if (
-        len(thread_parent) > 512
-        or re.fullmatch(r"[0-9]{1,512}", thread_parent) is None
-        or not any(character != "0" for character in thread_parent)
+        conversation_root is not None
+        and direct_parent is not None
+        and direct_parent != conversation_root
     ):
         raise ActivityRejected("invalid_thread_identity")
-    root_thread_id = thread_parent
+    root_thread_id = (
+        conversation_root or direct_parent or _validated_thread_id(message_id)
+    )
 
     content, omitted_attachments = _content_parts(activity, bot_app_id)
     facts = [
@@ -160,8 +162,8 @@ def normalize_activity(
         "content": content,
         "vendor_extension": {"vendor": "msteams", "facts": facts},
     }
-    if direct_parent is not None:
-        payload["reply"] = {"message_id": direct_parent}
+    if root_thread_id != message_id:
+        payload["reply"] = {"message_id": root_thread_id}
 
     trust = {
         "version": 1,
@@ -309,6 +311,57 @@ def _safe_media_id(value: str | None) -> bool:
         and "#" not in value
         and not any(ord(character) < 32 for character in value)
     )
+
+
+def _conversation_root_thread_id(conversation_id: str) -> str | None:
+    """Extract a Teams channel thread root from its conversation identifier.
+
+    Teams channel conversation IDs carry the top-level message as a numeric
+    ``;messageid=`` segment. Keep the full conversation ID for replies while
+    using that segment as the canonical thread root.
+
+    中文：从 Teams 频道 conversation ID 中提取顶层帖子 ID。回复仍保留完整
+    conversation ID，规范线程根使用 ``;messageid=`` 对应的数字 ID。
+    """
+
+    roots: list[str] = []
+    for segment in conversation_id.split(";")[1:]:
+        key, separator, value = segment.partition("=")
+        if key.casefold() == "messageid":
+            if not separator:
+                raise ActivityRejected("invalid_thread_identity")
+            roots.append(_validated_thread_id(value))
+        elif segment.casefold().startswith("messageid"):
+            raise ActivityRejected("invalid_thread_identity")
+    if len(roots) > 1:
+        raise ActivityRejected("invalid_thread_identity")
+    return roots[0] if roots else None
+
+
+def _validated_thread_id(value: Any) -> str:
+    """Require an ASCII numeric, non-zero Teams root ID within contract bounds.
+
+    中文：要求 Teams 线程根 ID 为有界、非零 ASCII 数字。
+    """
+
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > 512
+        or re.fullmatch(r"[0-9]{1,512}", value) is None
+        or not any(character != "0" for character in value)
+    ):
+        raise ActivityRejected("invalid_thread_identity")
+    return value
+
+
+def _optional_thread_id(value: Any) -> str | None:
+    """Validate a direct reply parent when the activity provides one.
+
+    中文：验证 activity 提供的直接回复父消息 ID。
+    """
+
+    return None if value is None else _validated_thread_id(value)
 
 
 def _is_self_authored(
