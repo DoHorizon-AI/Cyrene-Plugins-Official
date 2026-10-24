@@ -278,8 +278,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/json/integration-support/v1/schema.json",
-      "sha256": "1159a6c30e36e9962ab10db3b03e1c0b1d3c28c7e26eb6c777be2660b00a7473",
-      "size_bytes": 15051
+      "sha256": "d66aba940ed683d9d4c07f825b27adbedf4ef9fcec5d694e07734530a28026db",
+      "size_bytes": 20871
     },
     {
       "kind": "file",
@@ -831,8 +831,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/tool-provider-v1/test_integration_support_contracts.py",
-      "sha256": "56cea2a4ff88d8e2de08884ba427857f0ee1c2c8d32b43db70512a16b596a7dc",
-      "size_bytes": 16401
+      "sha256": "c83a95aa566c3c975140a49b321981a31d52c6f45406eea8b6afd7b002e57379",
+      "size_bytes": 18154
     },
     {
       "kind": "file",
@@ -922,7 +922,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/pyproject.toml",
-      "sha256": "2bc135793a30aa55102bced01ac936d8fb052e45d59e433fc8c0e5b41699993e",
+      "sha256": "e7a426cf0e2616854159f8cd94bc8c73124076f7f6f3749d8d6aaa5fc326ee1b",
       "size_bytes": 923
     },
     {
@@ -2077,7 +2077,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/wecom/uv.lock",
-      "sha256": "437805008319a8be204f0cfef87c3d9b584374795e447f07056371231531f6c1",
+      "sha256": "3bf8d4fe19aa439934e8e0f7aa333dbc6bd35139210e840f8d41a5fb26c126a1",
       "size_bytes": 372029
     },
     {
@@ -6494,7 +6494,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/pyproject.toml",
-      "sha256": "02ce5a2d85a2c25c7f1bbc39a4810a10688edf47b8382e25cdad7e86ea3b6187",
+      "sha256": "bb51473a00e95e26df437c7812334fee324a8f2580f2bd4763bf0e139687e729",
       "size_bytes": 801
     },
     {
@@ -6690,8 +6690,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "a091a3e02578d84ce4ba353acefce73df4be032405e247eb09b495ff722be54d",
-      "size_bytes": 69838
+      "sha256": "20f76e9f7df8b1079fe1c8d5e47258d7c035c321ca40fc7f908105c6aa019b22",
+      "size_bytes": 70813
     },
     {
       "kind": "file",
@@ -6774,7 +6774,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/account-center.in",
-      "sha256": "16fd307c50bbd82c2098ced3b2dd06dca4d976487b001cd1da65655f4fd87387",
+      "sha256": "994a4f4db201a6b03e3d5c0c80b2f4b98ccff8bb4809a75d0adcfd118020b421",
       "size_bytes": 337
     },
     {
