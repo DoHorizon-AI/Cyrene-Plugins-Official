@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-test = ["cryptography>=44,<47"]
+test = ["cryptography>=44,<51"]
 
 [project.scripts]
 cyrene-plugin-runtime = "cyrene_plugin_runtime.server:main"

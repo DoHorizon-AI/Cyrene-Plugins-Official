@@ -144,7 +144,30 @@ class OfficialPluginPackageTests(unittest.TestCase):
             [Requirement(value).name.lower() for value in project["dependencies"]],
         )
         self.assertEqual(
-            project["optional-dependencies"]["test"], ["cryptography>=44,<47"]
+            project["optional-dependencies"]["test"], ["cryptography>=44,<51"]
+        )
+        account_center_project = tomllib.loads(
+            (
+                self.repository
+                / "plugins/accounts/account-center/pyproject.toml"
+            ).read_text(encoding="utf-8")
+        )["project"]
+        account_center_cryptography = next(
+            Requirement(value)
+            for value in account_center_project["dependencies"]
+            if Requirement(value).name.lower() == "cryptography"
+        )
+        teams_cryptography = next(
+            line.split("==", 1)[1]
+            for line in (
+                self.repository / "plugins/connectors/teams/requirements.lock"
+            ).read_text(encoding="utf-8").splitlines()
+            if line.startswith("cryptography==")
+        )
+        self.assertTrue(account_center_cryptography.specifier.contains(teams_cryptography))
+        self.assertTrue(
+            Requirement(project["optional-dependencies"]["test"][0])
+            .specifier.contains(teams_cryptography)
         )
 
     def test_package_release_selection_preserves_push_scope_and_limits_dispatch(
