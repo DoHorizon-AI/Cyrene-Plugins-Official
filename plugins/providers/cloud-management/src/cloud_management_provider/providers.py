@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import re
 import threading
+import time
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -23,6 +24,7 @@ from urllib.parse import parse_qs, quote, unquote, urlsplit
 import httpx
 from cyrene_integration_contracts import canonical_json, payload_sha256
 
+from .azure_templates import validate_deployment_template
 from .ledger import LedgerCapacityError, ReplayConflict, RequestLedger
 from .operations import InvalidOperationRef, create_operation_ref, parse_operation_ref
 from .process import BoundedProcessRunner, ProcessConfigurationError, ProcessResult
@@ -45,6 +47,11 @@ RUNPOD_HOST = "api.runpod.io"
 RUNPOD_BASE = "https://api.runpod.io/v2"
 _MAX_HTTP_RESPONSE_BYTES = 1024 * 1024
 _MAX_TOOL_OUTPUT_BYTES = 24 * 1024
+_RUNPOD_LOG_MAX_BYTES = 8192
+_RUNPOD_LOG_MAX_RECORDS = 100
+_RUNPOD_LOG_MAX_OUTPUT_BYTES = 16 * 1024
+_RUNPOD_LOG_READ_CHUNK_BYTES = 1
+_RUNPOD_LOG_READ_SECONDS = 8.0
 _MAX_OPERATION_AGE = timedelta(days=30)
 _RESOURCE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _GCP_INSTANCE_NAME = re.compile(r"[a-z]([-a-z0-9]{0,61}[a-z0-9])?\Z")
@@ -278,11 +285,23 @@ class CloudManagementExecutor:
             raise ProviderFailure("PROFILE_NOT_FOUND") from error
         if tool_id in _WRITE_TOOLS:
             argument_digest = payload_sha256(dict(arguments))
+            write_receipt: Mapping[str, Any] | None = None
+            preparation_error: ProviderFailure | None = None
+            if tool_id == "cloud_resource_update" and profile.provider == "runpod":
+                try:
+                    _runpod_id_target(profile, arguments.get("target"))
+                    update_body = _runpod_update_body(
+                        profile, _object(arguments.get("parameters"), "parameters")
+                    )
+                    write_receipt = _runpod_update_receipt(update_body)
+                except ProviderFailure as error:
+                    preparation_error = error
             operation_ref = self._new_operation_ref(
                 profile,
                 tool_id,
                 arguments.get("target"),
                 request_id,
+                vendor_operation=write_receipt,
             )
             try:
                 existing = self._ledger.begin(request_id, argument_digest, operation_ref)
@@ -301,6 +320,8 @@ class CloudManagementExecutor:
                     response["operation_ref"] = existing.operation_ref
                 return response
             try:
+                if preparation_error is not None:
+                    raise preparation_error
                 result = self._dispatch(
                     profile,
                     tool_id,
@@ -369,7 +390,12 @@ class CloudManagementExecutor:
             )
         if tool_id == "cloud_resource_update":
             _require_keys(arguments, {"profile_ref", "target", "parameters"})
-            return self._update_resource(profile, arguments["target"], arguments["parameters"])
+            return self._update_resource(
+                profile,
+                arguments["target"],
+                arguments["parameters"],
+                operation_ref=operation_ref if profile.provider == "runpod" else None,
+            )
         if tool_id in {
             "cloud_resource_start",
             "cloud_resource_stop",
@@ -569,10 +595,18 @@ class CloudManagementExecutor:
 
         body = _object(parameters, "parameters")
         if profile.provider == "azure":
-            token, _ = self._azure_token(profile)
             if tool_id == "cloud_resource_deploy":
                 group, deployment_name = _azure_deployment_target(profile, target)
                 deployment = _azure_deployment_body(body)
+                try:
+                    validate_deployment_template(
+                        deployment["properties"]["template"],
+                        str(profile.scope["subscription_id"]),
+                        group,
+                    )
+                except ValueError as error:
+                    raise ProviderFailure("SCOPE_DENIED") from error
+                token, _ = self._azure_token(profile)
                 subscription = quote(str(profile.scope["subscription_id"]), safe="-")
                 url = (
                     f"https://{AZURE_HOST}/subscriptions/{subscription}/resourceGroups/"
@@ -589,7 +623,10 @@ class CloudManagementExecutor:
                 target_value = {"resource_group": group, "deployment_name": deployment_name}
                 return self._mutation_response(profile, "deploy", target_value, result)
             resource_id = _azure_resource_target(profile, target)
+            if _is_azure_deployment_resource_id(resource_id):
+                raise ProviderFailure("UNSUPPORTED_OPERATION")
             api_version = _azure_resource_api_version(profile, resource_id)
+            token, _ = self._azure_token(profile)
             result = self._request(
                 "PUT",
                 f"https://{AZURE_HOST}{_azure_path(resource_id)}",
@@ -623,13 +660,20 @@ class CloudManagementExecutor:
         return self._mutation_response(profile, "create", result_target, result)
 
     def _update_resource(
-        self, profile: CloudProfile, target: object, parameters: object
+        self,
+        profile: CloudProfile,
+        target: object,
+        parameters: object,
+        *,
+        operation_ref: str | None = None,
     ) -> dict[str, Any]:
         """Update a supported resource through a fixed vendor REST route."""
 
         body = _object(parameters, "parameters")
         if profile.provider == "azure":
             resource_id = _azure_resource_target(profile, target)
+            if _is_azure_deployment_resource_id(resource_id):
+                raise ProviderFailure("UNSUPPORTED_OPERATION")
             token, _ = self._azure_token(profile)
             result = self._request(
                 "PUT",
@@ -646,13 +690,40 @@ class CloudManagementExecutor:
         runpod_body = _runpod_update_body(profile, body)
         token = self._runpod_token(profile)
         self._runpod_get(profile, target, token)
-        result = self._request(
+        patch_result = self._request(
             "PATCH",
             f"{RUNPOD_BASE}/pods/{quote(pod_id, safe='-_')}",
             token=token,
             json_body=runpod_body,
         )
-        return self._mutation_response(profile, "update", {"pod_id": pod_id}, result)
+        operation_details = _runpod_update_receipt(runpod_body)
+        try:
+            observed = self._runpod_get(profile, target, token)
+        except ProviderFailure:
+            response = self._mutation_response(
+                profile,
+                "update",
+                {"pod_id": pod_id},
+                patch_result,
+                vendor_operation=operation_details,
+                operation_ref=operation_ref,
+            )
+            response.update(
+                {
+                    "state": "REMOTE_STATE_UNVERIFIED",
+                    "configuration_match": False,
+                    "reason_code": "READBACK_UNAVAILABLE",
+                }
+            )
+            return response
+        return self._mutation_response(
+            profile,
+            "update",
+            {"pod_id": pod_id},
+            HttpResult(200, {}, observed),
+            vendor_operation=operation_details,
+            operation_ref=operation_ref,
+        )
 
     def _change_state(self, profile: CloudProfile, tool_id: str, target: object) -> dict[str, Any]:
         """Start, stop, or delete one supported resource without internal retries."""
@@ -766,21 +837,39 @@ class CloudManagementExecutor:
         action: str,
         target: Mapping[str, Any],
         result: HttpResult,
+        *,
+        vendor_operation: Mapping[str, Any] | None = None,
+        operation_ref: str | None = None,
     ) -> dict[str, Any]:
         """Normalize vendor LRO/resource responses without claiming readiness."""
 
-        operation: dict[str, Any] = {
-            "profile_ref": profile.profile_ref,
-            "provider": profile.provider,
-            "operation": action,
-            "target": dict(target),
-            "request_id": str(uuid.uuid4()),
-            "created_at": _now(),
-        }
-        vendor_operation = self._vendor_operation(profile, result)
-        if vendor_operation is not None:
-            operation["vendor_operation"] = vendor_operation
-        op_ref = create_operation_ref(operation, _verification_key(self._settings))
+        if operation_ref is not None:
+            operation = self._operation_payload(profile, operation_ref)
+            if (
+                operation.get("provider") != profile.provider
+                or operation.get("operation") != action
+                or (
+                    vendor_operation is not None
+                    and operation.get("vendor_operation") != dict(vendor_operation)
+                )
+            ):
+                raise ProviderFailure("OPERATION_NOT_FOUND")
+            vendor_operation = operation.get("vendor_operation")
+            op_ref = operation_ref
+        else:
+            operation = {
+                "profile_ref": profile.profile_ref,
+                "provider": profile.provider,
+                "operation": action,
+                "target": dict(target),
+                "request_id": str(uuid.uuid4()),
+                "created_at": _now(),
+            }
+            if vendor_operation is None:
+                vendor_operation = self._vendor_operation(profile, result)
+            if vendor_operation is not None:
+                operation["vendor_operation"] = vendor_operation
+            op_ref = create_operation_ref(operation, _verification_key(self._settings))
         state = _vendor_state(profile, result.body)
         response: dict[str, Any] = {
             "state": state,
@@ -790,17 +879,35 @@ class CloudManagementExecutor:
             "actual_state": _actual_state(profile.provider, action, result.body),
             "readiness": _readiness(profile.provider, action, result.body),
         }
+        if profile.provider == "runpod" and response["expected_state"] is None:
+            response.pop("expected_state")
         if profile.provider == "runpod":
             body = result.body if isinstance(result.body, Mapping) else {}
             actual = body.get("status", "UNKNOWN")
             expected = _expected_state(profile.provider, action)
             if action == "update":
-                response["state"] = "SUCCEEDED"
+                details = operation.get("vendor_operation")
+                expected_configuration = (
+                    details.get("expected_configuration")
+                    if isinstance(details, Mapping) and details.get("kind") == "runpod_pod_update"
+                    else None
+                )
+                matched = _runpod_update_matches(body, details)
+                response["state"] = "SUCCEEDED" if matched else "PENDING"
+                response["configuration_match"] = matched
+                if isinstance(details, Mapping):
+                    response["expected_configuration_sha256"] = details.get(
+                        "expected_configuration_sha256"
+                    )
+                    response["observed_configuration"] = _runpod_configuration_snapshot(
+                        body, expected_configuration
+                    )
             elif action == "create":
                 response["state"] = "SUCCEEDED" if isinstance(body.get("id"), str) else "PENDING"
             else:
                 response["state"] = "SUCCEEDED" if actual == expected else "PENDING"
-            response["desired_state"] = expected
+            if action != "update":
+                response["desired_state"] = expected
             response["actual_state"] = actual
             response["readiness"] = "UNKNOWN" if actual == "RUNNING" else "NOT_READY"
             response["release_confirmed"] = False
@@ -822,7 +929,7 @@ class CloudManagementExecutor:
         elif profile.provider == "gcp":
             result = self._gcp_operation_status(profile, operation)
         else:
-            result = self._runpod_operation_status(profile, operation)
+            result = self._runpod_operation_status(profile, operation, reference)
         if result.get("state") in {"SUCCEEDED", "FAILED"}:
             request_id = operation.get("request_id")
             if isinstance(request_id, str):
@@ -1291,10 +1398,14 @@ class CloudManagementExecutor:
         }
 
     def _runpod_operation_status(
-        self, profile: CloudProfile, operation: Mapping[str, Any]
+        self, profile: CloudProfile, operation: Mapping[str, Any], reference: object
     ) -> dict[str, Any]:
         """Report Pod desired state, observed state, readiness, and deletion proof."""
 
+        if operation.get("operation") == "update" and not _runpod_update_receipt_valid(
+            operation.get("vendor_operation")
+        ):
+            raise ProviderFailure("OPERATION_NOT_FOUND")
         target = operation.get("target")
         if not isinstance(target, Mapping):
             raise ProviderFailure("OPERATION_NOT_FOUND")
@@ -1318,6 +1429,15 @@ class CloudManagementExecutor:
                         "readiness": "NOT_READY",
                         "release_confirmed": True,
                     }
+                if error.code == "RESOURCE_NOT_FOUND" and operation.get("operation") == "update":
+                    return {
+                        "provider": "runpod",
+                        "state": "REMOTE_STATE_UNVERIFIED",
+                        "reason_code": "RESOURCE_NOT_FOUND",
+                        "actual_state": "ABSENT",
+                        "configuration_match": False,
+                        "operation_ref": reference,
+                    }
                 raise
         else:
             pod_name = target.get("pod_name")
@@ -1336,6 +1456,25 @@ class CloudManagementExecutor:
             pod_id = str(body.get("id", ""))
         expected = _expected_state("runpod", str(operation.get("operation")))
         actual = body.get("status", "UNKNOWN")
+        if operation.get("operation") == "update":
+            details = operation.get("vendor_operation")
+            assert isinstance(details, Mapping)
+            expected_configuration = details.get("expected_configuration")
+            expected_digest = details.get("expected_configuration_sha256")
+            matched = _runpod_update_matches(body, details)
+            return {
+                "provider": "runpod",
+                "state": "SUCCEEDED" if matched else "PENDING",
+                "operation_ref": reference,
+                "configuration_match": matched,
+                "expected_configuration_sha256": expected_digest,
+                "observed_configuration": _runpod_configuration_snapshot(
+                    body, expected_configuration
+                ),
+                "actual_state": actual,
+                "readiness": "UNKNOWN" if actual == "RUNNING" else "NOT_READY",
+                "release_confirmed": False,
+            }
         matched = expected == actual or (
             operation.get("operation") == "create" and actual in {"RUNNING", "EXITED", "STOPPED"}
         )
@@ -1431,7 +1570,64 @@ class CloudManagementExecutor:
         return result.body if isinstance(result.body, Mapping) else {}
 
     def _runpod_logs(self, profile: CloudProfile, pod_id: str) -> dict[str, Any]:
-        """Read a bounded tail of Runpod's SSE Pod logs and close the stream."""
+        """Decode a bounded Runpod SSE tail and retain completed records on timeout."""
+
+        available = False
+        timed_out = False
+        truncated = False
+        records: list[dict[str, Any]] = []
+        buffer = bytearray()
+        event_data: list[bytes] = []
+        consumed = 0
+        started = time.monotonic()
+        total_seconds = min(float(self._settings.timeout_seconds), _RUNPOD_LOG_READ_SECONDS)
+        read_timeout = min(total_seconds, 1.0)
+        secret = self._settings.secret_value(profile.api_key_ref or "") or ""
+
+        def finish_event() -> None:
+            nonlocal truncated
+            if event_data:
+                payload = b"\n".join(event_data).decode("utf-8", errors="replace")
+                event_data.clear()
+                remaining = _RUNPOD_LOG_MAX_RECORDS - len(records)
+                for record in _runpod_log_records(payload, max_records=remaining + 1):
+                    if len(records) >= _RUNPOD_LOG_MAX_RECORDS:
+                        truncated = True
+                        break
+                    if secret:
+                        for key, value in tuple(record.items()):
+                            if isinstance(value, str):
+                                record[key] = value.replace(secret, "[REDACTED]")
+                    if len(canonical_json([*records, record])) > _RUNPOD_LOG_MAX_OUTPUT_BYTES:
+                        truncated = True
+                        break
+                    records.append(record)
+
+        def process_sse_line(raw_line: bytes) -> None:
+            if not raw_line:
+                finish_event()
+                return
+            if raw_line.startswith(b":"):
+                return
+            field, separator, value = raw_line.partition(b":")
+            if field != b"data":
+                return
+            if separator and value.startswith(b" "):
+                value = value[1:]
+            event_data.append(value)
+
+        def process_buffer(*, flush_incomplete: bool) -> None:
+            while True:
+                separator = buffer.find(b"\n")
+                if separator < 0:
+                    break
+                raw_line = bytes(buffer[:separator]).rstrip(b"\r")
+                del buffer[: separator + 1]
+                process_sse_line(raw_line)
+            if flush_incomplete and buffer:
+                raw_line = bytes(buffer).rstrip(b"\r")
+                buffer.clear()
+                process_sse_line(raw_line)
 
         try:
             with self._http.stream(
@@ -1442,35 +1638,53 @@ class CloudManagementExecutor:
                     "Accept": "text/event-stream",
                 },
                 params={"tail": "100"},
-                timeout=min(self._settings.timeout_seconds, 8),
+                timeout=httpx.Timeout(
+                    total_seconds,
+                    connect=min(total_seconds, 3.0),
+                    read=read_timeout,
+                    write=min(total_seconds, 3.0),
+                    pool=min(total_seconds, 3.0),
+                ),
             ) as response:
                 if response.status_code != 200:
                     self._raise_http_error(response.status_code, "GET")
-                pieces: list[str] = []
-                total = 0
-                for line in response.iter_lines():
-                    if not line:
+                available = True
+                # Small iteration quantum preserves a short SSE tail if the next read times out.
+                for chunk in response.iter_bytes(chunk_size=_RUNPOD_LOG_READ_CHUNK_BYTES):
+                    if total_seconds - (time.monotonic() - started) <= 0:
+                        timed_out = True
+                        break
+                    if not chunk:
                         continue
-                    encoded = line.encode("utf-8", errors="replace")
-                    if total + len(encoded) > 8192:
+                    room = _RUNPOD_LOG_MAX_BYTES - consumed
+                    if len(chunk) > room:
+                        buffer.extend(chunk[:room])
+                        consumed += room
+                        truncated = True
+                        process_buffer(flush_incomplete=False)
                         break
-                    pieces.append(line)
-                    total += len(encoded)
-                    if total >= 8192:
+                    buffer.extend(chunk)
+                    consumed += len(chunk)
+                    process_buffer(flush_incomplete=False)
+                    if truncated:
                         break
+                process_buffer(flush_incomplete=not truncated)
+                if not truncated:
+                    finish_event()
         except ProviderFailure:
             raise
         except httpx.TimeoutException:
-            pieces = []
+            timed_out = True
+            process_buffer(flush_incomplete=True)
+            finish_event()
         except httpx.HTTPError as error:
             raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
-        secret = self._settings.secret_value(profile.api_key_ref or "") or ""
-        safe_lines = [line.replace(secret, "[REDACTED]") if secret else line for line in pieces]
         return {
             "provider": "runpod",
-            "available": True,
-            "logs": safe_lines,
-            "truncated": len(pieces) >= 8192,
+            "available": available,
+            "logs": records,
+            "truncated": truncated,
+            "timed_out": timed_out,
         }
 
     def _find_runpod_by_name(
@@ -2435,6 +2649,17 @@ def _azure_resource_api_version(profile: CloudProfile, resource_id: str) -> str:
     raise ProviderFailure("API_VERSION_NOT_CONFIGURED")
 
 
+def _is_azure_deployment_resource_id(resource_id: str) -> bool:
+    """Identify deployment resources that require the separately scoped deploy route."""
+
+    match = _AZURE_RESOURCE_ID.fullmatch(resource_id)
+    return (
+        match is not None
+        and match.group("provider").casefold() == "microsoft.resources"
+        and match.group("types").split("/", 1)[0].casefold() == "deployments"
+    )
+
+
 def _require_azure_vm_id(resource_id: str) -> None:
     """Permit start/stop only for virtual machines in the fixed ARM shape."""
 
@@ -2779,7 +3004,7 @@ def _runpod_create_body(
 
 
 def _runpod_update_body(profile: CloudProfile, parameters: Mapping[str, Any]) -> dict[str, Any]:
-    """Allow only supported non-secret Pod configuration updates."""
+    """Allow only bounded, independently verifiable Pod configuration updates."""
 
     allowed = {"name", "image", "disk", "mounts", "ports", "args"}
     if not parameters or set(parameters) - allowed:
@@ -2787,8 +3012,10 @@ def _runpod_update_body(profile: CloudProfile, parameters: Mapping[str, Any]) ->
     body = dict(parameters)
     if "name" in body:
         name = body["name"]
-        if not isinstance(name, str) or not any(
-            name.startswith(prefix) for prefix in profile.scope["pod_name_prefixes"]
+        if (
+            not isinstance(name, str)
+            or not 1 <= len(name) <= 128
+            or not any(name.startswith(prefix) for prefix in profile.scope["pod_name_prefixes"])
         ):
             raise ProviderFailure("SCOPE_DENIED")
     if "disk" in body:
@@ -2799,27 +3026,133 @@ def _runpod_update_body(profile: CloudProfile, parameters: Mapping[str, Any]) ->
             or not 1 <= disk <= profile.scope["max_container_disk_gb"]
         ):
             raise ProviderFailure("SCOPE_DENIED")
-    if "image" in body and (not isinstance(body["image"], str) or len(body["image"]) > 512):
+    if "image" in body and (
+        not isinstance(body["image"], str) or not 1 <= len(body["image"]) <= 512
+    ):
         raise ProviderFailure("INVALID_ARGUMENTS")
     if "args" in body and (not isinstance(body["args"], str) or len(body["args"]) > 4096):
         raise ProviderFailure("INVALID_ARGUMENTS")
-    if "ports" in body and (not isinstance(body["ports"], list) or len(body["ports"]) > 32):
+    if "ports" in body and (
+        not isinstance(body["ports"], list)
+        or len(body["ports"]) > 32
+        or any(
+            not isinstance(port, str)
+            or not 1 <= len(port) <= 32
+            or any(ord(character) < 32 for character in port)
+            for port in body["ports"]
+        )
+    ):
         raise ProviderFailure("INVALID_ARGUMENTS")
     if "mounts" in body:
         mounts = body["mounts"]
-        if not isinstance(mounts, Mapping) or set(mounts) - {"persistent"}:
+        if not isinstance(mounts, Mapping) or set(mounts) != {"persistent"}:
             raise ProviderFailure("INVALID_ARGUMENTS")
         persistent = mounts.get("persistent")
-        if not isinstance(persistent, Mapping):
+        if not isinstance(persistent, Mapping) or set(persistent) != {"size", "path"}:
             raise ProviderFailure("INVALID_ARGUMENTS")
-        size = persistent.get("size", 0)
+        size = persistent["size"]
         if (
             isinstance(size, bool)
             or not isinstance(size, int)
             or not 0 <= size <= profile.scope["max_volume_disk_gb"]
         ):
             raise ProviderFailure("SCOPE_DENIED")
+        path = persistent["path"]
+        if (
+            not isinstance(path, str)
+            or not 1 <= len(path) <= 512
+            or not path.startswith("/")
+            or any(part in {".", ".."} for part in path.split("/"))
+            or any(ord(character) < 32 for character in path)
+        ):
+            raise ProviderFailure("INVALID_ARGUMENTS")
     return body
+
+
+def _runpod_update_receipt(configuration: Mapping[str, Any]) -> dict[str, Any]:
+    """Build a durable comparison receipt without copying sensitive argument text."""
+
+    return {
+        "kind": "runpod_pod_update",
+        "expected_configuration": {
+            key: value for key, value in configuration.items() if key != "args"
+        },
+        "expected_fields": sorted(configuration),
+        "expected_configuration_sha256": payload_sha256(configuration),
+    }
+
+
+def _runpod_update_receipt_valid(receipt: object) -> bool:
+    """Validate the safe configuration projection and digest stored in a signed receipt."""
+
+    if not isinstance(receipt, Mapping) or receipt.get("kind") != "runpod_pod_update":
+        return False
+    expected_configuration = receipt.get("expected_configuration")
+    expected_fields = receipt.get("expected_fields")
+    expected_digest = receipt.get("expected_configuration_sha256")
+    return (
+        isinstance(expected_configuration, Mapping)
+        and isinstance(expected_fields, list)
+        and bool(expected_fields)
+        and all(
+            isinstance(field, str) and field in {"name", "image", "disk", "mounts", "ports", "args"}
+            for field in expected_fields
+        )
+        and len(set(expected_fields)) == len(expected_fields)
+        and set(expected_configuration) == set(expected_fields) - {"args"}
+        and isinstance(expected_digest, str)
+        and re.fullmatch(r"[0-9a-f]{64}", expected_digest) is not None
+    )
+
+
+def _runpod_update_matches(pod: Mapping[str, Any], receipt: object) -> bool:
+    """Compare requested fields with a fresh Pod read without exposing sensitive args."""
+
+    if not _runpod_update_receipt_valid(receipt):
+        return False
+    assert isinstance(receipt, Mapping)
+    expected_fields = receipt["expected_fields"]
+    expected_digest = receipt["expected_configuration_sha256"]
+    observed = {field: pod.get(field) for field in expected_fields}
+    return payload_sha256(observed) == expected_digest
+
+
+def _runpod_configuration_snapshot(
+    pod: Mapping[str, Any], expected_configuration: object
+) -> dict[str, Any]:
+    """Project safe mutable configuration fields from a Runpod Pod document."""
+
+    if not isinstance(expected_configuration, Mapping):
+        return {}
+    return {key: pod.get(key) for key in expected_configuration if key != "args"}
+
+
+def _runpod_log_records(payload: str, *, max_records: int) -> list[dict[str, Any]]:
+    """Decode Runpod log event data while keeping only timestamp, source, and line."""
+
+    try:
+        decoded: Any = json.loads(payload)
+    except json.JSONDecodeError:
+        decoded = payload
+    values = decoded if isinstance(decoded, list) else [decoded]
+    records: list[dict[str, Any]] = []
+    for value in values:
+        if len(records) >= max_records:
+            break
+        if isinstance(value, Mapping):
+            line = value.get("line")
+            record: dict[str, Any] = {}
+            timestamp = value.get("ts")
+            source = value.get("source")
+            if isinstance(timestamp, (str, int, float)) and not isinstance(timestamp, bool):
+                record["ts"] = timestamp
+            if isinstance(source, str):
+                record["source"] = source
+            record["line"] = line if isinstance(line, str) else ""
+            records.append(record)
+        elif isinstance(value, str):
+            records.append({"line": value})
+    return records
 
 
 def _runpod_pod_in_scope(profile: CloudProfile, value: Mapping[str, Any]) -> bool:
@@ -2908,7 +3241,6 @@ def _expected_state(provider: str, operation: str) -> str | None:
             "delete": "TERMINATED",
             "create": "RUNNING",
             "deploy": "RUNNING",
-            "update": "UPDATED",
         },
     }
     return states.get(provider, {}).get(operation)

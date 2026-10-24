@@ -6,15 +6,17 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import httpx
 import pytest
-from cyrene_integration_contracts import sign_context
+from cyrene_integration_contracts import canonical_json, sign_context
 from jsonschema import Draft202012Validator
 
+from cloud_management_provider import providers as provider_impl
 from cloud_management_provider._generated import tool_provider_pb2 as wire
 from cloud_management_provider.operations import InvalidOperationRef, parse_operation_ref
 from cloud_management_provider.plugin import CloudManagementProvider
@@ -30,6 +32,17 @@ from cloud_management_provider.tool_catalog import (
 
 _API_KEY = "fixture-" + "x" * 32
 _EXCHANGE_KEY = bytes.fromhex("a5" * 32)
+
+
+class _PartialThenTimeoutStream(httpx.SyncByteStream):
+    """Yield one complete SSE event, then model a quiet streaming read timeout."""
+
+    def __iter__(self):
+        yield b'data: {"ts":"2026-10-23T00:00:00Z","source":"container","line":"tail"}\n\n'
+        raise httpx.ReadTimeout("fixture quiet timeout")
+
+    def close(self) -> None:
+        pass
 
 
 def _configuration(tmp_path: Any, *, cli_enabled: bool = False) -> dict[str, Any]:
@@ -95,10 +108,15 @@ def _settings(tmp_path: Any, *, cli_enabled: bool = False) -> ProviderSettings:
     return ProviderSettings.from_environment(environment)
 
 
-def _multi_provider_settings(tmp_path: Any) -> ProviderSettings:
+def _multi_provider_settings(
+    tmp_path: Any, *, azure_resource_api_versions: dict[str, str] | None = None
+) -> ProviderSettings:
     """Create Azure, GCP WIF, and Runpod profiles without contacting providers."""
 
     config = _configuration(tmp_path)
+    azure_api_versions = {"microsoft.compute/virtualmachines": "2024-07-01"}
+    if azure_resource_api_versions:
+        azure_api_versions.update(azure_resource_api_versions)
     config["profiles"] = [
         {
             "profile_ref": "azure/test",
@@ -107,7 +125,7 @@ def _multi_provider_settings(tmp_path: Any) -> ProviderSettings:
             "scope": {
                 "subscription_id": "11111111-2222-3333-4444-555555555555",
                 "resource_groups": ["rg-test"],
-                "resource_api_versions": {"microsoft.compute/virtualmachines": "2024-07-01"},
+                "resource_api_versions": azure_api_versions,
             },
             "auth": {"mode": "managed_identity"},
             "cli": {
@@ -307,6 +325,545 @@ def test_runpod_restart_uses_vendor_restart_action(tmp_path: Any) -> None:
     assert result["actual_state"] == "RUNNING"
     assert result["readiness"] == "UNKNOWN"
     assert result["release_confirmed"] is False
+    executor.close()
+
+
+def test_runpod_update_uses_independent_v2_configuration_readback(tmp_path: Any) -> None:
+    """A Pod update succeeds only after a fresh v2 GET confirms every requested field."""
+
+    settings = _settings(tmp_path)
+    calls: list[str] = []
+    current = _pod_response()
+    current["disk"] = 1
+    current["args"] = "original"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal current
+        calls.append(request.method)
+        if request.method == "GET":
+            return httpx.Response(200, json=dict(current))
+        assert request.method == "PATCH"
+        assert json.loads(request.content) == {
+            "disk": 2,
+            "args": "--token=private-argument-fixture",
+        }
+        current = {
+            **current,
+            "disk": 2,
+            "args": "--token=private-argument-fixture",
+        }
+        return httpx.Response(200, json=_pod_response(status="RUNNING"))
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    result = executor.call(
+        "cloud_resource_update",
+        {
+            "profile_ref": "runpod/test",
+            "target": {"pod_id": "pod-123"},
+            "parameters": {
+                "disk": 2,
+                "args": "--token=private-argument-fixture",
+            },
+        },
+        request_id="request-runpod-update-readback",
+    )
+    replay = executor.call(
+        "cloud_resource_update",
+        {
+            "profile_ref": "runpod/test",
+            "target": {"pod_id": "pod-123"},
+            "parameters": {
+                "disk": 2,
+                "args": "--token=private-argument-fixture",
+            },
+        },
+        request_id="request-runpod-update-readback",
+    )
+
+    assert calls == ["GET", "PATCH", "GET"]
+    assert replay == result
+    assert result["state"] == "SUCCEEDED"
+    assert result["configuration_match"] is True
+    assert result["observed_configuration"] == {"disk": 2}
+    assert "expected_state" not in result
+    assert "UPDATED" not in json.dumps(result)
+    assert "private-argument-fixture" not in json.dumps(result)
+    operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
+    details = operation["vendor_operation"]
+    assert details["expected_configuration"] == {"disk": 2}
+    assert details["expected_fields"] == ["args", "disk"]
+    assert "private-argument-fixture" not in json.dumps(operation)
+    polled = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "runpod/test", "operation_ref": result["operation_ref"]},
+        request_id="request-runpod-update-with-args-poll",
+    )
+    assert polled["state"] == "SUCCEEDED"
+    assert polled["configuration_match"] is True
+    assert "private-argument-fixture" not in json.dumps(polled)
+    assert calls == ["GET", "PATCH", "GET", "GET"]
+    executor.close()
+
+
+def test_runpod_update_mismatch_stays_pollable_until_configuration_matches(
+    tmp_path: Any,
+) -> None:
+    """A mismatch remains pending and a later independent poll can confirm the update."""
+
+    settings = _settings(tmp_path)
+    current = _pod_response()
+    current["disk"] = 1
+    calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.method)
+        if request.method == "PATCH":
+            assert json.loads(request.content) == {"disk": 2}
+            return httpx.Response(200, json={"status": "RUNNING"})
+        return httpx.Response(200, json=dict(current))
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    request_id = "request-runpod-update-pending"
+    arguments = {
+        "profile_ref": "runpod/test",
+        "target": {"pod_id": "pod-123"},
+        "parameters": {"disk": 2},
+    }
+    result = executor.call("cloud_resource_update", arguments, request_id=request_id)
+    operation_ref = result["operation_ref"]
+    operation = parse_operation_ref(operation_ref, _EXCHANGE_KEY)
+    assert calls == ["GET", "PATCH", "GET"]
+    assert operation["request_id"] == request_id
+    assert result["state"] == "PENDING"
+    assert result["configuration_match"] is False
+    assert result["observed_configuration"] == {"disk": 1}
+
+    first_poll = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-update-poll-1",
+    )
+    assert first_poll["state"] == "PENDING"
+    assert first_poll["configuration_match"] is False
+
+    current["disk"] = 2
+    second_poll = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-update-poll-2",
+    )
+    assert second_poll["state"] == "SUCCEEDED"
+    assert second_poll["configuration_match"] is True
+    assert second_poll["operation_ref"] == operation_ref
+    assert second_poll["observed_configuration"] == {"disk": 2}
+
+    with sqlite3.connect(settings.state_dir / "cloud-management.sqlite3") as connection:
+        ledger_row = connection.execute(
+            "SELECT terminal, operation_ref FROM cloud_write_requests WHERE request_id = ?",
+            (request_id,),
+        ).fetchone()
+    assert ledger_row == (1, operation_ref)
+
+    replay = executor.call("cloud_resource_update", arguments, request_id=request_id)
+    assert replay == result
+    assert replay["operation_ref"] == operation_ref
+    assert calls == ["GET", "PATCH", "GET", "GET", "GET"]
+    executor.close()
+
+
+def test_runpod_update_missing_readback_marks_original_sqlite_receipt_terminal(
+    tmp_path: Any,
+) -> None:
+    """A missing immediate readback can settle the pre-dispatch SQLite receipt by polling."""
+
+    settings = _settings(tmp_path)
+    calls: list[str] = []
+    current = _pod_response()
+    current["disk"] = 2
+    get_count = 0
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        nonlocal get_count
+        calls.append(request.method)
+        if request.method == "PATCH":
+            assert json.loads(request.content) == {"disk": 2}
+            return httpx.Response(200, json={"status": "RUNNING"})
+        get_count += 1
+        if get_count == 2:
+            raise httpx.ReadTimeout("fixture immediate readback timeout")
+        return httpx.Response(200, json=dict(current))
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    request_id = "request-runpod-update-readback-timeout"
+    arguments = {
+        "profile_ref": "runpod/test",
+        "target": {"pod_id": "pod-123"},
+        "parameters": {"disk": 2},
+    }
+    result = executor.call("cloud_resource_update", arguments, request_id=request_id)
+    operation_ref = result["operation_ref"]
+    receipt = parse_operation_ref(operation_ref, _EXCHANGE_KEY)
+
+    assert result["state"] == "REMOTE_STATE_UNVERIFIED"
+    assert result["reason_code"] == "READBACK_UNAVAILABLE"
+    assert receipt["request_id"] == request_id
+    assert calls == ["GET", "PATCH", "GET"]
+
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-update-readback-timeout-status",
+    )
+    assert status["state"] == "SUCCEEDED"
+    assert status["operation_ref"] == operation_ref
+
+    with sqlite3.connect(settings.state_dir / "cloud-management.sqlite3") as connection:
+        ledger_row = connection.execute(
+            "SELECT terminal, operation_ref FROM cloud_write_requests WHERE request_id = ?",
+            (request_id,),
+        ).fetchone()
+    assert ledger_row == (1, operation_ref)
+
+    replay = executor.call("cloud_resource_update", arguments, request_id=request_id)
+    assert replay == result
+    assert replay["operation_ref"] == operation_ref
+    assert calls == ["GET", "PATCH", "GET", "GET"]
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("observed_disk", "expected_state", "expected_match"),
+    [(1, "PENDING", False), (2, "SUCCEEDED", True)],
+)
+def test_runpod_update_timeout_returns_pollable_write_ahead_receipt(
+    tmp_path: Any, observed_disk: int, expected_state: str, expected_match: bool
+) -> None:
+    """An ambiguous PATCH has a safe pre-dispatch receipt and polling never retries it."""
+
+    settings = _settings(tmp_path)
+    calls: list[str] = []
+    current = _pod_response()
+    current["disk"] = observed_disk
+    current["args"] = "fixture-argument-value"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.method)
+        if request.method == "GET":
+            return httpx.Response(200, json=dict(current))
+        assert request.method == "PATCH"
+        assert json.loads(request.content) == {
+            "disk": 2,
+            "args": "fixture-argument-value",
+        }
+        raise httpx.ReadTimeout("fixture ambiguous write timeout")
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    arguments = {
+        "profile_ref": "runpod/test",
+        "target": {"pod_id": "pod-123"},
+        "parameters": {"disk": 2, "args": "fixture-argument-value"},
+    }
+    result = executor.call(
+        "cloud_resource_update", arguments, request_id="request-runpod-ambiguous-update"
+    )
+    replay = executor.call(
+        "cloud_resource_update", arguments, request_id="request-runpod-ambiguous-update"
+    )
+
+    assert result["state"] == "UNKNOWN_RESULT"
+    assert result["reason_code"] == "PROVIDER_TIMEOUT"
+    assert replay == result
+    assert calls == ["GET", "PATCH"]
+    assert "fixture-argument-value" not in json.dumps(result)
+    receipt = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
+    assert receipt["operation"] == "update"
+    assert receipt["vendor_operation"]["expected_configuration"] == {"disk": 2}
+    assert receipt["vendor_operation"]["expected_fields"] == ["args", "disk"]
+    assert "fixture-argument-value" not in json.dumps(receipt)
+
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "runpod/test", "operation_ref": result["operation_ref"]},
+        request_id="request-runpod-ambiguous-update-status",
+    )
+    assert status["state"] == expected_state
+    assert status["configuration_match"] is expected_match
+    assert "fixture-argument-value" not in json.dumps(status)
+    assert calls == ["GET", "PATCH", "GET"]
+    executor.close()
+
+
+def test_runpod_update_rejects_incomplete_mount_replacement(tmp_path: Any) -> None:
+    """Mount replacement requires its complete size and path and rejects unknown fields."""
+
+    settings = _settings(tmp_path)
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda request: pytest.fail("network was called"))
+        ),
+    )
+    for index, parameters in enumerate(
+        ({"mounts": {"persistent": {"size": 2}}}, {"unknown": True})
+    ):
+        result = executor.call(
+            "cloud_resource_update",
+            {
+                "profile_ref": "runpod/test",
+                "target": {"pod_id": "pod-123"},
+                "parameters": parameters,
+            },
+            request_id=f"request-runpod-invalid-update-{index}",
+        )
+        assert result["error"]["code"] == "INVALID_ARGUMENTS"
+    executor.close()
+
+
+def test_runpod_logs_decode_sse_payload_and_redact_credentials(tmp_path: Any) -> None:
+    """Runpod log data is decoded into the documented fields and secrets are redacted."""
+
+    settings = _settings(tmp_path)
+    payload = (
+        "data: "
+        + json.dumps(
+            {
+                "ts": "2026-10-23T00:00:00Z",
+                "source": "container",
+                "line": f"worker started {_API_KEY}",
+                "env": {"ignored": "private"},
+            }
+        )
+        + "\n\n"
+    ).encode()
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    content=payload,
+                )
+            )
+        ),
+    )
+    operation_ref = executor._new_operation_ref(  # noqa: SLF001
+        settings.profile("runpod/test"),
+        "cloud_resource_start",
+        {"pod_id": "pod-123"},
+        "request-runpod-logs-decode",
+    )
+    result = executor.call(
+        "cloud_operation_logs",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-logs-decode-call",
+    )
+
+    assert result["available"] is True
+    assert result["timed_out"] is False
+    assert result["truncated"] is False
+    assert result["logs"] == [
+        {
+            "ts": "2026-10-23T00:00:00Z",
+            "source": "container",
+            "line": "worker started [REDACTED]",
+        }
+    ]
+    executor.close()
+
+
+def test_runpod_logs_keep_received_records_on_quiet_timeout(tmp_path: Any) -> None:
+    """A read timeout ends the stream without discarding complete log events."""
+
+    settings = _settings(tmp_path)
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    stream=_PartialThenTimeoutStream(),
+                )
+            )
+        ),
+    )
+    operation_ref = executor._new_operation_ref(  # noqa: SLF001
+        settings.profile("runpod/test"),
+        "cloud_resource_start",
+        {"pod_id": "pod-123"},
+        "request-runpod-logs-timeout",
+    )
+    result = executor.call(
+        "cloud_operation_logs",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-logs-timeout-call",
+    )
+
+    assert result["available"] is True
+    assert result["timed_out"] is True
+    assert result["truncated"] is False
+    assert result["logs"] == [{"ts": "2026-10-23T00:00:00Z", "source": "container", "line": "tail"}]
+    executor.close()
+
+
+def test_runpod_logs_report_actual_byte_truncation(tmp_path: Any) -> None:
+    """The truncation flag reflects the enforced raw-byte limit, not the number of lines."""
+
+    settings = _settings(tmp_path)
+    event = ("data: " + json.dumps({"ts": "t", "source": "c", "line": "x" * 900}) + "\n\n").encode()
+    payload = event * 20
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    content=payload,
+                )
+            )
+        ),
+    )
+    operation_ref = executor._new_operation_ref(  # noqa: SLF001
+        settings.profile("runpod/test"),
+        "cloud_resource_start",
+        {"pod_id": "pod-123"},
+        "request-runpod-logs-truncated",
+    )
+    result = executor.call(
+        "cloud_operation_logs",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-logs-truncated-call",
+    )
+
+    assert result["available"] is True
+    assert result["truncated"] is True
+    assert result["timed_out"] is False
+    assert result["logs"]
+    assert len(result["logs"]) < 20
+    executor.close()
+
+
+def test_runpod_logs_bound_amplification_from_malformed_json_arrays(tmp_path: Any) -> None:
+    """Unsupported array entries never duplicate the complete SSE payload into output."""
+
+    settings = _settings(tmp_path)
+    payload = ("data: " + json.dumps([0] * 2000) + "\n\n").encode()
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    content=payload,
+                )
+            )
+        ),
+    )
+    operation_ref = executor._new_operation_ref(  # noqa: SLF001
+        settings.profile("runpod/test"),
+        "cloud_resource_start",
+        {"pod_id": "pod-123"},
+        "request-runpod-logs-array-amplification",
+    )
+    result = executor.call(
+        "cloud_operation_logs",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-logs-array-amplification-call",
+    )
+
+    assert result["logs"] == []
+    assert len(canonical_json(result)) < 256
+    assert result["truncated"] is False
+    executor.close()
+
+
+def test_runpod_logs_bound_record_count_for_many_tiny_events(tmp_path: Any) -> None:
+    """The tail returns at most 100 records and reports when it stops at that limit."""
+
+    settings = _settings(tmp_path)
+    payload = b"".join(b'data: {"line":"x"}\n\n' for _ in range(150))
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    content=payload,
+                )
+            )
+        ),
+    )
+    operation_ref = executor._new_operation_ref(  # noqa: SLF001
+        settings.profile("runpod/test"),
+        "cloud_resource_start",
+        {"pod_id": "pod-123"},
+        "request-runpod-logs-record-limit",
+    )
+    result = executor.call(
+        "cloud_operation_logs",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-logs-record-limit-call",
+    )
+
+    assert len(result["logs"]) == 100
+    assert result["truncated"] is True
+    assert len(canonical_json(result["logs"])) <= provider_impl._RUNPOD_LOG_MAX_OUTPUT_BYTES
+    executor.close()
+
+
+def test_runpod_logs_bound_serialized_output_size(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The encoded log list stops before its configured serialized output budget."""
+
+    settings = _settings(tmp_path)
+    monkeypatch.setattr(provider_impl, "_RUNPOD_LOG_MAX_OUTPUT_BYTES", 512)
+    payload = b"".join(
+        ("data: " + json.dumps({"line": "x" * 32}) + "\n\n").encode() for _ in range(30)
+    )
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: httpx.Response(
+                    200,
+                    headers={"content-type": "text/event-stream"},
+                    content=payload,
+                )
+            )
+        ),
+    )
+    operation_ref = executor._new_operation_ref(  # noqa: SLF001
+        settings.profile("runpod/test"),
+        "cloud_resource_start",
+        {"pod_id": "pod-123"},
+        "request-runpod-logs-output-limit",
+    )
+    result = executor.call(
+        "cloud_operation_logs",
+        {"profile_ref": "runpod/test", "operation_ref": operation_ref},
+        request_id="request-runpod-logs-output-limit-call",
+    )
+
+    assert result["logs"]
+    assert result["truncated"] is True
+    assert len(canonical_json(result["logs"])) <= 512
     executor.close()
 
 
@@ -776,6 +1333,171 @@ def test_gcloud_async_operation_is_polled_from_safe_json_reference(tmp_path: Any
     assert requested == [
         "/compute/v1/projects/cyrene-test-project/zones/us-central1-a/operations/operation-123"
     ]
+    executor.close()
+
+
+@pytest.mark.parametrize("resource_group", ["rg-test", "rg-foreign"])
+def test_azure_nested_deployment_scope_is_checked_before_auth_or_put(
+    tmp_path: Any, resource_group: str
+) -> None:
+    """Preserve local deployments and reject a hidden foreign target before dispatch."""
+
+    settings = _multi_provider_settings(tmp_path)
+    paths: list[str] = []
+    token_calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        assert request.method == "PUT"
+        return httpx.Response(202, json={"properties": {"provisioningState": "Accepted"}})
+
+    def token(_profile: Any) -> tuple[str, None]:
+        token_calls.append("auth")
+        return "fixture-token", None
+
+    executor = CloudManagementExecutor(
+        settings, http_client=httpx.Client(transport=httpx.MockTransport(handler))
+    )
+    executor._azure_token = token  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_deploy",
+        {
+            "profile_ref": "azure/test",
+            "target": {"resource_group": "rg-test", "deployment_name": "scope-test"},
+            "parameters": {
+                "template": {
+                    "resources": [
+                        {
+                            "type": "Microsoft.Resources/deployments",
+                            "name": "child",
+                            "resourceGroup": resource_group,
+                            "properties": {"template": {"resources": []}},
+                        }
+                    ]
+                }
+            },
+        },
+        request_id="request-azure-scope",
+    )
+    if resource_group == "rg-test":
+        assert result["state"] == "PENDING"
+        assert token_calls == ["auth"]
+        assert len(paths) == 1
+        assert "/resourceGroups/rg-test/" in paths[0]
+    else:
+        assert result == {"error": {"code": "SCOPE_DENIED", "retryable": False}}
+        assert paths == []
+        assert token_calls == []
+    executor.close()
+
+
+@pytest.mark.parametrize("tool_id", ["cloud_resource_create", "cloud_resource_update"])
+def test_azure_deployment_resource_cannot_bypass_scoped_deploy_route(
+    tmp_path: Any, tool_id: str
+) -> None:
+    """Generic create/update rejects ARM deployments before Azure auth or HTTP calls."""
+
+    settings = _multi_provider_settings(
+        tmp_path,
+        azure_resource_api_versions={"microsoft.resources/deployments": "2024-04-01"},
+    )
+    calls: list[str] = []
+    token_calls: list[str] = []
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda request: (calls.append(request.method), pytest.fail("ARM was called"))
+            )
+        ),
+    )
+
+    def token_provider(_profile: Any) -> tuple[str, None]:
+        token_calls.append("token")
+        return "fixture-token", None
+
+    executor._azure_token = token_provider  # noqa: SLF001
+    result = executor.call(
+        tool_id,
+        {
+            "profile_ref": "azure/test",
+            "target": {
+                "resource_id": (
+                    "/subscriptions/11111111-2222-3333-4444-555555555555/"
+                    "resourceGroups/rg-test/providers/Microsoft.Resources/deployments/"
+                    "cyrene-test-deployment"
+                )
+            },
+            "parameters": {
+                "properties": {
+                    "template": {
+                        "resources": [
+                            {
+                                "type": "Microsoft.Compute/virtualMachines",
+                                "name": "cyrene-test-vm",
+                                "resourceGroup": "foreign-rg",
+                            }
+                        ]
+                    }
+                }
+            },
+        },
+        request_id=f"request-azure-generic-deployment-{tool_id}",
+    )
+
+    assert result == {"error": {"code": "UNSUPPORTED_OPERATION", "retryable": False}}
+    assert calls == []
+    assert token_calls == []
+    executor.close()
+
+
+@pytest.mark.parametrize("tool_id", ["cloud_resource_create", "cloud_resource_update"])
+def test_azure_generic_mutations_still_allow_ordinary_resources(
+    tmp_path: Any, tool_id: str
+) -> None:
+    """The deployment-route guard leaves configured ordinary ARM resource types usable."""
+
+    settings = _multi_provider_settings(tmp_path)
+    calls: list[tuple[str, str]] = []
+    token_calls: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append((request.method, request.url.path))
+        return httpx.Response(
+            200,
+            json={"properties": {"provisioningState": "Succeeded"}},
+        )
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+    def token_provider(_profile: Any) -> tuple[str, None]:
+        token_calls.append("token")
+        return "fixture-token", None
+
+    executor._azure_token = token_provider  # noqa: SLF001
+    result = executor.call(
+        tool_id,
+        {
+            "profile_ref": "azure/test",
+            "target": {
+                "resource_id": (
+                    "/subscriptions/11111111-2222-3333-4444-555555555555/"
+                    "resourceGroups/rg-test/providers/Microsoft.Compute/virtualMachines/"
+                    "cyrene-test-vm"
+                )
+            },
+            "parameters": {"tags": {"purpose": "fixture"}},
+        },
+        request_id=f"request-azure-generic-resource-{tool_id}",
+    )
+
+    assert result["state"] == "SUCCEEDED"
+    assert calls and len(calls) == 1 and calls[0][0] == "PUT"
+    assert "/providers/Microsoft.Compute/virtualMachines/" in calls[0][1]
+    assert token_calls == ["token"]
     executor.close()
 
 
