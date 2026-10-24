@@ -44,11 +44,18 @@ connector role; the connector does not hard-code a person's identity. File
 support stays disabled because this release omits attachment URLs and sends
 text-only replies.
 
+Team-scoped v1.28 app packages set `supportsChannelFeatures` to `tier1` because
+the Teams app catalog rejects team-scoped packages that omit this declaration.
+It does not add a Graph permission or an RSC permission.
+
 App manifest 使用微软的 [v1.28 schema](https://developer.microsoft.com/json-schemas/teams/v1.28/MicrosoftTeams.schema.json)，
 只安装到 `team` scope，并只申请 `ChannelMessage.Read.Group`。该资源特定权限仅覆盖
 安装并同意应用的 Team 中的消息。运行时 team allowlist 会进一步限制接收范围。用户连接器
 角色仍由 Navigator 与 Directory 权威判定；连接器不硬编码个人身份。当前版本不支持文件，
 因为会省略附件 URL，且只发送文本回复。
+
+`team` scope 的 v1.28 应用包将 `supportsChannelFeatures` 设为 `tier1`，因为 Teams 应用
+目录会拒绝缺少此声明的 team-scoped package。该声明不会增加 Graph 或 RSC 权限。
 
 The ingress uses the [Microsoft Teams SDK for Python](https://microsoft.github.io/teams-sdk/python/)
 and keeps its built-in request authentication enabled. The app manifest's

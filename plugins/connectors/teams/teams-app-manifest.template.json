@@ -22,6 +22,7 @@
     "full": "Cyrene receives messages only in teams where this app is installed and consented. Channel replies in an active Cyrene thread continue without another mention."
   },
   "accentColor": "#2563EB",
+  "supportsChannelFeatures": "tier1",
   "webApplicationInfo": {
     "id": "<BOT_APP_CLIENT_ID>",
     "resource": "https://RscBasedStoreApp"
