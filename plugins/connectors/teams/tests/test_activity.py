@@ -127,6 +127,162 @@ def test_reply_without_mention_keeps_root_thread_and_direct_parent():
     assert event.payload["content"] == [{"text": {"text": "continue"}}]
 
 
+def test_conversation_messageid_routes_root_activity_without_reply_to_id():
+    """Use the Teams conversation suffix as the root for the initial post.
+
+    中文：初始帖子没有 replyToId 时，以 Teams conversation 后缀确定根帖子。
+    """
+
+    root_id = "1749000000000"
+    conversation_id = f"{CONVERSATION_ID};messageid={root_id}"
+    event = _normalize(
+        _activity(
+            id=root_id,
+            conversation={"id": conversation_id, "tenantId": TENANT_ID},
+        )
+    )
+
+    assert event.payload["conversation"]["conversation_id"] == conversation_id
+    assert event.payload["message_id"] == root_id
+    assert "reply" not in event.payload
+    assert event.trust["root_thread_id"] == root_id
+
+
+def test_conversation_messageid_routes_unmentioned_child_to_original_root():
+    """Keep child-message deduplication while routing its reply to the root.
+
+    中文：子消息仍用自身 ID 去重，并路由到原根帖子。
+    """
+
+    root_id = "1749000000000"
+    child_id = "1749000000001"
+    conversation_id = f"{CONVERSATION_ID};messageid={root_id}"
+    event = _normalize(
+        _activity(
+            id=child_id,
+            conversation={"id": conversation_id, "tenantId": TENANT_ID},
+            text="continue without mention",
+            entities=[],
+        )
+    )
+
+    assert event.payload["conversation"]["conversation_id"] == conversation_id
+    assert event.payload["message_id"] == child_id
+    assert event.payload["reply"] == {"message_id": root_id}
+    assert event.trust["message_id"] == child_id
+    assert event.trust["root_thread_id"] == event.payload["reply"]["message_id"]
+
+
+def test_direct_reply_parent_is_fallback_when_conversation_has_no_root_suffix():
+    """Retain the validated direct-parent fallback for older activity shapes.
+
+    中文：conversation ID 无根帖后缀时，保留经过验证的直接父消息回退。
+    """
+
+    event = _normalize(
+        _activity(
+            id="1749000000001",
+            replyToId="1749000000000",
+            text="continue",
+            entities=[],
+        )
+    )
+
+    assert event.payload["reply"] == {"message_id": "1749000000000"}
+    assert event.trust["root_thread_id"] == event.payload["reply"]["message_id"]
+
+
+@pytest.mark.parametrize(
+    "root_id",
+    ["", "letters", "0", "0000", "١٢٣"],
+)
+def test_malformed_conversation_root_fails_closed(root_id):
+    """Reject malformed or unbounded root metadata instead of misrouting.
+
+    中文：根帖 metadata 格式错误或超长时直接拒绝，避免错误路由。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                conversation={
+                    "id": f"{CONVERSATION_ID};messageid={root_id}",
+                    "tenantId": TENANT_ID,
+                }
+            )
+        )
+
+    assert error.value.reason == "invalid_thread_identity"
+
+
+def test_oversized_conversation_identity_fails_closed():
+    """Reject an overlong conversation ID before it can define a thread route.
+
+    中文：conversation ID 超出上限时拒绝，不允许其定义线程路由。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                conversation={
+                    "id": f"{CONVERSATION_ID};messageid={'9' * 513}",
+                    "tenantId": TENANT_ID,
+                }
+            )
+        )
+
+    assert error.value.reason == "missing_conversation_identity"
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        ";messageid",
+        ";messageid=1749000000000;messageid=1749000000000",
+        ";messageid=1749000000000;messageid=1749000000001",
+        ";messageid-extra=1749000000000",
+    ],
+)
+def test_ambiguous_conversation_root_fails_closed(suffix):
+    """Reject missing, duplicate, or malformed root metadata segments.
+
+    中文：根帖 metadata 缺失、重复或格式含糊时直接拒绝。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                conversation={
+                    "id": f"{CONVERSATION_ID}{suffix}",
+                    "tenantId": TENANT_ID,
+                }
+            )
+        )
+
+    assert error.value.reason == "invalid_thread_identity"
+
+
+def test_conflicting_direct_parent_and_conversation_root_fail_closed():
+    """Reject contradictory root sources rather than choosing one silently.
+
+    中文：直接父消息与 conversation 根帖不一致时拒绝，不静默选择其中一方。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                id="1749000000002",
+                replyToId="1749000000001",
+                conversation={
+                    "id": f"{CONVERSATION_ID};messageid=1749000000000",
+                    "tenantId": TENANT_ID,
+                },
+            )
+        )
+
+    assert error.value.reason == "invalid_thread_identity"
+
+
 @pytest.mark.parametrize(
     ("field", "value", "reason"),
     [
