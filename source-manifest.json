@@ -2363,6 +2363,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/providers/cloud-management/src/cloud_management_provider/azure_templates.py",
+      "sha256": "d76f6548054a376a074aac91823e0273641087f8496c8ec380642816933c2501",
+      "size_bytes": 10413
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/ledger.py",
       "sha256": "b2995ac8075308825cbcc9227c0364aa24b6cba29ec9a7058759074bbc9a2b83",
       "size_bytes": 11677
@@ -2392,8 +2399,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/providers.py",
-      "sha256": "ae3ac4ee5fed4e77c70bc8945cf70866ae98c69e737a0eb46014610180151421",
-      "size_bytes": 122274
+      "sha256": "dddec13ddc7f1bcbf6fcb7cd02398bf6c4dc426c62d4e265ce391933a1aee2ec",
+      "size_bytes": 136215
     },
     {
       "kind": "file",
@@ -2408,6 +2415,13 @@
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/tool_catalog.py",
       "sha256": "fa3f2c88998567a27890157a912e24fa692bb02e4bd087f59aee6456500f7f4e",
       "size_bytes": 8906
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/cloud-management/tests/test_azure_templates.py",
+      "sha256": "39bf92fb5c00416ac373f65fb4f2ced6ca52dc70cdedf70dee84998614b2f28a",
+      "size_bytes": 10167
     },
     {
       "kind": "file",
@@ -2427,8 +2441,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "6458b27f4f40cd1877efc6a58c965ca4f1ae7220c9c498dd70bf1812685d22a3",
-      "size_bytes": 41258
+      "sha256": "f124066640ad2494889b3cdb6a3ea0b8f4e29671e43180a185a9f44860999b72",
+      "size_bytes": 67211
     },
     {
       "kind": "file",
