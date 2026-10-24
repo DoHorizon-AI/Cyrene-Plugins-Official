@@ -1643,8 +1643,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/README.md",
-      "sha256": "c9eb28641353330b37aa5fbe9b4ee01c5ecf7514b47520681dd7310cda552e6a",
-      "size_bytes": 8012
+      "sha256": "3dbcf9a9c1c8cdf7a81d62bea2bab5abc30b246fac146421709551ac76113ab8",
+      "size_bytes": 8431
     },
     {
       "kind": "file",
@@ -1790,8 +1790,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/teams-app-manifest.template.json",
-      "sha256": "7e5433b095c546907351359033b2938c161da044465e403ff245fd138d1448ca",
-      "size_bytes": 1343
+      "sha256": "dc2d623256a5302305e3d96b6c40991fc881c3348399ec55af9997ce13e7694a",
+      "size_bytes": 1381
     },
     {
       "kind": "file",
