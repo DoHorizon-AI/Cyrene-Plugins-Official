@@ -46,7 +46,7 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/training-plugin-package-release.yml",
-      "sha256": "629c3368374b928ad876bac2b7d581844fb5a22e5c82e6d386b2441672a613ef",
+      "sha256": "1b5f2e25fde86c04cdc024ac0946a26d6d7888341cb4bb1f7559227644a07dbd",
       "size_bytes": 16720
     },
     {
@@ -180,8 +180,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "6b49d7c8ecdc87803936ee229eac79a32da0a0fa016ff2d7d8ada656f3c0d05d",
-      "size_bytes": 33890
+      "sha256": "ca7ee2edc5c31d376ef371327968602316d2f4f1b48a388def8317dcb603c566",
+      "size_bytes": 36974
     },
     {
       "kind": "file",
@@ -901,22 +901,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/README.md",
-      "sha256": "3b6f43dde252c913d9321e219b2325d963d9720dd53fcd236ff2609b1ca3f696",
-      "size_bytes": 7593
+      "sha256": "6bddcec20bf5084e602be7931d208e9a4d1fe5b00f8d3caf54e733f05686c753",
+      "size_bytes": 9378
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/contracts/v1/schema.json",
-      "sha256": "fa7809dd1bac5f3d38d14ce6647066f9570424dcaf907cbb75c7f266b91406f9",
-      "size_bytes": 16083
+      "sha256": "db32eab2107ce690565697532382633ce431dfe26a0bcb81f2ac798327cb4ea7",
+      "size_bytes": 17888
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/plugin.manifest.json",
-      "sha256": "52cddd8df05ed1734ccfe9f901b1bb3cf6b60c346f9e97aabf568b8c13df1291",
-      "size_bytes": 5936
+      "sha256": "7be6e453a8da9704831bea492d8705dd7150c59c286bb62a41110a90c6e9b93d",
+      "size_bytes": 5973
     },
     {
       "kind": "file",
@@ -936,8 +936,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/README.md",
-      "sha256": "7a63e19b949d120439ee288999d54dcc3632e1e15189456c7a16270d8bc8d54a",
-      "size_bytes": 1158
+      "sha256": "70683cde1366d6be9320e893b6678e670a80899806a9f94d1091ef49ac344f80",
+      "size_bytes": 1248
     },
     {
       "kind": "file",
@@ -970,6 +970,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/huggingface_oauth.py",
+      "sha256": "fc1d19b237c8d055607496434315253298f751fd1791369d4baf3b8757cff9b1",
+      "size_bytes": 11691
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/models.py",
       "sha256": "d882959f71d5d0ccb0fded997ba49088da85c5df71285969681ea931ad24d0f2",
       "size_bytes": 1445
@@ -978,8 +985,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/plugin.py",
-      "sha256": "008e70d59c2ff2a091ab1f55d256d653d604600a9e4379937dd05a19cc6040de",
-      "size_bytes": 93680
+      "sha256": "9ff470b76d28d4e190712cba2880aa42f4c23905f413e06eb2899df44a9d7e13",
+      "size_bytes": 119371
     },
     {
       "kind": "file",
@@ -992,14 +999,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/store.py",
-      "sha256": "e40e8e7611d962fe63151be6f873d6636f36cb572bed093f368b280362e8351a",
-      "size_bytes": 65894
+      "sha256": "ca38c5c2b0e0423538dc3bf41a5c51d1bd4ea676912933c6141f9765fa455c33",
+      "size_bytes": 87642
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_account_center.py",
-      "sha256": "e7da674a50f92ed67fe47f6b3f4e529620082a1822adf86598130a0d53b7a8b2",
+      "sha256": "8cc274fffce1278d00aeee2a986955027db28b6850ba8f178336928951c0e6ca",
       "size_bytes": 52932
     },
     {
@@ -1020,8 +1027,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "9b8191b0459b87ab2c8e1d1343610c174cfe8f1e96fe61cb9a313fdb1a65801a",
-      "size_bytes": 20182
+      "sha256": "8eb1f5466b92dc58749de7167508eba7d79857f7e2100ae54812dfca8b751c01",
+      "size_bytes": 56084
     },
     {
       "kind": "file",
@@ -2420,8 +2427,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "b5325e8122347707e91fd54f11d5175935283c6407ec4954e3b9666ebf152352",
-      "size_bytes": 41264
+      "sha256": "6458b27f4f40cd1877efc6a58c965ca4f1ae7220c9c498dd70bf1812685d22a3",
+      "size_bytes": 41258
     },
     {
       "kind": "file",
@@ -2616,8 +2623,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/README.md",
-      "sha256": "14ea4cca4e91fcbb2cb2eff528514f38196f6a0f1588c8947af92708bb0b259d",
-      "size_bytes": 1507
+      "sha256": "e378f5359ebe6e19f19e6394281f519bc71210927f8292a7cfb37adc7f876df9",
+      "size_bytes": 2714
     },
     {
       "kind": "file",
@@ -2665,8 +2672,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/plugin.py",
-      "sha256": "95b785de1cc991876e24bcd6782bac216dfccf2799a53934ca9aa7ace2540e55",
-      "size_bytes": 31627
+      "sha256": "051711a7572296ef2e1baa30503c00144feef1c1f376935b89a354f89d840e53",
+      "size_bytes": 36994
     },
     {
       "kind": "file",
@@ -2679,8 +2686,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/trust.py",
-      "sha256": "15dde18c964e2a5bc3c518ed34f432c590c9efb7b5965c05a7a0aa5de482ed8a",
-      "size_bytes": 4057
+      "sha256": "c53433520977932f6e26e9e75c30e552573ac2652b940e2c7ff4069e9ef7691d",
+      "size_bytes": 4094
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/github-issues/src/github_issues_provider/vendor_cli.py",
+      "sha256": "9d2239522a3a45b23451feae753e988b14eaea5e732c7775f33a6ec17df6dddb",
+      "size_bytes": 6368
     },
     {
       "kind": "file",
@@ -2693,8 +2707,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/tests/test_provider.py",
-      "sha256": "eccacda7fc4ef5e6fe374840c038c7d67a87924adf0cc3f30ecfe93b23240a77",
-      "size_bytes": 26893
+      "sha256": "3968a928e811e1237f2ddbe1d9daa6c9cfc0f4d95f4a6c3781471e840f6745ba",
+      "size_bytes": 31496
     },
     {
       "kind": "file",
@@ -2735,8 +2749,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/README.md",
-      "sha256": "72ff431f9094d4d353a6f83da24cb270a6ce642d62240c85eebb385ac923bc14",
-      "size_bytes": 1611
+      "sha256": "7ccf697696722bf7801d764635536bec00e74a83b27720a71525c67a7788ba19",
+      "size_bytes": 3045
     },
     {
       "kind": "file",
@@ -2770,8 +2784,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/account_center.py",
-      "sha256": "8e45710aa12a35d9092ca00ae8072ce0691ad960e6ed937f5ea984a1e4b0ceba",
-      "size_bytes": 10861
+      "sha256": "1ef497d9733e905c8c050c6412d3bf15fa729b29f11da2b674391a4b80a5f90f",
+      "size_bytes": 11331
     },
     {
       "kind": "file",
@@ -2784,22 +2798,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/plugin.py",
-      "sha256": "5217ab9df7db82250c1f4326e326780e97a5541dc6d75e78664596c9ac26ffb2",
-      "size_bytes": 20146
+      "sha256": "6b900a93bc5e1fa9ccac80db01d647e0f4e6981484880a83969013830629c64c",
+      "size_bytes": 26184
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/settings.py",
-      "sha256": "2d89d3d443de42cc64befe0accf56e80361b74593a9cb2a51929e40508108128",
-      "size_bytes": 10940
+      "sha256": "566eb3c902d58960692e72e9733a8fad1d426ba7d54a6374d101e692eaacc813",
+      "size_bytes": 11529
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/trust.py",
-      "sha256": "65d12b0ebcb89c37df10becbf5649b4de34d4a5877bc894d78a101b80d737327",
-      "size_bytes": 3868
+      "sha256": "10ce7113d852ed6a1366e9f66b497d2d62d348232213ea1aec680645b4402341",
+      "size_bytes": 3906
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/huggingface/src/huggingface_provider/vendor_cli.py",
+      "sha256": "9c6f328cdea2252ca5b97f3b1911cf7db5ae940d199cf6d9ba05a98819eea2bc",
+      "size_bytes": 16258
     },
     {
       "kind": "file",
@@ -2812,15 +2833,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_provider.py",
-      "sha256": "9e3f18d8ba5f11e953309a187f4738ada6f9ba66cc6e04e3dc129a5a0358fab1",
-      "size_bytes": 12488
+      "sha256": "ac5051991e34aaf02b2087e65ff787630d936cc4950d0823f274f4503c78c8bd",
+      "size_bytes": 20078
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_settings.py",
-      "sha256": "fd236ee1caaf58929b556dbd849bb7eb96d8284defe29d19c881e4cda7a667b3",
-      "size_bytes": 2979
+      "sha256": "a8ec8765d3c84be0dd85a75382661beddf7fd1bba27136c47974f023bb39d85d",
+      "size_bytes": 3556
     },
     {
       "kind": "file",
@@ -6340,8 +6361,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/contracts.py",
-      "sha256": "d6555de2f47bf8c19b9ad31558a95c89436b34510824ca3ec65c85e62f8a3f5e",
-      "size_bytes": 11895
+      "sha256": "180482c7e7a45b89ba89375c805d00bd62f02cd2f25b15c4d3152da355b56a8b",
+      "size_bytes": 12233
     },
     {
       "kind": "file",
@@ -6396,8 +6417,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_integration_contracts/src/cyrene_integration_contracts/contracts.py",
-      "sha256": "c126b3befada7a38b00623e7569d39605fe80c950a41ca76f0c53c08454d3bee",
-      "size_bytes": 41331
+      "sha256": "b75e8941285f3fe99af63c28277b4f2265b328a464977b7ed870ad3b402f2b5c",
+      "size_bytes": 41448
     },
     {
       "kind": "file",
@@ -6410,15 +6431,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_integration_contracts/src/cyrene_integration_contracts/schema.json",
-      "sha256": "fc1c48176d395f341536dcc9665f3939b51fd87dfcc73e876819c2e4b16b129b",
-      "size_bytes": 19324
+      "sha256": "d66aba940ed683d9d4c07f825b27adbedf4ef9fcec5d694e07734530a28026db",
+      "size_bytes": 20871
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_integration_contracts/tests/test_cloud_management_operations.py",
-      "sha256": "79f390ecd07cdde9b3078526ad61cee44de46e9eed91acac6c0c2a2b2186681b",
-      "size_bytes": 3986
+      "sha256": "6c154e0d7b10b88d0634d7459ee92b7f73e4eaca2c71ab3ec54fa719fb5f8d63",
+      "size_bytes": 6176
     },
     {
       "kind": "file",
@@ -6487,8 +6508,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/README.md",
-      "sha256": "675d32c290c40360c1cdd1c8bc11544eb2d19a9682b04528a85819c9bbb5ca8c",
-      "size_bytes": 2475
+      "sha256": "f67a92366ffedce58abc4f2ab4e86e87d60167f7311db0cc067c245b7ac51532",
+      "size_bytes": 3147
     },
     {
       "kind": "file",
@@ -6584,6 +6605,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/vendor_cli.py",
+      "sha256": "03f9339fec3825c9216a8419eff562ff3c4b7d6e6a05ebdd9a0d751b96526c14",
+      "size_bytes": 8893
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_configuration.py",
       "sha256": "9b8918c75c2b23ef8a12bb4c7c8d3ed2846362b5a00c986440dd37a489f77fd3",
       "size_bytes": 1316
@@ -6615,6 +6643,13 @@
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_direct_runtime.py",
       "sha256": "6b5fd22674adbbdc72d08229ea15c94c8d88bae29ded7d5b2b121304f73e07b3",
       "size_bytes": 22624
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_vendor_cli.py",
+      "sha256": "a92305b272fa8357308a9c2ea862144bc1c02bd2e43182b761ebdfcbda8a5b78",
+      "size_bytes": 4378
     },
     {
       "kind": "file",

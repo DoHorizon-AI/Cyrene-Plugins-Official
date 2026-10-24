@@ -28,7 +28,7 @@ from cloud_management_provider.tool_catalog import (
     TOOL_BY_ID,
 )
 
-_API_KEY = "runpod-fixture-key-123456"
+_API_KEY = "fixture-" + "x" * 32
 _EXCHANGE_KEY = bytes.fromhex("a5" * 32)
 
 
