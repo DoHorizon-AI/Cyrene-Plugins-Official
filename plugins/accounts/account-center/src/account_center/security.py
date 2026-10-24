@@ -9,7 +9,6 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import json
 import os
 import time
 from collections.abc import Mapping
@@ -17,6 +16,7 @@ from typing import Any
 
 from cryptography.exceptions import InvalidTag
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cyrene_account_center_contracts import canonical_json, payload_sha256
 
 from .models import AccountCenterError, Anchor
 
@@ -36,22 +36,10 @@ CONTEXT_FIELDS = (
 )
 
 
-def canonical_json(value: Any) -> bytes:
-    """Encode JSON values with the shared deterministic UTF-8 representation."""
-
-    return json.dumps(
-        value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
-
-
 def payload_digest(payload: Mapping[str, Any]) -> str:
     """Hash the exact semantic request payload that the context authorizes."""
 
-    return hashlib.sha256(canonical_json(payload)).hexdigest()
+    return payload_sha256(payload)
 
 
 def decode_key(value: str, *, length: int) -> bytes:

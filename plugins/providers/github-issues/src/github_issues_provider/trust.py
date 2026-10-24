@@ -49,6 +49,14 @@ def verify_exchange_context(
         "github.issue.get",
         "github.issue.comment.create",
         "github.issue.state.update",
+        "github.repository.list",
+        "github.repository.get",
+        "github.branches.list",
+        "github.pull_requests.list",
+        "github.pull_request.get",
+        "github.actions.runs.list",
+        "github.ci.status",
+        "github.vendor.cli.execute",
     }:
         raise TrustedContextError("trusted operation is invalid")
     if context.get("binding_id") != settings.binding_id:
@@ -85,13 +93,14 @@ def account_center_context(
     actor: Mapping[str, str | None],
     payload: Mapping[str, Any],
     *,
+    method: str = "redeem_credential_lease",
     now: int | None = None,
 ) -> dict[str, Any]:
     """Sign a redemption for the configured Account Center binding and actor."""
 
     issued_at = int(time.time()) if now is None else now
     context = sign_context(
-        method="redeem_credential_lease",
+        method=method,
         payload=dict(payload),
         caller_id=settings.provider_caller_id,
         issuer=str(actor["issuer"]),
@@ -100,7 +109,7 @@ def account_center_context(
         workspace_id=actor["workspace_id"],
         binding_id=settings.account_center_binding_id,
         request_id=str(uuid.uuid4()),
-        operation_id="redeem_credential_lease",
+        operation_id=method,
         key=settings.provider_signing_key,
         issued_at=issued_at,
         expires_at=issued_at + 60,

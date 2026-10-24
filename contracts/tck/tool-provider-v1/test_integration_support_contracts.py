@@ -338,6 +338,49 @@ def test_all_fixed_tool_envelopes_use_their_allowlisted_operation() -> None:
         "wecom_reauthorization_status": {"session_ref": "renewal-session-1"},
         "cloud_resources_query": {"target_ref": "configured-cloud-main"},
         "cloud_authorization_health": {"target_ref": "configured-cloud-main"},
+        "cloud_provider_health": {"profile_ref": "azure-prod"},
+        "cloud_resources_list": {"profile_ref": "azure-prod"},
+        "cloud_resource_get": {
+            "profile_ref": "azure-prod",
+            "target_ref": "vm-build-worker",
+        },
+        "cloud_resource_create": {
+            "profile_ref": "azure-prod",
+            "target_ref": "vm-build-worker",
+            "parameters": {"size": "small"},
+        },
+        "cloud_resource_deploy": {
+            "profile_ref": "gcp-prod",
+            "target_ref": "service-build-worker",
+            "parameters": {"version": "v1"},
+        },
+        "cloud_resource_start": {
+            "profile_ref": "azure-prod",
+            "target_ref": "vm-build-worker",
+        },
+        "cloud_resource_stop": {
+            "profile_ref": "azure-prod",
+            "target_ref": "vm-build-worker",
+        },
+        "cloud_resource_restart": {
+            "profile_ref": "runpod-prod",
+            "target_ref": "pod-build-worker",
+        },
+        "cloud_resource_update": {
+            "profile_ref": "runpod-prod",
+            "target_ref": "pod-build-worker",
+            "parameters": {"gpu_count": 1},
+        },
+        "cloud_resource_delete": {
+            "profile_ref": "runpod-prod",
+            "target_ref": "pod-build-worker",
+        },
+        "cloud_operation_status": {"operation_ref": "cloud-operation-1"},
+        "cloud_operation_logs": {"operation_ref": "cloud-operation-1"},
+        "cloud_operation_cancel": {"operation_ref": "cloud-operation-1"},
+        "cloud_vendor_cli": {"argv": ["az", "vm", "list"]},
+        "github_vendor_cli": {"argv": ["repo", "view", "--json", "name"]},
+        "hf_vendor_cli": {"argv": ["repo", "list", "--repo-type", "model"]},
         "email_notification_send": {
             "recipient_ref": "ops-oncall",
             "subject": "Connection requires attention",

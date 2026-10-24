@@ -17,7 +17,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import tomllib
 import zipfile
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -26,8 +25,9 @@ from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+import tomllib
 from packaging.requirements import Requirement
-from packaging.tags import sys_tags
+from packaging.tags import parse_tag, sys_tags
 from packaging.utils import canonicalize_name, parse_wheel_filename
 
 if __package__ in {None, ""}:
@@ -52,21 +52,68 @@ SOURCE_DEPENDENCY_BUILD_PINS = (
     "wheel==0.48.0",
 )
 JCS_LOCK_PATH = "tools/ci/connection-release-requirements.txt"
-TARGET_ID = "linux-ubuntu-24.04-x86_64-python-3.12"
-TARGET = {
-    "os": "linux",
-    "osVersion": "24.04",
-    "distribution": "ubuntu",
-    "distributionVersion": "24.04",
-    "architecture": "x86_64",
-    "abi": "glibc-2.39",
-    "runtime": "python:3.12",
+TARGETS = {
+    "linux-ubuntu-24.04-x86_64-python-3.12": {
+        "os": "linux",
+        "osVersion": "24.04",
+        "distribution": "ubuntu",
+        "distributionVersion": "24.04",
+        "architecture": "x86_64",
+        "abi": "glibc-2.39",
+        "runtime": "python:3.12",
+    },
+    "linux-ubuntu-24.04-aarch64-python-3.12": {
+        "os": "linux",
+        "osVersion": "24.04",
+        "distribution": "ubuntu",
+        "distributionVersion": "24.04",
+        "architecture": "aarch64",
+        "abi": "glibc-2.39",
+        "runtime": "python:3.12",
+    },
 }
+TARGET_ID_BY_MACHINE = {
+    "x86_64": "linux-ubuntu-24.04-x86_64-python-3.12",
+    "aarch64": "linux-ubuntu-24.04-aarch64-python-3.12",
+    "arm64": "linux-ubuntu-24.04-aarch64-python-3.12",
+}
+DEFAULT_TARGET_ID = "linux-ubuntu-24.04-x86_64-python-3.12"
+
+
+def target_id_for_machine(machine: str) -> str | None:
+    """Map a native machine name to an explicitly supported release target.
+
+    中文：仅将受支持的本机架构映射到固定发行目标。
+    """
+
+    return TARGET_ID_BY_MACHINE.get(machine.lower())
+
+
+def _require_native_target(target_id: str, *, machine: str | None = None) -> None:
+    """Reject cross-architecture builds and verifications before reading assets.
+
+    中文：在读取或生成发行资产前拒绝跨架构目标。
+    """
+
+    native_machine = platform.machine() if machine is None else machine
+    native_target = target_id_for_machine(native_machine)
+    if native_target is None:
+        raise PackageBuildError(
+            f"unsupported native package builder architecture: {native_machine}"
+        )
+    if target_id != native_target:
+        raise PackageBuildError(
+            f"target {target_id} does not match native builder target {native_target}"
+        )
+
+
+TARGET_ID = target_id_for_machine(platform.machine()) or DEFAULT_TARGET_ID
+TARGET = TARGETS[TARGET_ID]
 SUPPORTED_CHANNELS = {"candidate", "preview", "stable"}
 CAPABILITY_PROTOCOL = "cyrene.plugin.runtime.v1"
 PREPARER_DISTRIBUTION = "cyrene-plugin-runtime"
-PREPARER_VERSION = "0.2.1"
-PREPARER_WHEEL = "cyrene_plugin_runtime-0.2.1-py3-none-any.whl"
+PREPARER_VERSION = "0.2.2"
+PREPARER_WHEEL = "cyrene_plugin_runtime-0.2.2-py3-none-any.whl"
 WHEELHOUSE_TARGET = TARGET_ID
 WHEELHOUSE_MANIFEST = "wheelhouse/manifest.json"
 SBOM_SPEC_VERSION = "1.6"
@@ -221,6 +268,33 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
         source_dir="plugins/providers/cloud-resources",
         requirements_input="tooling/release/requirements/cloud-resources.in",
         vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.connectors.teams": PackageSpec(
+        package_id="cyrene.connectors.teams",
+        component_id="cyrene-connectors-teams",
+        primary_capability="message.connector.v1",
+        source_dir="plugins/connectors/teams",
+        requirements_input="tooling/release/requirements/teams-connector.in",
+        vendored_sdks=(RUNTIME_SDK,),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.cloud-management": PackageSpec(
+        package_id="cyrene.providers.cloud-management",
+        component_id="cyrene-providers-cloud-management",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/providers/cloud-management",
+        requirements_input="tooling/release/requirements/cloud-management.in",
+        vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.huggingface": PackageSpec(
+        package_id="cyrene.providers.huggingface",
+        component_id="cyrene-providers-huggingface",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/providers/huggingface",
+        requirements_input="tooling/release/requirements/huggingface.in",
+        vendored_sdks=(RUNTIME_SDK, ACCOUNT_CENTER_SDK),
         require_spdx_license=True,
     ),
     "cyrene.connectors.wecom": PackageSpec(
@@ -572,9 +646,13 @@ def _lock_lines(payload: bytes, label: str) -> list[str]:
 
 
 def _wheel_metadata(payload: bytes, filename: str) -> tuple[str, str]:
-    """Read and validate a wheel's single distribution identity record."""
+    """Read identity and ensure WHEEL tags agree with the filename tags.
+
+    中文：读取 wheel 身份，并确保 WHEEL 元数据与文件名标签一致。
+    """
 
     try:
+        _, _, _, filename_tags = parse_wheel_filename(filename)
         with zipfile.ZipFile(BytesIO(payload)) as archive:
             metadata_names = [
                 item
@@ -585,13 +663,33 @@ def _wheel_metadata(payload: bytes, filename: str) -> tuple[str, str]:
                 raise PackageBuildError(
                     f"wheel must contain one METADATA file: {filename}"
                 )
+            wheel_names = [
+                item for item in archive.namelist() if item.endswith(".dist-info/WHEEL")
+            ]
+            if len(wheel_names) != 1:
+                raise PackageBuildError(
+                    f"wheel must contain one WHEEL metadata file: {filename}"
+                )
             metadata = BytesParser().parsebytes(archive.read(metadata_names[0]))
-    except (OSError, UnicodeError, zipfile.BadZipFile) as error:
+            wheel_metadata = BytesParser().parsebytes(archive.read(wheel_names[0]))
+    except (OSError, UnicodeError, ValueError, zipfile.BadZipFile) as error:
         raise PackageBuildError(f"invalid wheel archive: {filename}") from error
     name = metadata.get("Name")
     version = metadata.get("Version")
     if not isinstance(name, str) or not isinstance(version, str):
         raise PackageBuildError(f"wheel has no distribution identity: {filename}")
+    try:
+        declared_tags = {
+            tag
+            for raw_tag in wheel_metadata.get_all("Tag", [])
+            for tag in parse_tag(raw_tag)
+        }
+    except (TypeError, ValueError) as error:
+        raise PackageBuildError(f"wheel has invalid WHEEL tags: {filename}") from error
+    if not declared_tags or declared_tags != filename_tags:
+        raise PackageBuildError(
+            f"wheel WHEEL metadata tags do not match its filename: {filename}"
+        )
     return canonicalize_name(name), version
 
 
@@ -769,11 +867,8 @@ def _download_wheelhouse(
         os_release = platform.freedesktop_os_release()
     except (AttributeError, OSError):
         os_release = {}
-    if (
-        os_release.get("ID") != "ubuntu"
-        or os_release.get("VERSION_ID") != "24.04"
-        or platform.machine() != "x86_64"
-    ):
+    _require_native_target(TARGET_ID)
+    if os_release.get("ID") != "ubuntu" or os_release.get("VERSION_ID") != "24.04":
         raise PackageBuildError(
             f"wheelhouse generation requires the {TARGET_ID} builder environment"
         )
@@ -1891,7 +1986,7 @@ def build_release_artifacts(
                 "os_version": "24.04",
                 "distribution": "ubuntu",
                 "distribution_version": "24.04",
-                "architecture": "x86_64",
+                "architecture": TARGET["architecture"],
                 "python": "3.12",
             },
             "runtime": {
@@ -2660,7 +2755,7 @@ def _arguments() -> argparse.ArgumentParser:
         command.add_argument(
             "--channel", choices=sorted(SUPPORTED_CHANNELS), required=True
         )
-        command.add_argument("--target", choices=(TARGET_ID,), required=True)
+        command.add_argument("--target", choices=tuple(TARGETS), required=True)
         command.add_argument("--github-sha", required=True)
         command.add_argument("--run-id")
         command.add_argument("--run-attempt", type=int, default=1)
@@ -2671,6 +2766,11 @@ def _arguments() -> argparse.ArgumentParser:
 def main() -> int:
     options = _arguments().parse_args()
     try:
+        _require_native_target(options.target)
+        if options.target != TARGET_ID:
+            raise PackageBuildError(
+                f"selected target {options.target} does not match process target {TARGET_ID}"
+            )
         options.handler(options)
     except (OSError, UnicodeError, zipfile.BadZipFile, PackageBuildError) as error:
         raise SystemExit(f"official Plugin package release: {error}") from error

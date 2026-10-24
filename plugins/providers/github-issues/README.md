@@ -1,11 +1,51 @@
-# GitHub Issues Provider
+# GitHub Issues and Repository Provider
 
-This binding exposes three fixed `tool.provider.v1` tools for repositories explicitly listed by stable GitHub repository ID and owner/name. Writes require a one-use Account Center lease bound to the verified actor, operation, repository, issue, and canonical arguments. The provider accesses only GitHub Cloud at `api.github.com`; it does not accept URLs, commands, installation-token fallback, or caller-supplied identities.
+This binding exposes fixed `tool.provider.v1` operations over GitHub Cloud at
+`api.github.com`: repository inventory and metadata, branches, pull requests,
+Actions runs, commit/CI status, and the existing issue read/write tools. Every
+repository target must match both a stable numeric repository ID and the
+configured owner/name pair. The provider accepts no arbitrary URL, command, or
+caller-supplied identity.
 
-The host supplies the resolved `account_center.connection_ref` and Account Center `binding_id` in activation configuration. The Account Center binding can differ from this provider's binding: Exchange context verification checks the provider binding, and the one-use lease redemption is then signed for the configured Account Center binding. The no-argument runtime entrypoint reads the standard capability binding environment, builds an `AccountCenterDirectLeaseClient`, and invokes `account.center.v1` over the canonical DirectPluginRuntime contract. Local connections must be loopback; remote connections require explicit `grpcs://` plus operator-provided mTLS material. Invalid or missing activation configuration prevents the provider from starting. `hostSecretRefs` maps stable manifest references to host-injected environment-variable names; activation JSON contains no secret values. Exchange verification and provider-role signing keys use separate references, each resolving to a 32-byte HMAC key encoded as hex or base64.
+New calls use a GitHub App installation profile and a one-use Account Center
+lease bound to the verified actor, profile, operation, exact target, and
+canonical argument digest. Account Center signs a repository-scoped installation
+token only for the provider caller; the token stays in provider memory. Writes
+retain readback or explicit uncertain outcomes, and the provider never retries
+an ambiguous write. Legacy GitHub OAuth issue leases remain supported for
+existing bindings during migration.
 
-`normalize_webhook` accepts an internal transport envelope containing the delivery ID, event header, signature, and base64 of the original raw bytes. It validates HMAC-SHA256 before decoding JSON, then checks installation, event, action, and repository allowlists. The method emits normalized event facts only; it never invokes a model.
+The host supplies the resolved Account Center connection reference and binding
+in activation configuration. Local connections must be loopback; remote
+connections require explicit `grpcs://` plus operator-provided mTLS material.
+`hostSecretRefs` maps stable references to host-injected environment names and
+never contains secret values. Exchange verification and provider signing use
+different 32-byte HMAC keys.
 
-The request and response are specified by `contracts/v1/webhook.schema.json`. The request contains only `delivery_id`, `event`, `signature`, and `raw_body_base64`; the signed connection is selected by the resolved provider binding. Success returns `NormalizedGitHubEvent` fields directly. Failure returns only a closed `{ "error": { "code": ... } }` object. The provider does not attach a wall-clock timestamp, so retries with the same signed event normalize to identical JSON.
+`normalize_webhook` authenticates the original raw bytes before decoding JSON,
+then checks the installation, event, action, and repository allowlists. It
+emits normalized event facts and never invokes a model.
 
-Run the focused tests from this directory with `uv run --project . --with pytest --with jsonschema pytest -q tests`. The package uses local path sources for the public Account Center SDK and DirectPluginRuntime SDK so a clean repository checkout does not need unpublished registry packages.
+Run focused tests from this directory with
+`uv run --project . --with pytest --with jsonschema pytest -q tests`.
+
+## GitHub Issues 与仓库状态提供方
+
+此 binding 通过 GitHub Cloud `api.github.com` 暴露固定的 `tool.provider.v1`
+操作：仓库清单与 metadata、分支、PR、Actions runs、commit/CI 状态，以及现有
+Issue 读写工具。每个仓库目标必须同时匹配稳定数字 repository ID 与配置的
+owner/name。provider 不接受任意 URL、命令或调用方自选身份。
+
+新调用使用 GitHub App installation profile 和 Account Center 一次性租约，租约绑定
+可信 actor、profile、操作、精确目标和规范化参数摘要。Account Center 只向 provider
+caller 签发限定仓库的 installation token，token 只保留在 provider 内存。写操作保留
+回读结果或明确的未知状态；结果不确定时不会自动重试。迁移期间仍支持旧 binding 的
+GitHub OAuth Issue 租约。
+
+宿主在激活配置中提供已解析的 Account Center 连接引用和 binding。本地连接必须指向
+loopback；远程连接必须显式使用 `grpcs://` 和 operator 提供的 mTLS 资料。
+`hostSecretRefs` 只将稳定引用映射到宿主注入的环境变量名，不包含密钥值。Exchange
+验证和 provider 签名使用彼此独立的 32 字节 HMAC key。
+
+`normalize_webhook` 会先验证原始字节，再解码 JSON，然后检查 installation、事件、操作
+和仓库 allowlist。它只输出规范化事件事实，不会调用模型。

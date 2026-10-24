@@ -392,9 +392,45 @@ def test_runpod_expected_status_stays_unknown_and_uses_a_bearer_header_path() ->
     }
     call = fixture.get_calls[0]
     assert call["host"] == RUNPOD_API_HOST
-    assert call["url"] == "https://rest.runpod.io/v1/pods/pod-42_fixture"
+    assert call["url"] == "https://api.runpod.io/v2/pods/pod-42_fixture"
     assert call["token"] == "fixture-runpod-key"
     assert "fixture-runpod-key" not in call["url"]
+
+
+def test_runpod_v2_actual_status_does_not_claim_desired_or_observed_state() -> None:
+    """Runpod v2 runtime status remains UNKNOWN in this observation connector."""
+
+    target = RunpodPodTarget("pod-prod", "Training pod", "pod-42_fixture")
+    fixture = FixtureTransport(
+        {
+            "id": "pod-42_fixture",
+            "status": "RUNNING",
+            "startedAt": "2026-10-14T13:00:00.000Z",
+            "publicIp": "100.64.0.9",
+            "env": {"SECRET": "private"},
+            "image": "private-registry.example/model:latest",
+        }
+    )
+    settings = make_settings(
+        (target,),
+        runpod_env_name="TEST_RUNPOD_KEY",
+        environment={"TEST_EXCHANGE_KEY": "11" * 32, "TEST_RUNPOD_KEY": "fixture-runpod-key"},
+    )
+    reader = CloudResourceReader(
+        settings,
+        transport=fixture,
+        credentials=DefaultCredentialAcquirer(settings, transport=fixture),
+        clock=lambda: CHECKED_AT,
+    )
+
+    observation, _ = reader.observe("pod-prod")
+
+    assert observation.status == "UNKNOWN"
+    assert observation.provider_status is None
+    assert observation.observed_at is None
+    assert observation.attributes == {}
+    assert fixture.get_calls[0]["host"] == "api.runpod.io"
+    assert fixture.get_calls[0]["url"] == "https://api.runpod.io/v2/pods/pod-42_fixture"
 
 
 def test_provider_403_remains_permission_denied_not_stopped() -> None:

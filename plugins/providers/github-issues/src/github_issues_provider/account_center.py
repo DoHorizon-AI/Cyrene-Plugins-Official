@@ -17,6 +17,7 @@ import grpc
 from cyrene_account_center_contracts import (
     AuthMaterial,
     RedeemCredentialLeaseRequest,
+    RedeemProviderCredentialLeaseRequest,
     Resource,
     canonical_json,
     sign_context,
@@ -34,6 +35,11 @@ ACCOUNT_CENTER_REQUEST_TYPE_URL = (
 ACCOUNT_CENTER_RESPONSE_TYPE_URL = (
     "type.googleapis.com/cyrene.account.center.v1.RedeemCredentialLeaseResponse"
 )
+PROVIDER_LEASE_METHOD = "redeem_provider_credential_lease"
+PROVIDER_LEASE_REQUEST_TYPE_URL = (
+    "type.googleapis.com/cyrene.account.center.v1.RedeemProviderCredentialLeaseRequest"
+)
+PROVIDER_LEASE_RESPONSE_TYPE_URL = ACCOUNT_CENTER_RESPONSE_TYPE_URL
 MAX_RPC_RESPONSE_BYTES = 64 * 1024
 
 
@@ -50,6 +56,13 @@ class AccountCenterLeaseClient(Protocol):
         trusted_context: Mapping[str, str | int | None],
     ) -> AuthMaterial:
         """Redeem a lease once and return private in-memory auth material."""
+
+    def redeem_provider_credential_lease(
+        self,
+        payload: Mapping[str, object],
+        trusted_context: Mapping[str, str | int | None],
+    ) -> AuthMaterial:
+        """Redeem one profile-scoped lease and return private in-memory auth."""
 
 
 class AccountCenterDirectLeaseClient:
@@ -120,6 +133,55 @@ class AccountCenterDirectLeaseClient:
             or len(result.value) > MAX_RPC_RESPONSE_BYTES
         ):
             raise AccountCenterUnavailable("Account Center response contract is invalid")
+        return _auth_material(_parse_response(result.value))
+
+    def redeem_provider_credential_lease(
+        self,
+        payload: Mapping[str, object],
+        trusted_context: Mapping[str, str | int | None],
+    ) -> AuthMaterial:
+        """Redeem the exact generic profile/operation/target lease privately."""
+
+        request = _provider_lease_request(payload)
+        request_payload = _provider_lease_request_dict(request)
+        actor = _actor_context(trusted_context)
+        issued_at = int(time.time())
+        signed = sign_context(
+            method=PROVIDER_LEASE_METHOD,
+            payload=request_payload,
+            caller_id=self._settings.provider_caller_id,
+            issuer=str(actor["issuer"]),
+            subject=str(actor["subject"]),
+            organization_id=str(actor["organization_id"]),
+            workspace_id=actor["workspace_id"],
+            binding_id=str(actor["binding_id"]),
+            request_id=str(uuid.uuid4()),
+            operation_id=PROVIDER_LEASE_METHOD,
+            key=self._settings.provider_signing_key,
+            issued_at=issued_at,
+            expires_at=issued_at + 60,
+        )
+        envelope = {"payload": request_payload, "trusted_context": signed.as_dict()}
+        try:
+            result = self._client.invoke(
+                capability=ACCOUNT_CENTER_CAPABILITY,
+                interface_version=ACCOUNT_CENTER_INTERFACE_VERSION,
+                method=PROVIDER_LEASE_METHOD,
+                request=DirectPayload(
+                    type_url=PROVIDER_LEASE_REQUEST_TYPE_URL,
+                    value=canonical_json(envelope),
+                ),
+                deadline_seconds=self._settings.timeout_seconds,
+            )
+        except Exception as error:
+            raise AccountCenterUnavailable(
+                "Account Center profile lease redemption failed"
+            ) from error
+        if (
+            result.type_url != PROVIDER_LEASE_RESPONSE_TYPE_URL
+            or len(result.value) > MAX_RPC_RESPONSE_BYTES
+        ):
+            raise AccountCenterUnavailable("Account Center profile response contract is invalid")
         return _auth_material(_parse_response(result.value))
 
 
@@ -232,6 +294,49 @@ def _request_dict(request: RedeemCredentialLeaseRequest) -> dict[str, Any]:
             "repository": request.resource.repository,
             "issue_number": request.resource.issue_number,
         },
+        "arguments_sha256": request.arguments_sha256,
+    }
+
+
+def _provider_lease_request(
+    payload: Mapping[str, object],
+) -> RedeemProviderCredentialLeaseRequest:
+    """Validate generic lease fields without coercing targets or digests."""
+
+    required = {
+        "lease_ref",
+        "profile_ref",
+        "operation_id",
+        "target",
+        "arguments_sha256",
+    }
+    if set(payload) != required:
+        raise AccountCenterUnavailable("profile lease redemption request shape is invalid")
+    target = payload.get("target")
+    if not isinstance(target, Mapping):
+        raise AccountCenterUnavailable("profile lease target is invalid")
+    try:
+        return RedeemProviderCredentialLeaseRequest(
+            lease_ref=str(payload["lease_ref"]),
+            profile_ref=str(payload["profile_ref"]),
+            operation_id=str(payload["operation_id"]),
+            target=dict(target),
+            arguments_sha256=str(payload["arguments_sha256"]),
+        )
+    except (KeyError, TypeError, ValueError) as error:
+        raise AccountCenterUnavailable("profile lease redemption request is invalid") from error
+
+
+def _provider_lease_request_dict(
+    request: RedeemProviderCredentialLeaseRequest,
+) -> dict[str, Any]:
+    """Serialize the generic DTO exactly as signed by the Account Center SDK."""
+
+    return {
+        "lease_ref": request.lease_ref,
+        "profile_ref": request.profile_ref,
+        "operation_id": request.operation_id,
+        "target": request.target,
         "arguments_sha256": request.arguments_sha256,
     }
 

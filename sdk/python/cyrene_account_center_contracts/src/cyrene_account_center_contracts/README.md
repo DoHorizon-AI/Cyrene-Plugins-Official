@@ -1,6 +1,6 @@
 # Account Center contract package
 
-This package provides typed DTOs and canonical signing helpers for `account.center.v1`.
+This package provides typed DTOs and RFC 8785 (JCS) canonical signing helpers for `account.center.v1`.
 
 | File | Responsibility |
 | --- | --- |

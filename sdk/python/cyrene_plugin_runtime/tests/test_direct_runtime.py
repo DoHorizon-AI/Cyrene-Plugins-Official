@@ -4,13 +4,19 @@
 
 from __future__ import annotations
 
+import ipaddress
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 
 import grpc
 import pytest
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, serve
 from cyrene_plugin_runtime._generated import direct_plugin_runtime_pb2 as wire
 from cyrene_plugin_runtime._generated import direct_plugin_runtime_pb2_grpc as wire_grpc
@@ -88,7 +94,7 @@ class EchoPlugin:
 class MultiCapabilityPlugin:
     """Minimal plugin fixture for a shared direct endpoint.
 
-        中文:供共享直连端点使用的最小 Plugin 夹具。"""
+    中文:供共享直连端点使用的最小 Plugin 夹具。"""
 
     plugin_id = "test.direct.multi"
     version = "1.0.0"
@@ -139,6 +145,169 @@ def request(method: str = "echo") -> wire.DirectInvocationRequest:
     )
 
 
+def _generate_mtls_certificates(directory: Path) -> dict[str, Path]:
+    """Generate ephemeral server/client identities for the real TLS loopback test."""
+
+    directory.mkdir(parents=True, exist_ok=True)
+    # Cryptography's X.509 builders interpret naive datetimes as UTC.
+    not_before = datetime.fromisoformat("2020-01-01T00:00:00")
+    not_after = datetime.fromisoformat("2040-01-01T00:00:00")
+
+    def new_key() -> rsa.RSAPrivateKey:
+        return rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    def subject(common_name: str) -> x509.Name:
+        return x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, common_name)])
+
+    def write_key(label: str, key: rsa.RSAPrivateKey) -> Path:
+        path = directory / f"{label}-key.pem"
+        path.write_bytes(
+            key.private_bytes(
+                serialization.Encoding.PEM,
+                serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption(),
+            )
+        )
+        return path
+
+    def write_cert(label: str, cert: x509.Certificate) -> Path:
+        path = directory / f"{label}-cert.pem"
+        path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        return path
+
+    def new_ca(label: str) -> tuple[rsa.RSAPrivateKey, x509.Certificate]:
+        key = new_key()
+        identity = subject(label)
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(identity)
+            .issuer_name(identity)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(not_before)
+            .not_valid_after(not_after)
+            .add_extension(x509.BasicConstraints(ca=True, path_length=1), critical=True)
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=False,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=True,
+                    crl_sign=True,
+                    encipher_only=None,
+                    decipher_only=None,
+                ),
+                critical=True,
+            )
+            .sign(key, hashes.SHA256())
+        )
+        return key, cert
+
+    def new_leaf(
+        label: str,
+        key: rsa.RSAPrivateKey,
+        ca_key: rsa.RSAPrivateKey,
+        ca_cert: x509.Certificate,
+        usage: x509.ObjectIdentifier,
+        *,
+        server: bool = False,
+    ) -> x509.Certificate:
+        builder = (
+            x509.CertificateBuilder()
+            .subject_name(subject(label))
+            .issuer_name(ca_cert.subject)
+            .public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(not_before)
+            .not_valid_after(not_after)
+            .add_extension(
+                x509.BasicConstraints(ca=False, path_length=None), critical=True
+            )
+            .add_extension(
+                x509.KeyUsage(
+                    digital_signature=True,
+                    content_commitment=False,
+                    key_encipherment=server,
+                    data_encipherment=False,
+                    key_agreement=False,
+                    key_cert_sign=False,
+                    crl_sign=False,
+                    encipher_only=None,
+                    decipher_only=None,
+                ),
+                critical=True,
+            )
+            .add_extension(x509.ExtendedKeyUsage([usage]), critical=False)
+        )
+        if server:
+            builder = builder.add_extension(
+                x509.SubjectAlternativeName(
+                    [
+                        x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
+                        x509.DNSName("localhost"),
+                    ]
+                ),
+                critical=False,
+            )
+        return builder.sign(ca_key, hashes.SHA256())
+
+    ca_key, ca_cert = new_ca("Cyrene Runtime Test CA")
+    ca_path = directory / "ca.pem"
+    ca_path.write_bytes(ca_cert.public_bytes(serialization.Encoding.PEM))
+
+    server_key = new_key()
+    server_key_path = write_key("server", server_key)
+    server_cert_path = write_cert(
+        "server",
+        new_leaf(
+            "127.0.0.1",
+            server_key,
+            ca_key,
+            ca_cert,
+            ExtendedKeyUsageOID.SERVER_AUTH,
+            server=True,
+        ),
+    )
+
+    client_key = new_key()
+    client_key_path = write_key("client", client_key)
+    client_cert_path = write_cert(
+        "client",
+        new_leaf(
+            "cyrene-runtime-test-client",
+            client_key,
+            ca_key,
+            ca_cert,
+            ExtendedKeyUsageOID.CLIENT_AUTH,
+        ),
+    )
+
+    wrong_ca_key, wrong_ca_cert = new_ca("Cyrene Untrusted Test CA")
+    wrong_client_key = new_key()
+    wrong_client_key_path = write_key("wrong-client", wrong_client_key)
+    wrong_client_cert_path = write_cert(
+        "wrong-client",
+        new_leaf(
+            "cyrene-untrusted-test-client",
+            wrong_client_key,
+            wrong_ca_key,
+            wrong_ca_cert,
+            ExtendedKeyUsageOID.CLIENT_AUTH,
+        ),
+    )
+    return {
+        "ca": ca_path,
+        "server_key": server_key_path,
+        "server_cert": server_cert_path,
+        "client_key": client_key_path,
+        "client_cert": client_cert_path,
+        "wrong_client_key": wrong_client_key_path,
+        "wrong_client_cert": wrong_client_cert_path,
+    }
+
+
 def test_product_calls_plugin_endpoint_without_platform_process() -> None:
     server, connection_ref = serve(EchoPlugin(), "test.echo.v1", "1", "127.0.0.1:0")
     target = connection_ref.removeprefix("grpc://")
@@ -165,6 +334,84 @@ def test_product_calls_plugin_endpoint_without_platform_process() -> None:
     finally:
         channel.close()
         server.stop(grace=None).wait()
+
+
+def test_remote_direct_endpoint_requires_and_validates_mutual_tls(
+    tmp_path: Path,
+) -> None:
+    """A real TLS loopback accepts a trusted client and rejects absent/untrusted certs."""
+
+    certificates = _generate_mtls_certificates(tmp_path / "mtls")
+    server, connection_ref = serve(
+        EchoPlugin(),
+        "test.echo.v1",
+        "1",
+        "127.0.0.1:0",
+        tls_cert_file=certificates["server_cert"],
+        tls_key_file=certificates["server_key"],
+        tls_client_ca_file=certificates["ca"],
+    )
+    assert connection_ref.startswith("grpcs://127.0.0.1:")
+    target = connection_ref.removeprefix("grpcs://")
+    ca = certificates["ca"].read_bytes()
+
+    valid_channel = grpc.secure_channel(
+        target,
+        grpc.ssl_channel_credentials(
+            root_certificates=ca,
+            private_key=certificates["client_key"].read_bytes(),
+            certificate_chain=certificates["client_cert"].read_bytes(),
+        ),
+    )
+    missing_channel = grpc.secure_channel(
+        target,
+        grpc.ssl_channel_credentials(root_certificates=ca),
+    )
+    wrong_channel = grpc.secure_channel(
+        target,
+        grpc.ssl_channel_credentials(
+            root_certificates=ca,
+            private_key=certificates["wrong_client_key"].read_bytes(),
+            certificate_chain=certificates["wrong_client_cert"].read_bytes(),
+        ),
+    )
+    try:
+        valid = wire_grpc.DirectPluginRuntimeStub(valid_channel)
+        response = valid.Invoke(request(), timeout=3)
+        assert response.WhichOneof("result") == "payload"
+        assert response.payload.value == b"hello"
+        assert valid.Health(wire.HealthRequest(), timeout=3).status == (
+            wire.HealthResponse.STATUS_SERVING
+        )
+
+        for channel in (missing_channel, wrong_channel):
+            client = wire_grpc.DirectPluginRuntimeStub(channel)
+            with pytest.raises(grpc.RpcError) as denied:
+                client.Health(wire.HealthRequest(), timeout=3)
+            assert denied.value.code() in {
+                grpc.StatusCode.UNAVAILABLE,
+                grpc.StatusCode.UNAUTHENTICATED,
+            }
+    finally:
+        valid_channel.close()
+        missing_channel.close()
+        wrong_channel.close()
+        server.stop(grace=None).wait()
+
+
+def test_mutual_tls_server_configuration_is_all_or_none() -> None:
+    """Partial TLS configuration and nonlocal plaintext listeners fail closed."""
+
+    with pytest.raises(ValueError, match="mTLS requires"):
+        serve(
+            EchoPlugin(),
+            "test.echo.v1",
+            "1",
+            "127.0.0.1:0",
+            tls_cert_file="/unused/server.pem",
+        )
+    with pytest.raises(ValueError, match="loopback or Unix sockets"):
+        serve(EchoPlugin(), "test.echo.v1", "1", "0.0.0.0:0")
 
 
 def test_product_client_preserves_direct_payloads_streaming_and_failures() -> None:
@@ -392,3 +639,6 @@ def test_running_the_bootstrap_by_path_does_not_shadow_stdlib_modules() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "usage" in result.stdout.lower()
+    assert "--tls-cert-file" in result.stdout
+    assert "--tls-key-file" in result.stdout
+    assert "--tls-client-ca-file" in result.stdout

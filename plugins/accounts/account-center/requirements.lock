@@ -3,3 +3,4 @@ cryptography==46.0.7
 grpcio==1.62.3
 protobuf==4.25.9
 pycparser==3.11
+rfc8785==0.1.4

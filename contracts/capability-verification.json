@@ -407,6 +407,27 @@
           "command": "uv run --project plugins/accounts/account-center --with-editable sdk/python/cyrene_account_center_contracts --with pytest pytest -q plugins/accounts/account-center/tests sdk/python/cyrene_account_center_contracts/tests",
           "result": "36 passed; fixed account methods, exact caller roles, OAuth PKCE/state callback handling, encrypted storage, one-use lease semantics, refresh recovery, unavailable-credential unlink recovery, tuple-safe WeCom identity listing, atomic fresh database initialization, and no-argument local gRPC startup verified",
           "notes": "Provider identity and callback behavior use local test doubles; no real OAuth login, tenant identity, or external account operation was performed."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / pytest with fake GitHub App and Hugging Face identity transports, local SQLite, in-process DirectPluginRuntime, and Account Center SDK contract tests",
+          "command": "uv run --project plugins/accounts/account-center --with pytest pytest -q plugins/accounts/account-center/tests sdk/python/cyrene_account_center_contracts/tests",
+          "result": "52 passed; account links and credential leases, repository-scoped GitHub App installation profiles, Hugging Face profile linking and rotation, actor binding, refresh recovery, and SDK caller-context contracts exercised",
+          "notes": "All provider transports are local fakes; no real GitHub or Hugging Face identity, token, repository, or remote write was used."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / locked Account Center and SDK tests with RFC 8785 0.1.4, local SQLite, and fake provider transports",
+          "command": "uv run --locked --project plugins/accounts/account-center --with pytest pytest -q plugins/accounts/account-center/tests sdk/python/cyrene_account_center_contracts/tests",
+          "result": "60 passed; includes Exchange/Navigator JCS byte and digest vectors, unsafe numeric rejection, App-only activation without legacy OAuth secrets, conditional manifest secret metadata, and Account Center app/HF profile and lease coverage",
+          "notes": "Provider transports use local fakes; no real GitHub or Hugging Face identity, token, repository, or remote write was used."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / locked Account Center and Account Center Contracts tests with local SQLite, fake Hub OAuth responses, and signed profile-scope grant fixtures",
+          "command": "uv run --locked --project plugins/accounts/account-center --with pytest pytest -o addopts='' -q plugins/accounts/account-center/tests sdk/python/cyrene_account_center_contracts/tests",
+          "result": "75 passed; covers device OAuth linking, access and refresh token rotation, restart recovery, concurrent refresh, revocation and wrong-subject rejection, shared-profile HMAC proof and one-use grants, sha256 grantRef wire shape, legacy credential migration, provider leases, and shared RFC 8785 digest contracts",
+          "notes": "Hub OAuth, grant proofs, and storage use local fixtures; no real Hugging Face login, GitHub identity, token, repository, or remote write was used."
         }
       ]
     },
@@ -422,6 +443,27 @@
           "command": "uv run --project plugins/providers/github-issues --with pytest pytest -q plugins/providers/github-issues/tests",
           "result": "14 passed; fixed tool schemas, actor-bound one-use lease redemption, no-argument hostSecretRefs startup, signed issues and issue_comment normalization, and sanitized API errors verified",
           "notes": "GitHub API and Account Center use local fakes; no real GitHub login, repository write, or external webhook was performed."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / local DirectPluginRuntime and fake Account Center lease / GitHub API transports",
+          "command": "uv run --project plugins/providers/github-issues --with pytest pytest -q plugins/providers/github-issues/tests",
+          "result": "16 passed; repository, branch, pull request and CI reads, profile-bound lease checks, signed webhook normalization, and non-retryable uncertain writes exercised",
+          "notes": "Only local responses and synthetic leases were used; no GitHub account, token, repository, webhook, or remote write was accessed."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / locked GitHub Issues tests with RFC 8785 Account Center SDK and synthetic leases/API responses",
+          "command": "uv run --locked --project plugins/providers/github-issues --with pytest pytest -q plugins/providers/github-issues/tests",
+          "result": "16 passed; repository/branch/PR/CI reads and write leases use the shared SDK JCS argument digest path, with signed webhook normalization and uncertain writes remaining fail-closed",
+          "notes": "Only local responses and synthetic leases were used; no GitHub account, token, repository, webhook, or remote write was accessed."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / locked GitHub provider and DirectPluginRuntime tests with synthetic Account Center leases, fake GitHub transport, and isolated vendor CLI fixtures",
+          "command": "PYTHONPATH=plugins/providers/github-issues/src:sdk/python/cyrene_account_center_contracts/src:sdk/python/cyrene_plugin_runtime/src uv run --locked --project plugins/providers/github-issues --with pytest pytest -o addopts='' -q plugins/providers/github-issues/tests",
+          "result": "24 passed; repository/branch/PR/CI reads, provider-bound lease checks, argv-only GitHub CLI scope, token suppression, fixed-host transport, signed webhook handling, and non-retryable uncertain writes exercised",
+          "notes": "GitHub API and CLI use local fixtures and fake executables; no GitHub account, token, repository, webhook, or remote write was accessed."
         }
       ]
     },
@@ -437,6 +479,13 @@
           "command": "uv run --locked --project plugins/providers/cloud-resources --extra test pytest -q -p no:cacheprovider plugins/providers/cloud-resources/tests; python -m unittest tests.release.test_official_plugin_package.OfficialPluginPackageTests.test_cloud_resources_package_builds_and_lists_tools_from_exact_wheelhouse",
           "result": "35 passed; locked cloud ZIP starts and lists both fixed tools from its isolated wheelhouse, with provider observations exercised only through fixtures",
           "notes": "No Azure, Google, Hugging Face, Tailscale, or Runpod tenant/API call occurred. Provider authorization and real observation freshness remain unverified."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / fixture-backed cloud observation API tests with a local Runpod v2 transport",
+          "command": "PYTHONPATH=plugins/providers/cloud-resources/src:sdk/python/cyrene_integration_contracts/src:sdk/python/cyrene_plugin_runtime/src uv run --no-project --with-requirements plugins/providers/cloud-resources/requirements.lock --with 'pytest>=8,<10' -- python -m pytest -q plugins/providers/cloud-resources/tests",
+          "result": "36 passed; Azure/GCP source-state handling and Runpod v2 observations preserve actual/unknown state without inferring desired state",
+          "notes": "Runpod v2 path was exercised with FixtureTransport only; no Azure, GCP, Tailscale, Hugging Face, or Runpod credential/API/resource operation was used."
         }
       ]
     },
@@ -452,6 +501,65 @@
           "command": "uv run --project plugins/connectors/email-notification --python 3.12 --extra test --refresh-package cyrene-integration-contracts pytest -q -p no:cacheprovider plugins/connectors/email-notification/tests; python -m unittest tests.release.test_official_plugin_package.OfficialPluginPackageTests.test_email_notification_package_builds_and_bootstraps_from_exact_wheelhouse",
           "result": "24 passed; SMTP submission/replay behavior uses a local fixture, and the locked package ZIP starts and lists its tools",
           "notes": "No external SMTP server or production credential was used."
+        }
+      ]
+    },
+    {
+      "capability": "message.connector.v1",
+      "implementation": "cyrene.connectors.teams",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / generated Bot Framework keys, fake HTTPX transports, fake Navigator seam, and fake SDK sender",
+          "command": "cd plugins/connectors/teams && uv run --frozen pytest -q tests",
+          "result": "65 passed; Teams authentication, tenant/team filtering, durable Navigator acceptance, terminal rejection acknowledgements, thread routing, schema v1.28 RSC, and text-only file-suppression behavior exercised through local fixtures",
+          "notes": "No live Teams, Navigator, Exchange, tenant, Bot Framework endpoint, or message was contacted or sent."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.cloud-management",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / local Azure, Google Cloud, and Runpod provider fixtures with signed operation records",
+          "command": "PYTHONPATH=plugins/providers/cloud-management/src:sdk/python/cyrene_account_center_contracts/src:sdk/python/cyrene_integration_contracts/src:sdk/python/cyrene_plugin_runtime/src uv run --no-project --with-requirements plugins/providers/cloud-management/requirements.lock --with 'pytest>=8,<10' --with 'rfc8785==0.1.4' -- python -m pytest -o addopts='' -q plugins/providers/cloud-management/tests sdk/python/cyrene_integration_contracts/tests/test_cloud_management_operations.py",
+          "result": "42 passed; profile-scoped resource calls, signed operation references, Azure/GCP polling, Runpod create/stop/restart/delete readback, resource-target binding, provider-scoped vendor CLI contracts, CLI credential suppression, v1 sunset compatibility, timeouts, cancellation, and bounded durable operation-ledger behavior exercised with local fixtures",
+          "notes": "No Azure, Google Cloud, or Runpod credentials, tenant API calls, resource creation/deletion, or costed provider operations were used."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.huggingface",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / fake Hugging Face API and CDN transports with synthetic Account Center profile leases",
+          "command": "uv run --project plugins/providers/huggingface --with pytest pytest -q plugins/providers/huggingface/tests",
+          "result": "16 passed; scoped model and repository reads, safe downloads, profile-bound uploads with tree readback, redaction, permission failures, and no retry after uncertain upload outcomes exercised",
+          "notes": "All HTTP and authorization are local fixtures; no Hugging Face account, token, Hub repository, upload, or external call was used."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / locked Hugging Face tests with RFC 8785 Account Center SDK and synthetic profile leases",
+          "command": "uv run --locked --project plugins/providers/huggingface --with pytest pytest -q plugins/providers/huggingface/tests",
+          "result": "16 passed; scoped reads, safe downloads, profile-bound uploads and tree readback use the shared JCS lease digest path, with redaction and uncertain-upload no-retry behavior covered",
+          "notes": "All HTTP and authorization are local fixtures; no Hugging Face account, token, Hub repository, upload, or external call was used."
+        },
+        {
+          "observed_at": "2026-10-23",
+          "environment": "linux / Python 3.12 / locked Hugging Face provider and settings tests with fake Hub/CDN transports, synthetic Account Center leases, and isolated vendor CLI fixtures",
+          "command": "PYTHONPATH=plugins/providers/huggingface/src:sdk/python/cyrene_account_center_contracts/src:sdk/python/cyrene_plugin_runtime/src uv run --locked --project plugins/providers/huggingface --with pytest pytest -o addopts='' -q plugins/providers/huggingface/tests",
+          "result": "44 passed; profile-scoped model, dataset and Space access, device OAuth metadata, safe downloads, verified uploads, bound CLI argv and permissions, token suppression, redaction, and uncertain-write no-retry behavior exercised",
+          "notes": "Hub/CDN and CLI use local fixtures; no Hugging Face account, OAuth login, token, repository, upload, or external call was used."
         }
       ]
     }

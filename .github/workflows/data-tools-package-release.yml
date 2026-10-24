@@ -14,6 +14,9 @@ on:
       - "plugins/accounts/account-center/**"
       - "plugins/providers/github-issues/**"
       - "plugins/providers/cloud-resources/**"
+      - "plugins/providers/cloud-management/**"
+      - "plugins/providers/huggingface/**"
+      - "plugins/connectors/teams/**"
       - "plugins/connectors/email-notification/**"
       - "plugins/connectors/wecom/**"
       - "sdk/python/cyrene_account_center_contracts/**"
@@ -41,6 +44,9 @@ on:
       - "plugins/accounts/account-center/**"
       - "plugins/providers/github-issues/**"
       - "plugins/providers/cloud-resources/**"
+      - "plugins/providers/cloud-management/**"
+      - "plugins/providers/huggingface/**"
+      - "plugins/connectors/teams/**"
       - "plugins/connectors/email-notification/**"
       - "plugins/connectors/wecom/**"
       - "sdk/python/cyrene_account_center_contracts/**"
@@ -66,6 +72,7 @@ on:
           - legacy5
           - integration-v1
           - authorization-cloud-v1
+          - teams-cloud-v1
           - cyrene.tools.dataset-preparation
           - cyrene.tools.document-parsing
           - cyrene.tools.dataset-generation
@@ -75,6 +82,9 @@ on:
           - cyrene.providers.github-issues
           - cyrene.connectors.wecom
           - cyrene.providers.cloud-resources
+          - cyrene.connectors.teams
+          - cyrene.providers.cloud-management
+          - cyrene.providers.huggingface
           - cyrene.connectors.email-notification
 
 permissions:
@@ -154,14 +164,19 @@ jobs:
 
           requested = {"duckdb", "pillow"}
           # Keep the shared test process on the runtime/WeCom-compatible gRPC
-          # baseline. Cloud and Email clean-start checks install their own
-          # exact wheelhouse so different component locks are never merged.
+          # baseline. Provider-specific packages install their own exact
+          # wheelhouses so component locks are never merged.
           pins = {
               "grpcio": "grpcio==1.62.3",
               "protobuf": "protobuf==4.25.9",
           }
           lock_isolated_packages = {
               "cyrene.providers.cloud-resources",
+              "cyrene.connectors.teams",
+              "cyrene.providers.cloud-management",
+              "cyrene.providers.huggingface",
+              "cyrene.accounts.account-center",
+              "cyrene.providers.github-issues",
               "cyrene.connectors.email-notification",
           }
           root = Path.cwd()
@@ -263,6 +278,144 @@ jobs:
           if-no-files-found: error
           retention-days: 30
           compression-level: 0
+
+  native-arm64-package-build:
+    name: native ARM64 package build / ${{ matrix.name }}
+    if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && inputs.package_set == 'teams-cloud-v1')
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: teams-connector
+            package_id: cyrene.connectors.teams
+          - name: cloud-management
+            package_id: cyrene.providers.cloud-management
+          - name: huggingface-provider
+            package_id: cyrene.providers.huggingface
+          - name: account-center
+            package_id: cyrene.accounts.account-center
+          - name: github-issues
+            package_id: cyrene.providers.github-issues
+    steps:
+      - name: Check out the exact source commit
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Verify the native Ubuntu ARM64 builder
+        run: |
+          set -euo pipefail
+          test "$(uname -s)" = "Linux"
+          test "$(uname -m)" = "aarch64"
+          python3 - <<'PY'
+          import platform
+          import sys
+          from pathlib import Path
+
+          if sys.version_info[:2] != (3, 12):
+              raise SystemExit("native Package Runtime builds require Python 3.12")
+          details = platform.freedesktop_os_release()
+          if details.get("ID") != "ubuntu" or details.get("VERSION_ID") != "24.04":
+              raise SystemExit("native Package Runtime builds require Ubuntu 24.04")
+          print("native Ubuntu 24.04 ARM64 builder is ready")
+          PY
+
+      - name: Install pinned release build and metadata tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --disable-pip-version-check \
+            --requirement tooling/release/build-requirements.lock \
+            --requirement tools/ci/connection-release-requirements.txt
+
+      - name: Build and verify a candidate package on native ARM64
+        env:
+          PACKAGE_ID: ${{ matrix.package_id }}
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          target="$(python -c 'from tooling.release.official_plugin_package import TARGET_ID; print(TARGET_ID)')"
+          output="$RUNNER_TEMP/official-plugin-arm64-${{ matrix.name }}"
+          mkdir -p "$output"
+          python tooling/release/official_plugin_package.py build \
+            --output-dir "$output" \
+            --package-id "$PACKAGE_ID" \
+            --source-ref "$SOURCE_REF" \
+            --channel candidate \
+            --target "$target" \
+            --github-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+          python tooling/release/official_plugin_package.py verify \
+            --output-dir "$output" \
+            --package-id "$PACKAGE_ID" \
+            --source-ref "$SOURCE_REF" \
+            --channel candidate \
+            --target "$target" \
+            --github-sha "$SOURCE_SHA" \
+            --run-id "$GITHUB_RUN_ID" \
+            --run-attempt "$GITHUB_RUN_ATTEMPT"
+
+      - name: Install native ARM64 wheelhouse and import packaged Plugin
+        env:
+          PACKAGE_ID: ${{ matrix.package_id }}
+        run: |
+          set -euo pipefail
+          output="$RUNNER_TEMP/official-plugin-arm64-${{ matrix.name }}"
+          package_archive="$(find "$output" -maxdepth 1 -type f -name '*.zip' -print -quit)"
+          lock_file="$(find "$output" -maxdepth 1 -type f -name '*-requirements.lock' -print -quit)"
+          test -n "$package_archive"
+          test -n "$lock_file"
+          package_root="$RUNNER_TEMP/official-plugin-arm64-payload-${{ matrix.name }}"
+          install_root="$RUNNER_TEMP/official-plugin-arm64-dependencies-${{ matrix.name }}"
+          mkdir -p "$package_root" "$install_root"
+          python3 - "$package_archive" "$package_root" <<'PY'
+          import sys
+          import zipfile
+          from pathlib import Path, PurePosixPath
+
+          archive_path, destination = map(Path, sys.argv[1:])
+          with zipfile.ZipFile(archive_path) as archive:
+              for member in archive.namelist():
+                  if not (
+                      member.startswith("src/")
+                      or member.startswith("wheelhouse/")
+                      or member == "plugin.manifest.json"
+                  ):
+                      continue
+                  relative = PurePosixPath(member)
+                  if relative.is_absolute() or ".." in relative.parts:
+                      raise SystemExit(f"unsafe package path: {member}")
+                  target = destination.joinpath(*relative.parts)
+                  target.parent.mkdir(parents=True, exist_ok=True)
+                  target.write_bytes(archive.read(member))
+          PY
+          python -m pip install --disable-pip-version-check \
+            --ignore-installed \
+            --no-index \
+            --only-binary=:all: \
+            --find-links "$package_root/wheelhouse" \
+            --requirement "$lock_file" \
+            --target "$install_root"
+          PYTHONPATH="$install_root:$package_root/src" python -S - "$package_root/plugin.manifest.json" <<'PY'
+          import importlib
+          import json
+          import sys
+          from pathlib import Path
+
+          manifest = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          module_name = manifest["runtime"]["entrypoint"].split(":", 1)[0]
+          importlib.import_module(module_name)
+          print(f"native ARM64 import passed: {manifest['id']}")
+          PY
 
   publish:
     name: attest and release ${{ matrix.name }} package

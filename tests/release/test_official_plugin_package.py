@@ -15,9 +15,11 @@ import tempfile
 import unittest
 import zipfile
 from copy import deepcopy
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
+import tomllib
 from packaging.requirements import Requirement
 
 from tooling.release import official_plugin_package as release
@@ -27,19 +29,23 @@ from tooling.release import training_llama_factory_package as training_release
 LOCK_ISOLATED_STARTUP_PACKAGES = frozenset(
     {
         "cyrene.accounts.account-center",
+        "cyrene.connectors.teams",
         "cyrene.connectors.wecom",
+        "cyrene.providers.cloud-management",
         "cyrene.providers.cloud-resources",
+        "cyrene.providers.github-issues",
+        "cyrene.providers.huggingface",
     }
 )
 
 
 def _write_preparer_wheel(path: Path) -> Path:
-    metadata_root = "cyrene_plugin_runtime-0.2.1.dist-info"
+    metadata_root = "cyrene_plugin_runtime-0.2.2.dist-info"
     path.parent.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as archive:
         archive.writestr(
             f"{metadata_root}/METADATA",
-            "Metadata-Version: 2.1\nName: cyrene-plugin-runtime\nVersion: 0.2.1\n",
+            "Metadata-Version: 2.1\nName: cyrene-plugin-runtime\nVersion: 0.2.2\n",
         )
         archive.writestr(
             f"{metadata_root}/WHEEL", "Wheel-Version: 1.0\nTag: py3-none-any\n"
@@ -124,6 +130,46 @@ class OfficialPluginPackageTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temporary.cleanup()
 
+    def test_runtime_version_and_mtls_test_dependency_are_consistent(self) -> None:
+        """Keep the tested X.509 helper out of production runtime dependencies."""
+
+        project_path = self.repository / "sdk/python/cyrene_plugin_runtime/pyproject.toml"
+        project = tomllib.loads(project_path.read_text(encoding="utf-8"))["project"]
+
+        self.assertEqual(project["version"], release.PREPARER_VERSION)
+        self.assertEqual(project["version"], training_release.RUNTIME_VERSION)
+        self.assertEqual(release.PREPARER_WHEEL, training_release.RUNTIME_WHEEL_NAME)
+        self.assertNotIn(
+            "cryptography",
+            [Requirement(value).name.lower() for value in project["dependencies"]],
+        )
+        self.assertEqual(
+            project["optional-dependencies"]["test"], ["cryptography>=44,<51"]
+        )
+        account_center_project = tomllib.loads(
+            (
+                self.repository
+                / "plugins/accounts/account-center/pyproject.toml"
+            ).read_text(encoding="utf-8")
+        )["project"]
+        account_center_cryptography = next(
+            Requirement(value)
+            for value in account_center_project["dependencies"]
+            if Requirement(value).name.lower() == "cryptography"
+        )
+        teams_cryptography = next(
+            line.split("==", 1)[1]
+            for line in (
+                self.repository / "plugins/connectors/teams/requirements.lock"
+            ).read_text(encoding="utf-8").splitlines()
+            if line.startswith("cryptography==")
+        )
+        self.assertTrue(account_center_cryptography.specifier.contains(teams_cryptography))
+        self.assertTrue(
+            Requirement(project["optional-dependencies"]["test"][0])
+            .specifier.contains(teams_cryptography)
+        )
+
     def test_package_release_selection_preserves_push_scope_and_limits_dispatch(
         self,
     ) -> None:
@@ -183,6 +229,84 @@ class OfficialPluginPackageTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "fixed official package allowlist"):
             selection.select_package_release("workflow_dispatch", "arbitrary-package")
+
+    def test_native_target_registry_and_cross_architecture_guard(self) -> None:
+        """Map both native Linux targets and reject cross-architecture requests."""
+
+        self.assertEqual(
+            release.target_id_for_machine("x86_64"),
+            "linux-ubuntu-24.04-x86_64-python-3.12",
+        )
+        self.assertEqual(
+            release.target_id_for_machine("aarch64"),
+            "linux-ubuntu-24.04-aarch64-python-3.12",
+        )
+        self.assertEqual(
+            release.target_id_for_machine("arm64"),
+            "linux-ubuntu-24.04-aarch64-python-3.12",
+        )
+        self.assertIsNone(release.target_id_for_machine("riscv64"))
+        self.assertEqual(
+            release.TARGET["architecture"],
+            "aarch64"
+            if release.TARGET_ID.endswith("-aarch64-python-3.12")
+            else "x86_64",
+        )
+        with self.assertRaisesRegex(
+            release.PackageBuildError, "does not match native builder target"
+        ):
+            release._require_native_target(
+                "linux-ubuntu-24.04-aarch64-python-3.12", machine="x86_64"
+            )
+
+    def test_wheel_filename_and_wheel_metadata_architectures_must_match(self) -> None:
+        """Reject a wheel whose filename and embedded WHEEL tags disagree."""
+
+        filename = "fixture-1.0-cp312-cp312-manylinux_2_39_x86_64.whl"
+        payload = BytesIO()
+        with zipfile.ZipFile(payload, "w", compression=zipfile.ZIP_STORED) as archive:
+            archive.writestr(
+                "fixture-1.0.dist-info/METADATA",
+                "Metadata-Version: 2.1\nName: fixture\nVersion: 1.0\n",
+            )
+            archive.writestr(
+                "fixture-1.0.dist-info/WHEEL",
+                "Wheel-Version: 1.0\nTag: cp312-cp312-manylinux_2_39_aarch64\n",
+            )
+
+        with self.assertRaisesRegex(
+            release.PackageBuildError, "WHEEL metadata tags do not match"
+        ):
+            release._wheel_metadata(payload.getvalue(), filename)
+
+    def test_wheelhouse_rejects_a_wheel_for_the_other_architecture(self) -> None:
+        """Never accept a foreign-architecture wheel into a native package ZIP."""
+
+        current_architecture = release.TARGET["architecture"]
+        other_architecture = "aarch64" if current_architecture == "x86_64" else "x86_64"
+        platform_tag = (
+            "manylinux_2_39_aarch64"
+            if other_architecture == "aarch64"
+            else "manylinux_2_39_x86_64"
+        )
+        filename = f"protobuf-4.25.9-cp312-cp312-{platform_tag}.whl"
+        wheel_path = self.temp_root / filename
+        with zipfile.ZipFile(wheel_path, "w", compression=zipfile.ZIP_STORED) as archive:
+            archive.writestr(
+                "protobuf-4.25.9.dist-info/METADATA",
+                "Metadata-Version: 2.1\nName: protobuf\nVersion: 4.25.9\n",
+            )
+            archive.writestr(
+                "protobuf-4.25.9.dist-info/WHEEL",
+                f"Wheel-Version: 1.0\nTag: cp312-cp312-{platform_tag}\n",
+            )
+
+        with self.assertRaisesRegex(
+            release.PackageBuildError, "wheel is incompatible with"
+        ):
+            release._wheelhouse_entries(
+                b"grpcio==1.62.3\nprotobuf==4.25.9\n", [wheel_path]
+            )
 
     def test_wecom_package_refuses_an_unlicensed_manifest(self) -> None:
         """Do not publish an independent Plugin package without its component grant."""
@@ -326,7 +450,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
             if line.strip() and not line.lstrip().startswith("#")
         }
         self.assertEqual(input_requirements, {"grpcio", "jsonschema", "protobuf"})
-        self.assertIn("cyrene-plugin-runtime==0.2.1", requirements_input)
+        self.assertIn("cyrene-plugin-runtime==0.2.2", requirements_input)
         self.assertIn("cyrene-integration-contracts==0.1.0", requirements_input)
         pins = release._verify_lock_inputs(spec, source_files)
         self.assertEqual(
@@ -399,7 +523,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 "requests",
             },
         )
-        self.assertIn("cyrene-plugin-runtime==0.2.1", requirements_input)
+        self.assertIn("cyrene-plugin-runtime==0.2.2", requirements_input)
         self.assertIn("cyrene-integration-contracts==0.1.0", requirements_input)
         pins = release._verify_lock_inputs(spec, source_files)
         pin_versions = {
@@ -765,7 +889,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                         channel="preview",
                     )
 
-    def test_ten_packages_and_training_template_start_with_pythonpath_unset(
+    def test_registered_packages_and_training_template_start_with_pythonpath_unset(
         self,
     ) -> None:
         """Require clean startup from each ZIP's ``src`` tree.
@@ -774,16 +898,13 @@ class OfficialPluginPackageTests(unittest.TestCase):
         """
 
         cases: list[tuple[str, Path, str, str, str | None]] = []
-        expected_target = {
-            "os": "linux",
-            "osVersion": "24.04",
-            "distribution": "ubuntu",
-            "distributionVersion": "24.04",
-            "architecture": "x86_64",
-            "abi": "glibc-2.39",
-            "runtime": "python:3.12",
-        }
-        self.assertEqual(release.TARGET, expected_target)
+        expected_target = release.TARGET
+        self.assertEqual(
+            expected_target["architecture"],
+            "aarch64"
+            if release.TARGET_ID.endswith("-aarch64-python-3.12")
+            else "x86_64",
+        )
         for index, package_id in enumerate(sorted(release.PACKAGE_SPECS)):
             spec = release.PACKAGE_SPECS[package_id]
             output_dir = self.temp_root / f"package-{index}"
@@ -1115,6 +1236,81 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 "TEST_PACKAGE_CLOUD_CONTEXT_KEY": (b"\x55" * 32).hex(),
             }
 
+        if package_id == "cyrene.providers.cloud-management":
+            state_directory = self.temp_root / "cloud-management-package-state"
+            state_directory.mkdir(mode=0o700)
+            os.chmod(state_directory, 0o700)
+            configuration = {
+                "trusted_callers": [
+                    {
+                        "caller_workload": "cyrene-exchange",
+                        "audience": "cloud-management",
+                        "organization_id": "package-fixture-org",
+                        "workspace_id": "package-fixture-workspace",
+                        "issuer": "cyrene-exchange",
+                        "verification_key_ref": "cloud-management/exchange-verification-key",
+                    }
+                ],
+                "profiles": [
+                    {
+                        "profile_ref": "azure-package-test",
+                        "provider": "azure",
+                        "identity_ref": "system-assigned",
+                        "scope": {
+                            "subscription_id": "11111111-2222-3333-4444-555555555555",
+                            "resource_groups": ["package-test"],
+                        },
+                        "auth": {"mode": "managed_identity"},
+                    }
+                ],
+                "hostSecretRefs": {
+                    "cloud-management/exchange-verification-key": (
+                        "TEST_PACKAGE_CLOUD_MANAGEMENT_EXCHANGE_KEY"
+                    ),
+                    "cloud-management/state-dir": "TEST_PACKAGE_CLOUD_MANAGEMENT_STATE_DIR",
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "cloud-management-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_CLOUD_MANAGEMENT_EXCHANGE_KEY": (b"\x56" * 32).hex(),
+                "TEST_PACKAGE_CLOUD_MANAGEMENT_STATE_DIR": str(state_directory),
+            }
+
+        if package_id == "cyrene.providers.huggingface":
+            configuration = {
+                "exchange_caller_id": "exchange-service",
+                "exchange_verification_key_ref": "huggingface/exchange-verification-key",
+                "account_center": {
+                    "binding_id": "account-center-package-test",
+                    "connection_ref": "grpc://127.0.0.1:1",
+                    "transport": "local",
+                    "caller_id": "huggingface-provider",
+                    "signing_key_ref": "huggingface/account-center-provider-signing-key",
+                },
+                "repositories": [
+                    {
+                        "repo_type": "model",
+                        "repo_id": "fixture/model",
+                        "permissions": ["read"],
+                    }
+                ],
+                "hostSecretRefs": {
+                    "huggingface/exchange-verification-key": (
+                        "TEST_PACKAGE_HF_EXCHANGE_KEY"
+                    ),
+                    "huggingface/account-center-provider-signing-key": (
+                        "TEST_PACKAGE_HF_ACCOUNT_CENTER_KEY"
+                    ),
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "huggingface-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_HF_EXCHANGE_KEY": (b"\x57" * 32).hex(),
+                "TEST_PACKAGE_HF_ACCOUNT_CENTER_KEY": (b"\x58" * 32).hex(),
+            }
+
         if package_id == "cyrene.connectors.email-notification":
             storage = self.temp_root / "email-notification-package-state"
             storage.mkdir(mode=0o700)
@@ -1252,10 +1448,10 @@ class OfficialPluginPackageTests(unittest.TestCase):
     ) -> Path | None:
         """Create a runtime from an isolated exact wheelhouse where pins differ.
 
-        Account Center and WeCom have distinct crypto pins, while Cloud uses a
-        newer gRPC pin than the shared test baseline. These clean-start checks
-        install each ZIP's wheelhouse instead of merging incompatible pins.
-        中文：为固定密码学版本的 package 独立安装 ZIP 锁定的 wheelhouse。
+        Account Center, GitHub, WeCom, Cloud, Teams, and Hugging Face have
+        component-specific locks. These checks install each ZIP's exact
+        wheelhouse instead of merging provider dependency pins.
+        中文：为有独立依赖锁的 package 安装各自 ZIP 中的精确 wheelhouse。
         """
 
         if package_id not in LOCK_ISOLATED_STARTUP_PACKAGES:
@@ -1330,6 +1526,10 @@ class OfficialPluginPackageTests(unittest.TestCase):
             "TEST_PACKAGE_GH_EXCHANGE_KEY",
             "TEST_PACKAGE_GH_WEBHOOK_SECRET",
             "TEST_PACKAGE_GH_PROVIDER_KEY",
+            "TEST_PACKAGE_CLOUD_MANAGEMENT_EXCHANGE_KEY",
+            "TEST_PACKAGE_CLOUD_MANAGEMENT_STATE_DIR",
+            "TEST_PACKAGE_HF_EXCHANGE_KEY",
+            "TEST_PACKAGE_HF_ACCOUNT_CENTER_KEY",
             "EMAIL_NOTIFICATION_CONTEXT_HMAC_KEY",
             "SMTP_USERNAME",
             "SMTP_PASSWORD",

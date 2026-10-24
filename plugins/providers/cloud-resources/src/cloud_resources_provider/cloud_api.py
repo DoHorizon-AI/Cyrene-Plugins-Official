@@ -34,7 +34,7 @@ AZURE_MANAGEMENT_HOST = "management.azure.com"
 GCP_COMPUTE_HOST = "compute.googleapis.com"
 HF_HUB_HOST = "huggingface.co"
 TAILSCALE_API_HOST = "api.tailscale.com"
-RUNPOD_API_HOST = "rest.runpod.io"
+RUNPOD_API_HOST = "api.runpod.io"
 _AZURE_SCOPE = "https://management.azure.com/.default"
 _GCP_SCOPE = "https://www.googleapis.com/auth/compute.readonly"
 _GOOGLE_TOKEN_URI = "https://oauth2.googleapis.com/token"
@@ -525,7 +525,7 @@ class CloudResourceReader:
         """Read one Pod and preserve desired status without asserting actual runtime state."""
 
         pod_id = quote(target.pod_id, safe="-_")
-        url = f"https://{RUNPOD_API_HOST}/v1/pods/{pod_id}"
+        url = f"https://{RUNPOD_API_HOST}/v2/pods/{pod_id}"
         document = self._transport.get_json(
             url,
             expected_host=RUNPOD_API_HOST,

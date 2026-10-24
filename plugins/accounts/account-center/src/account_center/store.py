@@ -16,7 +16,7 @@ from typing import Any
 
 from .models import AccountCenterError, Anchor
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 7
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 
@@ -171,8 +171,12 @@ class AccountStore:
                 # Keep legacy WeCom rows unresolved rather than guessing how a
                 # slash-joined source authority was originally partitioned.
                 db.execute("ALTER TABLE accounts ADD COLUMN bot_namespace TEXT")
-                db.execute("ALTER TABLE accounts ADD COLUMN remote_revocation_status TEXT")
-                db.execute("ALTER TABLE accounts ADD COLUMN remote_revocation_owner TEXT")
+                db.execute(
+                    "ALTER TABLE accounts ADD COLUMN remote_revocation_status TEXT"
+                )
+                db.execute(
+                    "ALTER TABLE accounts ADD COLUMN remote_revocation_owner TEXT"
+                )
                 db.execute(
                     "ALTER TABLE accounts ADD COLUMN remote_revocation_command_hash TEXT"
                 )
@@ -240,7 +244,9 @@ class AccountStore:
                     "CREATE INDEX command_idempotency_expiry "
                     "ON command_idempotency(expires_at)"
                 )
-                db.execute("ALTER TABLE accounts ADD COLUMN remote_revocation_owner TEXT")
+                db.execute(
+                    "ALTER TABLE accounts ADD COLUMN remote_revocation_owner TEXT"
+                )
                 db.execute(
                     "ALTER TABLE accounts ADD COLUMN remote_revocation_command_hash TEXT"
                 )
@@ -253,7 +259,9 @@ class AccountStore:
                 )
                 db.execute("PRAGMA user_version = 4")
             elif current == 3:
-                db.execute("ALTER TABLE accounts ADD COLUMN remote_revocation_owner TEXT")
+                db.execute(
+                    "ALTER TABLE accounts ADD COLUMN remote_revocation_owner TEXT"
+                )
                 db.execute(
                     "ALTER TABLE accounts ADD COLUMN remote_revocation_command_hash TEXT"
                 )
@@ -265,15 +273,129 @@ class AccountStore:
                     "WHERE status='revocation_pending'"
                 )
                 db.execute("PRAGMA user_version = 4")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS provider_profiles ("
+                "profile_ref TEXT PRIMARY KEY,anchor_issuer TEXT NOT NULL,"
+                "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
+                "provider TEXT NOT NULL CHECK(provider IN "
+                "('github','huggingface','azure','gcp','runpod')),"
+                "identity_ref TEXT NOT NULL,target_scope_json TEXT NOT NULL,"
+                "auth_status TEXT NOT NULL CHECK(auth_status IN "
+                "('unknown','configured','healthy','unavailable','reauthorization_required','revoked')),"
+                "external_subject TEXT,credential_blob BLOB,credential_expires_at INTEGER,"
+                "credential_secret_ref TEXT,status TEXT NOT NULL CHECK(status IN ('active','unlinked')) ,"
+                "created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS provider_profile_owner_scope ON provider_profiles("
+                "anchor_issuer,anchor_subject,organization_id,workspace_id,status)"
+            )
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS provider_external_identity "
+                "ON provider_profiles(provider,identity_ref,organization_id) "
+                "WHERE status='active' AND provider IN ('github','huggingface')"
+            )
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS provider_credential_leases ("
+                "lease_ref TEXT PRIMARY KEY,profile_ref TEXT NOT NULL "
+                "REFERENCES provider_profiles(profile_ref),anchor_issuer TEXT NOT NULL,"
+                "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
+                "binding_id TEXT NOT NULL,provider_caller_id TEXT NOT NULL,operation_id TEXT NOT NULL,"
+                "target_json TEXT NOT NULL,arguments_sha256 TEXT NOT NULL,expires_at INTEGER NOT NULL,"
+                "redeemed_at INTEGER)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS provider_credential_lease_expiry "
+                "ON provider_credential_leases(expires_at)"
+            )
+            if current < 5:
+                db.execute("PRAGMA user_version = 5")
+            if current < 6:
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN auth_mode TEXT NOT NULL "
+                    "DEFAULT 'legacy' CHECK(auth_mode IN "
+                    "('legacy','fine_grained_token','device_oauth','github_app','host_identity'))"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN credential_refresh_blob BLOB"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN credential_refresh_expires_at INTEGER"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN oauth_client_id TEXT"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN oauth_scopes_json TEXT"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN refresh_claim_id TEXT"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN refresh_claim_owner TEXT"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN refresh_claimed_at INTEGER"
+                )
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN credential_revision INTEGER "
+                    "NOT NULL DEFAULT 0"
+                )
+                db.execute(
+                    "UPDATE provider_profiles SET auth_mode=CASE provider "
+                    "WHEN 'github' THEN 'github_app' "
+                    "WHEN 'huggingface' THEN 'fine_grained_token' "
+                    "ELSE 'host_identity' END"
+                )
+                db.execute("PRAGMA user_version = 6")
+            if current < 7:
+                db.execute(
+                    "ALTER TABLE provider_profiles ADD COLUMN access_mode TEXT NOT NULL "
+                    "DEFAULT 'actor_owned' CHECK(access_mode IN "
+                    "('actor_owned','workspace_operator'))"
+                )
+                db.execute(
+                    "ALTER TABLE provider_credential_leases ADD COLUMN connection_ref TEXT"
+                )
+                db.execute(
+                    "CREATE TABLE consumed_connector_grants ("
+                    "grant_ref TEXT PRIMARY KEY,connection_ref TEXT NOT NULL,"
+                    "profile_ref TEXT NOT NULL,provider_id TEXT NOT NULL,"
+                    "operation_id TEXT NOT NULL,resource_ref TEXT NOT NULL,"
+                    "arguments_sha256 TEXT NOT NULL,anchor_issuer TEXT NOT NULL,"
+                    "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,"
+                    "workspace_id TEXT NOT NULL,issued_at INTEGER NOT NULL,"
+                    "expires_at INTEGER NOT NULL,consumed_at INTEGER NOT NULL)"
+                )
+                db.execute(
+                    "CREATE INDEX consumed_connector_grants_expiry "
+                    "ON consumed_connector_grants(expires_at)"
+                )
+                db.execute("PRAGMA user_version = 7")
 
     def _recover_interrupted_operations(self) -> None:
         """Mark token rotations, callbacks, and revocations interrupted by restart."""
 
+        stale_claim_before = int(time.time()) - 45
         with self.transaction() as db:
             db.execute(
                 "UPDATE accounts SET credential_status='reauthorization_required', "
                 "credential_blob=NULL,refresh_claim_id=NULL,refresh_claim_owner=NULL, "
                 "refresh_claimed_at=NULL WHERE credential_status='refresh_pending'"
+            )
+            db.execute(
+                "UPDATE provider_profiles SET auth_status='reauthorization_required',"
+                "credential_blob=NULL,credential_refresh_blob=NULL,refresh_claim_id=NULL,"
+                "refresh_claim_owner=NULL,refresh_claimed_at=NULL,"
+                "credential_revision=credential_revision+1,updated_at=? "
+                "WHERE status='active' AND refresh_claim_id IS NOT NULL "
+                "AND refresh_claimed_at<=?",
+                (int(time.time()), stale_claim_before),
+            )
+            db.execute(
+                "DELETE FROM provider_credential_leases WHERE profile_ref IN "
+                "(SELECT profile_ref FROM provider_profiles "
+                "WHERE auth_status='reauthorization_required' AND provider='huggingface')"
             )
             db.execute(
                 "DELETE FROM credential_leases WHERE account_ref IN "
@@ -341,6 +463,15 @@ class AccountStore:
                 (timestamp,),
             )
             db.execute(
+                "DELETE FROM provider_credential_leases WHERE expires_at < ? "
+                "OR redeemed_at IS NOT NULL",
+                (timestamp,),
+            )
+            db.execute(
+                "DELETE FROM consumed_connector_grants WHERE expires_at < ?",
+                (timestamp,),
+            )
+            db.execute(
                 "DELETE FROM consumed_requests WHERE expires_at < ?", (timestamp,)
             )
             db.execute(
@@ -364,7 +495,9 @@ class AccountStore:
                 (key_hash,),
             ).fetchone()
             if row is not None and row["expires_at"] <= now:
-                db.execute("DELETE FROM command_idempotency WHERE key_hash=?", (key_hash,))
+                db.execute(
+                    "DELETE FROM command_idempotency WHERE key_hash=?", (key_hash,)
+                )
                 row = None
             if row is not None:
                 if row["method"] != method or row["payload_sha256"] != payload_sha256:
@@ -385,9 +518,7 @@ class AccountStore:
             )
         return None
 
-    def complete_idempotent_command(
-        self, key_hash: str, response_blob: bytes
-    ) -> None:
+    def complete_idempotent_command(self, key_hash: str, response_blob: bytes) -> None:
         """Store one encrypted bounded result after the command finishes."""
 
         with self.transaction() as db:
@@ -840,8 +971,8 @@ class AccountStore:
             )
             if complete_session_ref is not None:
                 changed = db.execute(
-                "UPDATE link_sessions SET status='completed',code_verifier_blob=NULL, "
-                "pending_credential_blob=NULL "
+                    "UPDATE link_sessions SET status='completed',code_verifier_blob=NULL, "
+                    "pending_credential_blob=NULL "
                     "WHERE link_session_ref=? AND status='processing' AND expires_at>?",
                     (complete_session_ref, now),
                 ).rowcount
@@ -907,6 +1038,26 @@ class AccountStore:
             row["anchor_issuer"] == anchor.issuer
             and row["anchor_subject"] == anchor.subject
             and row["organization_id"] == anchor.organization_id
+            and row["workspace_id"] == anchor.workspace_id
+        )
+
+    @staticmethod
+    def _owns_provider_profile(
+        row: Mapping[str, Any],
+        anchor: Anchor,
+        *,
+        allow_workspace_operator: bool = False,
+    ) -> bool:
+        """Keep actor-owned profiles private and share only exact workspace scope."""
+
+        if AccountStore._owns(row, anchor):
+            return True
+        return (
+            allow_workspace_operator
+            and row["access_mode"] == "workspace_operator"
+            and row["anchor_issuer"] == anchor.issuer
+            and row["organization_id"] == anchor.organization_id
+            and row["workspace_id"] is not None
             and row["workspace_id"] == anchor.workspace_id
         )
 
@@ -1004,6 +1155,684 @@ class AccountStore:
                 db.execute(
                     "DELETE FROM credential_leases WHERE account_ref=?", (account_ref,)
                 )
+
+    def create_provider_profile(
+        self,
+        *,
+        profile_ref: str,
+        anchor: Anchor,
+        provider: str,
+        identity_ref: str,
+        target_scope_json: str,
+        auth_status: str,
+        external_subject: str | None,
+        credential_blob: bytes | None,
+        credential_expires_at: int | None,
+        credential_secret_ref: str | None,
+        auth_mode: str | None = None,
+        credential_refresh_blob: bytes | None = None,
+        credential_refresh_expires_at: int | None = None,
+        oauth_client_id: str | None = None,
+        oauth_scopes_json: str | None = None,
+        access_mode: str = "actor_owned",
+        now: int,
+    ) -> None:
+        """Persist one owner-bound provider profile and encrypted credential."""
+
+        if auth_mode is None:
+            auth_mode = {
+                "github": "github_app",
+                "huggingface": "fine_grained_token",
+            }.get(provider, "host_identity")
+        if auth_mode not in {
+            "fine_grained_token",
+            "device_oauth",
+            "github_app",
+            "host_identity",
+        }:
+            raise AccountCenterError("invalid_request")
+        if access_mode not in {"actor_owned", "workspace_operator"}:
+            raise AccountCenterError("invalid_request")
+        if access_mode == "workspace_operator" and anchor.workspace_id is None:
+            raise AccountCenterError("profile_unavailable")
+        with self.transaction() as db:
+            try:
+                db.execute(
+                    "INSERT INTO provider_profiles(profile_ref,anchor_issuer,anchor_subject,"
+                    "organization_id,workspace_id,provider,identity_ref,target_scope_json,"
+                    "auth_status,external_subject,credential_blob,credential_expires_at,"
+                    "credential_secret_ref,status,created_at,updated_at,auth_mode,"
+                    "credential_refresh_blob,credential_refresh_expires_at,oauth_client_id,"
+                    "oauth_scopes_json,access_mode,credential_revision) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,'active',?,?,?,?,?,?,?,?,0)",
+                    (
+                        profile_ref,
+                        anchor.issuer,
+                        anchor.subject,
+                        anchor.organization_id,
+                        anchor.workspace_id,
+                        provider,
+                        identity_ref,
+                        target_scope_json,
+                        auth_status,
+                        external_subject,
+                        credential_blob,
+                        credential_expires_at,
+                        credential_secret_ref,
+                        now,
+                        now,
+                        auth_mode,
+                        credential_refresh_blob,
+                        credential_refresh_expires_at,
+                        oauth_client_id,
+                        oauth_scopes_json,
+                        access_mode,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                existing = db.execute(
+                    "SELECT * FROM provider_profiles WHERE profile_ref=?",
+                    (profile_ref,),
+                ).fetchone()
+                if existing is not None and self._owns(existing, anchor):
+                    raise AccountCenterError("profile_already_exists") from None
+                external = db.execute(
+                    "SELECT * FROM provider_profiles WHERE provider=? AND identity_ref=? "
+                    "AND organization_id=? AND status='active'",
+                    (provider, identity_ref, anchor.organization_id),
+                ).fetchone()
+                if external is not None and not self._owns(external, anchor):
+                    raise AccountCenterError("external_identity_owned") from None
+                if external is not None:
+                    raise AccountCenterError("duplicate_provider_identity") from None
+                raise AccountCenterError("profile_ref_unavailable") from None
+
+    def list_provider_profiles(self, anchor: Anchor) -> list[sqlite3.Row]:
+        """Return metadata-only profiles owned by the exact actor/workspace."""
+
+        with self._connect() as db:
+            rows = db.execute(
+                "SELECT profile_ref,provider,identity_ref,target_scope_json,auth_status,"
+                "external_subject,credential_expires_at,status,created_at,updated_at,"
+                "auth_mode,oauth_scopes_json,access_mode "
+                "FROM provider_profiles WHERE anchor_issuer=? AND anchor_subject=? "
+                "AND organization_id=? AND workspace_id IS ? AND status='active' "
+                "ORDER BY created_at,profile_ref",
+                (
+                    anchor.issuer,
+                    anchor.subject,
+                    anchor.organization_id,
+                    anchor.workspace_id,
+                ),
+            ).fetchall()
+        return list(rows)
+
+    def get_provider_profile(
+        self,
+        profile_ref: str,
+        anchor: Anchor,
+        *,
+        allow_workspace_operator: bool = False,
+    ) -> sqlite3.Row:
+        """Return a profile to its owner or a caller with verified workspace proof."""
+
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+        if row is None or not self._owns_provider_profile(
+            row, anchor, allow_workspace_operator=allow_workspace_operator
+        ):
+            raise AccountCenterError("profile_not_found")
+        return row
+
+    def update_provider_profile_credential(
+        self,
+        *,
+        profile_ref: str,
+        anchor: Anchor,
+        credential_blob: bytes,
+        credential_expires_at: int | None,
+        external_subject: str,
+        auth_status: str,
+        now: int,
+        allow_workspace_operator: bool = False,
+    ) -> None:
+        """Replace encrypted profile credentials only when identity remains stable."""
+
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if row is None or not self._owns_provider_profile(
+                row, anchor, allow_workspace_operator=allow_workspace_operator
+            ):
+                raise AccountCenterError("profile_not_found")
+            if row["external_subject"] and row["external_subject"] != external_subject:
+                raise AccountCenterError("external_identity_mismatch")
+            db.execute(
+                "UPDATE provider_profiles SET credential_blob=?,credential_expires_at=?,"
+                "external_subject=?,auth_status=?,updated_at=? WHERE profile_ref=?",
+                (
+                    credential_blob,
+                    credential_expires_at,
+                    external_subject,
+                    auth_status,
+                    now,
+                    profile_ref,
+                ),
+            )
+
+    def update_huggingface_profile_credentials(
+        self,
+        *,
+        profile_ref: str,
+        anchor: Anchor,
+        credential_blob: bytes,
+        credential_refresh_blob: bytes | None,
+        credential_expires_at: int | None,
+        credential_refresh_expires_at: int | None,
+        oauth_client_id: str | None,
+        oauth_scopes_json: str | None,
+        auth_mode: str,
+        credential_secret_ref: str,
+        external_subject: str,
+        now: int,
+    ) -> None:
+        """Replace HF access and refresh material atomically for the pinned owner."""
+
+        if auth_mode not in {"fine_grained_token", "device_oauth"}:
+            raise AccountCenterError("invalid_request")
+        if auth_mode == "device_oauth" and (
+            credential_refresh_blob is None or not oauth_client_id
+        ):
+            raise AccountCenterError("credential_unavailable")
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if row is None or not self._owns(row, anchor):
+                raise AccountCenterError("profile_not_found")
+            if row["provider"] != "huggingface":
+                raise AccountCenterError("profile_provider_mismatch")
+            if row["external_subject"] and row["external_subject"] != external_subject:
+                raise AccountCenterError("external_identity_mismatch")
+            db.execute(
+                "UPDATE provider_profiles SET credential_blob=?,credential_refresh_blob=?,"
+                "credential_expires_at=?,credential_refresh_expires_at=?,oauth_client_id=?,"
+                "oauth_scopes_json=?,auth_mode=?,credential_secret_ref=?,external_subject=?,"
+                "auth_status='healthy',refresh_claim_id=NULL,refresh_claim_owner=NULL,"
+                "refresh_claimed_at=NULL,credential_revision=credential_revision+1,"
+                "updated_at=? WHERE profile_ref=?",
+                (
+                    credential_blob,
+                    credential_refresh_blob,
+                    credential_expires_at,
+                    credential_refresh_expires_at,
+                    oauth_client_id,
+                    oauth_scopes_json,
+                    auth_mode,
+                    credential_secret_ref,
+                    external_subject,
+                    now,
+                    profile_ref,
+                ),
+            )
+            db.execute(
+                "DELETE FROM provider_credential_leases WHERE profile_ref=?",
+                (profile_ref,),
+            )
+
+    def claim_huggingface_oauth_refresh(
+        self,
+        profile_ref: str,
+        anchor: Anchor,
+        *,
+        now: int,
+        refresh_margin_seconds: int = 60,
+        claim_stale_seconds: int = 45,
+    ) -> tuple[str, sqlite3.Row | None, str | None]:
+        """Claim one durable OAuth rotation or report its current state."""
+
+        with self.transaction() as db:
+            profile = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if profile is None or not self._owns_provider_profile(
+                profile, anchor, allow_workspace_operator=True
+            ):
+                raise AccountCenterError("profile_not_found")
+            if (
+                profile["provider"] != "huggingface"
+                or profile["auth_mode"] != "device_oauth"
+            ):
+                raise AccountCenterError("profile_provider_mismatch")
+            if profile["auth_status"] != "healthy":
+                raise AccountCenterError("credential_reauthorization_required")
+            expires_at = profile["credential_expires_at"]
+            if (
+                isinstance(expires_at, int)
+                and expires_at > now + refresh_margin_seconds
+                and profile["credential_blob"] is not None
+            ):
+                return "ready", profile, None
+            if profile["credential_refresh_blob"] is None:
+                self._mark_huggingface_reauthorization_required(db, profile_ref, now)
+                return "reauthorization_required", None, None
+            refresh_expires_at = profile["credential_refresh_expires_at"]
+            if isinstance(refresh_expires_at, int) and refresh_expires_at <= now:
+                self._mark_huggingface_reauthorization_required(db, profile_ref, now)
+                return "reauthorization_required", None, None
+            claim_id = profile["refresh_claim_id"]
+            if claim_id is not None:
+                claimed_at = profile["refresh_claimed_at"]
+                if (
+                    isinstance(claimed_at, int)
+                    and now - claimed_at <= claim_stale_seconds
+                ):
+                    return "waiting", None, None
+                self._mark_huggingface_reauthorization_required(db, profile_ref, now)
+                return "reauthorization_required", None, None
+            claim_id = str(uuid.uuid4())
+            changed = db.execute(
+                "UPDATE provider_profiles SET refresh_claim_id=?,refresh_claim_owner=?,"
+                "refresh_claimed_at=?,updated_at=? WHERE profile_ref=? AND status='active' "
+                "AND auth_status='healthy' AND auth_mode='device_oauth' "
+                "AND credential_revision=? AND refresh_claim_id IS NULL",
+                (
+                    claim_id,
+                    self._instance_id,
+                    now,
+                    now,
+                    profile_ref,
+                    profile["credential_revision"],
+                ),
+            ).rowcount
+            if changed != 1:
+                return "waiting", None, None
+            claimed = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=?",
+                (profile_ref,),
+            ).fetchone()
+            return "claimed", claimed, claim_id
+
+    def complete_huggingface_oauth_refresh(
+        self,
+        *,
+        profile_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        credential_blob: bytes,
+        credential_refresh_blob: bytes,
+        credential_expires_at: int,
+        credential_refresh_expires_at: int | None,
+        oauth_scopes_json: str | None,
+        now: int,
+    ) -> None:
+        """Commit rotated token material before the caller can return access."""
+
+        with self.transaction() as db:
+            changed = db.execute(
+                "UPDATE provider_profiles SET credential_blob=?,credential_refresh_blob=?,"
+                "credential_expires_at=?,credential_refresh_expires_at=?,oauth_scopes_json=?,"
+                "auth_status='healthy',"
+                "refresh_claim_id=NULL,refresh_claim_owner=NULL,refresh_claimed_at=NULL,"
+                "credential_revision=credential_revision+1,updated_at=? "
+                "WHERE profile_ref=? AND anchor_issuer=? AND organization_id=? "
+                "AND workspace_id IS ? AND (anchor_subject=? OR access_mode='workspace_operator') "
+                "AND provider='huggingface' "
+                "AND status='active' AND auth_mode='device_oauth' "
+                "AND refresh_claim_id=? AND refresh_claim_owner=?",
+                (
+                    credential_blob,
+                    credential_refresh_blob,
+                    credential_expires_at,
+                    credential_refresh_expires_at,
+                    oauth_scopes_json,
+                    now,
+                    profile_ref,
+                    anchor.issuer,
+                    anchor.organization_id,
+                    anchor.workspace_id,
+                    anchor.subject,
+                    claim_id,
+                    self._instance_id,
+                ),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("credential_refresh_claim_lost")
+
+    def release_huggingface_oauth_refresh(
+        self,
+        *,
+        profile_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        now: int,
+        auth_status: str = "healthy",
+        clear_credentials: bool = False,
+    ) -> None:
+        """Release a refresh claim, clearing credentials when rotation is unknown."""
+
+        if auth_status not in {"healthy", "unavailable", "reauthorization_required"}:
+            raise AccountCenterError("invalid_request")
+        clear = (
+            ",credential_blob=NULL,credential_refresh_blob=NULL"
+            if clear_credentials
+            else ""
+        )
+        with self.transaction() as db:
+            changed = db.execute(
+                "UPDATE provider_profiles SET auth_status=?" + clear + ","
+                "refresh_claim_id=NULL,refresh_claim_owner=NULL,refresh_claimed_at=NULL,"
+                "credential_revision=credential_revision+1,updated_at=? "
+                "WHERE profile_ref=? AND anchor_issuer=? AND organization_id=? "
+                "AND workspace_id IS ? AND (anchor_subject=? OR access_mode='workspace_operator') "
+                "AND provider='huggingface' "
+                "AND status='active' AND refresh_claim_id=? AND refresh_claim_owner=?",
+                (
+                    auth_status,
+                    now,
+                    profile_ref,
+                    anchor.issuer,
+                    anchor.organization_id,
+                    anchor.workspace_id,
+                    anchor.subject,
+                    claim_id,
+                    self._instance_id,
+                ),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("credential_refresh_claim_lost")
+            if clear_credentials or auth_status == "unavailable":
+                db.execute(
+                    "DELETE FROM provider_credential_leases WHERE profile_ref=?",
+                    (profile_ref,),
+                )
+
+    @staticmethod
+    def _mark_huggingface_reauthorization_required(
+        db: sqlite3.Connection, profile_ref: str, now: int
+    ) -> None:
+        db.execute(
+            "UPDATE provider_profiles SET auth_status='reauthorization_required',"
+            "credential_blob=NULL,credential_refresh_blob=NULL,refresh_claim_id=NULL,"
+            "refresh_claim_owner=NULL,refresh_claimed_at=NULL,"
+            "credential_revision=credential_revision+1,updated_at=? WHERE profile_ref=?",
+            (now, profile_ref),
+        )
+        db.execute(
+            "DELETE FROM provider_credential_leases WHERE profile_ref=?", (profile_ref,)
+        )
+
+    def update_provider_profile_auth_status(
+        self,
+        profile_ref: str,
+        anchor: Anchor,
+        auth_status: str,
+        *,
+        now: int,
+        allow_workspace_operator: bool = False,
+    ) -> None:
+        """Record a sanitized authentication health transition for a profile."""
+
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if row is None or not self._owns_provider_profile(
+                row, anchor, allow_workspace_operator=allow_workspace_operator
+            ):
+                raise AccountCenterError("profile_not_found")
+            db.execute(
+                "UPDATE provider_profiles SET auth_status=?,updated_at=? WHERE profile_ref=?",
+                (auth_status, now, profile_ref),
+            )
+
+    def set_provider_profile_secret_ref(
+        self, profile_ref: str, anchor: Anchor, secret_ref: str, *, now: int
+    ) -> None:
+        """Persist a stable host secret reference without copying its value."""
+
+        with self.transaction() as db:
+            changed = db.execute(
+                "UPDATE provider_profiles SET credential_secret_ref=?,updated_at=? "
+                "WHERE profile_ref=? AND anchor_issuer=? AND anchor_subject=? "
+                "AND organization_id=? AND workspace_id IS ? AND provider='huggingface' "
+                "AND status='active'",
+                (
+                    secret_ref,
+                    now,
+                    profile_ref,
+                    anchor.issuer,
+                    anchor.subject,
+                    anchor.organization_id,
+                    anchor.workspace_id,
+                ),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("profile_not_found")
+
+    def unlink_provider_profile(
+        self, profile_ref: str, anchor: Anchor, *, now: int
+    ) -> None:
+        """Remove local credentials and invalidate outstanding provider leases."""
+
+        with self.transaction() as db:
+            changed = db.execute(
+                "UPDATE provider_profiles SET status='unlinked',auth_status='revoked',"
+                "credential_blob=NULL,credential_refresh_blob=NULL,credential_secret_ref=NULL,"
+                "refresh_claim_id=NULL,refresh_claim_owner=NULL,refresh_claimed_at=NULL,"
+                "updated_at=? "
+                "WHERE profile_ref=? AND anchor_issuer=? AND anchor_subject=? "
+                "AND organization_id=? AND workspace_id IS ? AND status='active'",
+                (
+                    now,
+                    profile_ref,
+                    anchor.issuer,
+                    anchor.subject,
+                    anchor.organization_id,
+                    anchor.workspace_id,
+                ),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("profile_not_found")
+            db.execute(
+                "DELETE FROM provider_credential_leases WHERE profile_ref=?",
+                (profile_ref,),
+            )
+
+    def create_provider_lease(
+        self,
+        *,
+        profile_ref: str,
+        anchor: Anchor,
+        binding_id: str,
+        provider_caller_id: str,
+        operation_id: str,
+        target_json: str,
+        arguments_sha256: str,
+        expires_at: int,
+        now: int,
+        allow_workspace_operator: bool = False,
+        grant_ref: str | None = None,
+        connection_ref: str | None = None,
+        grant_provider_id: str | None = None,
+        grant_operation_id: str | None = None,
+        resource_ref: str | None = None,
+        grant_issued_at: int | None = None,
+        grant_expires_at: int | None = None,
+    ) -> str:
+        """Persist one exact lease and atomically consume shared-mode grant proof."""
+
+        self.prune_expired(now=now)
+        lease_ref = str(uuid.uuid4())
+        with self.transaction() as db:
+            profile = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            shared = (
+                profile is not None and profile["access_mode"] == "workspace_operator"
+            )
+            if (
+                profile is None
+                or not self._owns_provider_profile(
+                    profile,
+                    anchor,
+                    allow_workspace_operator=allow_workspace_operator,
+                )
+                or profile["auth_status"] != "healthy"
+                or profile["provider"] not in {"github", "huggingface"}
+            ):
+                raise AccountCenterError("profile_unavailable")
+            has_grant = grant_ref is not None
+            if shared and (not allow_workspace_operator or not has_grant):
+                raise AccountCenterError("connector_grant_required")
+            if has_grant:
+                if (
+                    not connection_ref
+                    or grant_provider_id != profile["provider"]
+                    or grant_operation_id != operation_id
+                    or not resource_ref
+                    or not isinstance(grant_issued_at, int)
+                    or isinstance(grant_issued_at, bool)
+                    or not isinstance(grant_expires_at, int)
+                    or isinstance(grant_expires_at, bool)
+                    or grant_issued_at > now
+                    or now - grant_issued_at > 15
+                    or grant_expires_at <= now
+                    or grant_expires_at <= grant_issued_at
+                    or grant_expires_at - grant_issued_at > 15
+                    or expires_at > grant_expires_at
+                    or anchor.workspace_id is None
+                ):
+                    raise AccountCenterError("connector_grant_required")
+                try:
+                    db.execute(
+                        "INSERT INTO consumed_connector_grants(grant_ref,connection_ref,"
+                        "profile_ref,provider_id,operation_id,resource_ref,arguments_sha256,"
+                        "anchor_issuer,anchor_subject,organization_id,workspace_id,issued_at,"
+                        "expires_at,consumed_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                        (
+                            grant_ref,
+                            connection_ref,
+                            profile_ref,
+                            grant_provider_id,
+                            grant_operation_id,
+                            resource_ref,
+                            arguments_sha256,
+                            anchor.issuer,
+                            anchor.subject,
+                            anchor.organization_id,
+                            anchor.workspace_id,
+                            grant_issued_at,
+                            grant_expires_at,
+                            now,
+                        ),
+                    )
+                except sqlite3.IntegrityError:
+                    raise AccountCenterError("connector_grant_replayed") from None
+            elif shared or any(
+                value is not None
+                for value in (
+                    grant_ref,
+                    connection_ref,
+                    grant_provider_id,
+                    grant_operation_id,
+                    resource_ref,
+                    grant_issued_at,
+                    grant_expires_at,
+                )
+            ):
+                raise AccountCenterError("invalid_request")
+            try:
+                db.execute(
+                    "INSERT INTO provider_credential_leases(lease_ref,profile_ref,"
+                    "anchor_issuer,anchor_subject,organization_id,workspace_id,binding_id,"
+                    "provider_caller_id,operation_id,target_json,arguments_sha256,expires_at,"
+                    "redeemed_at,connection_ref) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,NULL,?)",
+                    (
+                        lease_ref,
+                        profile_ref,
+                        anchor.issuer,
+                        anchor.subject,
+                        anchor.organization_id,
+                        anchor.workspace_id,
+                        binding_id,
+                        provider_caller_id,
+                        operation_id,
+                        target_json,
+                        arguments_sha256,
+                        expires_at,
+                        connection_ref,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                raise AccountCenterError("connector_grant_replayed") from None
+        return lease_ref
+
+    def redeem_provider_lease(
+        self,
+        *,
+        lease_ref: str,
+        profile_ref: str,
+        anchor: Anchor,
+        caller_id: str,
+        binding_id: str,
+        operation_id: str,
+        target_json: str,
+        arguments_sha256: str,
+        now: int,
+    ) -> sqlite3.Row:
+        """Atomically consume a lease after every signed field matches."""
+
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM provider_credential_leases WHERE lease_ref=?",
+                (lease_ref,),
+            ).fetchone()
+            if (
+                row is None
+                or row["profile_ref"] != profile_ref
+                or row["anchor_issuer"] != anchor.issuer
+                or row["anchor_subject"] != anchor.subject
+                or row["organization_id"] != anchor.organization_id
+                or row["workspace_id"] != anchor.workspace_id
+                or row["binding_id"] != binding_id
+                or row["provider_caller_id"] != caller_id
+                or row["operation_id"] != operation_id
+                or row["target_json"] != target_json
+                or row["arguments_sha256"] != arguments_sha256
+                or row["expires_at"] <= now
+                or row["redeemed_at"] is not None
+            ):
+                raise AccountCenterError("lease_rejected")
+            changed = db.execute(
+                "UPDATE provider_credential_leases SET redeemed_at=? WHERE lease_ref=? "
+                "AND redeemed_at IS NULL AND expires_at>?",
+                (now, lease_ref, now),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("lease_rejected")
+            profile = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if (
+                profile is None
+                or not self._owns_provider_profile(
+                    profile, anchor, allow_workspace_operator=True
+                )
+                or profile["auth_status"] != "healthy"
+            ):
+                raise AccountCenterError("profile_unavailable")
+        return profile
 
     def create_lease(
         self,

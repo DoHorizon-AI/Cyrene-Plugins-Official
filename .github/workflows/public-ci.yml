@@ -97,12 +97,12 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check \
             -r tools/ci/connection-release-requirements.txt \
-            pytest ruff PyYAML grpcio-tools==1.62.3
+            pytest ruff PyYAML grpcio-tools==1.62.3 'pytest-asyncio>=0.24,<1'
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_account_center_contracts \
             -e sdk/python/cyrene_integration_contracts \
-            -e sdk/python/cyrene_plugin_runtime \
+            -e 'sdk/python/cyrene_plugin_runtime[test]' \
             -e plugins/connectors/onebot-v11 \
             -e plugins/connectors/im \
             -e plugins/connectors/wecom \
@@ -112,6 +112,9 @@ jobs:
             -e plugins/accounts/account-center \
             -e plugins/providers/github-issues \
             -e plugins/providers/cloud-resources \
+            -e plugins/providers/cloud-management \
+            -e plugins/providers/huggingface \
+            -e plugins/connectors/teams \
             -e plugins/connectors/email-notification \
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
@@ -163,6 +166,9 @@ jobs:
             plugins/accounts/account-center \
             plugins/providers/github-issues \
             plugins/providers/cloud-resources \
+            plugins/providers/cloud-management \
+            plugins/providers/huggingface \
+            plugins/connectors/teams \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \
             plugins/evaluation/llm-judge \
@@ -188,7 +194,7 @@ jobs:
             tools/ci/verify_source_manifest.py
       - name: Run Python runtime and official Plugin tests
         run: |
-          python3 -m pytest -q \
+          python3 -m pytest -q --import-mode=importlib \
             sdk/python/cyrene_plugin_runtime/tests \
             sdk/python/cyrene_account_center_contracts/tests \
             plugins/accounts/account-center/tests \
@@ -204,6 +210,9 @@ jobs:
             plugins/evaluation/llm-judge/tests \
             plugins/providers/model-api-connector/tests \
             plugins/providers/cloud-resources/tests \
+            plugins/providers/cloud-management/tests \
+            plugins/providers/huggingface/tests \
+            plugins/connectors/teams/tests \
             plugins/serving/vllm-runtime/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/document-parsing/tests \

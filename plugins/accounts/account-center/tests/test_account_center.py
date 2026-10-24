@@ -27,7 +27,7 @@ from account_center.plugin import (
     AccountCenterPlugin,
     _idempotency_scope_hash,
 )
-from account_center.security import canonical_json
+from account_center.security import canonical_json, payload_digest
 from account_center.store import AccountStore
 from cyrene_account_center_contracts import sign_context
 from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, DirectPluginFailure
@@ -38,6 +38,27 @@ CALLBACK = "oauth-callback-service"
 WECOM = "wecom-source"
 WECOM_SECOND = "wecom-source-secondary"
 PROVIDER = "github-provider"
+JCS_VECTOR = {
+    "\ue000": "bmp",
+    "𐀀": "supplementary",
+    "small": 1e-7,
+    "decimal": 1e-6,
+}
+
+
+def test_account_center_security_uses_shared_rfc8785_bytes_and_digest() -> None:
+    """Keep Account Center payload checks byte-identical to the shared SDK."""
+
+    expected_bytes = (
+        '{"decimal":0.000001,"small":1e-7,"𐀀":"supplementary","":"bmp"}'
+    ).encode()
+
+    assert canonical_json(JCS_VECTOR) == expected_bytes
+    assert payload_digest(JCS_VECTOR) == (
+        "201897b3c1db3ba8f346a7cd54066c3879fb96d13c7bd04b59e1c4e0a1992bd5"
+    )
+
+
 ACTOR = {
     "issuer": "https://platform.example",
     "subject": "user-42",
@@ -1163,7 +1184,7 @@ def test_schema_v1_migration_preserves_legacy_data_and_fails_closed_on_wecom_tup
     store = AccountStore(db_path)
 
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 7
     links = store.list_accounts(ACTOR_ANCHOR(), ACTOR["workspace_id"])
     assert links[0]["source_authority"] == "wecom:tenant:9/bot/main"
     assert links[0]["status"] == "reauthorization_required"
@@ -1213,7 +1234,7 @@ def test_fresh_schema_ddl_rolls_back_as_one_transaction(
 
     store = AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 4
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 7
 
 
 def test_direct_runtime_rejects_duplicate_json_keys_and_wrong_type_url(
