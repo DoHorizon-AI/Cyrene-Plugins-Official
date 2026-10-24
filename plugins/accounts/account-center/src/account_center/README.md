@@ -10,6 +10,7 @@ This package implements the private `account.center.v1` DirectPluginRuntime capa
 | `github.py` | Legacy fixed GitHub OAuth, PKCE, refresh, and revocation |
 | `github_app.py` | GitHub App JWT verification and repository-scoped token issuance |
 | `huggingface_auth.py` | Fixed-host Hugging Face token identity verification |
+| `huggingface_oauth.py` | Closed device OAuth seed parsing and durable refresh support |
 | `models.py` | Internal owner, credential, and sanitized error types |
 
 Read `security.py` and `store.py` before changing a state transition; then follow the caller through `plugin.py` to the fixed provider client.

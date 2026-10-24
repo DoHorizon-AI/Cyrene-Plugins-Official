@@ -35,6 +35,11 @@ from .github import (
 )
 from .github_app import GitHubAppClient, GitHubAppError
 from .huggingface_auth import HuggingFaceAuthError, HuggingFaceIdentityClient
+from .huggingface_oauth import (
+    HuggingFaceOAuthClient,
+    HuggingFaceOAuthError,
+    parse_device_oauth_seed,
+)
 from .models import AccountCenterError, Anchor, OAuthCredential, require_object
 from .security import (
     canonical_json,
@@ -82,6 +87,7 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "github.pull_request.get",
         "github.actions.runs.list",
         "github.ci.status",
+        "github.vendor.cli.execute",
         *PROVIDER_OPERATIONS,
     },
     "huggingface": {
@@ -91,6 +97,7 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "huggingface.repo.get",
         "huggingface.file.download",
         "huggingface.file.upload",
+        "huggingface.vendor.cli.execute",
     },
 }
 CALLBACK_METHODS = {"complete_github_link", "observe_wecom_challenge"}
@@ -249,6 +256,7 @@ class AccountCenterPlugin:
         github_client: Any | None = None,
         github_app_client: Any | None = None,
         huggingface_client: Any | None = None,
+        huggingface_oauth_client: Any | None = None,
         now: Any = time.time,
     ) -> None:
         selected = dict(config) if config is not None else _environment_config()
@@ -299,6 +307,23 @@ class AccountCenterPlugin:
         }
         if len(self._provider_secrets) != len(provider_secrets):
             raise AccountCenterError("configuration_unavailable")
+        workspace_operator_profile_refs = selected.get(
+            "workspace_operator_profile_refs", []
+        )
+        if (
+            not isinstance(workspace_operator_profile_refs, list)
+            or any(
+                not isinstance(reference, str)
+                for reference in workspace_operator_profile_refs
+            )
+            or len(set(workspace_operator_profile_refs))
+            != len(workspace_operator_profile_refs)
+        ):
+            raise AccountCenterError("configuration_unavailable")
+        self._workspace_operator_profile_refs = {
+            _opaque_profile_ref(reference)
+            for reference in workspace_operator_profile_refs
+        }
         self._method_callers = _load_method_callers(
             selected,
             exchange_caller=self._exchange_caller,
@@ -350,6 +375,7 @@ class AccountCenterPlugin:
                 except GitHubAppError:
                     raise AccountCenterError("configuration_unavailable") from None
         self._huggingface = huggingface_client or HuggingFaceIdentityClient()
+        self._huggingface_oauth = huggingface_oauth_client or HuggingFaceOAuthClient()
         self._provider_refresh_locks: dict[str, threading.Lock] = {}
         self._provider_refresh_lock = threading.Lock()
         self._recover_interrupted_callback_credentials()
@@ -450,9 +476,7 @@ class AccountCenterPlugin:
             except AccountCenterError as error:
                 self._store.complete_idempotent_command(
                     key_hash,
-                    self._encode_idempotency_response(
-                        key_hash, {"error": error.code}
-                    ),
+                    self._encode_idempotency_response(key_hash, {"error": error.code}),
                 )
                 raise
             except Exception:  # noqa: BLE001 - persist only a fixed sanitized result.
@@ -671,7 +695,11 @@ class AccountCenterPlugin:
                 now=now,
                 complete_session_ref=session_ref,
             )
-            return {"account_ref": account_ref, "provider": "github", "status": "active"}
+            return {
+                "account_ref": account_ref,
+                "provider": "github",
+                "status": "active",
+            }
         except GitHubIdentityVerificationError as error:
             outcome = self._revoke_callback_token(error.credential.access_token)
             self._store.fail_session(session_ref, outcome)
@@ -856,11 +884,13 @@ class AccountCenterPlugin:
             ),
             credential_expires_at=token.expires_at,
             credential_secret_ref=None,
+            access_mode=self._configured_profile_access_mode(profile_ref),
             now=int(self._now()),
         )
         return {
             "profile_ref": profile_ref,
             "provider": "github",
+            "access_mode": self._configured_profile_access_mode(profile_ref),
             "auth_status": "healthy",
             "external_subject": identity["login"],
             "expires_at": token.expires_at,
@@ -869,20 +899,49 @@ class AccountCenterPlugin:
     def _link_huggingface_profile(
         self, request: Mapping[str, Any], anchor: Anchor
     ) -> dict[str, Any]:
-        """Verify a host-injected HF token and persist only its ciphertext."""
+        """Verify a host credential source and persist encrypted profile material."""
 
         _require_fields(
             request,
             {"profile_ref", "credential_secret_ref", "scopes"},
+            {"auth_mode"},
         )
         if "huggingface" not in self._provider_caller_ids:
             raise AccountCenterError("provider_not_configured")
         profile_ref = _opaque_profile_ref(request["profile_ref"])
         secret_ref = _safe_secret_reference(request["credential_secret_ref"])
-        token = self._provider_secrets.get(secret_ref)
-        if token is None:
-            raise AccountCenterError("credential_unavailable")
+        auth_mode = _huggingface_auth_mode(request.get("auth_mode"))
         scopes = _safe_huggingface_scopes(request["scopes"])
+        token: str
+        refresh_blob: bytes | None = None
+        refresh_expires_at: int | None = None
+        oauth_client_id: str | None = None
+        oauth_scopes_json: str | None = None
+        if auth_mode == "device_oauth":
+            seed = self._huggingface_oauth_seed(secret_ref, scopes)
+            now = int(self._now())
+            if seed.access_token_expires_at <= now or (
+                seed.refresh_token_expires_at is not None
+                and seed.refresh_token_expires_at <= now
+            ):
+                raise AccountCenterError("credential_rejected")
+            token = seed.access_token
+            refresh_blob = self._encrypt_provider_refresh_token(
+                profile_ref, seed.refresh_token
+            )
+            refresh_expires_at = seed.refresh_token_expires_at
+            oauth_client_id = seed.client_id
+            oauth_scopes_json = (
+                canonical_json(list(seed.oauth_scopes)).decode("utf-8")
+                if seed.oauth_scopes is not None
+                else None
+            )
+            credential_expires_at = seed.access_token_expires_at
+        else:
+            token = self._provider_secrets.get(secret_ref, "")
+            if not token:
+                raise AccountCenterError("credential_unavailable")
+            credential_expires_at = None
         try:
             external_subject = self._huggingface.whoami(token)
         except HuggingFaceAuthError as error:
@@ -895,17 +954,27 @@ class AccountCenterPlugin:
             target_scope_json=canonical_json(scopes).decode("utf-8"),
             auth_status="healthy",
             external_subject=external_subject,
-            credential_blob=self._encrypt_provider_token(profile_ref, token, None),
-            credential_expires_at=None,
+            credential_blob=self._encrypt_provider_token(
+                profile_ref, token, credential_expires_at
+            ),
+            credential_expires_at=credential_expires_at,
             credential_secret_ref=secret_ref,
+            auth_mode=auth_mode,
+            access_mode=self._configured_profile_access_mode(profile_ref),
+            credential_refresh_blob=refresh_blob,
+            credential_refresh_expires_at=refresh_expires_at,
+            oauth_client_id=oauth_client_id,
+            oauth_scopes_json=oauth_scopes_json,
             now=int(self._now()),
         )
         return {
             "profile_ref": profile_ref,
             "provider": "huggingface",
+            "auth_mode": auth_mode,
+            "access_mode": self._configured_profile_access_mode(profile_ref),
             "auth_status": "healthy",
             "external_subject": external_subject,
-            "expires_at": None,
+            "expires_at": credential_expires_at,
         }
 
     def _rotate_huggingface_profile(
@@ -913,45 +982,113 @@ class AccountCenterPlugin:
     ) -> dict[str, Any]:
         """Rotate an HF credential through a configured host secret reference."""
 
-        _require_fields(request, {"profile_ref", "credential_secret_ref"})
+        _require_fields(
+            request,
+            {"profile_ref", "credential_secret_ref"},
+            {"auth_mode"},
+        )
         profile_ref = _opaque_profile_ref(request["profile_ref"])
         secret_ref = _safe_secret_reference(request["credential_secret_ref"])
-        token = self._provider_secrets.get(secret_ref)
-        if token is None:
-            raise AccountCenterError("credential_unavailable")
         profile = self._store.get_provider_profile(profile_ref, anchor)
         if profile["provider"] != "huggingface":
             raise AccountCenterError("profile_provider_mismatch")
+        auth_mode = _huggingface_auth_mode(
+            request.get("auth_mode", profile["auth_mode"])
+        )
+        scopes = _json_object(profile["target_scope_json"])
+        token: str
+        refresh_blob: bytes | None = None
+        refresh_expires_at: int | None = None
+        oauth_client_id: str | None = None
+        oauth_scopes_json: str | None = None
+        if auth_mode == "device_oauth":
+            seed = self._huggingface_oauth_seed(secret_ref, scopes)
+            now = int(self._now())
+            if seed.access_token_expires_at <= now or (
+                seed.refresh_token_expires_at is not None
+                and seed.refresh_token_expires_at <= now
+            ):
+                raise AccountCenterError("credential_rejected")
+            token = seed.access_token
+            refresh_blob = self._encrypt_provider_refresh_token(
+                profile_ref, seed.refresh_token
+            )
+            refresh_expires_at = seed.refresh_token_expires_at
+            oauth_client_id = seed.client_id
+            oauth_scopes_json = (
+                canonical_json(list(seed.oauth_scopes)).decode("utf-8")
+                if seed.oauth_scopes is not None
+                else None
+            )
+            credential_expires_at = seed.access_token_expires_at
+        else:
+            token = self._provider_secrets.get(secret_ref, "")
+            if not token:
+                raise AccountCenterError("credential_unavailable")
+            credential_expires_at = None
         try:
             external_subject = self._huggingface.whoami(token)
         except HuggingFaceAuthError as error:
             raise AccountCenterError(error.code) from None
-        self._store.update_provider_profile_credential(
+        if (
+            profile["external_subject"]
+            and profile["external_subject"] != external_subject
+        ):
+            raise AccountCenterError("external_identity_mismatch")
+        self._store.update_huggingface_profile_credentials(
             profile_ref=profile_ref,
             anchor=anchor,
-            credential_blob=self._encrypt_provider_token(profile_ref, token, None),
-            credential_expires_at=None,
+            credential_blob=self._encrypt_provider_token(
+                profile_ref, token, credential_expires_at
+            ),
+            credential_refresh_blob=refresh_blob,
+            credential_expires_at=credential_expires_at,
+            credential_refresh_expires_at=refresh_expires_at,
+            oauth_client_id=oauth_client_id,
+            oauth_scopes_json=oauth_scopes_json,
+            auth_mode=auth_mode,
+            credential_secret_ref=secret_ref,
             external_subject=external_subject,
-            auth_status="healthy",
             now=int(self._now()),
-        )
-        self._store.set_provider_profile_secret_ref(
-            profile_ref, anchor, secret_ref, now=int(self._now())
         )
         return {
             "profile_ref": profile_ref,
             "provider": "huggingface",
+            "auth_mode": auth_mode,
+            "access_mode": profile["access_mode"],
             "auth_status": "healthy",
             "external_subject": external_subject,
-            "expires_at": None,
+            "expires_at": credential_expires_at,
         }
+
+    def _huggingface_oauth_seed(
+        self, secret_ref: str, scopes: Mapping[str, Any]
+    ) -> Any:
+        """Read and validate one launcher-provided OAuth seed without logging it."""
+
+        serialized = self._provider_secrets.get(secret_ref)
+        if serialized is None:
+            raise AccountCenterError("credential_unavailable")
+        try:
+            seed = parse_device_oauth_seed(
+                serialized,
+                expected_secret_ref=secret_ref,
+            )
+            seed_scope = _safe_huggingface_scopes(seed.target_scope)
+        except HuggingFaceOAuthError as error:
+            raise AccountCenterError(error.code) from None
+        if canonical_json(seed_scope) != canonical_json(scopes):
+            raise AccountCenterError("authorization_scope_mismatch")
+        return seed
 
     def _register_host_identity_profile(
         self, request: Mapping[str, Any], anchor: Anchor
     ) -> dict[str, Any]:
         """Register only metadata for host-managed cloud credentials."""
 
-        _require_fields(request, {"profile_ref", "provider", "identity_ref", "target_scope"})
+        _require_fields(
+            request, {"profile_ref", "provider", "identity_ref", "target_scope"}
+        )
         profile_ref = _opaque_profile_ref(request["profile_ref"])
         provider = request["provider"]
         if provider not in {"azure", "gcp", "runpod"}:
@@ -969,6 +1106,7 @@ class AccountCenterPlugin:
             credential_blob=None,
             credential_expires_at=None,
             credential_secret_ref=None,
+            access_mode=self._configured_profile_access_mode(profile_ref),
             now=int(self._now()),
         )
         return {
@@ -976,6 +1114,7 @@ class AccountCenterPlugin:
             "provider": provider,
             "identity_ref": identity_ref,
             "target_scope": target_scope,
+            "access_mode": self._configured_profile_access_mode(profile_ref),
             "auth_status": "unknown",
             "external_subject": None,
             "expires_at": None,
@@ -993,18 +1132,37 @@ class AccountCenterPlugin:
                 scope = json.loads(row["target_scope_json"])
             except (TypeError, json.JSONDecodeError):
                 raise AccountCenterError("profile_unavailable") from None
-            profiles.append(
-                {
-                    "profile_ref": row["profile_ref"],
-                    "provider": row["provider"],
-                    "identity_ref": row["identity_ref"],
-                    "target_scope": scope,
-                    "auth_status": row["auth_status"],
-                    "external_subject": row["external_subject"],
-                    "expires_at": row["credential_expires_at"],
-                }
-            )
+            profile = {
+                "profile_ref": row["profile_ref"],
+                "provider": row["provider"],
+                "identity_ref": row["identity_ref"],
+                "target_scope": scope,
+                "auth_mode": row["auth_mode"],
+                "access_mode": row["access_mode"],
+                "auth_status": row["auth_status"],
+                "external_subject": row["external_subject"],
+                "expires_at": row["credential_expires_at"],
+            }
+            if row["provider"] == "huggingface" and row["auth_mode"] == "device_oauth":
+                if row["oauth_scopes_json"] is None:
+                    oauth_scopes = None
+                else:
+                    try:
+                        oauth_scopes = json.loads(row["oauth_scopes_json"])
+                    except (TypeError, json.JSONDecodeError):
+                        raise AccountCenterError("profile_unavailable") from None
+                    if not isinstance(oauth_scopes, list):
+                        raise AccountCenterError("profile_unavailable")
+                profile["oauth_scopes"] = oauth_scopes
+            profiles.append(profile)
         return {"profiles": profiles}
+
+    def _configured_profile_access_mode(self, profile_ref: str) -> str:
+        """Apply only the launcher-owned workspace sharing allowlist."""
+
+        if profile_ref in self._workspace_operator_profile_refs:
+            return "workspace_operator"
+        return "actor_owned"
 
     def _unlink_provider_profile(
         self, request: Mapping[str, Any], anchor: Anchor
@@ -1024,14 +1182,31 @@ class AccountCenterPlugin:
         _require_fields(
             request,
             {"profile_ref", "operation_id", "target", "arguments_sha256"},
+            {"connector_grant"},
         )
         profile_ref = _opaque_profile_ref(request["profile_ref"])
         operation_id = _required_text(request, "operation_id", maximum=200)
         arguments_sha256 = _sha256_text(request["arguments_sha256"])
-        profile = self._store.get_provider_profile(profile_ref, anchor)
+        profile = self._store.get_provider_profile(
+            profile_ref, anchor, allow_workspace_operator=True
+        )
         provider = profile["provider"]
         if operation_id not in PROVIDER_OPERATIONS_BY_PROVIDER.get(provider, set()):
             raise AccountCenterError("authorization_denied")
+        now = int(self._now())
+        grant = request.get("connector_grant")
+        if profile["access_mode"] == "workspace_operator" and grant is None:
+            raise AccountCenterError("connector_grant_required")
+        if grant is not None:
+            grant = _validated_connector_grant(
+                grant,
+                anchor=anchor,
+                profile_ref=profile_ref,
+                provider=provider,
+                operation_id=operation_id,
+                arguments_sha256=arguments_sha256,
+                now=now,
+            )
         target = _safe_provider_target(provider, operation_id, request["target"])
         scope = _json_object(profile["target_scope_json"])
         if not _provider_target_allowed(provider, operation_id, target, scope):
@@ -1039,8 +1214,9 @@ class AccountCenterPlugin:
         provider_caller = self._provider_caller_ids.get(provider)
         if provider_caller is None or profile["auth_status"] != "healthy":
             raise AccountCenterError("profile_unavailable")
-        now = int(self._now())
         expires_at = now + LEASE_TTL_SECONDS
+        if grant is not None:
+            expires_at = min(expires_at, grant["expires_at"])
         target_json = canonical_json(target).decode("utf-8")
         lease_ref = self._store.create_provider_lease(
             profile_ref=profile_ref,
@@ -1052,6 +1228,14 @@ class AccountCenterPlugin:
             arguments_sha256=arguments_sha256,
             expires_at=expires_at,
             now=now,
+            allow_workspace_operator=(profile["access_mode"] == "workspace_operator"),
+            grant_ref=grant["grant_ref"] if grant is not None else None,
+            connection_ref=grant["connection_ref"] if grant is not None else None,
+            grant_provider_id=grant["provider_id"] if grant is not None else None,
+            grant_operation_id=grant["operation_id"] if grant is not None else None,
+            resource_ref=grant["resource_ref"] if grant is not None else None,
+            grant_issued_at=grant["issued_at"] if grant is not None else None,
+            grant_expires_at=grant["expires_at"] if grant is not None else None,
         )
         return {
             "lease_ref": lease_ref,
@@ -1080,7 +1264,9 @@ class AccountCenterPlugin:
         profile_ref = _opaque_profile_ref(request["profile_ref"])
         operation_id = _required_text(request, "operation_id", maximum=200)
         arguments_sha256 = _sha256_text(request["arguments_sha256"])
-        profile = self._store.get_provider_profile(profile_ref, anchor)
+        profile = self._store.get_provider_profile(
+            profile_ref, anchor, allow_workspace_operator=True
+        )
         provider = profile["provider"]
         if caller_id != self._provider_caller_ids.get(provider):
             raise AccountCenterError("untrusted_caller")
@@ -1102,12 +1288,20 @@ class AccountCenterPlugin:
             now=int(self._now()),
         )
         credential, expires_at = self._fresh_provider_credential(profile, anchor)
-        return {
+        response = {
             "access_token": credential,
             "token_type": "Bearer",
             "external_subject": profile["external_subject"] or profile["identity_ref"],
             "expires_at": expires_at,
         }
+        if (
+            provider == "huggingface"
+            and operation_id == "huggingface.vendor.cli.execute"
+        ):
+            response["profile_scope_sha256"] = hashlib.sha256(
+                canonical_json(_safe_huggingface_scopes(scope))
+            ).hexdigest()
+        return response
 
     def _fresh_provider_credential(
         self, profile: Mapping[str, Any], anchor: Anchor
@@ -1116,15 +1310,33 @@ class AccountCenterPlugin:
 
         profile_ref = str(profile["profile_ref"])
         if profile["provider"] == "huggingface":
+            if profile["auth_mode"] == "device_oauth":
+                return self._fresh_huggingface_oauth_credential(profile, anchor)
             if profile["credential_blob"] is None:
                 raise AccountCenterError("credential_unavailable")
-            return self._decrypt_provider_token(profile_ref, bytes(profile["credential_blob"]))
+            credential, expires_at = self._decrypt_provider_token(
+                profile_ref, bytes(profile["credential_blob"])
+            )
+            if expires_at is not None and expires_at <= int(self._now()):
+                self._store.update_provider_profile_auth_status(
+                    profile_ref,
+                    anchor,
+                    "reauthorization_required",
+                    now=int(self._now()),
+                    allow_workspace_operator=True,
+                )
+                raise AccountCenterError("credential_reauthorization_required")
+            return credential, expires_at
         if profile["provider"] != "github":
             raise AccountCenterError("profile_provider_mismatch")
         with self._provider_refresh_lock:
-            lock = self._provider_refresh_locks.setdefault(profile_ref, threading.Lock())
+            lock = self._provider_refresh_locks.setdefault(
+                profile_ref, threading.Lock()
+            )
         with lock:
-            current = self._store.get_provider_profile(profile_ref, anchor)
+            current = self._store.get_provider_profile(
+                profile_ref, anchor, allow_workspace_operator=True
+            )
             expires_at = current["credential_expires_at"]
             if (
                 current["credential_blob"] is not None
@@ -1136,7 +1348,11 @@ class AccountCenterPlugin:
                 )
             if self._github_app is None:
                 self._store.update_provider_profile_auth_status(
-                    profile_ref, anchor, "reauthorization_required", now=int(self._now())
+                    profile_ref,
+                    anchor,
+                    "reauthorization_required",
+                    now=int(self._now()),
+                    allow_workspace_operator=True,
                 )
                 raise AccountCenterError("provider_not_configured")
             scope = _json_object(current["target_scope_json"])
@@ -1158,7 +1374,11 @@ class AccountCenterPlugin:
                     else "unavailable"
                 )
                 self._store.update_provider_profile_auth_status(
-                    profile_ref, anchor, auth_status, now=int(self._now())
+                    profile_ref,
+                    anchor,
+                    auth_status,
+                    now=int(self._now()),
+                    allow_workspace_operator=True,
                 )
                 raise AccountCenterError(error.code) from None
             encrypted = self._encrypt_provider_token(
@@ -1172,8 +1392,174 @@ class AccountCenterPlugin:
                 external_subject=str(current["external_subject"]),
                 auth_status="healthy",
                 now=int(self._now()),
+                allow_workspace_operator=True,
             )
             return token.access_token, token.expires_at
+
+    def _fresh_huggingface_oauth_credential(
+        self, profile: Mapping[str, Any], anchor: Anchor
+    ) -> tuple[str, int | None]:
+        """Refresh an HF OAuth grant under a persisted cross-process claim."""
+
+        profile_ref = str(profile["profile_ref"])
+        with self._provider_refresh_lock:
+            lock = self._provider_refresh_locks.setdefault(
+                profile_ref, threading.Lock()
+            )
+        with lock:
+            deadline = time.monotonic() + 18
+            while True:
+                state, current, claim_id = self._store.claim_huggingface_oauth_refresh(
+                    profile_ref,
+                    anchor,
+                    now=int(self._now()),
+                )
+                if state == "ready" and current is not None:
+                    if current["credential_blob"] is None:
+                        raise AccountCenterError("credential_unavailable")
+                    return self._decrypt_provider_token(
+                        profile_ref, bytes(current["credential_blob"])
+                    )
+                if state == "reauthorization_required":
+                    raise AccountCenterError("credential_reauthorization_required")
+                if state == "claimed" and current is not None and claim_id is not None:
+                    break
+                if state != "waiting" or time.monotonic() >= deadline:
+                    raise AccountCenterError("credential_refresh_in_progress")
+                time.sleep(0.05)
+
+            refresh_blob = current["credential_refresh_blob"]
+            client_id = current["oauth_client_id"]
+            if refresh_blob is None or not isinstance(client_id, str) or not client_id:
+                self._release_huggingface_refresh(
+                    profile_ref,
+                    anchor,
+                    claim_id,
+                    auth_status="reauthorization_required",
+                    clear_credentials=True,
+                )
+                raise AccountCenterError("credential_reauthorization_required")
+            try:
+                refresh_token = self._decrypt_provider_refresh_token(
+                    profile_ref, bytes(refresh_blob)
+                )
+                now = int(self._now())
+                refreshed = self._huggingface_oauth.refresh(
+                    client_id=client_id,
+                    refresh_token=refresh_token,
+                    now=now,
+                )
+                external_subject = self._huggingface.whoami(refreshed.access_token)
+                expected_subject = current["external_subject"]
+                if not expected_subject or external_subject != expected_subject:
+                    self._release_huggingface_refresh(
+                        profile_ref,
+                        anchor,
+                        claim_id,
+                        auth_status="reauthorization_required",
+                        clear_credentials=True,
+                    )
+                    raise AccountCenterError("external_identity_mismatch")
+                next_refresh_token = refreshed.refresh_token or refresh_token
+                next_refresh_expires_at = (
+                    refreshed.refresh_token_expires_at
+                    or current["credential_refresh_expires_at"]
+                )
+                next_oauth_scopes_json = (
+                    canonical_json(list(refreshed.oauth_scopes)).decode("utf-8")
+                    if refreshed.oauth_scopes is not None
+                    else current["oauth_scopes_json"]
+                )
+                self._store.complete_huggingface_oauth_refresh(
+                    profile_ref=profile_ref,
+                    anchor=anchor,
+                    claim_id=claim_id,
+                    credential_blob=self._encrypt_provider_token(
+                        profile_ref,
+                        refreshed.access_token,
+                        refreshed.access_token_expires_at,
+                    ),
+                    credential_refresh_blob=self._encrypt_provider_refresh_token(
+                        profile_ref, next_refresh_token
+                    ),
+                    credential_expires_at=refreshed.access_token_expires_at,
+                    credential_refresh_expires_at=next_refresh_expires_at,
+                    oauth_scopes_json=next_oauth_scopes_json,
+                    now=int(self._now()),
+                )
+                return refreshed.access_token, refreshed.access_token_expires_at
+            except HuggingFaceOAuthError as error:
+                needs_reauthorization = (
+                    error.uncertain or error.code == "credential_rejected"
+                )
+                auth_status = (
+                    "reauthorization_required"
+                    if needs_reauthorization
+                    else "unavailable"
+                    if error.code == "oauth_client_rejected"
+                    else "healthy"
+                )
+                self._release_huggingface_refresh(
+                    profile_ref,
+                    anchor,
+                    claim_id,
+                    auth_status=auth_status,
+                    clear_credentials=needs_reauthorization,
+                )
+                raise AccountCenterError(error.code) from None
+            except HuggingFaceAuthError as error:
+                self._release_huggingface_refresh(
+                    profile_ref,
+                    anchor,
+                    claim_id,
+                    auth_status="reauthorization_required",
+                    clear_credentials=True,
+                )
+                raise AccountCenterError(error.code) from None
+            except AccountCenterError as error:
+                if error.code != "external_identity_mismatch":
+                    self._release_huggingface_refresh(
+                        profile_ref,
+                        anchor,
+                        claim_id,
+                        auth_status="reauthorization_required",
+                        clear_credentials=True,
+                    )
+                raise
+            except Exception:  # noqa: BLE001 - refresh outcome must never leak provider errors.
+                self._release_huggingface_refresh(
+                    profile_ref,
+                    anchor,
+                    claim_id,
+                    auth_status="reauthorization_required",
+                    clear_credentials=True,
+                )
+                raise AccountCenterError("credential_refresh_unknown") from None
+
+    def _release_huggingface_refresh(
+        self,
+        profile_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        *,
+        auth_status: str,
+        clear_credentials: bool,
+    ) -> None:
+        """Best-effort release after a provider outcome leaves no safe retry."""
+
+        try:
+            self._store.release_huggingface_oauth_refresh(
+                profile_ref=profile_ref,
+                anchor=anchor,
+                claim_id=claim_id,
+                now=int(self._now()),
+                auth_status=auth_status,
+                clear_credentials=clear_credentials,
+            )
+        except AccountCenterError:
+            # A persisted claim is recovered as reauthorization-required after
+            # its bounded stale window if private storage is temporarily down.
+            return
 
     def _encrypt_provider_token(
         self, profile_ref: str, token: str, expires_at: int | None
@@ -1204,12 +1590,43 @@ class AccountCenterPlugin:
             expires_at = value.get("expires_at")
         except (UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError):
             raise AccountCenterError("credential_unavailable") from None
-        if not isinstance(token, str) or not token or (
-            expires_at is not None
-            and (isinstance(expires_at, bool) or not isinstance(expires_at, int))
+        if (
+            not isinstance(token, str)
+            or not token
+            or (
+                expires_at is not None
+                and (isinstance(expires_at, bool) or not isinstance(expires_at, int))
+            )
         ):
             raise AccountCenterError("credential_unavailable")
         return token, expires_at
+
+    def _encrypt_provider_refresh_token(self, profile_ref: str, token: str) -> bytes:
+        """Encrypt an OAuth refresh token under a purpose-specific profile key."""
+
+        if not token or len(token) > 8192 or "\r" in token or "\n" in token:
+            raise AccountCenterError("credential_unavailable")
+        return encrypt(
+            self._encryption_key,
+            token.encode("utf-8"),
+            f"provider-refresh:{profile_ref}".encode(),
+        )
+
+    def _decrypt_provider_refresh_token(self, profile_ref: str, blob: bytes) -> str:
+        """Decrypt one OAuth refresh token into short-lived process memory."""
+
+        clear = decrypt(
+            self._encryption_key,
+            blob,
+            f"provider-refresh:{profile_ref}".encode(),
+        )
+        try:
+            token = clear.decode("utf-8")
+        except UnicodeDecodeError:
+            raise AccountCenterError("credential_unavailable") from None
+        if not token or len(token) > 8192 or "\r" in token or "\n" in token:
+            raise AccountCenterError("credential_unavailable")
+        return token
 
     def _get_authorization(
         self, request: Mapping[str, Any], anchor: Anchor
@@ -1314,7 +1731,9 @@ class AccountCenterPlugin:
     ) -> dict[str, Any]:
         """Resolve trusted WeCom sender identity to an owner anchor without grants."""
 
-        _require_fields(request, {"source_authority", "bot_namespace", "stable_subject"})
+        _require_fields(
+            request, {"source_authority", "bot_namespace", "stable_subject"}
+        )
         source_authority = _required_text(request, "source_authority", maximum=500)
         bot_namespace = _required_text(request, "bot_namespace", maximum=200)
         stable_subject = _required_text(request, "stable_subject", maximum=500)
@@ -1345,9 +1764,7 @@ class AccountCenterPlugin:
             "workspace_id": row["workspace_id"],
         }
 
-    def _fresh_credential(
-        self, account: Mapping[str, Any]
-    ) -> OAuthCredential:
+    def _fresh_credential(self, account: Mapping[str, Any]) -> OAuthCredential:
         """Refresh once under a durable claim; never retry an uncertain rotation."""
 
         account_ref = account["account_ref"]
@@ -1363,10 +1780,7 @@ class AccountCenterPlugin:
                 account["workspace_id"],
             )
             current = self._store.get_account(account_ref, owner)
-            if (
-                current["status"] != "active"
-                or current["credential_status"] != "ready"
-            ):
+            if current["status"] != "active" or current["credential_status"] != "ready":
                 raise AccountCenterError("credential_reauthentication_required")
             now = int(self._now())
             if (
@@ -1384,16 +1798,12 @@ class AccountCenterPlugin:
                 and current["refresh_expires_at"] <= now
             ):
                 claim_id = str(uuid.uuid4())
-                self._store.claim_refresh(
-                    account_ref, owner, claim_id, now=now
-                )
+                self._store.claim_refresh(account_ref, owner, claim_id, now=now)
                 self._store.fail_refresh(account_ref, claim_id)
                 raise AccountCenterError("credential_reauthentication_required")
 
             claim_id = str(uuid.uuid4())
-            revision = self._store.claim_refresh(
-                account_ref, owner, claim_id, now=now
-            )
+            revision = self._store.claim_refresh(account_ref, owner, claim_id, now=now)
             try:
                 refreshed = self._github.refresh(current_credential.refresh_token)
             except AccountCenterError as error:
@@ -1549,7 +1959,9 @@ class AccountCenterPlugin:
                 "unknown" if error.code == "provider_unavailable" else "failed"
             )
             status = (
-                "revocation_unknown" if remote_status == "unknown" else "revocation_failed"
+                "revocation_unknown"
+                if remote_status == "unknown"
+                else "revocation_failed"
             )
         except Exception:  # noqa: BLE001 - network outcome is not knowable.
             remote_status = "unknown"
@@ -1700,7 +2112,11 @@ def _safe_huggingface_scopes(value: Any) -> dict[str, Any]:
     if set(scope) != {"repositories"}:
         raise AccountCenterError("invalid_request")
     raw_repositories = scope["repositories"]
-    if not isinstance(raw_repositories, list) or not raw_repositories or len(raw_repositories) > 100:
+    if (
+        not isinstance(raw_repositories, list)
+        or not raw_repositories
+        or len(raw_repositories) > 100
+    ):
         raise AccountCenterError("invalid_request")
     repositories: list[dict[str, Any]] = []
     seen: set[tuple[str, str]] = set()
@@ -1720,6 +2136,7 @@ def _safe_huggingface_scopes(value: Any) -> dict[str, Any]:
             or not re.fullmatch(r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}", repo_id)
             or not isinstance(permissions, list)
             or not permissions
+            or any(not isinstance(permission, str) for permission in permissions)
             or set(permissions) - {"read", "write"}
             or len(permissions) != len(set(permissions))
             or (repo_type, repo_id) in seen
@@ -1733,7 +2150,19 @@ def _safe_huggingface_scopes(value: Any) -> dict[str, Any]:
                 "permissions": sorted(permissions),
             }
         )
+    repositories.sort(
+        key=lambda repository: (repository["repo_type"], repository["repo_id"])
+    )
     return {"repositories": repositories}
+
+
+def _huggingface_auth_mode(value: Any) -> str:
+    """Resolve an explicit HF credential mode, preserving legacy token callers."""
+
+    mode = "fine_grained_token" if value is None else value
+    if mode not in {"fine_grained_token", "device_oauth"}:
+        raise AccountCenterError("invalid_request")
+    return mode
 
 
 def _safe_identity_ref(value: Any) -> str:
@@ -1744,7 +2173,10 @@ def _safe_identity_ref(value: Any) -> str:
         or not value
         or len(value) > 256
         or not re.fullmatch(r"[A-Za-z0-9._:/@-]+", value)
-        or any(fragment in value.lower() for fragment in ("token", "secret", "password", "key="))
+        or any(
+            fragment in value.lower()
+            for fragment in ("token", "secret", "password", "key=")
+        )
     ):
         raise AccountCenterError("invalid_request")
     return value
@@ -1763,7 +2195,13 @@ def _safe_profile_scope(value: Any) -> dict[str, Any]:
             for key, child in item.items():
                 if not isinstance(key, str) or any(
                     marker in key.lower()
-                    for marker in ("token", "secret", "password", "private_key", "credential")
+                    for marker in (
+                        "token",
+                        "secret",
+                        "password",
+                        "private_key",
+                        "credential",
+                    )
                 ):
                     raise AccountCenterError("invalid_request")
                 visit(child)
@@ -1783,12 +2221,94 @@ def _safe_profile_scope(value: Any) -> dict[str, Any]:
 def _safe_secret_reference(value: Any) -> str:
     """Require one allowlisted host secret reference, never a token value."""
 
-    if (
-        not isinstance(value, str)
-        or not re.fullmatch(r"[a-z][a-z0-9._/-]{0,127}", value)
+    if not isinstance(value, str) or not re.fullmatch(
+        r"[a-z][a-z0-9._/-]{0,127}", value
     ):
         raise AccountCenterError("invalid_request")
     return value
+
+
+def _validated_connector_grant(
+    value: Any,
+    *,
+    anchor: Anchor,
+    profile_ref: str,
+    provider: str,
+    operation_id: str,
+    arguments_sha256: str,
+    now: int,
+) -> dict[str, Any]:
+    """Check the closed Exchange-HMAC-covered Directory proof against this lease."""
+
+    grant = require_object(value, code="connector_grant_required")
+    fields = {
+        "grant_ref",
+        "issued_at",
+        "expires_at",
+        "issuer",
+        "subject",
+        "organization_id",
+        "workspace_id",
+        "connection_ref",
+        "provider_id",
+        "profile_ref",
+        "operation_id",
+        "resource_ref",
+        "arguments_sha256",
+    }
+    if set(grant) != fields:
+        raise AccountCenterError("connector_grant_required")
+    try:
+        grant_ref = grant["grant_ref"]
+        if not isinstance(grant_ref, str) or not re.fullmatch(
+            r"sha256:[0-9a-f]{64}", grant_ref
+        ):
+            raise AccountCenterError("connector_grant_required")
+        connection_ref = _uuid_text(grant["connection_ref"])
+        granted_profile_ref = _opaque_profile_ref(grant["profile_ref"])
+        issuer = _required_text(grant, "issuer", maximum=500)
+        subject = _required_text(grant, "subject", maximum=500)
+        organization_id = _required_text(grant, "organization_id", maximum=200)
+        workspace_id = _required_text(grant, "workspace_id", maximum=200)
+        granted_operation = _required_text(grant, "operation_id", maximum=200)
+        resource_ref = _required_text(grant, "resource_ref", maximum=512)
+        digest = _sha256_text(grant["arguments_sha256"])
+    except AccountCenterError:
+        raise AccountCenterError("connector_grant_required") from None
+    issued_at = grant["issued_at"]
+    expires_at = grant["expires_at"]
+    if (
+        not isinstance(issued_at, int)
+        or isinstance(issued_at, bool)
+        or not isinstance(expires_at, int)
+        or isinstance(expires_at, bool)
+        or issued_at > now
+        or now - issued_at > 15
+        or expires_at <= now
+        or expires_at <= issued_at
+        or expires_at - issued_at > 15
+        or issuer != anchor.issuer
+        or subject != anchor.subject
+        or organization_id != anchor.organization_id
+        or anchor.workspace_id is None
+        or workspace_id != anchor.workspace_id
+        or grant["provider_id"] != provider
+        or granted_profile_ref != profile_ref
+        or granted_operation != operation_id
+        or digest != arguments_sha256
+    ):
+        raise AccountCenterError("connector_grant_required")
+    return {
+        "grant_ref": grant_ref,
+        "issued_at": issued_at,
+        "expires_at": expires_at,
+        "connection_ref": connection_ref,
+        "provider_id": provider,
+        "profile_ref": profile_ref,
+        "operation_id": operation_id,
+        "resource_ref": resource_ref,
+        "arguments_sha256": digest,
+    }
 
 
 def _safe_provider_target(
@@ -1800,12 +2320,20 @@ def _safe_provider_target(
     if len(canonical_json(target)) > 8192:
         raise AccountCenterError("invalid_request")
     if provider == "github":
+        if operation_id == "github.vendor.cli.execute":
+            if target:
+                raise AccountCenterError("invalid_request")
+            return {}
         if operation_id == "github.repository.list":
             if target:
                 raise AccountCenterError("invalid_request")
             return {}
         allowed = {"repository_id", "repository"}
-        if operation_id in {"github.issue.get", "github.issue.comment.create", "github.issue.state.update"}:
+        if operation_id in {
+            "github.issue.get",
+            "github.issue.comment.create",
+            "github.issue.state.update",
+        }:
             allowed.add("issue_number")
         elif operation_id == "github.pull_request.get":
             allowed.add("pull_number")
@@ -1813,7 +2341,9 @@ def _safe_provider_target(
             allowed.update({"branch", "commit_sha"})
         elif operation_id == "github.ci.status":
             allowed.add("commit_sha")
-        if set(target) - allowed or not {"repository_id", "repository"}.issubset(target):
+        if set(target) - allowed or not {"repository_id", "repository"}.issubset(
+            target
+        ):
             raise AccountCenterError("invalid_request")
         repository_id = _numeric_id(target["repository_id"])
         repository = target["repository"]
@@ -1825,18 +2355,34 @@ def _safe_provider_target(
         for field in ("issue_number", "pull_number"):
             if field in target:
                 number = target[field]
-                if isinstance(number, bool) or not isinstance(number, int) or number < 1:
+                if (
+                    isinstance(number, bool)
+                    or not isinstance(number, int)
+                    or number < 1
+                ):
                     raise AccountCenterError("invalid_request")
                 normalized[field] = number
         for field in ("branch", "commit_sha"):
             if field in target:
                 text = target[field]
-                pattern = r"[A-Za-z0-9._/-]{1,255}" if field == "branch" else r"[0-9a-fA-F]{7,64}"
-                if not isinstance(text, str) or not re.fullmatch(pattern, text) or ".." in text.split("/"):
+                pattern = (
+                    r"[A-Za-z0-9._/-]{1,255}"
+                    if field == "branch"
+                    else r"[0-9a-fA-F]{7,64}"
+                )
+                if (
+                    not isinstance(text, str)
+                    or not re.fullmatch(pattern, text)
+                    or ".." in text.split("/")
+                ):
                     raise AccountCenterError("invalid_request")
                 normalized[field] = text
         return normalized
     if provider == "huggingface":
+        if operation_id == "huggingface.vendor.cli.execute":
+            if target:
+                raise AccountCenterError("invalid_request")
+            return {}
         allowed = {"repo_type", "repo_id", "revision", "path"}
         if set(target) - allowed or "repo_type" not in target:
             raise AccountCenterError("invalid_request")
@@ -1861,9 +2407,11 @@ def _safe_provider_target(
         normalized["repo_id"] = repo_id
         if "revision" in target:
             revision = target["revision"]
-            if not isinstance(revision, str) or not re.fullmatch(
-                r"[A-Za-z0-9._/-]{1,128}", revision
-            ) or ".." in revision.split("/"):
+            if (
+                not isinstance(revision, str)
+                or not re.fullmatch(r"[A-Za-z0-9._/-]{1,128}", revision)
+                or ".." in revision.split("/")
+            ):
                 raise AccountCenterError("invalid_request")
             normalized["revision"] = revision
         if "path" in target:
@@ -1873,9 +2421,11 @@ def _safe_provider_target(
             if any(segment in {"", ".", ".."} for segment in path.split("/")):
                 raise AccountCenterError("invalid_request")
             normalized["path"] = path
-        required = {"huggingface.repo.get": {"repo_type", "repo_id"},
-                    "huggingface.file.download": {"repo_type", "repo_id", "path"},
-                    "huggingface.file.upload": {"repo_type", "repo_id", "path"}}
+        required = {
+            "huggingface.repo.get": {"repo_type", "repo_id"},
+            "huggingface.file.download": {"repo_type", "repo_id", "path"},
+            "huggingface.file.upload": {"repo_type", "repo_id", "path"},
+        }
         if operation_id in required and set(normalized) < required[operation_id]:
             raise AccountCenterError("invalid_request")
         return normalized
@@ -1892,17 +2442,24 @@ def _provider_target_allowed(
 
     if provider == "github":
         repositories = _safe_github_repositories(scope.get("repositories"))
+        if operation_id == "github.vendor.cli.execute":
+            return bool(repositories)
         if operation_id == "github.repository.list":
             return bool(repositories)
         return any(
             repository["repository_id"] == target.get("repository_id")
-            and f"{repository['owner']}/{repository['name']}" == target.get("repository")
+            and f"{repository['owner']}/{repository['name']}"
+            == target.get("repository")
             for repository in repositories
         )
     if provider == "huggingface":
         repositories = _safe_huggingface_scopes(scope).get("repositories", [])
+        if operation_id == "huggingface.vendor.cli.execute":
+            return bool(repositories)
         repo_type = target.get("repo_type")
-        required_permission = "write" if operation_id == "huggingface.file.upload" else "read"
+        required_permission = (
+            "write" if operation_id == "huggingface.file.upload" else "read"
+        )
         matching = [item for item in repositories if item["repo_type"] == repo_type]
         if operation_id.endswith(".list"):
             return any("read" in item["permissions"] for item in matching)
@@ -1965,7 +2522,9 @@ def _idempotency_key(request: Mapping[str, Any]) -> str:
     """Validate the opaque per-command key required for public mutations."""
 
     value = _required_text(request, "idempotency_key", maximum=200)
-    if value != value.strip() or any(ord(character) < 0x21 or ord(character) == 0x7F for character in value):
+    if value != value.strip() or any(
+        ord(character) < 0x21 or ord(character) == 0x7F for character in value
+    ):
         raise AccountCenterError("invalid_request")
     return value
 
@@ -2143,6 +2702,9 @@ def _environment_config() -> dict[str, Any]:
             "github_app_id",
             "github_app_private_key_ref",
             "provider_secret_refs",
+            "provider_secret_file_refs",
+            "hostSecretFileRefs",
+            "workspace_operator_profile_refs",
             "method_callers",
             "wecom_sources",
         }
@@ -2157,6 +2719,9 @@ def _environment_config() -> dict[str, Any]:
             "github_app_id",
             "github_app_private_key_ref",
             "provider_secret_refs",
+            "provider_secret_file_refs",
+            "hostSecretFileRefs",
+            "workspace_operator_profile_refs",
         }
         required_fields = allowed_fields - optional_fields
         if set(config) - allowed_fields or not required_fields <= set(config):
@@ -2167,6 +2732,7 @@ def _environment_config() -> dict[str, Any]:
         config["storage_path"] = str(
             _resolved_account_database_path(config.get("storage_path"), storage_root)
         )
+        config.setdefault("workspace_operator_profile_refs", [])
         config["binding_id"] = settings["binding_id"]
         refs = config.get("hostSecretRefs")
         if not isinstance(refs, dict) or any(
@@ -2176,6 +2742,18 @@ def _environment_config() -> dict[str, Any]:
             or not env_name
             for ref, env_name in refs.items()
         ):
+            raise AccountCenterError("configuration_unavailable")
+        file_refs = config.get("hostSecretFileRefs", {})
+        if not isinstance(file_refs, dict) or any(
+            not isinstance(reference, str)
+            or not re.fullmatch(r"[a-z][a-z0-9._/-]{0,127}", reference)
+            or not isinstance(path, str)
+            or not path.startswith("/run/secrets/")
+            or ".." in Path(path).parts
+            for reference, path in file_refs.items()
+        ):
+            raise AccountCenterError("configuration_unavailable")
+        if set(file_refs) & set(refs):
             raise AccountCenterError("configuration_unavailable")
 
         oauth_fields = (
@@ -2205,18 +2783,31 @@ def _environment_config() -> dict[str, Any]:
         github_secret_ref = config.pop("github_client_secret_ref", None)
         app_private_key_ref = config.pop("github_app_private_key_ref", None)
         provider_secret_refs = config.pop("provider_secret_refs", [])
+        provider_secret_file_refs = config.pop("provider_secret_file_refs", [])
         if not isinstance(caller_key_refs, dict) or not caller_key_refs:
             raise AccountCenterError("configuration_unavailable")
-        if not isinstance(provider_secret_refs, list) or any(
-            not isinstance(reference, str) for reference in provider_secret_refs
-        ) or len(set(provider_secret_refs)) != len(provider_secret_refs):
+        if (
+            not isinstance(provider_secret_refs, list)
+            or any(not isinstance(reference, str) for reference in provider_secret_refs)
+            or len(set(provider_secret_refs)) != len(provider_secret_refs)
+        ):
+            raise AccountCenterError("configuration_unavailable")
+        if (
+            not isinstance(provider_secret_file_refs, list)
+            or any(
+                not isinstance(reference, str)
+                for reference in provider_secret_file_refs
+            )
+            or len(set(provider_secret_file_refs)) != len(provider_secret_file_refs)
+            or set(provider_secret_file_refs) - set(file_refs)
+            or set(provider_secret_file_refs) & set(provider_secret_refs)
+        ):
             raise AccountCenterError("configuration_unavailable")
         if (config.get("github_app_id") is None) != (app_private_key_ref is None):
             raise AccountCenterError("configuration_unavailable")
         config["encryption_key"] = resolve(encryption_ref)
         config["caller_keys"] = {
-            caller: resolve(reference)
-            for caller, reference in caller_key_refs.items()
+            caller: resolve(reference) for caller, reference in caller_key_refs.items()
         }
         if github_secret_ref is not None:
             config["github_client_secret"] = resolve(github_secret_ref)
@@ -2225,6 +2816,12 @@ def _environment_config() -> dict[str, Any]:
         config["provider_secrets"] = {
             reference: resolve(reference) for reference in provider_secret_refs
         }
+        config["provider_secrets"].update(
+            {
+                reference: _read_private_secret_file(file_refs[reference])
+                for reference in provider_secret_file_refs
+            }
+        )
         # Reject unused references so the host binding has one auditable meaning.
         used = {
             encryption_ref,
@@ -2233,7 +2830,7 @@ def _environment_config() -> dict[str, Any]:
             *caller_key_refs.values(),
             *provider_secret_refs,
         } - {None}
-        if used != set(refs):
+        if used != set(refs) or set(provider_secret_file_refs) != set(file_refs):
             raise AccountCenterError("configuration_unavailable")
         return config
     except AccountCenterError:
@@ -2244,6 +2841,39 @@ def _environment_config() -> dict[str, Any]:
 
 class Plugin(AccountCenterPlugin):
     """Manifest-compatible short entrypoint alias."""
+
+
+def _read_private_secret_file(path: str) -> str:
+    """Read one bounded, non-symlink secret mounted by the service launcher."""
+
+    if not path.startswith("/run/secrets/") or ".." in Path(path).parts:
+        raise AccountCenterError("configuration_unavailable")
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    try:
+        descriptor = os.open(path, flags)
+        try:
+            metadata = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or metadata.st_size < 1
+                or metadata.st_size > 64_000
+                or metadata.st_mode & 0o022
+            ):
+                raise AccountCenterError("configuration_unavailable")
+            with os.fdopen(descriptor, "rb", closefd=False) as secret_file:
+                value = secret_file.read(64_001)
+        finally:
+            os.close(descriptor)
+    except AccountCenterError:
+        raise
+    except OSError:
+        raise AccountCenterError("configuration_unavailable") from None
+    if len(value) > 64_000:
+        raise AccountCenterError("configuration_unavailable")
+    try:
+        return value.decode("utf-8")
+    except UnicodeDecodeError:
+        raise AccountCenterError("configuration_unavailable") from None
 
 
 def _validated_private_storage_root(value: str | None) -> Path:

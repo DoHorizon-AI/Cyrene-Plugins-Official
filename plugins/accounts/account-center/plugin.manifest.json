@@ -47,7 +47,8 @@
       "account-center/caller-hmac-keys/huggingface-provider",
       "github-app/client-secret",
       "github-app/private-key",
-      "huggingface/fine-grained-token"
+      "huggingface/fine-grained-token",
+      "huggingface/connector-token"
     ]
   },
   "state": {"isStateful": true, "storageCategory": "relational", "migrationSupported": true, "downgradeSupported": false, "retentionPolicyOnUninstall": "prompt"},

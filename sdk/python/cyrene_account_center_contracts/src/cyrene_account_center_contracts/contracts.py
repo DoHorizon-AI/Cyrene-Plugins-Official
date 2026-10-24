@@ -169,6 +169,9 @@ class ProviderProfile:
     identity_ref: str
     target_scope: dict[str, Any]
     auth_status: str
+    auth_mode: str | None = None
+    oauth_scopes: list[str] | None = None
+    access_mode: str | None = None
     external_subject: str | None = None
     expires_at: int | None = None
 
@@ -182,6 +185,8 @@ class LinkedProviderProfileResponse:
     auth_status: str
     external_subject: str
     expires_at: int | None
+    auth_mode: str | None = None
+    access_mode: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -192,6 +197,7 @@ class CreateProviderCredentialLeaseRequest:
     operation_id: str
     target: dict[str, Any]
     arguments_sha256: str
+    connector_grant: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -235,6 +241,7 @@ class AuthMaterial:
     token_type: str
     external_subject: str
     expires_at: int | None
+    profile_scope_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -255,6 +262,7 @@ class LinkHuggingFaceProfileRequest:
     credential_secret_ref: str
     scopes: dict[str, Any]
     idempotency_key: str
+    auth_mode: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -264,6 +272,7 @@ class RotateHuggingFaceProfileRequest:
     profile_ref: str
     credential_secret_ref: str
     idempotency_key: str
+    auth_mode: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
