@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -109,7 +110,10 @@ def _settings(tmp_path: Any, *, cli_enabled: bool = False) -> ProviderSettings:
 
 
 def _multi_provider_settings(
-    tmp_path: Any, *, azure_resource_api_versions: dict[str, str] | None = None
+    tmp_path: Any,
+    *,
+    azure_resource_api_versions: dict[str, str] | None = None,
+    gcp_disk_scope: bool = False,
 ) -> ProviderSettings:
     """Create Azure, GCP WIF, and Runpod profiles without contacting providers."""
 
@@ -117,6 +121,19 @@ def _multi_provider_settings(
     azure_api_versions = {"microsoft.compute/virtualmachines": "2024-07-01"}
     if azure_resource_api_versions:
         azure_api_versions.update(azure_resource_api_versions)
+    gcp_scope: dict[str, Any] = {
+        "project_id": "cyrene-test-project",
+        "zones": ["us-central1-a"],
+        "instance_name_prefixes": ["cyrene-test-"],
+    }
+    if gcp_disk_scope:
+        gcp_scope.update(
+            {
+                "disk_name_prefixes": ["cyrene-test-"],
+                "disk_size_gb_range": {"min": 10, "max": 16},
+                "disk_source_images": ["projects/debian-cloud/global/images/family/debian-12"],
+            }
+        )
     config["profiles"] = [
         {
             "profile_ref": "azure/test",
@@ -138,11 +155,7 @@ def _multi_provider_settings(
             "profile_ref": "gcp/test",
             "provider": "gcp",
             "identity_ref": "service-accounts/gcp/test",
-            "scope": {
-                "project_id": "cyrene-test-project",
-                "zones": ["us-central1-a"],
-                "instance_name_prefixes": ["cyrene-test-"],
-            },
+            "scope": gcp_scope,
             "auth": {
                 "mode": "workload_identity_federation",
                 "credential_config_ref": "cloud-management/gcp-wif-credential-config",
@@ -185,6 +198,53 @@ def _pod_response(
         "status": status,
         "cost": 0.2,
         "gpu": {"id": "NVIDIA GeForce RTX 4090", "count": 1},
+    }
+
+
+def _gcp_disk_response(
+    name: str = "cyrene-test-boot",
+    status: str = "READY",
+    labels: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Return a minimal zonal Disk fixture containing an intentionally sensitive field."""
+
+    return {
+        "id": "123456789",
+        "name": name,
+        "zone": "https://www.googleapis.com/compute/v1/projects/cyrene-test-project/zones/us-central1-a",
+        "status": status,
+        "sizeGb": "10",
+        "type": "https://www.googleapis.com/compute/v1/projects/cyrene-test-project/zones/us-central1-a/diskTypes/pd-standard",
+        "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+        "labels": labels or {},
+        "diskEncryptionKey": {"kmsKeyName": "must-not-be-returned"},
+    }
+
+
+def _gcp_operation_response(
+    name: str,
+    disk_name: str,
+    client_operation_id: str,
+    action: str,
+    insert_time: str,
+) -> dict[str, Any]:
+    """Return a zonal Operation fixture whose target identity matches one test disk."""
+
+    return {
+        "kind": "compute#operation",
+        "name": name,
+        "zone": (
+            "https://www.googleapis.com/compute/v1/projects/cyrene-test-project/zones/us-central1-a"
+        ),
+        "clientOperationId": client_operation_id,
+        "operationType": "insert" if action == "create" else "delete",
+        "targetLink": (
+            "https://www.googleapis.com/compute/v1/projects/"
+            f"cyrene-test-project/zones/us-central1-a/disks/{disk_name}"
+        ),
+        "targetId": "123456789",
+        "status": "DONE",
+        "insertTime": insert_time,
     }
 
 
@@ -1055,6 +1115,23 @@ def test_vendor_cli_uses_profile_scope_instead_of_claiming_one_vm(tmp_path: Any)
         executor._validate_cli_scope(
             gcp, ["compute", "instances", "list", "--url", "https://attacker.example"]
         )
+    gcp_disk_settings = _multi_provider_settings(tmp_path / "gcp-disk-cli", gcp_disk_scope=True)
+    gcp_disk = gcp_disk_settings.profile("gcp/test")
+    executor._validate_cli_scope(
+        gcp_disk,
+        ["compute", "disks", "describe", "cyrene-test-boot", "--zone", "us-central1-a"],
+    )
+    executor._validate_cli_scope(gcp_disk, ["compute", "disks", "list", "--zone=us-central1-a"])
+    with pytest.raises(ProviderFailure, match="SCOPE_DENIED"):
+        executor._validate_cli_scope(
+            gcp_disk,
+            ["compute", "disks", "describe", "outside-test-disk", "--zone=us-central1-a"],
+        )
+    with pytest.raises(ProviderFailure, match="UNSUPPORTED_OPERATION"):
+        executor._validate_cli_scope(
+            gcp_disk,
+            ["compute", "disks", "delete", "cyrene-test-boot", "--zone=us-central1-a"],
+        )
 
     runpod_settings = _settings(tmp_path / "runpod")
     runpod_executor = CloudManagementExecutor(
@@ -1603,6 +1680,44 @@ def test_gcp_list_filters_results_to_profile_name_scope(tmp_path: Any) -> None:
     executor.close()
 
 
+def test_gcp_disk_list_is_explicit_and_prefix_filtered(tmp_path: Any) -> None:
+    """Disk enumeration uses its own target kind and name-prefix allowlist."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    _gcp_disk_response(labels={"owner": "yidong-derek-li"}),
+                    _gcp_disk_response(name="other-disk"),
+                ],
+                "nextPageToken": "disk-next-page",
+            },
+        )
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    listed = executor.call(
+        "cloud_resources_list",
+        {"profile_ref": "gcp/test", "target": {"kind": "disk", "zone": "us-central1-a"}},
+        request_id="request-gcp-disk-list",
+    )
+    assert paths == ["/compute/v1/projects/cyrene-test-project/zones/us-central1-a/disks"]
+    assert listed["resource_kind"] == "disk"
+    assert [item["name"] for item in listed["resources"]] == ["cyrene-test-boot"]
+    assert listed["resources"][0]["labels"] == {"owner": "yidong-derek-li"}
+    assert listed["next_page_token"] == "disk-next-page"
+    assert "diskEncryptionKey" not in json.dumps(listed)
+    executor.close()
+
+
 def test_gcp_instance_operation_status_uses_zone_and_operation_name(tmp_path: Any) -> None:
     """GCE operation polling reconstructs only fixed project/zone REST paths."""
 
@@ -1651,6 +1766,786 @@ def test_gcp_instance_operation_status_uses_zone_and_operation_name(tmp_path: An
     assert paths[1].endswith("/zones/us-central1-a/operations/operation-123")
     assert paths[2].endswith("/zones/us-central1-a/instances/cyrene-test-vm")
     assert all(path.startswith("/compute/v1/projects/cyrene-test-project/") for path in paths)
+    executor.close()
+
+
+def test_gcp_zonal_disk_create_attach_delete_and_confirm_absence(tmp_path: Any) -> None:
+    """Create, poll, attach, and delete one scoped boot disk through fixed REST routes."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+    delete_requested = [False]
+    labels = {
+        "cyrene-task": "teams-cloud-20261023",
+        "author": "yidong-derek-li",
+        "authorization": "managed",
+    }
+    expected_source = "projects/cyrene-test-project/zones/us-central1-a/disks/cyrene-test-boot"
+    create_lro: dict[str, Any] = {}
+    delete_lro: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        path = request.url.path
+        if request.method == "POST" and path.endswith("/zones/us-central1-a/disks"):
+            assert request.headers["Authorization"] == "Bearer fixture-token"
+            assert request.url.params["sourceImage"] == (
+                "projects/debian-cloud/global/images/family/debian-12"
+            )
+            request_uuid = uuid.UUID(request.url.params["requestId"])
+            assert request_uuid.int != 0
+            body = json.loads(request.content)
+            assert body == {
+                "name": "cyrene-test-boot",
+                "sizeGb": "10",
+                "type": "zones/us-central1-a/diskTypes/pd-standard",
+                "labels": labels,
+            }
+            create_lro.update(
+                _gcp_operation_response(
+                    "disk-insert-op",
+                    "cyrene-test-boot",
+                    request.url.params["requestId"],
+                    "create",
+                    "",
+                )
+            )
+            create_lro["status"] = "RUNNING"
+            return httpx.Response(200, json={"name": "disk-insert-op", "status": "RUNNING"})
+        if request.method == "GET" and path.endswith("/operations/disk-insert-op"):
+            return httpx.Response(200, json=create_lro)
+        if request.method == "GET" and path.endswith("/operations/disk-delete-op"):
+            return httpx.Response(200, json=delete_lro)
+        if request.method == "GET" and path.endswith("/disks/cyrene-test-boot"):
+            if delete_requested[0]:
+                return httpx.Response(404, json={"error": {"code": 404}})
+            return httpx.Response(200, json=_gcp_disk_response(labels=labels))
+        if request.method == "POST" and path.endswith("/zones/us-central1-a/instances"):
+            body = json.loads(request.content)
+            assert body["disks"] == [{"boot": True, "source": expected_source, "autoDelete": False}]
+            assert body["name"] == "cyrene-test-vm"
+            return httpx.Response(
+                200,
+                json={"name": "instance-insert-op", "status": "RUNNING", "zone": "us-central1-a"},
+            )
+        if request.method == "DELETE" and path.endswith("/disks/cyrene-test-boot"):
+            delete_requested[0] = True
+            assert uuid.UUID(request.url.params["requestId"]).int != 0
+            delete_lro.update(
+                _gcp_operation_response(
+                    "disk-delete-op",
+                    "cyrene-test-boot",
+                    request.url.params["requestId"],
+                    "delete",
+                    "",
+                )
+            )
+            delete_lro["status"] = "RUNNING"
+            return httpx.Response(
+                200,
+                json={"name": "disk-delete-op", "status": "RUNNING", "zone": "us-central1-a"},
+            )
+        raise AssertionError(f"unexpected GCE request: {request.method} {path}")
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    executor = CloudManagementExecutor(settings, http_client=client)
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    disk_target = {
+        "kind": "disk",
+        "zone": "us-central1-a",
+        "disk_name": "cyrene-test-boot",
+    }
+    create_arguments = {
+        "profile_ref": "gcp/test",
+        "target": disk_target,
+        "parameters": {
+            "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+            "sizeGb": 10,
+            "type": "pd-standard",
+            "labels": labels,
+        },
+    }
+    created = executor.call(
+        "cloud_resource_create", create_arguments, request_id="request-gcp-disk-create"
+    )
+    replay = executor.call(
+        "cloud_resource_create", create_arguments, request_id="request-gcp-disk-create"
+    )
+    assert created == replay
+    assert created["state"] == "PENDING"
+    assert created["expected_state"] == "READY"
+    assert created["desired_state"] == "READY"
+    assert created["actual_state"] == "UNKNOWN"
+    assert created["readiness"] == "UNKNOWN"
+    create_operation = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
+    create_lro["insertTime"] = create_operation["created_at"]
+    create_lro["status"] = "DONE"
+    assert create_operation["request_id"] == "request-gcp-disk-create"
+    assert create_operation["vendor_operation"]["expected_labels"] == labels
+    assert create_operation["vendor_operation"]["expected_source_image"] == (
+        "projects/debian-cloud/global/images/family/debian-12"
+    )
+    create_request = requests[0]
+    assert create_request.url.params["requestId"] == str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "cyrene-cloud-management:gcp:gcp/test:request-gcp-disk-create",
+        )
+    )
+
+    create_status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
+        request_id="request-gcp-disk-status",
+    )
+    assert create_status["state"] == "SUCCEEDED"
+    assert create_status["expected_state"] == "READY"
+    assert create_status["desired_state"] == "READY"
+    assert create_status["actual_state"] == "READY"
+    assert create_status["readiness"] == "READY"
+    assert create_status["release_confirmed"] is False
+
+    readback = executor.call(
+        "cloud_resource_get",
+        {
+            "profile_ref": "gcp/test",
+            "target": {"zone": "us-central1-a", "disk_name": "cyrene-test-boot"},
+        },
+        request_id="request-gcp-disk-get",
+    )
+    assert readback["resource"]["status"] == "READY"
+    assert readback["resource"]["sourceImage"] == (
+        "projects/debian-cloud/global/images/family/debian-12"
+    )
+    assert readback["resource"]["labels"] == labels
+    assert "diskEncryptionKey" not in json.dumps(readback)
+    assert "must-not-be-returned" not in json.dumps(readback)
+
+    instance = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {"zone": "us-central1-a", "instance_name": "cyrene-test-vm"},
+            "parameters": {
+                "machineType": "zones/us-central1-a/machineTypes/e2-medium",
+                "disks": [{"boot": True, "source": expected_source, "autoDelete": False}],
+                "networkInterfaces": [],
+            },
+        },
+        request_id="request-gcp-instance-create",
+    )
+    assert instance["state"] == "PENDING"
+
+    deleted = executor.call(
+        "cloud_resource_delete",
+        {"profile_ref": "gcp/test", "target": disk_target},
+        request_id="request-gcp-disk-delete",
+    )
+    assert deleted["state"] == "PENDING"
+    assert deleted["desired_state"] == "ABSENT"
+    assert deleted["actual_state"] == "UNKNOWN"
+    delete_operation = parse_operation_ref(deleted["operation_ref"], _EXCHANGE_KEY)
+    delete_lro["insertTime"] = delete_operation["created_at"]
+    delete_lro["status"] = "DONE"
+    assert delete_operation["request_id"] == "request-gcp-disk-delete"
+    delete_request = next(request for request in requests if request.method == "DELETE")
+    assert delete_request.url.params["requestId"] == str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            "cyrene-cloud-management:gcp:gcp/test:request-gcp-disk-delete",
+        )
+    )
+    delete_status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": deleted["operation_ref"]},
+        request_id="request-gcp-disk-delete-status",
+    )
+    assert delete_status["state"] == "SUCCEEDED"
+    assert delete_status["actual_state"] == "ABSENT"
+    assert delete_status["release_confirmed"] is True
+    assert (
+        len(
+            [
+                request
+                for request in requests
+                if request.method == "POST" and "/disks" in request.url.path
+            ]
+        )
+        == 1
+    )
+    assert len([request for request in requests if request.method == "DELETE"]) == 1
+    executor.close()
+
+
+def test_gcp_zonal_disk_create_without_labels_is_allowed(tmp_path: Any) -> None:
+    """An otherwise scoped persistent disk does not require provider-invented labels."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+    operation_body: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "POST":
+            body = json.loads(request.content)
+            assert body == {"name": "cyrene-test-no-labels", "sizeGb": "10"}
+            operation_body.update(
+                _gcp_operation_response(
+                    "disk-no-label-op",
+                    "cyrene-test-no-labels",
+                    request.url.params["requestId"],
+                    "create",
+                    "",
+                )
+            )
+            operation_body["status"] = "RUNNING"
+            return httpx.Response(
+                200,
+                json={"name": "disk-no-label-op", "status": "RUNNING", "zone": "us-central1-a"},
+            )
+        if request.url.path.endswith("/operations/disk-no-label-op"):
+            return httpx.Response(200, json=operation_body)
+        return httpx.Response(200, json=_gcp_disk_response(name="cyrene-test-no-labels"))
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    created = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-no-labels",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+            },
+        },
+        request_id="request-gcp-disk-no-labels",
+    )
+    operation_ref = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
+    operation_body["insertTime"] = operation_ref["created_at"]
+    operation_body["status"] = "DONE"
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
+        request_id="request-gcp-disk-no-labels-status",
+    )
+    assert len(requests) == 3
+    assert status["state"] == "SUCCEEDED"
+    assert status["actual_state"] == "READY"
+    assert status["observed_configuration"]["labels"] == {}
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("readback_status", "expected_state", "actual_state", "release_confirmed"),
+    [(404, "SUCCEEDED", "ABSENT", True), (200, "UNKNOWN_RESULT", "PRESENT", False)],
+)
+def test_gcp_disk_delete_404_requires_a_fresh_absence_query(
+    tmp_path: Any,
+    readback_status: int,
+    expected_state: str,
+    actual_state: str,
+    release_confirmed: bool,
+) -> None:
+    """An idempotent delete verifies absence and stays unknown if the disk remains."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    methods: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        methods.append(request.method)
+        if request.method == "DELETE":
+            return httpx.Response(404, json={"error": {"code": 404}})
+        assert request.method == "GET"
+        if readback_status == 404:
+            return httpx.Response(404, json={"error": {"code": 404}})
+        return httpx.Response(200, json=_gcp_disk_response(status="READY"))
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_delete",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-already-absent",
+            },
+        },
+        request_id="request-gcp-delete-absent",
+    )
+    assert methods == ["DELETE", "GET"]
+    assert result["state"] == expected_state
+    assert result["actual_state"] == actual_state
+    assert result["release_confirmed"] is release_confirmed
+    operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
+    assert operation["request_id"] == "request-gcp-delete-absent"
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("field", "wrong_value"),
+    [
+        ("sourceImage", "projects/debian-cloud/global/images/family/debian-11"),
+        ("sizeGb", "12"),
+        ("labels", {"cyrene-task": "different-task"}),
+    ],
+)
+def test_gcp_disk_operation_requires_exact_configuration_readback(
+    tmp_path: Any, field: str, wrong_value: object
+) -> None:
+    """A READY disk with a different image, size, or owner/task label is not success."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    labels = {"cyrene-task": "teams-cloud-20261023"}
+    operation_body: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            operation_body.update(
+                _gcp_operation_response(
+                    "disk-verify-op",
+                    "cyrene-test-readback-mismatch",
+                    request.url.params["requestId"],
+                    "create",
+                    "",
+                )
+            )
+            operation_body["status"] = "RUNNING"
+            return httpx.Response(
+                200,
+                json={"name": "disk-verify-op", "status": "RUNNING", "zone": "us-central1-a"},
+            )
+        if request.url.path.endswith("/operations/disk-verify-op"):
+            return httpx.Response(200, json=operation_body)
+        disk = _gcp_disk_response(labels=labels)
+        disk[field] = wrong_value
+        return httpx.Response(200, json=disk)
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    request_id = f"request-gcp-disk-readback-{uuid.uuid4()}"
+    created = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-readback-mismatch",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": labels,
+            },
+        },
+        request_id=request_id,
+    )
+    operation_ref = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
+    operation_body["insertTime"] = operation_ref["created_at"]
+    operation_body["status"] = "DONE"
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
+        request_id=f"request-gcp-disk-readback-status-{uuid.uuid4()}",
+    )
+    assert status["state"] == "UNKNOWN_RESULT"
+    assert status["actual_state"] == "READY"
+    assert status["reason_code"] == "DISK_CONFIGURATION_READBACK_MISMATCH"
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("operation_list_status", "expected_lookup_error"),
+    [(200, None), (403, "SCOPE_DENIED")],
+)
+def test_gcp_interrupted_disk_create_is_queried_without_replay(
+    tmp_path: Any, operation_list_status: int, expected_lookup_error: str | None
+) -> None:
+    """A matching pre-existing disk is not adopted when LRO identity is unproved."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    methods: list[str] = []
+    labels = {"cyrene-task": "teams-cloud-20261023"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        methods.append(request.method)
+        if request.method == "POST":
+            raise httpx.ReadTimeout("fixture write response lost")
+        if request.url.path.endswith("/zones/us-central1-a/operations"):
+            if operation_list_status == 403:
+                return httpx.Response(403, json={"error": {"code": 403}})
+            return httpx.Response(200, json={"items": []})
+        return httpx.Response(
+            200,
+            json=_gcp_disk_response(
+                name="cyrene-test-interrupted",
+                labels=labels,
+            ),
+        )
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    arguments = {
+        "profile_ref": "gcp/test",
+        "target": {
+            "kind": "disk",
+            "zone": "us-central1-a",
+            "disk_name": "cyrene-test-interrupted",
+        },
+        "parameters": {
+            "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+            "sizeGb": 10,
+            "labels": labels,
+        },
+    }
+    result = executor.call(
+        "cloud_resource_create", arguments, request_id="request-gcp-disk-unknown"
+    )
+    replay = executor.call(
+        "cloud_resource_create", arguments, request_id="request-gcp-disk-unknown"
+    )
+    assert replay == result
+    assert result["state"] == "UNKNOWN_RESULT"
+    assert methods == ["POST"]
+    operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
+    assert operation["request_id"] == "request-gcp-disk-unknown"
+    assert operation["vendor_operation"]["expected_labels"] == {
+        "cyrene-task": "teams-cloud-20261023"
+    }
+
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": result["operation_ref"]},
+        request_id="request-gcp-disk-unknown-status",
+    )
+    assert methods == ["POST", "GET", "GET"]
+    assert status["state"] == "UNKNOWN_RESULT"
+    assert status["actual_state"] == "READY"
+    assert status["reason_code"] == "DISK_OPERATION_IDENTITY_UNVERIFIED"
+    assert status["operation_lookup_error"] == expected_lookup_error
+    assert status["observed_configuration"] == {
+        "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+        "sizeGb": "10",
+        "type": "pd-standard",
+        "labels": labels,
+    }
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("target_id", "time_offset_minutes", "expected_state", "expected_reason", "request_count"),
+    [
+        ("123456789", 0, "SUCCEEDED", None, 4),
+        ("987654321", 0, "UNKNOWN_RESULT", "DISK_TARGET_ID_READBACK_MISMATCH", 4),
+        (
+            "123456789",
+            10,
+            "UNKNOWN_RESULT",
+            "DISK_OPERATION_IDENTITY_UNVERIFIED",
+            3,
+        ),
+    ],
+)
+def test_gcp_interrupted_disk_create_requires_exact_operation_identity(
+    tmp_path: Any,
+    target_id: str,
+    time_offset_minutes: int,
+    expected_state: str,
+    expected_reason: str | None,
+    request_count: int,
+) -> None:
+    """A lost POST needs exact request, target, action, time, and disk incarnation matches."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    request_id = "request-gcp-disk-lro-proof"
+    client_operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"cyrene-cloud-management:gcp:gcp/test:{request_id}",
+        )
+    )
+    operation_resource: dict[str, Any] = {
+        "kind": "compute#operation",
+        "name": "disk-insert-confirmed",
+        "zone": (
+            "https://www.googleapis.com/compute/v1/projects/cyrene-test-project/zones/us-central1-a"
+        ),
+        "clientOperationId": client_operation_id,
+        "operationType": "insert",
+        "targetLink": (
+            "https://www.googleapis.com/compute/v1/projects/"
+            "cyrene-test-project/zones/us-central1-a/disks/cyrene-test-lro-proof"
+        ),
+        "targetId": target_id,
+        "status": "DONE",
+        "insertTime": "",
+    }
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "POST":
+            assert request.url.params["requestId"] == client_operation_id
+            raise httpx.ReadTimeout("fixture write response lost")
+        if request.url.path.endswith("/zones/us-central1-a/operations"):
+            assert request.url.params["maxResults"] == "100"
+            assert request.url.params["orderBy"] == "creationTimestamp desc"
+            return httpx.Response(200, json={"items": [operation_resource]})
+        if request.url.path.endswith("/operations/disk-insert-confirmed"):
+            return httpx.Response(200, json=operation_resource)
+        return httpx.Response(
+            200,
+            json=_gcp_disk_response(
+                name="cyrene-test-lro-proof",
+                labels={"cyrene-task": "teams-cloud-20261023"},
+            ),
+        )
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    created = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-lro-proof",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": {"cyrene-task": "teams-cloud-20261023"},
+            },
+        },
+        request_id=request_id,
+    )
+    operation_ref = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
+    created_at = datetime.fromisoformat(operation_ref["created_at"].replace("Z", "+00:00"))
+    operation_resource["insertTime"] = (
+        (created_at + timedelta(minutes=time_offset_minutes)).isoformat().replace("+00:00", "Z")
+    )
+
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
+        request_id="request-gcp-disk-lro-proof-status",
+    )
+    assert created["state"] == "UNKNOWN_RESULT"
+    assert status["state"] == expected_state
+    assert status["actual_state"] == "READY"
+    assert len(requests) == request_count
+    if expected_reason is None:
+        assert "reason_code" not in status
+    else:
+        assert status["reason_code"] == expected_reason
+    assert requests[0].method == "POST"
+    assert all(request.method == "GET" for request in requests[1:])
+    assert sum(request.method == "POST" for request in requests) == 1
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("target", "parameters"),
+    [
+        (
+            {"kind": "disk", "zone": "us-central1-b", "disk_name": "cyrene-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+            },
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "outside-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+            },
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
+            {"sourceImage": "projects/other-cloud/global/images/family/debian-12", "sizeGb": 10},
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 17,
+            },
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": {"api_key": "sensitive"},
+            },
+        ),
+    ],
+)
+def test_gcp_disk_scope_and_create_bounds_fail_before_provider_calls(
+    tmp_path: Any, target: dict[str, str], parameters: dict[str, Any]
+) -> None:
+    """Wrong zones, names, images, sizes, and secret labels never reach GCE."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda request: requests.append(request))
+        ),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {"profile_ref": "gcp/test", "target": target, "parameters": parameters},
+        request_id=f"request-gcp-invalid-{uuid.uuid4()}",
+    )
+    assert result["error"]["code"] in {"SCOPE_DENIED", "INVALID_ARGUMENTS"}
+    assert requests == []
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "projects/other-cloud/zones/us-central1-a/disks/cyrene-test-boot",
+        "projects/cyrene-test-project/zones/us-central1-b/disks/cyrene-test-boot",
+        "projects/cyrene-test-project/zones/us-central1-a/disks/outside-test-boot",
+    ],
+)
+def test_gcp_vm_cannot_attach_disk_outside_project_zone_or_prefix(
+    tmp_path: Any, source: str
+) -> None:
+    """Existing-disk attachment validates project, zone, and disk prefix before insert."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(500)
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {"zone": "us-central1-a", "instance_name": "cyrene-test-vm"},
+            "parameters": {
+                "machineType": "zones/us-central1-a/machineTypes/e2-medium",
+                "disks": [{"boot": True, "source": source, "autoDelete": False}],
+                "networkInterfaces": [],
+            },
+        },
+        request_id=f"request-gcp-vm-disk-scope-{uuid.uuid4()}",
+    )
+    assert result["error"]["code"] == "SCOPE_DENIED"
+    assert requests == []
+    executor.close()
+
+
+def test_gcp_disk_creation_is_default_denied_without_explicit_disk_scope(tmp_path: Any) -> None:
+    """Legacy GCP profiles continue to manage instances but cannot create disks."""
+
+    settings = _multi_provider_settings(tmp_path)
+    requests: list[httpx.Request] = []
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda request: requests.append(request))
+        ),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-default-denied",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+            },
+        },
+        request_id="request-gcp-default-denied",
+    )
+    assert result["error"]["code"] == "SCOPE_DENIED"
+    assert requests == []
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_code"),
+    [(401, "AUTHENTICATION_FAILED"), (403, "SCOPE_DENIED")],
+)
+def test_gcp_disk_create_surfaces_auth_and_permission_failures(
+    tmp_path: Any, status_code: int, expected_code: str
+) -> None:
+    """GCE authentication and IAM failures remain explicit provider errors."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(status_code, json={"error": {"code": status_code}})
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-auth-check",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": {"cyrene-task": "teams-cloud-20261023"},
+            },
+        },
+        request_id=f"request-gcp-auth-{status_code}",
+    )
+    assert result["error"]["code"] == expected_code
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
     executor.close()
 
 
