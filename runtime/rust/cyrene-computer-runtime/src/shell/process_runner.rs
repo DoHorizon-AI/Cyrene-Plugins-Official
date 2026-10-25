@@ -508,7 +508,7 @@ impl ShellProcessRunner {
         Ok(Duration::from_millis(timeout_ms))
     }
 
-    fn requested_output_limit(&self, requested_bytes: Option<i64>) -> usize {
+    pub(crate) fn requested_output_limit(&self, requested_bytes: Option<i64>) -> usize {
         match requested_bytes {
             Some(value) if value > 0 => (value as usize).min(self.max_output_bytes),
             _ => self.max_output_bytes,

@@ -25,6 +25,14 @@ impl PathValidator {
         }
     }
 
+    /// Returns the canonical roots approved for workspace access.
+    ///
+    /// External sandbox adapters use these exact roots to build their mount
+    /// policy; they must not widen access from the requested working directory.
+    pub fn allowed_roots(&self) -> &[PathBuf] {
+        &self.allowed_roots
+    }
+
     /// Validates and resolves a path against allowed roots.
     /// Rejects path traversal (`..`), empty paths, and symlinks escaping the roots.
     /// 根据允许的根目录校验并解析路径。

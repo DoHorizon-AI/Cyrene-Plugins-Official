@@ -30,7 +30,9 @@ use cyrene_agent_runtime::adapter::tool_catalog::ToolCatalogSource;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::{MockModelProvider, MockToolProvider};
 use cyrene_agent_runtime::CancellationToken;
-use cyrene_computer_runtime::{ComputerRuntimeLimits, ComputerRuntimeService};
+use cyrene_computer_runtime::{
+    ComputerExecutionBackend, ComputerRuntimeLimits, ComputerRuntimeService,
+};
 use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_memory_runtime::backend::sqlite::SqliteMemoryBackend;
 use cyrene_memory_runtime::embedding::ContractModelEmbeddingClient;
@@ -198,11 +200,33 @@ impl DirectPluginRuntimeServiceImpl {
             )?,
         };
         validate_limits(&limits)?;
-        let computer = Arc::new(ComputerRuntimeService::with_limits_and_artifact_dir(
+        let backend = ComputerExecutionBackend::parse(
+            std::env::var("CYRENE_COMPUTER_EXECUTION_BACKEND")
+                .ok()
+                .as_deref(),
+        )?;
+        let helper_path = if backend == ComputerExecutionBackend::MicrosoftMxc {
+            let executable = std::env::current_exe()
+                .map_err(|error| format!("cannot resolve plugin server executable: {error}"))?;
+            let parent = executable
+                .parent()
+                .ok_or_else(|| "plugin server executable has no parent directory".to_string())?;
+            Some(parent.join("cyrene-mxc-exec"))
+        } else {
+            None
+        };
+        let computer = Arc::new(ComputerRuntimeService::with_execution_backend(
             vec![workspace_root],
             artifact_root,
             limits.clone(),
-        ));
+            backend,
+            helper_path,
+        )?);
+        if let Some(version) = computer.bubblewrap_version() {
+            eprintln!(
+                "[CYRENE_COMPUTER_BACKEND] backend=mxc isolation=microsoft-process-namespace mxc-sdk=1.0.1 bubblewrap={version}"
+            );
+        }
         Ok(Self::with_runtime(computer, limits, None, false, None))
     }
 
