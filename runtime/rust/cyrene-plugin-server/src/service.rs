@@ -5,6 +5,7 @@
 //! - agent.runtime.v1
 //! - memory.provider.v1
 //! - computer.runtime.v1
+//! - tool.provider.v1 (fixed Computer Runtime facade plus optional MCP bindings)
 //!
 //! Enforces strict fail-closed protection against:
 //! - Mismatched interface versions (must be "1")
@@ -29,7 +30,7 @@ use cyrene_agent_runtime::adapter::tool_catalog::ToolCatalogSource;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::{MockModelProvider, MockToolProvider};
 use cyrene_agent_runtime::CancellationToken;
-use cyrene_computer_runtime::ComputerRuntimeService;
+use cyrene_computer_runtime::{ComputerRuntimeLimits, ComputerRuntimeService};
 use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_memory_runtime::backend::sqlite::SqliteMemoryBackend;
 use cyrene_memory_runtime::embedding::ContractModelEmbeddingClient;
@@ -45,7 +46,16 @@ use cyrene_plugin_contracts::computer_runtime_v1::{
 use cyrene_plugin_contracts::memory_provider_v1::{
     DeleteMemoryRequest, GetMemoryRequest, RecallMemoryRequest, StoreMemoryRequest,
 };
-use cyrene_plugin_contracts::tool_provider_v1::{CallToolRequest, ListToolsRequest};
+use cyrene_plugin_contracts::tool_provider_v1::{
+    call_tool_response, list_tools_response, CallToolRequest, CallToolResponse, ListToolsRequest,
+    ListToolsResponse, ToolCatalog, ToolProviderError, ToolProviderErrorCode,
+};
+
+#[path = "computer_tools.rs"]
+mod computer_tools;
+use self::computer_tools::{ComputerToolProvider, COMPUTER_BINDING_ID};
+
+pub const PLUGIN_ID: &str = "cyrene.tools.computer-runtime";
 
 use crate::proto::direct_invocation_error::Code;
 use crate::proto::direct_invocation_response::Result as InvocationResult;
@@ -83,6 +93,7 @@ fn canonical_method<'a>(capability: &str, method: &'a str) -> &'a str {
 pub struct DirectPluginRuntimeServiceImpl {
     memory: Option<Arc<CyreneMemoryService>>,
     computer: Arc<ComputerRuntimeService>,
+    computer_tools: Arc<ComputerToolProvider>,
     mcp: Option<Arc<McpToolProvider>>,
     simulated_agent_dependencies: bool,
 }
@@ -138,14 +149,61 @@ impl DirectPluginRuntimeServiceImpl {
     /// Computer 操作没有模拟上游依赖，因此仍可使用。
     pub fn new() -> Self {
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let computer = Arc::new(ComputerRuntimeService::new(vec![current_dir]));
+        Self::with_runtime(
+            Arc::new(ComputerRuntimeService::new(vec![current_dir])),
+            ComputerRuntimeLimits::default(),
+            None,
+            false,
+            None,
+        )
+    }
 
-        Self {
-            memory: None,
-            computer,
-            mcp: None,
-            simulated_agent_dependencies: false,
+    /// Loads the isolated runner roots and limits from deployment configuration.
+    /// 从部署配置加载隔离运行器的目录与资源限制。
+    #[allow(dead_code)] // Integration tests embed this module without the package entrypoint.
+    pub fn from_environment() -> Result<Self, String> {
+        let workspace_root = required_directory("CYRENE_COMPUTER_WORKSPACE_ROOT")?;
+        let artifact_root = required_directory("CYRENE_COMPUTER_ARTIFACT_ROOT")?;
+        if workspace_root.starts_with(&artifact_root) || artifact_root.starts_with(&workspace_root)
+        {
+            return Err("workspace and artifact roots must be separate directories".into());
         }
+
+        let defaults = ComputerRuntimeLimits::default();
+        let limits = ComputerRuntimeLimits {
+            command_default_timeout_ms: read_u64(
+                "CYRENE_COMPUTER_COMMAND_DEFAULT_TIMEOUT_MS",
+                defaults.command_default_timeout_ms,
+            )?,
+            command_max_timeout_ms: read_u64(
+                "CYRENE_COMPUTER_COMMAND_MAX_TIMEOUT_MS",
+                defaults.command_max_timeout_ms,
+            )?,
+            max_output_bytes: read_usize(
+                "CYRENE_COMPUTER_MAX_OUTPUT_BYTES",
+                defaults.max_output_bytes,
+            )?,
+            max_file_bytes: read_usize("CYRENE_COMPUTER_MAX_FILE_BYTES", defaults.max_file_bytes)?,
+            max_directory_entries: read_usize(
+                "CYRENE_COMPUTER_MAX_DIRECTORY_ENTRIES",
+                defaults.max_directory_entries,
+            )?,
+            max_directory_depth: read_i32(
+                "CYRENE_COMPUTER_MAX_DIRECTORY_DEPTH",
+                defaults.max_directory_depth,
+            )?,
+            max_artifact_bytes: read_usize(
+                "CYRENE_COMPUTER_MAX_ARTIFACT_BYTES",
+                defaults.max_artifact_bytes,
+            )?,
+        };
+        validate_limits(&limits)?;
+        let computer = Arc::new(ComputerRuntimeService::with_limits_and_artifact_dir(
+            vec![workspace_root],
+            artifact_root,
+            limits.clone(),
+        ));
+        Ok(Self::with_runtime(computer, limits, None, false, None))
     }
 
     /// Builds a host that serves `tool.provider.v1` over the configured MCP
@@ -155,14 +213,13 @@ impl DirectPluginRuntimeServiceImpl {
     /// 软件包启动器应在解析绑定后调用此方法；否则工具调用会失败关闭。
     pub fn with_mcp_servers(servers: Vec<McpServerConfig>) -> Self {
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let computer = Arc::new(ComputerRuntimeService::new(vec![current_dir]));
-
-        Self {
-            memory: None,
-            computer,
-            mcp: Some(Arc::new(McpToolProvider::new(servers))),
-            simulated_agent_dependencies: false,
-        }
+        Self::with_runtime(
+            Arc::new(ComputerRuntimeService::new(vec![current_dir])),
+            ComputerRuntimeLimits::default(),
+            Some(Arc::new(McpToolProvider::new(servers))),
+            false,
+            None,
+        )
     }
 
     /// Builds a deterministic in-memory service exclusively for contract tests.
@@ -173,13 +230,29 @@ impl DirectPluginRuntimeServiceImpl {
         let memory = Arc::new(CyreneMemoryService::new(mem_backend, Some(mem_embed), 4));
 
         let current_dir = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let computer = Arc::new(ComputerRuntimeService::new(vec![current_dir]));
+        Self::with_runtime(
+            Arc::new(ComputerRuntimeService::new(vec![current_dir])),
+            ComputerRuntimeLimits::default(),
+            None,
+            true,
+            Some(memory),
+        )
+    }
 
+    fn with_runtime(
+        computer: Arc<ComputerRuntimeService>,
+        limits: ComputerRuntimeLimits,
+        mcp: Option<Arc<McpToolProvider>>,
+        simulated_agent_dependencies: bool,
+        memory: Option<Arc<CyreneMemoryService>>,
+    ) -> Self {
+        let computer_tools = Arc::new(ComputerToolProvider::new(computer.clone(), limits));
         Self {
-            memory: Some(memory),
+            memory,
             computer,
-            mcp: None,
-            simulated_agent_dependencies: true,
+            computer_tools,
+            mcp,
+            simulated_agent_dependencies,
         }
     }
 
@@ -214,13 +287,160 @@ impl DirectPluginRuntimeServiceImpl {
     }
 }
 
+#[allow(dead_code)]
+fn required_directory(name: &str) -> Result<std::path::PathBuf, String> {
+    let raw = std::env::var(name).map_err(|_| format!("required setting {name} is missing"))?;
+    let configured = std::path::PathBuf::from(raw);
+    if !configured.is_absolute() {
+        return Err(format!("{name} must be an absolute path"));
+    }
+    let metadata = std::fs::metadata(&configured)
+        .map_err(|error| format!("{name} is unavailable: {error}"))?;
+    if !metadata.is_dir() {
+        return Err(format!("{name} must name an existing directory"));
+    }
+    configured
+        .canonicalize()
+        .map_err(|error| format!("{name} cannot be resolved: {error}"))
+}
+
+#[allow(dead_code)]
+fn read_u64(name: &str, default: u64) -> Result<u64, String> {
+    match std::env::var(name) {
+        Ok(raw) => raw
+            .parse::<u64>()
+            .map_err(|error| format!("{name} must be a positive integer: {error}")),
+        Err(std::env::VarError::NotPresent) => Ok(default),
+        Err(error) => Err(format!("{name} is unavailable: {error}")),
+    }
+}
+
+#[allow(dead_code)]
+fn read_usize(name: &str, default: usize) -> Result<usize, String> {
+    match std::env::var(name) {
+        Ok(raw) => raw
+            .parse::<usize>()
+            .map_err(|error| format!("{name} must be a positive integer: {error}")),
+        Err(std::env::VarError::NotPresent) => Ok(default),
+        Err(error) => Err(format!("{name} is unavailable: {error}")),
+    }
+}
+
+#[allow(dead_code)]
+fn read_i32(name: &str, default: i32) -> Result<i32, String> {
+    match std::env::var(name) {
+        Ok(raw) => raw
+            .parse::<i32>()
+            .map_err(|error| format!("{name} must be a positive integer: {error}")),
+        Err(std::env::VarError::NotPresent) => Ok(default),
+        Err(error) => Err(format!("{name} is unavailable: {error}")),
+    }
+}
+
+#[allow(dead_code)]
+fn validate_limits(limits: &ComputerRuntimeLimits) -> Result<(), String> {
+    if limits.command_default_timeout_ms == 0
+        || limits.command_default_timeout_ms > limits.command_max_timeout_ms
+        || limits.command_max_timeout_ms > 900_000
+    {
+        return Err(
+            "command timeout settings must satisfy 1 <= default <= maximum <= 900000 ms".into(),
+        );
+    }
+    if limits.max_output_bytes == 0 || limits.max_output_bytes > 64 * 1024 {
+        return Err("CYRENE_COMPUTER_MAX_OUTPUT_BYTES must be in [1, 65536]".into());
+    }
+    if limits.max_file_bytes == 0 || limits.max_file_bytes > 1024 * 1024 {
+        return Err("CYRENE_COMPUTER_MAX_FILE_BYTES must be in [1, 1048576]".into());
+    }
+    if limits.max_directory_entries == 0 || limits.max_directory_entries > 10_000 {
+        return Err("CYRENE_COMPUTER_MAX_DIRECTORY_ENTRIES must be in [1, 10000]".into());
+    }
+    if !(1..=64).contains(&limits.max_directory_depth) {
+        return Err("CYRENE_COMPUTER_MAX_DIRECTORY_DEPTH must be in [1, 64]".into());
+    }
+    if limits.max_artifact_bytes == 0 || limits.max_artifact_bytes > 16 * 1024 * 1024 {
+        return Err("CYRENE_COMPUTER_MAX_ARTIFACT_BYTES must be in [1, 16777216]".into());
+    }
+    Ok(())
+}
+
+fn unavailable_tool_catalog(binding_id: &str) -> ListToolsResponse {
+    ListToolsResponse {
+        result: Some(list_tools_response::Result::Error(ToolProviderError {
+            code: ToolProviderErrorCode::InvalidArguments as i32,
+            message: format!("binding '{binding_id}' is not configured"),
+            retryable: false,
+        })),
+    }
+}
+
+fn combine_tool_catalogs(
+    local: ListToolsResponse,
+    external: ListToolsResponse,
+) -> ListToolsResponse {
+    let local_catalog = match local.result {
+        Some(list_tools_response::Result::Catalog(catalog)) => catalog,
+        Some(list_tools_response::Result::Error(error)) => {
+            return ListToolsResponse {
+                result: Some(list_tools_response::Result::Error(error)),
+            };
+        }
+        None => {
+            return ListToolsResponse {
+                result: Some(list_tools_response::Result::Error(ToolProviderError {
+                    code: ToolProviderErrorCode::ProviderError as i32,
+                    message: "Computer tool provider returned no catalog result".into(),
+                    retryable: true,
+                })),
+            };
+        }
+    };
+    let external_catalog = match external.result {
+        Some(list_tools_response::Result::Catalog(catalog)) => catalog,
+        Some(list_tools_response::Result::Error(error)) => {
+            return ListToolsResponse {
+                result: Some(list_tools_response::Result::Error(error)),
+            };
+        }
+        None => {
+            return ListToolsResponse {
+                result: Some(list_tools_response::Result::Error(ToolProviderError {
+                    code: ToolProviderErrorCode::ProviderError as i32,
+                    message: "Configured tool provider returned no catalog result".into(),
+                    retryable: true,
+                })),
+            };
+        }
+    };
+
+    let mut tools = local_catalog.tools;
+    tools.extend(external_catalog.tools);
+    tools.sort_by(|left, right| {
+        (&left.binding_id, &left.provider_tool_id)
+            .cmp(&(&right.binding_id, &right.provider_tool_id))
+    });
+    ListToolsResponse {
+        result: Some(list_tools_response::Result::Catalog(ToolCatalog {
+            catalog_version: format!(
+                "{}+{}",
+                local_catalog.catalog_version, external_catalog.catalog_version
+            ),
+            tools,
+        })),
+    }
+}
+
 #[tonic::async_trait]
 impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
     async fn health(
         &self,
         _request: Request<HealthRequest>,
     ) -> Result<Response<HealthResponse>, Status> {
-        let mut capabilities = vec!["computer.runtime.v1".to_string()];
+        let mut capabilities = vec![
+            "computer.runtime.v1".to_string(),
+            "tool.provider.v1".to_string(),
+        ];
         if self.simulated_agent_dependencies {
             capabilities.splice(
                 0..0,
@@ -233,7 +453,7 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
 
         Ok(Response::new(HealthResponse {
             status: health_response::Status::Serving as i32,
-            plugin_id: "cyrene.plugin.rust.server".to_string(),
+            plugin_id: PLUGIN_ID.to_string(),
             plugin_version: "0.1.0".to_string(),
             capabilities,
         }))
@@ -729,96 +949,117 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 ))),
             },
 
-            "tool.provider.v1" => {
-                let Some(mcp) = self.mcp.clone() else {
-                    return Ok(Response::new(Self::fail_closed_error(
-                        Code::Unavailable,
-                        "MCP tool provider binding is not configured",
-                        "TOOL_PROVIDER_NOT_CONFIGURED",
-                    )));
-                };
-                match method {
-                    "list_tools" => {
-                        const EXPECTED_URL: &str =
-                            "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest";
-                        if req.payload_type_url != EXPECTED_URL {
+            "tool.provider.v1" => match method {
+                "list_tools" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
+                    }
+                    let list_req = match ListToolsRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
                             return Ok(Response::new(Self::fail_closed_error(
                                 Code::InvalidRequest,
-                                format!(
-                                    "Invalid payload_type_url '{}', expected '{}'",
-                                    req.payload_type_url, EXPECTED_URL
-                                ),
-                                "INVALID_TYPE_URL",
+                                format!("Failed to decode ListToolsRequest: {}", e),
+                                "DECODE_ERROR",
                             )));
                         }
-                        let list_req = match ListToolsRequest::decode(&req.payload[..]) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                return Ok(Response::new(Self::fail_closed_error(
-                                    Code::InvalidRequest,
-                                    format!("Failed to decode ListToolsRequest: {}", e),
-                                    "DECODE_ERROR",
-                                )));
-                            }
-                        };
-                        let response = mcp.list_tools(list_req.binding_id.as_deref()).await;
-                        let mut buf = Vec::new();
-                        response.encode(&mut buf).unwrap();
-                        Ok(Response::new(DirectInvocationResponse {
-                            result: Some(InvocationResult::Payload(DirectPayload {
-                                type_url:
-                                    "type.cyrene.io/cyrene.tool.provider.v1.ListToolsResponse"
-                                        .into(),
-                                value: buf,
-                                event_type: String::new(),
-                            })),
-                        }))
-                    }
-                    "call_tool" => {
-                        const EXPECTED_URL: &str =
-                            "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest";
-                        if req.payload_type_url != EXPECTED_URL {
-                            return Ok(Response::new(Self::fail_closed_error(
-                                Code::InvalidRequest,
-                                format!(
-                                    "Invalid payload_type_url '{}', expected '{}'",
-                                    req.payload_type_url, EXPECTED_URL
-                                ),
-                                "INVALID_TYPE_URL",
-                            )));
+                    };
+                    let response = match list_req.binding_id.as_deref() {
+                        Some(binding_id) if binding_id == COMPUTER_BINDING_ID => {
+                            self.computer_tools.list_tools(Some(binding_id))
                         }
-                        let call_req = match CallToolRequest::decode(&req.payload[..]) {
-                            Ok(r) => r,
-                            Err(e) => {
-                                return Ok(Response::new(Self::fail_closed_error(
-                                    Code::InvalidRequest,
-                                    format!("Failed to decode CallToolRequest: {}", e),
-                                    "DECODE_ERROR",
-                                )));
+                        Some(binding_id) => match self.mcp.as_ref() {
+                            Some(mcp) if mcp.is_configured() => {
+                                mcp.list_tools(Some(binding_id)).await
                             }
-                        };
-                        let response = mcp.call_tool(&call_req).await;
-                        let mut buf = Vec::new();
-                        response.encode(&mut buf).unwrap();
-                        Ok(Response::new(DirectInvocationResponse {
-                            result: Some(InvocationResult::Payload(DirectPayload {
-                                type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolResponse"
-                                    .into(),
-                                value: buf,
-                                event_type: String::new(),
-                            })),
-                        }))
-                    }
-                    _ => Ok(Response::new(Self::fail_closed_error(
-                        Code::MethodNotFound,
-                        format!(
-                            "Method '{}' not found in capability 'tool.provider.v1'",
-                            req.method
-                        ),
-                        "METHOD_NOT_FOUND",
-                    ))),
+                            _ => unavailable_tool_catalog(binding_id),
+                        },
+                        None => {
+                            let local = self.computer_tools.list_tools(None);
+                            match self.mcp.as_ref() {
+                                Some(mcp) if mcp.is_configured() => {
+                                    let external = mcp.list_tools(None).await;
+                                    combine_tool_catalogs(local, external)
+                                }
+                                _ => local,
+                            }
+                        }
+                    };
+                    Ok(Response::new(DirectInvocationResponse {
+                        result: Some(InvocationResult::Payload(DirectPayload {
+                            type_url: "type.cyrene.io/cyrene.tool.provider.v1.ListToolsResponse"
+                                .into(),
+                            value: response.encode_to_vec(),
+                            event_type: String::new(),
+                        })),
+                    }))
                 }
-            }
+                "call_tool" => {
+                    const EXPECTED_URL: &str =
+                        "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest";
+                    if req.payload_type_url != EXPECTED_URL {
+                        return Ok(Response::new(Self::fail_closed_error(
+                            Code::InvalidRequest,
+                            format!(
+                                "Invalid payload_type_url '{}', expected '{}'",
+                                req.payload_type_url, EXPECTED_URL
+                            ),
+                            "INVALID_TYPE_URL",
+                        )));
+                    }
+                    let call_req = match CallToolRequest::decode(&req.payload[..]) {
+                        Ok(r) => r,
+                        Err(e) => {
+                            return Ok(Response::new(Self::fail_closed_error(
+                                Code::InvalidRequest,
+                                format!("Failed to decode CallToolRequest: {}", e),
+                                "DECODE_ERROR",
+                            )));
+                        }
+                    };
+                    let response = if call_req.binding_id == COMPUTER_BINDING_ID {
+                        self.computer_tools.call_tool(&call_req).await
+                    } else if let Some(mcp) = self.mcp.as_ref().filter(|mcp| mcp.is_configured()) {
+                        mcp.call_tool(&call_req).await
+                    } else {
+                        CallToolResponse {
+                            result: Some(call_tool_response::Result::Error(ToolProviderError {
+                                code: ToolProviderErrorCode::InvalidArguments as i32,
+                                message: format!(
+                                    "binding '{}' is not configured",
+                                    call_req.binding_id
+                                ),
+                                retryable: false,
+                            })),
+                        }
+                    };
+                    Ok(Response::new(DirectInvocationResponse {
+                        result: Some(InvocationResult::Payload(DirectPayload {
+                            type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolResponse"
+                                .into(),
+                            value: response.encode_to_vec(),
+                            event_type: String::new(),
+                        })),
+                    }))
+                }
+                _ => Ok(Response::new(Self::fail_closed_error(
+                    Code::MethodNotFound,
+                    format!(
+                        "Method '{}' not found in capability 'tool.provider.v1'",
+                        req.method
+                    ),
+                    "METHOD_NOT_FOUND",
+                ))),
+            },
 
             unknown => Ok(Response::new(Self::fail_closed_error(
                 Code::MethodNotFound,
