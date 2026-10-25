@@ -61,6 +61,21 @@
       ]
     },
     {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.tools.computer-runtime",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-10-24",
+          "environment": "linux / cargo test / ComputerToolProvider backed by a real temporary workspace and artifact directory",
+          "command": "cargo test --locked --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml fixed_operations_read_write_list_and_execute_in_the_scoped_root -- --nocapture",
+          "result": "1 passed; fixed read, write, directory list, and command tools ran against the scoped workspace",
+          "notes": "The fixed provider implementation is verified locally; Exchange-to-runner managed-runtime deployment and external integration acceptance are not included."
+        }
+      ]
+    },
+    {
       "capability": "message.connector.v1",
       "implementation": "cyrene.connectors.onebot-v11",
       "verification_level": "IMPLEMENTATION_VERIFIED",

@@ -23,21 +23,76 @@ use tokio::time::timeout;
 use cyrene_plugin_contracts::computer_runtime_v1::{
     command_execution_response, command_stream_event, CommandExecutionRequest,
     CommandExecutionResponse, CommandStreamEvent, ComputerError, ComputerErrorCode,
-    ExecutionEvidence, ExecutionResourceUsage,
+    ExecutionEvidence,
 };
 
-use crate::security::{EnvironmentFilter, OutputCollector, PathValidator};
+use crate::security::{
+    EnvironmentFilter, OutputCollector, PathValidator, ABSOLUTE_MAX_OUTPUT_BYTES,
+    DEFAULT_MAX_OUTPUT_BYTES,
+};
 
 pub struct ShellProcessRunner {
     path_validator: PathValidator,
     env_filter: EnvironmentFilter,
+    default_timeout_ms: u64,
+    max_timeout_ms: u64,
+    max_output_bytes: usize,
+}
+
+/// Kills a command process group when its request future is dropped.
+/// 请求 future 被丢弃时终止该命令的整个进程组。
+struct ProcessGroupGuard {
+    pid: Option<u32>,
+}
+
+impl ProcessGroupGuard {
+    fn new(pid: u32) -> Self {
+        Self { pid: Some(pid) }
+    }
+
+    fn terminate(&self) {
+        if let Some(pid) = self.pid {
+            ShellProcessRunner::kill_process_group(pid);
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.pid = None;
+    }
+}
+
+impl Drop for ProcessGroupGuard {
+    fn drop(&mut self) {
+        self.terminate();
+    }
 }
 
 impl ShellProcessRunner {
     pub fn new(path_validator: PathValidator, env_filter: EnvironmentFilter) -> Self {
+        Self::with_limits(
+            path_validator,
+            env_filter,
+            30_000,
+            600_000,
+            DEFAULT_MAX_OUTPUT_BYTES,
+        )
+    }
+
+    /// Creates a runner with deployment-supplied per-command bounds.
+    /// 使用部署提供的单次命令资源边界创建运行器。
+    pub fn with_limits(
+        path_validator: PathValidator,
+        env_filter: EnvironmentFilter,
+        default_timeout_ms: u64,
+        max_timeout_ms: u64,
+        max_output_bytes: usize,
+    ) -> Self {
         Self {
             path_validator,
             env_filter,
+            default_timeout_ms: default_timeout_ms.max(1),
+            max_timeout_ms: max_timeout_ms.max(default_timeout_ms.max(1)),
+            max_output_bytes: max_output_bytes.clamp(1, ABSOLUTE_MAX_OUTPUT_BYTES),
         }
     }
 
@@ -64,6 +119,14 @@ impl ShellProcessRunner {
         cancel_flag: Option<Arc<AtomicBool>>,
     ) -> CommandExecutionResponse {
         let start_time = Instant::now();
+        let timeout_duration = match self.requested_timeout(request.timeout_ms) {
+            Ok(value) => value,
+            Err(error) => {
+                return CommandExecutionResponse {
+                    result: Some(command_execution_response::Result::Error(error)),
+                };
+            }
+        };
 
         // 1. Validate working directory (T75)
         // 1. 校验工作目录（T75）。
@@ -106,13 +169,11 @@ impl ShellProcessRunner {
         };
 
         let child_pid = child.id().unwrap_or(0);
-        let timeout_duration = match request.timeout_ms {
-            Some(ms) if ms > 0 => Duration::from_millis(ms as u64),
-            _ => Duration::from_secs(30), // Default 30s timeout; 默认超时为 30 秒
-        };
+        let mut process_group = (child_pid > 0).then(|| ProcessGroupGuard::new(child_pid));
 
-        let mut stdout_collector = OutputCollector::new(request.max_output_bytes);
-        let mut stderr_collector = OutputCollector::new(request.max_output_bytes);
+        let output_limit = self.requested_output_limit(request.max_output_bytes);
+        let mut stdout_collector = OutputCollector::new(Some(output_limit as i64));
+        let mut stderr_collector = OutputCollector::new(Some(output_limit as i64));
 
         let mut child_stdout = child.stdout.take().unwrap();
         let mut child_stderr = child.stderr.take().unwrap();
@@ -144,14 +205,18 @@ impl ShellProcessRunner {
                     res = child_stdout.read(&mut stdout_buf), if !stdout_done => {
                         match res {
                             Ok(0) => stdout_done = true,
-                            Ok(n) => stdout_collector.append(&stdout_buf[..n]),
+                            Ok(n) => {
+                                stdout_collector.append(&stdout_buf[..n]);
+                            }
                             Err(_) => stdout_done = true,
                         }
                     }
                     res = child_stderr.read(&mut stderr_buf), if !stderr_done => {
                         match res {
                             Ok(0) => stderr_done = true,
-                            Ok(n) => stderr_collector.append(&stderr_buf[..n]),
+                            Ok(n) => {
+                                stderr_collector.append(&stderr_buf[..n]);
+                            }
                             Err(_) => stderr_done = true,
                         }
                     }
@@ -171,20 +236,26 @@ impl ShellProcessRunner {
             Ok(Ok(code)) => code,
             Ok(Err(err)) => {
                 // Cancelled or errored -> clean process group
-                if child_pid > 0 {
-                    Self::kill_process_group(child_pid);
+                if let Some(group) = process_group.as_ref() {
+                    group.terminate();
                 }
                 let _ = child.wait().await;
+                if let Some(group) = process_group.as_mut() {
+                    group.disarm();
+                }
                 return CommandExecutionResponse {
                     result: Some(command_execution_response::Result::Error(err)),
                 };
             }
             Err(_) => {
                 // Timeout exceeded (T80)
-                if child_pid > 0 {
-                    Self::kill_process_group(child_pid);
+                if let Some(group) = process_group.as_ref() {
+                    group.terminate();
                 }
                 let _ = child.wait().await;
+                if let Some(group) = process_group.as_mut() {
+                    group.disarm();
+                }
                 return CommandExecutionResponse {
                     result: Some(command_execution_response::Result::Error(ComputerError {
                         code: ComputerErrorCode::CommandTimeout as i32,
@@ -198,6 +269,10 @@ impl ShellProcessRunner {
             }
         };
 
+        if let Some(group) = process_group.as_mut() {
+            group.disarm();
+        }
+
         let duration_ms = start_time.elapsed().as_millis() as i64;
         let (stdout_str, stdout_truncated) = stdout_collector.into_string_lossy();
         let (stderr_str, stderr_truncated) = stderr_collector.into_string_lossy();
@@ -210,7 +285,6 @@ impl ShellProcessRunner {
         hasher.update(stderr_str.as_bytes());
         let sha256_hash = format!("{:x}", hasher.finalize());
 
-        let peak_mem = (stdout_str.len() + stderr_str.len()) as i64;
         let evidence = ExecutionEvidence {
             exit_code,
             duration_ms,
@@ -219,10 +293,9 @@ impl ShellProcessRunner {
             stdout_truncated,
             stderr_truncated,
             sha256_hash,
-            resource_usage: Some(ExecutionResourceUsage {
-                cpu_time_ms: duration_ms,
-                peak_memory_bytes: peak_mem,
-            }),
+            // The runtime measures wall time and captured output, not CPU or
+            // process memory. Keep those unavailable counters absent.
+            resource_usage: None,
         };
 
         CommandExecutionResponse {
@@ -240,6 +313,7 @@ impl ShellProcessRunner {
     ) -> Result<(), ComputerError> {
         let seq = AtomicI64::new(1);
         let start_time = Instant::now();
+        let timeout_duration = self.requested_timeout(request.timeout_ms)?;
 
         let cwd = self.path_validator.validate_cwd(request.cwd.as_deref())?;
         let sanitized_env = self.env_filter.sanitize_environment(&request.env);
@@ -261,16 +335,14 @@ impl ShellProcessRunner {
         })?;
 
         let child_pid = child.id().unwrap_or(0);
-        let timeout_duration = match request.timeout_ms {
-            Some(ms) if ms > 0 => Duration::from_millis(ms as u64),
-            _ => Duration::from_secs(30),
-        };
+        let mut process_group = (child_pid > 0).then(|| ProcessGroupGuard::new(child_pid));
 
         let mut child_stdout = child.stdout.take().unwrap();
         let mut child_stderr = child.stderr.take().unwrap();
 
-        let mut stdout_accum = OutputCollector::new(request.max_output_bytes);
-        let mut stderr_accum = OutputCollector::new(request.max_output_bytes);
+        let output_limit = self.requested_output_limit(request.max_output_bytes);
+        let mut stdout_accum = OutputCollector::new(Some(output_limit as i64));
+        let mut stderr_accum = OutputCollector::new(Some(output_limit as i64));
 
         let stream_fut = async {
             let mut stdout_buf = [0u8; 4096];
@@ -299,13 +371,15 @@ impl ShellProcessRunner {
                             Ok(0) => stdout_done = true,
                             Ok(n) => {
                                 let chunk = &stdout_buf[..n];
-                                stdout_accum.append(chunk);
-                                let text = String::from_utf8_lossy(chunk).to_string();
-                                let _ = sender.send(CommandStreamEvent {
-                                    sequence_number: seq.fetch_add(1, Ordering::SeqCst),
-                                    timestamp_ms: Self::current_epoch_ms(),
-                                    event: Some(command_stream_event::Event::StdoutChunk(text)),
-                                }).await;
+                                let retained = stdout_accum.append(chunk);
+                                if retained > 0 {
+                                    let text = String::from_utf8_lossy(&chunk[..retained]).to_string();
+                                    let _ = sender.send(CommandStreamEvent {
+                                        sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                        timestamp_ms: Self::current_epoch_ms(),
+                                        event: Some(command_stream_event::Event::StdoutChunk(text)),
+                                    }).await;
+                                }
                             }
                             Err(_) => stdout_done = true,
                         }
@@ -315,13 +389,15 @@ impl ShellProcessRunner {
                             Ok(0) => stderr_done = true,
                             Ok(n) => {
                                 let chunk = &stderr_buf[..n];
-                                stderr_accum.append(chunk);
-                                let text = String::from_utf8_lossy(chunk).to_string();
-                                let _ = sender.send(CommandStreamEvent {
-                                    sequence_number: seq.fetch_add(1, Ordering::SeqCst),
-                                    timestamp_ms: Self::current_epoch_ms(),
-                                    event: Some(command_stream_event::Event::StderrChunk(text)),
-                                }).await;
+                                let retained = stderr_accum.append(chunk);
+                                if retained > 0 {
+                                    let text = String::from_utf8_lossy(&chunk[..retained]).to_string();
+                                    let _ = sender.send(CommandStreamEvent {
+                                        sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                        timestamp_ms: Self::current_epoch_ms(),
+                                        event: Some(command_stream_event::Event::StderrChunk(text)),
+                                    }).await;
+                                }
                             }
                             Err(_) => stderr_done = true,
                         }
@@ -342,6 +418,9 @@ impl ShellProcessRunner {
 
         match exit_result {
             Ok(Ok(code)) => {
+                if let Some(group) = process_group.as_mut() {
+                    group.disarm();
+                }
                 let duration_ms = start_time.elapsed().as_millis() as i64;
                 let (stdout_str, stdout_truncated) = stdout_accum.into_string_lossy();
                 let (stderr_str, stderr_truncated) = stderr_accum.into_string_lossy();
@@ -360,10 +439,7 @@ impl ShellProcessRunner {
                     stdout_truncated,
                     stderr_truncated,
                     sha256_hash,
-                    resource_usage: Some(ExecutionResourceUsage {
-                        cpu_time_ms: duration_ms,
-                        peak_memory_bytes: 4096,
-                    }),
+                    resource_usage: None,
                 };
 
                 let _ = sender
@@ -376,10 +452,13 @@ impl ShellProcessRunner {
                 Ok(())
             }
             Ok(Err(err)) => {
-                if child_pid > 0 {
-                    Self::kill_process_group(child_pid);
+                if let Some(group) = process_group.as_ref() {
+                    group.terminate();
                 }
                 let _ = child.wait().await;
+                if let Some(group) = process_group.as_mut() {
+                    group.disarm();
+                }
                 let _ = sender
                     .send(CommandStreamEvent {
                         sequence_number: seq.fetch_add(1, Ordering::SeqCst),
@@ -390,10 +469,13 @@ impl ShellProcessRunner {
                 Ok(())
             }
             Err(_) => {
-                if child_pid > 0 {
-                    Self::kill_process_group(child_pid);
+                if let Some(group) = process_group.as_ref() {
+                    group.terminate();
                 }
                 let _ = child.wait().await;
+                if let Some(group) = process_group.as_mut() {
+                    group.disarm();
+                }
                 let err = ComputerError {
                     code: ComputerErrorCode::CommandTimeout as i32,
                     message: "Stream command execution timed out".to_string(),
@@ -408,6 +490,28 @@ impl ShellProcessRunner {
                     .await;
                 Ok(())
             }
+        }
+    }
+
+    fn requested_timeout(&self, requested_ms: Option<i64>) -> Result<Duration, ComputerError> {
+        let timeout_ms = match requested_ms {
+            Some(value) if value <= 0 => {
+                return Err(ComputerError {
+                    code: ComputerErrorCode::ExecutionDenied as i32,
+                    message: "Command timeout must be a positive number of milliseconds".into(),
+                    retryable: false,
+                });
+            }
+            Some(value) => (value as u64).min(self.max_timeout_ms),
+            None => self.default_timeout_ms,
+        };
+        Ok(Duration::from_millis(timeout_ms))
+    }
+
+    fn requested_output_limit(&self, requested_bytes: Option<i64>) -> usize {
+        match requested_bytes {
+            Some(value) if value > 0 => (value as usize).min(self.max_output_bytes),
+            _ => self.max_output_bytes,
         }
     }
 }

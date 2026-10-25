@@ -9,7 +9,9 @@
 
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
+use std::fs;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::RwLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -36,7 +38,21 @@ pub struct ArtifactIndexEntry {
 pub struct ArtifactStore {
     storage_dir: PathBuf,
     index: RwLock<HashMap<String, ArtifactIndexEntry>>,
+    max_inline_payload_bytes: usize,
+    initialization_error: Option<String>,
 }
+
+#[derive(serde::Serialize, serde::Deserialize)]
+struct PersistedArtifactMetadata {
+    artifact_id: String,
+    name: String,
+    mime_type: String,
+    size_bytes: i64,
+    sha256_hash: String,
+    created_at_ms: i64,
+}
+
+static ARTIFACT_ID_COUNTER: AtomicU64 = AtomicU64::new(1);
 
 impl Default for ArtifactStore {
     fn default() -> Self {
@@ -55,10 +71,22 @@ impl ArtifactStore {
     /// Creates an ArtifactStore with an explicit storage directory on disk.
     /// 在磁盘上使用显式存储目录创建 ArtifactStore。
     pub fn with_storage_dir(dir: PathBuf) -> Self {
-        let _ = std::fs::create_dir_all(&dir);
+        Self::with_storage_dir_and_limit(dir, MAX_INLINE_PAYLOAD_BYTES)
+    }
+
+    /// Creates a disk-backed artifact store and restores metadata after restart.
+    /// 创建磁盘制品存储，并在服务重启后恢复其元数据索引。
+    pub fn with_storage_dir_and_limit(dir: PathBuf, max_payload_bytes: usize) -> Self {
+        let max_inline_payload_bytes = max_payload_bytes.clamp(1, MAX_INLINE_PAYLOAD_BYTES);
+        let (index, initialization_error) = match restore_index(&dir, max_inline_payload_bytes) {
+            Ok(index) => (index, None),
+            Err(error) => (HashMap::new(), Some(error)),
+        };
         Self {
             storage_dir: dir,
-            index: RwLock::new(HashMap::new()),
+            index: RwLock::new(index),
+            max_inline_payload_bytes,
+            initialization_error,
         }
     }
 
@@ -81,28 +109,31 @@ impl ArtifactStore {
     /// and indexes only the metadata and file path. Zero payload bytes retained in memory.
     /// 创建 artifact：将 payload 直接写入磁盘，计算 SHA-256，并仅索引 metadata 和文件路径。内存中不保留 payload 字节。
     pub fn create_artifact(&self, req: CreateArtifactRequest) -> CreateArtifactResponse {
+        if let Some(error) = &self.initialization_error {
+            return create_error(ComputerErrorCode::ExecutionDenied, error.clone());
+        }
         if req.name.trim().is_empty() {
-            return CreateArtifactResponse {
-                result: Some(create_artifact_response::Result::Error(ComputerError {
-                    code: ComputerErrorCode::ExecutionDenied as i32,
-                    message: "Artifact name cannot be empty".to_string(),
-                    retryable: false,
-                })),
-            };
+            return create_error(
+                ComputerErrorCode::ExecutionDenied,
+                "Artifact name cannot be empty".to_string(),
+            );
+        }
+        if req.name.len() > 4 * 1024 || req.mime_type.len() > 256 {
+            return create_error(
+                ComputerErrorCode::OutputLimitExceeded,
+                "Artifact name or MIME type exceeds its configured metadata limit".to_string(),
+            );
         }
 
-        if req.data.len() > MAX_INLINE_PAYLOAD_BYTES {
-            return CreateArtifactResponse {
-                result: Some(create_artifact_response::Result::Error(ComputerError {
-                    code: ComputerErrorCode::OutputLimitExceeded as i32,
-                    message: format!(
-                        "Artifact size {} bytes exceeds max inline limit of {} bytes",
-                        req.data.len(),
-                        MAX_INLINE_PAYLOAD_BYTES
-                    ),
-                    retryable: false,
-                })),
-            };
+        if req.data.len() > self.max_inline_payload_bytes {
+            return create_error(
+                ComputerErrorCode::OutputLimitExceeded,
+                format!(
+                    "Artifact size {} bytes exceeds configured maximum of {} bytes",
+                    req.data.len(),
+                    self.max_inline_payload_bytes
+                ),
+            );
         }
 
         // Calculate SHA-256
@@ -116,9 +147,14 @@ impl ArtifactStore {
             .map(|d| d.as_millis() as i64)
             .unwrap_or(0);
 
-        // Opaque token format: art-{prefix}-{short_time}
-        // 不透明 token 格式：art-{prefix}-{short_time}。
-        let artifact_id = format!("art-{}-{}", &sha256_hash[..12], created_at_ms % 100000);
+        // Include nanoseconds plus a process counter so identical writes do
+        // not silently replace one another within the same millisecond.
+        let epoch_nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let counter = ARTIFACT_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let artifact_id = format!("art-{sha256_hash}-{epoch_nanos}-{counter}");
         let size_bytes = req.data.len() as i64;
         let mime_type = if req.mime_type.is_empty() {
             "application/octet-stream".to_string()
@@ -130,24 +166,18 @@ impl ArtifactStore {
 
         // Write directly to disk (externalization)
         // 直接写入磁盘（外置存储）。
-        if let Err(e) = std::fs::create_dir_all(&self.storage_dir) {
-            return CreateArtifactResponse {
-                result: Some(create_artifact_response::Result::Error(ComputerError {
-                    code: ComputerErrorCode::ExecutionDenied as i32,
-                    message: format!("Failed to create artifact storage directory: {}", e),
-                    retryable: false,
-                })),
-            };
+        if let Err(error) = fs::create_dir_all(&self.storage_dir) {
+            return create_error(
+                ComputerErrorCode::ExecutionDenied,
+                format!("Failed to create artifact storage directory: {error}"),
+            );
         }
 
-        if let Err(e) = std::fs::write(&target_file, &req.data) {
-            return CreateArtifactResponse {
-                result: Some(create_artifact_response::Result::Error(ComputerError {
-                    code: ComputerErrorCode::ExecutionDenied as i32,
-                    message: format!("Failed to persist artifact to disk: {}", e),
-                    retryable: false,
-                })),
-            };
+        if let Err(error) = write_new_file(&target_file, &req.data) {
+            return create_error(
+                ComputerErrorCode::ExecutionDenied,
+                format!("Failed to persist artifact to disk: {error}"),
+            );
         }
 
         let metadata = ArtifactMetadata {
@@ -164,6 +194,33 @@ impl ArtifactStore {
             disk_path: target_file,
         };
 
+        let sidecar_path = metadata_path(&self.storage_dir, &artifact_id);
+        let sidecar = PersistedArtifactMetadata {
+            artifact_id: metadata.artifact_id.clone(),
+            name: metadata.name.clone(),
+            mime_type: metadata.mime_type.clone(),
+            size_bytes: metadata.size_bytes,
+            sha256_hash: metadata.sha256_hash.clone(),
+            created_at_ms: metadata.created_at_ms,
+        };
+        let sidecar_bytes = match serde_json::to_vec(&sidecar) {
+            Ok(bytes) => bytes,
+            Err(error) => {
+                let _ = fs::remove_file(&entry.disk_path);
+                return create_error(
+                    ComputerErrorCode::ExecutionDenied,
+                    format!("Failed to encode artifact metadata: {error}"),
+                );
+            }
+        };
+        if let Err(error) = write_new_file(&sidecar_path, &sidecar_bytes) {
+            let _ = fs::remove_file(&entry.disk_path);
+            return create_error(
+                ComputerErrorCode::ExecutionDenied,
+                format!("Failed to persist artifact metadata: {error}"),
+            );
+        }
+
         let mut map = self.index.write().unwrap();
         map.insert(artifact_id, entry);
 
@@ -175,6 +232,9 @@ impl ArtifactStore {
     /// Retrieves an artifact by its opaque token, reading bytes on-demand from external disk.
     /// 通过不透明 token 获取 artifact，按需从外部磁盘读取字节。
     pub fn get_artifact(&self, req: GetArtifactRequest) -> GetArtifactResponse {
+        if let Some(error) = &self.initialization_error {
+            return get_error(ComputerErrorCode::ExecutionDenied, error.clone());
+        }
         let (metadata, path) = {
             let map = self.index.read().unwrap();
             match map.get(&req.artifact_id) {
@@ -194,8 +254,30 @@ impl ArtifactStore {
             }
         };
 
-        // Read bytes from disk on demand
-        // 按需从磁盘读取字节。
+        let disk_metadata = match fs::symlink_metadata(&path) {
+            Ok(metadata) => metadata,
+            Err(error) => {
+                return get_error(
+                    ComputerErrorCode::ArtifactNotFound,
+                    format!("Artifact payload is unavailable: {error}"),
+                );
+            }
+        };
+        if !disk_metadata.file_type().is_file()
+            || disk_metadata.len() as i64 != metadata.size_bytes
+            || disk_metadata.len() as usize > self.max_inline_payload_bytes
+        {
+            return get_error(
+                ComputerErrorCode::ExecutionDenied,
+                format!(
+                    "Artifact '{}' has an invalid file type or size",
+                    req.artifact_id
+                ),
+            );
+        }
+
+        // Read bytes from disk on demand after checking type and size.
+        // 校验文件类型和大小后，按需从磁盘读取字节。
         match std::fs::read(&path) {
             Ok(bytes) => {
                 // Verify SHA-256 integrity on retrieval
@@ -232,4 +314,128 @@ impl ArtifactStore {
             },
         }
     }
+}
+
+fn create_error(code: ComputerErrorCode, message: String) -> CreateArtifactResponse {
+    CreateArtifactResponse {
+        result: Some(create_artifact_response::Result::Error(ComputerError {
+            code: code as i32,
+            message,
+            retryable: false,
+        })),
+    }
+}
+
+fn get_error(code: ComputerErrorCode, message: String) -> GetArtifactResponse {
+    GetArtifactResponse {
+        result: Some(get_artifact_response::Result::Error(ComputerError {
+            code: code as i32,
+            message,
+            retryable: false,
+        })),
+    }
+}
+
+fn metadata_path(directory: &std::path::Path, artifact_id: &str) -> PathBuf {
+    directory.join(format!("{artifact_id}.meta.json"))
+}
+
+fn write_new_file(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
+}
+
+fn restore_index(
+    directory: &std::path::Path,
+    max_inline_payload_bytes: usize,
+) -> Result<HashMap<String, ArtifactIndexEntry>, String> {
+    fs::create_dir_all(directory)
+        .map_err(|error| format!("Failed to initialize artifact directory: {error}"))?;
+    let entries = fs::read_dir(directory)
+        .map_err(|error| format!("Failed to read artifact directory: {error}"))?;
+    let mut index = HashMap::new();
+    for entry in entries {
+        let entry =
+            entry.map_err(|error| format!("Failed to read artifact index entry: {error}"))?;
+        let path = entry.path();
+        if path.extension().and_then(|value| value.to_str()) != Some("json")
+            || !path
+                .file_name()
+                .and_then(|value| value.to_str())
+                .is_some_and(|name| name.ends_with(".meta.json"))
+        {
+            continue;
+        }
+
+        let sidecar_metadata = fs::symlink_metadata(&path)
+            .map_err(|error| format!("Failed to inspect artifact metadata: {error}"))?;
+        if !sidecar_metadata.file_type().is_file() || sidecar_metadata.len() > 64 * 1024 {
+            return Err("Artifact metadata file has an invalid type or size".into());
+        }
+        let bytes = fs::read(&path)
+            .map_err(|error| format!("Failed to read artifact metadata: {error}"))?;
+        let saved: PersistedArtifactMetadata = serde_json::from_slice(&bytes)
+            .map_err(|error| format!("Invalid artifact metadata: {error}"))?;
+        if !valid_artifact_id(&saved.artifact_id)
+            || saved.size_bytes < 0
+            || saved.size_bytes as usize > max_inline_payload_bytes
+            || saved.name.len() > 4 * 1024
+            || saved.mime_type.len() > 256
+            || saved.sha256_hash.len() != 64
+            || !saved
+                .sha256_hash
+                .bytes()
+                .all(|byte| byte.is_ascii_hexdigit())
+        {
+            return Err("Artifact metadata contains invalid identity or size".into());
+        }
+        let expected_name = format!("{}.meta.json", saved.artifact_id);
+        if path.file_name().and_then(|value| value.to_str()) != Some(expected_name.as_str()) {
+            return Err("Artifact metadata filename does not match its identity".into());
+        }
+        let disk_path = directory.join(format!("{}.bin", saved.artifact_id));
+        let metadata = fs::symlink_metadata(&disk_path)
+            .map_err(|error| format!("Artifact payload is unavailable: {error}"))?;
+        if !metadata.file_type().is_file() || metadata.len() as i64 != saved.size_bytes {
+            return Err("Artifact payload type or size does not match its metadata".into());
+        }
+        let artifact = ArtifactMetadata {
+            artifact_id: saved.artifact_id.clone(),
+            name: saved.name,
+            mime_type: saved.mime_type,
+            size_bytes: saved.size_bytes,
+            sha256_hash: saved.sha256_hash,
+            created_at_ms: saved.created_at_ms,
+        };
+        if index
+            .insert(
+                artifact.artifact_id.clone(),
+                ArtifactIndexEntry {
+                    metadata: artifact,
+                    disk_path,
+                },
+            )
+            .is_some()
+        {
+            return Err("Artifact metadata contains duplicate identities".into());
+        }
+    }
+    Ok(index)
+}
+
+fn valid_artifact_id(artifact_id: &str) -> bool {
+    let parts: Vec<&str> = artifact_id.split('-').collect();
+    parts.len() == 4
+        && parts[0] == "art"
+        && parts[1].len() == 64
+        && parts[1].bytes().all(|byte| byte.is_ascii_hexdigit())
+        && !parts[2].is_empty()
+        && parts[2].bytes().all(|byte| byte.is_ascii_digit())
+        && !parts[3].is_empty()
+        && parts[3].bytes().all(|byte| byte.is_ascii_digit())
 }

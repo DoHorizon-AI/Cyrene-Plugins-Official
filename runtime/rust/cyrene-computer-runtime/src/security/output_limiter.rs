@@ -6,8 +6,8 @@
 // │  模块职责：严格限制输出字节数，防止输出炸弹造成内存耗尽                 │
 // └─────────────────────────────────────────────────────────────────────┘
 
-pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 512 * 1024; // 512 KB | 中文：默认输出上限为 512 KB
-pub const ABSOLUTE_MAX_OUTPUT_BYTES: usize = 4 * 1024 * 1024; // 4 MB | 中文：输出绝对上限为 4 MB
+pub const DEFAULT_MAX_OUTPUT_BYTES: usize = 64 * 1024; // 64 KiB | 中文：每个输出流默认上限为 64 KiB，兼容工具传输封套
+pub const ABSOLUTE_MAX_OUTPUT_BYTES: usize = DEFAULT_MAX_OUTPUT_BYTES; // Tool envelope stays below the 1.5 MiB call limit | 工具封套控制在 1.5 MiB 调用限制内
 
 pub struct OutputCollector {
     max_bytes: usize,
@@ -33,19 +33,22 @@ impl OutputCollector {
 
     /// Appends data chunk; truncates once limit is reached.
     /// 追加数据块；达到上限后截断。
-    pub fn append(&mut self, chunk: &[u8]) {
+    pub fn append(&mut self, chunk: &[u8]) -> usize {
         self.total_bytes_seen += chunk.len();
 
         if self.buffer.len() < self.max_bytes {
             let remaining = self.max_bytes - self.buffer.len();
             if chunk.len() <= remaining {
                 self.buffer.extend_from_slice(chunk);
+                chunk.len()
             } else {
                 self.buffer.extend_from_slice(&chunk[..remaining]);
                 self.is_truncated = true;
+                remaining
             }
         } else {
             self.is_truncated = true;
+            0
         }
     }
 

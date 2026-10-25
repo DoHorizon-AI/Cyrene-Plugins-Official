@@ -44,6 +44,120 @@ ACTOR = {
 }
 GITHUB_REPOSITORIES = [{"repository_id": "123", "owner": "acme", "name": "project"}]
 GITHUB_TARGET = {"repository_id": "123", "repository": "acme/project"}
+GITHUB_TYPED_TARGET_CASES = [
+    (
+        "github.issues.search",
+        GITHUB_TARGET,
+        {**GITHUB_TARGET, "state": "OPEN", "limit": 20, "updated_since": "2026-10-01T00:00:00Z"},
+    ),
+    (
+        "github.branch.get",
+        {**GITHUB_TARGET, "branch": "cyrene/assistant/task-1"},
+        {**GITHUB_TARGET, "branch": "cyrene/assistant/task-1"},
+    ),
+    (
+        "github.file.get",
+        {
+            **GITHUB_TARGET,
+            "branch": "cyrene/assistant/task-1",
+            "path": "src/main.py",
+        },
+        {
+            **GITHUB_TARGET,
+            "branch": "cyrene/assistant/task-1",
+            "path": "src/main.py",
+        },
+    ),
+    (
+        "github.actions.jobs.list",
+        {**GITHUB_TARGET, "run_id": "987654321"},
+        {**GITHUB_TARGET, "run_id": "987654321", "limit": 50},
+    ),
+    (
+        "github.actions.job.logs.read",
+        {**GITHUB_TARGET, "run_id": "987654321", "job_id": "987654322"},
+        {
+            **GITHUB_TARGET,
+            "run_id": "987654321",
+            "job_id": "987654322",
+            "max_lines": 100,
+        },
+    ),
+    (
+        "github.branch.create",
+        {**GITHUB_TARGET, "branch": "cyrene/assistant/task-1"},
+        {
+            **GITHUB_TARGET,
+            "branch": "cyrene/assistant/task-1",
+            "from_sha": "a" * 40,
+        },
+    ),
+    (
+        "github.branch.delete",
+        {**GITHUB_TARGET, "branch": "cyrene/assistant/task-1"},
+        {
+            **GITHUB_TARGET,
+            "branch": "cyrene/assistant/task-1",
+            "expected_sha": "a" * 40,
+        },
+    ),
+    (
+        "github.file.commit",
+        {
+            **GITHUB_TARGET,
+            "branch": "cyrene/assistant/task-1",
+            "path": "src/main.py",
+        },
+        {
+            **GITHUB_TARGET,
+            "branch": "cyrene/assistant/task-1",
+            "path": "src/main.py",
+            "message": "Update the task file",
+            "content_base64": "YQ==",
+            "expected_sha": "b" * 40,
+        },
+    ),
+    (
+        "github.pull_request.draft.create",
+        {
+            **GITHUB_TARGET,
+            "head_branch": "cyrene/assistant/task-1",
+            "base_branch": "develop",
+        },
+        {
+            **GITHUB_TARGET,
+            "head_branch": "cyrene/assistant/task-1",
+            "base_branch": "develop",
+            "title": "Task change",
+            "body": "Bounded task work.",
+        },
+    ),
+    (
+        "github.pull_request.draft.find",
+        {
+            **GITHUB_TARGET,
+            "head_branch": "cyrene/assistant/task-1",
+            "base_branch": "develop",
+        },
+        {
+            **GITHUB_TARGET,
+            "head_branch": "cyrene/assistant/task-1",
+            "base_branch": "develop",
+        },
+    ),
+    (
+        "github.actions.rerun_failed",
+        {**GITHUB_TARGET, "run_id": "987654321"},
+        {
+            **GITHUB_TARGET,
+            "run_id": "987654321",
+            "expected_workflow_id": "987654323",
+            "expected_head_branch": "cyrene/assistant/task-1",
+            "expected_head_sha": "c" * 40,
+            "expected_attempt": 2,
+        },
+    ),
+]
 
 
 class FakeGitHubApp:
@@ -433,6 +547,135 @@ def test_github_app_profile_mints_refreshes_caches_and_scope_binds_leases(
                 "target": {"repository_id": "124", "repository": "acme/other"},
                 "arguments_sha256": _digest(arguments),
             },
+        )
+
+
+def test_github_profile_operation_catalog_is_closed_for_typed_tools(
+    tmp_path: Path,
+) -> None:
+    harness = ProfileHarness(tmp_path / "accounts.sqlite3")
+    profile_ref = _github_profile(harness)
+    allowed = account_center_plugin_module.PROVIDER_OPERATIONS_BY_PROVIDER["github"]
+    expected_typed = {case[0] for case in GITHUB_TYPED_TARGET_CASES}
+    assert expected_typed.issubset(allowed)
+    assert "github.actions.run.get" not in allowed
+
+    with pytest.raises(AccountCenterError, match="authorization_denied"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": profile_ref,
+                "operation_id": "github.actions.run.get",
+                "target": {**GITHUB_TARGET, "run_id": "987654321"},
+                "arguments_sha256": _digest({"run_id": "987654321"}),
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    ("operation", "target", "arguments"), GITHUB_TYPED_TARGET_CASES
+)
+def test_typed_github_app_leases_bind_exact_locator_digest_and_one_use(
+    tmp_path: Path,
+    operation: str,
+    target: dict[str, Any],
+    arguments: dict[str, Any],
+) -> None:
+    harness = ProfileHarness(tmp_path / f"{operation.replace('.', '-')}.sqlite3")
+    profile_ref = _github_profile(harness)
+    allowed_operations = account_center_plugin_module.PROVIDER_OPERATIONS_BY_PROVIDER[
+        "github"
+    ]
+    assert operation in allowed_operations
+
+    with pytest.raises(AccountCenterError, match="invalid_request"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": profile_ref,
+                "operation_id": operation,
+                "target": {**target, "unexpected": "locator"},
+                "arguments_sha256": _digest(arguments),
+            },
+        )
+    missing_locator = dict(target)
+    if operation != "github.issues.search":
+        locator_fields = set(target) - set(GITHUB_TARGET)
+        missing_locator.pop(next(iter(locator_fields)))
+        with pytest.raises(AccountCenterError, match="invalid_request"):
+            harness.call(
+                "create_provider_credential_lease",
+                {
+                    "profile_ref": profile_ref,
+                    "operation_id": operation,
+                    "target": missing_locator,
+                    "arguments_sha256": _digest(arguments),
+                },
+            )
+    out_of_scope_target = {**target, "repository_id": "124", "repository": "acme/other"}
+    with pytest.raises(AccountCenterError, match="authorization_denied"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": profile_ref,
+                "operation_id": operation,
+                "target": out_of_scope_target,
+                "arguments_sha256": _digest(arguments),
+            },
+        )
+    invalid_locator = dict(target)
+    if "path" in target:
+        invalid_locator["path"] = "../secret.txt"
+    elif "branch" in target:
+        invalid_locator["branch"] = "cyrene/assistant/../main"
+    elif "run_id" in target:
+        invalid_locator["run_id"] = "0"
+    elif "head_branch" in target:
+        invalid_locator["head_branch"] = "../develop"
+    else:
+        invalid_locator = {}
+    if invalid_locator:
+        with pytest.raises(AccountCenterError, match="invalid_request"):
+            harness.call(
+                "create_provider_credential_lease",
+                {
+                    "profile_ref": profile_ref,
+                    "operation_id": operation,
+                    "target": invalid_locator,
+                    "arguments_sha256": _digest(arguments),
+                },
+            )
+
+    lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": profile_ref,
+            "operation_id": operation,
+            "target": target,
+            "arguments_sha256": _digest(arguments),
+        },
+    )
+    redemption = {
+        "lease_ref": lease["lease_ref"],
+        "profile_ref": profile_ref,
+        "operation_id": operation,
+        "target": target,
+        "arguments_sha256": _digest(arguments),
+    }
+    with pytest.raises(AccountCenterError, match="lease_rejected"):
+        harness.call(
+            "redeem_provider_credential_lease",
+            {**redemption, "arguments_sha256": _digest({**arguments, "changed": True})},
+            caller=GITHUB_PROVIDER,
+        )
+
+    material = harness.call(
+        "redeem_provider_credential_lease", redemption, caller=GITHUB_PROVIDER
+    )
+    assert material["access_token"].startswith("installation-token-")
+    with pytest.raises(AccountCenterError, match="lease_rejected"):
+        harness.call(
+            "redeem_provider_credential_lease", redemption, caller=GITHUB_PROVIDER
         )
 
 

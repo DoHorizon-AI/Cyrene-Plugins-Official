@@ -1,11 +1,55 @@
 # GitHub Issues and Repository Provider
 
 This binding exposes fixed `tool.provider.v1` operations over GitHub Cloud at
-`api.github.com`: repository inventory and metadata, branches, pull requests,
-Actions runs, commit/CI status, and the existing issue read/write tools. Every
-repository target must match both a stable numeric repository ID and the
-configured owner/name pair. The provider accepts no arbitrary URL, command, or
-caller-supplied identity.
+`api.github.com`: repository inventory and metadata, issue search, branch and
+file readback, pull requests, Actions runs/jobs/log excerpts, and CI status. Its
+bounded task operations can create and delete non-protected branches, create or
+compare-and-update one file, open a draft pull request, and rerun failed jobs for
+an exact task-branch CI attempt. Writable branch refs must use
+`cyrene/assistant/<task>`; the repository default branch is always protected.
+Branch deletion is refused while an open same-repository pull request uses it.
+Every repository target must match both a
+stable numeric repository ID and the configured owner/name pair. The provider
+accepts no arbitrary URL, command, or caller-supplied identity.
+
+Issue search always pins the configured repository and excludes pull requests.
+State, labels, lower and upper update-window bounds, and page are structured
+inputs; free text does not accept GitHub query qualifiers. Results echo
+`page_cursor` and report `complete`, `truncated`, `incomplete_results`,
+`result_limit_reached`, and `next_cursor`. `complete` means this response
+alone contains all results, so page 2 can never claim the earlier page was
+included. The workflow must reconcile the ordered page receipts before moving
+its watermark. GitHub's 1,000-result search ceiling is reported explicitly.
+The update window accepts UTC RFC3339 with `Z` or `+00:00`; the provider
+normalizes both bounds to the documented UTC offset syntax before sending the
+fixed search query.
+CI status returns context and check-run counts with `complete`/`truncated`;
+responses over the first 100 items are explicitly incomplete and cannot be
+treated as a green result.
+Actions run and job lists also return `total_count`, `complete`, and
+`truncated`; consumers can distinguish the bounded first page from the full
+set.
+Failed-job reruns require a repository-scoped `source_workflow_ids` allowlist;
+an absent or empty entry denies every rerun. The request binds the expected
+`expected_workflow_id` and task branch, and the provider rereads the run before
+retrying.
+Workflow logs follow only GitHub's short-lived redirect to the documented
+`productionresultssa*.blob.core.windows.net` hosts, omit the App token on that
+request, and return a best-effort excerpt with common credential patterns
+redacted, bounded to 200 lines and 20,000 bytes. This filter cannot identify
+every possible secret format.
+
+Writes require the dedicated assistant task namespace and exact SHA preconditions
+where the GitHub API supports them. Branch deletion checks the expected SHA
+and current default branch immediately before deletion, but GitHub exposes no
+atomic conditional delete. The host must hold the same repository-and-branch
+lifecycle lock across ref writes, draft-PR creation or closure, and deletion of
+that unique task branch. This lock cannot serialize changes made directly in
+GitHub, so a concurrent external edit or PR remains outside the guarantee.
+Hidden files, workflow/CI controls, permissions, deployment and production
+configuration paths are denied. A file is limited to 500,000 bytes.
+Create, delete, commit, draft-PR, and CI-rerun calls reconcile remote state
+before reporting success and never retry an unknown write outcome.
 
 New calls use a GitHub App installation profile and a one-use Account Center
 lease bound to the verified actor, profile, operation, exact target, and
@@ -32,9 +76,36 @@ Run focused tests from this directory with
 ## GitHub Issues 与仓库状态提供方
 
 此 binding 通过 GitHub Cloud `api.github.com` 暴露固定的 `tool.provider.v1`
-操作：仓库清单与 metadata、分支、PR、Actions runs、commit/CI 状态，以及现有
-Issue 读写工具。每个仓库目标必须同时匹配稳定数字 repository ID 与配置的
-owner/name。provider 不接受任意 URL、命令或调用方自选身份。
+操作：仓库清单与 metadata、Issue 搜索、分支和文件回读、PR、Actions runs/jobs/日志摘录、
+commit/CI 状态。受限任务操作仅可在 `cyrene/assistant/<task>` 命名空间创建/删除分支、
+创建或按 SHA 比对更新单个文件、创建 draft PR，以及针对指定任务分支 CI attempt 重跑失败 job；
+仓库默认分支始终受保护，若同仓库的开放 PR 正在使用某分支则拒绝删除。每个仓库目标必须同时匹配
+稳定数字 repository ID 与配置的 owner/name。provider 不接受任意 URL、命令或调用方自选身份。
+
+Issue 搜索始终固定限定在配置仓库并排除 PR。state、labels、更新时间窗口上下界和 page 都是
+结构化字段；自由文本不能传 GitHub 搜索限定符。结果回显 `page_cursor`，并返回
+`complete`、`truncated`、`incomplete_results`、`result_limit_reached` 和 `next_cursor`。
+`complete` 表示本次响应自身包含全部结果，因此第 2 页不会声称包含了第 1 页；workflow
+须按顺序核对每页真实回执后再推进水位。GitHub 搜索 API 的 1,000 条上限会明确报告。
+更新时间窗口接收 UTC RFC3339 的 `Z` 或 `+00:00` 格式，provider 会在发送固定搜索查询前将
+上下界都规范为 GitHub 文档说明的 UTC offset 形式。日志只跟随
+GitHub 短时重定向到文档所列的 `productionresultssa*.blob.core.windows.net` 主机，
+下载时不携带 App token，日志摘录会尽力过滤常见凭据格式（最多 200 行、20,000 字节）；
+此过滤无法识别所有可能的密钥格式。
+CI 状态附带 status context/check-run 计数与 `complete`/`truncated`；超过首批 100 条时会
+明确标为不完整，不能当作 CI 全绿结果。
+Actions run 和 job 列表也会返回 `total_count`、`complete` 与 `truncated`，调用方可以区分有界
+首批结果与完整集合。
+失败 job 重跑还需要按仓库配置的 `source_workflow_ids` 正向 allowlist；缺失或空列表时一律拒绝。
+请求会绑定 `expected_workflow_id` 和任务分支，provider 在重跑前重新读取并核对上游 run。
+
+写入要求使用专属 assistant 任务分支，并在 API 支持时绑定精确 SHA。删除分支前会重新读取并
+核对 expected SHA 和当前默认分支，但 GitHub 没有原子化的条件删除 API；宿主必须对同一仓库和
+唯一任务分支使用同一生命周期锁，覆盖 ref 写入、draft PR 创建或关闭以及分支删除。此锁无法
+串行化直接在 GitHub 上进行的更改，因此并发外部编辑或 PR 不在保证范围内。隐藏文件、
+工作流/CI 控制、权限、部署和生产配置路径会被拒绝；单个文件最多 500,000 字节。
+创建分支、删除分支、提交文件、创建 draft PR 和重跑 CI 都会先核对远端状态再报告成功；
+结果未知时不会自动重试写入。
 
 新调用使用 GitHub App installation profile 和 Account Center 一次性租约，租约绑定
 可信 actor、profile、操作、精确目标和规范化参数摘要。Account Center 只向 provider

@@ -328,7 +328,7 @@ class TestCatalogCliExecution:
         _assert_data_tools_plugin_metadata(data)
 
     def test_catalog_list_exchange_service(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test Exchange includes all eleven explicitly supported plugins."""
+        """Test Exchange includes all twelve explicitly supported plugins."""
         rc = main(["catalog", "list", "--service", "Cyrene-Exchange", "--json"])
         assert rc == 0
         data = json.loads(capsys.readouterr().out)
@@ -344,6 +344,7 @@ class TestCatalogCliExecution:
             "cyrene.providers.github-issues",
             "cyrene.providers.huggingface",
             "cyrene.providers.model-api-connector",
+            "cyrene.tools.computer-runtime",
         }
 
     def test_catalog_show_existing(self, capsys: pytest.CaptureFixture[str]) -> None:

@@ -10,7 +10,7 @@ import json
 import os
 import re
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -62,6 +62,7 @@ class ProviderSettings:
     allowed_events: frozenset[str]
     allowed_actions: frozenset[str]
     timeout_seconds: float = 15.0
+    source_workflow_ids: Mapping[str, frozenset[str]] = field(default_factory=dict)
 
     def repository(self, repository_id: str, slug: str) -> Repository:
         """Resolve both configured identity components or reject the request."""
@@ -93,6 +94,7 @@ class ProviderSettings:
             "allowed_installation_ids",
             "allowed_events",
             "allowed_actions",
+            "source_workflow_ids",
             "timeout_seconds",
             "hostSecretRefs",
         }
@@ -132,6 +134,28 @@ class ProviderSettings:
                 raise ConfigurationError("repository owner/name is invalid")
             seen_ids.add(repository_id)
             repositories.append(Repository(repository_id, owner, name))
+
+        source_workflow_ids_raw = config.get("source_workflow_ids", {})
+        if not isinstance(source_workflow_ids_raw, Mapping):
+            raise ConfigurationError("source_workflow_ids must map repository IDs to arrays")
+        configured_repository_ids = {repository.repository_id for repository in repositories}
+        source_workflow_ids: dict[str, frozenset[str]] = {}
+        for repository_id, workflow_ids_raw in source_workflow_ids_raw.items():
+            if (
+                not isinstance(repository_id, str)
+                or repository_id not in configured_repository_ids
+                or not isinstance(workflow_ids_raw, list)
+                or any(
+                    not isinstance(workflow_id, str)
+                    or re.fullmatch(r"[1-9][0-9]{0,19}", workflow_id) is None
+                    for workflow_id in workflow_ids_raw
+                )
+                or len(set(workflow_ids_raw)) != len(workflow_ids_raw)
+            ):
+                raise ConfigurationError(
+                    "source_workflow_ids contains an invalid repository or workflow ID"
+                )
+            source_workflow_ids[repository_id] = frozenset(workflow_ids_raw)
 
         account_center = config.get("account_center")
         if not isinstance(account_center, Mapping):
@@ -245,6 +269,7 @@ class ProviderSettings:
             allowed_installation_ids=allowed_installations,
             allowed_events=allowed_events,
             allowed_actions=allowed_actions,
+            source_workflow_ids=source_workflow_ids,
             timeout_seconds=_positive_timeout(config.get("timeout_seconds", 15)),
         )
 

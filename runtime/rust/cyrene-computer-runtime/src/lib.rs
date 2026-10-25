@@ -45,6 +45,38 @@ use computer_runtime_v1::{
     WriteFileResponse,
 };
 
+/// ════════════════════════════════════════════════════════════════════════
+/// Per-operation bounds shared by direct Computer Runtime calls and the
+/// `tool.provider.v1` facade. They do not cap user turns or work duration.
+///
+/// 直接 Computer Runtime 与 `tool.provider.v1` 门面的单次操作边界，
+/// 不限制用户对话轮数或工作的总时长。
+/// ════════════════════════════════════════════════════════════════════════
+#[derive(Clone, Debug)]
+pub struct ComputerRuntimeLimits {
+    pub command_default_timeout_ms: u64,
+    pub command_max_timeout_ms: u64,
+    pub max_output_bytes: usize,
+    pub max_file_bytes: usize,
+    pub max_directory_entries: usize,
+    pub max_directory_depth: i32,
+    pub max_artifact_bytes: usize,
+}
+
+impl Default for ComputerRuntimeLimits {
+    fn default() -> Self {
+        Self {
+            command_default_timeout_ms: 30_000,
+            command_max_timeout_ms: 600_000,
+            max_output_bytes: security::DEFAULT_MAX_OUTPUT_BYTES,
+            max_file_bytes: 1024 * 1024,
+            max_directory_entries: 2_048,
+            max_directory_depth: 32,
+            max_artifact_bytes: artifact::MAX_INLINE_PAYLOAD_BYTES,
+        }
+    }
+}
+
 /// Unified high-level service facade for Computer Runtime v1.
 /// Computer Runtime v1 的统一高层 service facade。
 pub struct ComputerRuntimeService {
@@ -57,26 +89,49 @@ pub struct ComputerRuntimeService {
 
 impl ComputerRuntimeService {
     pub fn new(allowed_roots: Vec<PathBuf>) -> Self {
-        let validator = PathValidator::new(allowed_roots);
-        let env_filter = EnvironmentFilter::new();
-
-        Self {
-            shell: ShellProcessRunner::new(validator.clone(), env_filter),
-            fs: FilesystemService::new(validator),
-            artifacts: ArtifactStore::new(),
-            browser: BrowserService::new(),
-            isolation_level: IsolationLevel::BoundedManagedExecution,
-        }
+        Self::with_limits_and_artifact_dir(
+            allowed_roots,
+            std::env::temp_dir().join("cyrene-artifacts"),
+            ComputerRuntimeLimits::default(),
+        )
     }
 
     pub fn with_artifact_dir(allowed_roots: Vec<PathBuf>, artifact_dir: PathBuf) -> Self {
+        Self::with_limits_and_artifact_dir(
+            allowed_roots,
+            artifact_dir,
+            ComputerRuntimeLimits::default(),
+        )
+    }
+
+    /// Creates a runtime scoped to explicit workspace and artifact roots.
+    /// 创建一个明确绑定工作区和制品目录的运行时。
+    pub fn with_limits_and_artifact_dir(
+        allowed_roots: Vec<PathBuf>,
+        artifact_dir: PathBuf,
+        limits: ComputerRuntimeLimits,
+    ) -> Self {
         let validator = PathValidator::new(allowed_roots);
         let env_filter = EnvironmentFilter::new();
 
         Self {
-            shell: ShellProcessRunner::new(validator.clone(), env_filter),
-            fs: FilesystemService::new(validator),
-            artifacts: ArtifactStore::with_storage_dir(artifact_dir),
+            shell: ShellProcessRunner::with_limits(
+                validator.clone(),
+                env_filter,
+                limits.command_default_timeout_ms,
+                limits.command_max_timeout_ms,
+                limits.max_output_bytes,
+            ),
+            fs: FilesystemService::with_limits(
+                validator,
+                limits.max_file_bytes,
+                limits.max_directory_entries,
+                limits.max_directory_depth,
+            ),
+            artifacts: ArtifactStore::with_storage_dir_and_limit(
+                artifact_dir,
+                limits.max_artifact_bytes,
+            ),
             browser: BrowserService::new(),
             isolation_level: IsolationLevel::BoundedManagedExecution,
         }

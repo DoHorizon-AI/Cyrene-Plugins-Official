@@ -110,6 +110,7 @@ def test_runtime_entrypoint_builds_and_uses_resolved_account_center_client(
         "allowed_installation_ids": ["99"],
         "allowed_events": ["issues"],
         "allowed_actions": ["opened", "closed", "reopened"],
+        "source_workflow_ids": {"12345": ["22"]},
         "account_center": {
             "binding_id": "account-center.binding.one",
             "connection_ref": connection_ref,
@@ -134,6 +135,7 @@ def test_runtime_entrypoint_builds_and_uses_resolved_account_center_client(
         provider = load_entrypoint("github_issues_provider.plugin:GitHubIssuesProvider")
         assert isinstance(provider._account_center, AccountCenterDirectLeaseClient)
         assert provider._settings.host_secret_names == config["hostSecretRefs"]
+        assert provider._settings.source_workflow_ids == {"12345": frozenset({"22"})}
         assert EXCHANGE_KEY.hex() not in json.dumps(config)
         assert ACCOUNT_CENTER_KEY.hex() not in json.dumps(config)
         provider._github_api = GitHubApiFixture()
@@ -196,6 +198,18 @@ def test_runtime_entrypoint_builds_and_uses_resolved_account_center_client(
         assert call["context"]["binding_id"] == "account-center.binding.one"
         assert call["context"]["method"] == "redeem_credential_lease"
         assert "private-github-user-token" not in response.outcome.content[0].json.json
+
+        for source_workflow_ids in (
+            {"99999": ["22"]},
+            {"12345": ["0"]},
+            {"12345": ["22", "22"]},
+            {"12345": "22"},
+        ):
+            config["source_workflow_ids"] = source_workflow_ids
+            monkeypatch.setenv("CYRENE_CAPABILITY_CONFIGURATION_JSON", json.dumps(config))
+            with pytest.raises(ConfigurationError, match="source_workflow_ids"):
+                ProviderSettings.from_environment()
+        config["source_workflow_ids"] = {"12345": ["22"]}
 
         config["hostSecretRefs"]["github-issues/unused-secret"] = "TEST_UNUSED_SECRET"
         monkeypatch.setenv("TEST_UNUSED_SECRET", "unused test secret value")

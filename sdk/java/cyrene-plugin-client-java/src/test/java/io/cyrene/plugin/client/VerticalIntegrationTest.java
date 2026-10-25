@@ -16,9 +16,13 @@ package io.cyrene.plugin.client;
 
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 
@@ -94,6 +98,20 @@ class VerticalIntegrationTest {
             return artifactCandidate;
         }
         return candidate;
+    }
+
+    /**
+     * Configures separate temporary Computer roots required by the production server.
+     * <p>为生产服务配置彼此独立的 Computer 临时目录。</p>
+     */
+    private static void configureComputerRoots(
+        ProcessBuilder builder,
+        Path root
+    ) throws IOException {
+        Path workspaceRoot = Files.createDirectories(root.resolve("workspace"));
+        Path artifactRoot = Files.createDirectories(root.resolve("artifacts"));
+        builder.environment().put("CYRENE_COMPUTER_WORKSPACE_ROOT", workspaceRoot.toString());
+        builder.environment().put("CYRENE_COMPUTER_ARTIFACT_ROOT", artifactRoot.toString());
     }
 
     @Test
@@ -219,12 +237,15 @@ class VerticalIntegrationTest {
         assertThat(nmOutput).contains("cyrene_plugin_destroy_v1");
     }
     @Test
-    void testJavaToRustServer_ProductionFailsClosedWithoutBindings_R08() throws Exception {
+    void testJavaToRustServer_ProductionFailsClosedWithoutBindings_R08(
+        @TempDir Path tempDir
+    ) throws Exception {
         File serverBin = resolveRustServerBin();
         Assumptions.assumeTrue(serverBin.exists() && serverBin.canExecute(),
             "Rust cyrene-plugin-server binary not found at " + serverBin.getAbsolutePath() + "; build with cargo build --bin cyrene-plugin-server");
 
         ProcessBuilder pb = new ProcessBuilder(serverBin.getAbsolutePath(), "--port", "0");
+        configureComputerRoots(pb, tempDir);
         Process proc = pb.start();
 
         java.io.BufferedReader reader = new java.io.BufferedReader(
@@ -252,8 +273,11 @@ class VerticalIntegrationTest {
 // 中文：1. Health check。
             HealthResponse health = client.health("rust-server", io.cyrene.plugin.runtime.v1.HealthRequest.getDefaultInstance());
             assertThat(health.getStatus()).isEqualTo(HealthResponse.Status.STATUS_SERVING);
-            assertThat(health.getPluginId()).isEqualTo("cyrene.plugin.rust.server");
-            assertThat(health.getCapabilitiesList()).containsExactly("computer.runtime.v1");
+            assertThat(health.getPluginId()).isEqualTo("cyrene.tools.computer-runtime");
+            assertThat(health.getCapabilitiesList()).containsExactly(
+                "computer.runtime.v1",
+                "tool.provider.v1"
+            );
 
             // Production startup has no implicit SQLite or synthetic embedding backend.
 // 中文：生产启动时不会隐式启用 SQLite 或合成 embedding 后端。
@@ -292,12 +316,15 @@ class VerticalIntegrationTest {
     }
 
     @Test
-    void testJavaToRustServer_FailClosed_R09() throws Exception {
+    void testJavaToRustServer_FailClosed_R09(
+        @TempDir Path tempDir
+    ) throws Exception {
         File serverBin = resolveRustServerBin();
         Assumptions.assumeTrue(serverBin.exists() && serverBin.canExecute(),
             "Rust cyrene-plugin-server binary not found at " + serverBin.getAbsolutePath());
 
         ProcessBuilder pb = new ProcessBuilder(serverBin.getAbsolutePath(), "--port", "0");
+        configureComputerRoots(pb, tempDir);
         Process proc = pb.start();
 
         java.io.BufferedReader reader = new java.io.BufferedReader(
