@@ -35,7 +35,7 @@ use tokio::sync::mpsc;
 use tokio::task::AbortHandle;
 
 const MXC_LAUNCH_SCRIPT: &str =
-    "exec \"$CYRENE_MXC_EXEC_HELPER\" --execute --request \"$CYRENE_MXC_REQUEST\" --receipt \"$CYRENE_MXC_RECEIPT\"";
+    "exec \"$CYRENE_MXC_EXEC_HELPER\" --execute --expected-parent-pid \"$CYRENE_MXC_SUPERVISOR_PID\" --request \"$CYRENE_MXC_REQUEST\" --receipt \"$CYRENE_MXC_RECEIPT\"";
 const DEFAULT_WORKLOAD_PATH: &str = "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin";
 const MAX_MXC_COMMAND_BYTES: usize = 512 * 1024;
 const MAX_MXC_ENV_ENTRIES: usize = 128;
@@ -70,6 +70,7 @@ pub struct MicrosoftMxcSandboxProviderAdapter {
     path_validator: PathValidator,
     runner: Arc<ShellProcessRunner>,
     env_filter: EnvironmentFilter,
+    supervisor_pid: u32,
 }
 
 /// Per-call private control files and the fixed helper environment.
@@ -112,7 +113,13 @@ impl MicrosoftMxcSandboxProviderAdapter {
             .map_err(denied)?;
         let control_path = trusted_control_path(&control_directories)
             .map_err(|error| denied(format!("cannot build trusted MXC PATH: {error}")))?;
-        let bubblewrap_version = run_startup_probe(&helper_path, &workspace_roots, &control_path)?;
+        let supervisor_pid = std::process::id();
+        let bubblewrap_version = run_startup_probe(
+            &helper_path,
+            &workspace_roots,
+            &control_path,
+            supervisor_pid,
+        )?;
         Ok(Self {
             helper_path,
             control_path,
@@ -121,6 +128,7 @@ impl MicrosoftMxcSandboxProviderAdapter {
             path_validator,
             runner,
             env_filter: EnvironmentFilter::new(),
+            supervisor_pid,
         })
     }
 
@@ -173,6 +181,7 @@ impl MicrosoftMxcSandboxProviderAdapter {
 
         let control_request = MxcControlRequest {
             schema_version: MXC_CONTROL_SCHEMA_VERSION,
+            supervisor_pid: self.supervisor_pid,
             command: request.command.clone(),
             start_marker,
             timeout_ms,
@@ -232,6 +241,10 @@ impl MicrosoftMxcSandboxProviderAdapter {
         );
         control_environment.insert("CYRENE_MXC_REQUEST".into(), path_to_utf8(&request_path)?);
         control_environment.insert("CYRENE_MXC_RECEIPT".into(), path_to_utf8(&receipt_path)?);
+        control_environment.insert(
+            "CYRENE_MXC_SUPERVISOR_PID".into(),
+            self.supervisor_pid.to_string(),
+        );
         control_environment.insert("PATH".into(), self.control_path.clone());
         control_environment.insert("HOME".into(), path_to_utf8(&host_home)?);
         control_environment.insert("TMPDIR".into(), path_to_utf8(&directory_path)?);
@@ -557,12 +570,15 @@ fn run_startup_probe(
     helper_path: &Path,
     workspace_roots: &[PathBuf],
     control_path: &str,
+    supervisor_pid: u32,
 ) -> Result<String, ComputerError> {
     use std::os::unix::process::CommandExt;
 
     let mut command = Command::new(helper_path);
     command
         .arg("--probe")
+        .arg("--expected-parent-pid")
+        .arg(supervisor_pid.to_string())
         .env_clear()
         .env("PATH", control_path)
         .env("HOME", "/tmp/cyrene-mxc-probe-home")

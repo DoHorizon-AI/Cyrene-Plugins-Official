@@ -3015,8 +3015,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/computer-runtime/README.md",
-      "sha256": "39adb9692fd5c234c71c0d114721887401d515d8ad5fc3d07a65ca74fe4897f1",
-      "size_bytes": 13630
+      "sha256": "73c9023194d8731c6d979c6791d8af7fb42a5a612ea6eac7658158db2d575810",
+      "size_bytes": 14498
     },
     {
       "kind": "file",
@@ -4142,8 +4142,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/mxc_exec.rs",
-      "sha256": "9663d42ef498896747edf44b67ef0c0fbcac21dbb2ad304d7c930abf4855e9dc",
-      "size_bytes": 39652
+      "sha256": "f4555a3794c8d3af77d1e261f665e216e8072006d0d662f75df58c88fc86dc19",
+      "size_bytes": 45779
     },
     {
       "kind": "file",
@@ -4156,15 +4156,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/mxc.rs",
-      "sha256": "85d96732dd7be3ec3bdaadbb153cc3013350021b753552eee283ac20132497f8",
-      "size_bytes": 31175
+      "sha256": "07477e911951470f7ed5bbd06f8ef21649b9989ee3d71876f565be52edc33be3",
+      "size_bytes": 31698
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/mxc_protocol.rs",
-      "sha256": "65ba51c9a379bce343fe017ad59d926c3c9cb8545c3d5566012d513546fd5885",
-      "size_bytes": 6574
+      "sha256": "3b84e1b7264e524d1c6dbf09c742d5342c7f0767a9e9c6f3ce3c14bee187c0f1",
+      "size_bytes": 6814
     },
     {
       "kind": "file",
@@ -4226,8 +4226,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/tests/mxc_backend_tests.rs",
-      "sha256": "ce6a5982e1c72499731c74b06e4d1d7f7dbadb9abacd68c53d56f802c2705f02",
-      "size_bytes": 24093
+      "sha256": "52dcd4bcd80fc3e30f217e04d7f3194c4b4251198ca0c07603f244a9ceecc07b",
+      "size_bytes": 30389
     },
     {
       "kind": "file",

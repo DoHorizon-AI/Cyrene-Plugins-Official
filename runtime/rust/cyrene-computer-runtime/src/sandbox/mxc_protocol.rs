@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-pub const MXC_CONTROL_SCHEMA_VERSION: u32 = 1;
+pub const MXC_CONTROL_SCHEMA_VERSION: u32 = 2;
 pub const MAX_MXC_CONTROL_REQUEST_BYTES: usize = 1024 * 1024;
 pub const MAX_MXC_TERMINAL_RECEIPT_BYTES: usize = 4096;
 pub const MAX_MXC_RECEIPT_MESSAGE_BYTES: usize = 1536;
@@ -90,7 +90,7 @@ pub fn trusted_control_path(directories: &[PathBuf]) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{trusted_control_path, MxcControlRequest};
+    use super::{trusted_control_path, MxcControlRequest, MXC_CONTROL_SCHEMA_VERSION};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 
@@ -110,10 +110,11 @@ mod tests {
     #[test]
     fn control_request_carries_an_explicit_workload_deadline() {
         let request = MxcControlRequest {
-            schema_version: 1,
+            schema_version: MXC_CONTROL_SCHEMA_VERSION,
             command: "true".into(),
             start_marker: "CYRENE_MXC_STARTED_0123456789abcdef0123456789abcdef".into(),
             timeout_ms: 321,
+            supervisor_pid: 42,
             workspace_roots: vec!["/workspace".into()],
             working_directory: "/workspace".into(),
             environment: BTreeMap::new(),
@@ -121,6 +122,7 @@ mod tests {
         let json = serde_json::to_string(&request).unwrap();
         let decoded: MxcControlRequest = serde_json::from_str(&json).unwrap();
         assert_eq!(decoded.timeout_ms, 321);
+        assert_eq!(decoded.supervisor_pid, 42);
     }
 }
 
@@ -147,6 +149,8 @@ pub fn ensure_control_directories_outside_workspaces(
 #[serde(deny_unknown_fields)]
 pub struct MxcControlRequest {
     pub schema_version: u32,
+    /// Host process that owns this helper and is authorized to supervise it.
+    pub supervisor_pid: u32,
     pub command: String,
     pub start_marker: String,
     pub timeout_ms: u32,
