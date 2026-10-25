@@ -41,8 +41,14 @@ mod linux {
     }
 
     enum HelperMode {
-        Execute(Paths),
-        Probe(Vec<PathBuf>),
+        Execute {
+            paths: Paths,
+            expected_parent_pid: u32,
+        },
+        Probe {
+            roots: Vec<PathBuf>,
+            expected_parent_pid: Option<u32>,
+        },
     }
 
     fn bounded_message(value: impl AsRef<str>) -> String {
@@ -82,27 +88,53 @@ mod linux {
             .ok_or_else(|| "MXC helper requires an operation".to_string())?;
         if first == "--probe" {
             let mut roots = Vec::new();
+            let mut expected_parent_pid = None;
+            let mut standalone_probe = false;
             while let Some(argument) = args.next() {
-                if argument != "--workspace-root" {
-                    return Err("invalid MXC probe arguments".into());
+                match argument.as_str() {
+                    "--workspace-root" => {
+                        let root = args
+                            .next()
+                            .ok_or_else(|| "MXC probe is missing a workspace root".to_string())?;
+                        roots.push(PathBuf::from(root));
+                    }
+                    "--expected-parent-pid" if expected_parent_pid.is_none() => {
+                        let raw = args.next().ok_or_else(|| {
+                            "MXC probe is missing its expected parent PID".to_string()
+                        })?;
+                        expected_parent_pid = Some(parse_expected_parent_pid(&raw)?);
+                    }
+                    "--standalone-probe" if !standalone_probe => standalone_probe = true,
+                    _ => return Err("invalid MXC probe arguments".into()),
                 }
-                let root = args
-                    .next()
-                    .ok_or_else(|| "MXC probe is missing a workspace root".to_string())?;
-                roots.push(PathBuf::from(root));
             }
             if roots.is_empty() {
                 return Err("MXC probe requires a configured workspace root".into());
             }
-            return Ok(HelperMode::Probe(roots));
+            if standalone_probe == expected_parent_pid.is_some() {
+                return Err(
+                    "MXC probe requires either --expected-parent-pid or --standalone-probe".into(),
+                );
+            }
+            return Ok(HelperMode::Probe {
+                roots,
+                expected_parent_pid,
+            });
         }
         if first != "--execute" {
             return Err("invalid MXC helper operation".into());
         }
         let mut request = None;
         let mut receipt = None;
+        let mut expected_parent_pid = None;
         while let Some(argument) = args.next() {
             match argument.as_str() {
+                "--expected-parent-pid" if expected_parent_pid.is_none() => {
+                    let raw = args.next().ok_or_else(|| {
+                        "MXC execute is missing its expected parent PID".to_string()
+                    })?;
+                    expected_parent_pid = Some(parse_expected_parent_pid(&raw)?);
+                }
                 "--request" if request.is_none() => {
                     request = args.next().map(PathBuf::from);
                 }
@@ -112,12 +144,28 @@ mod linux {
                 _ => return Err("invalid MXC helper arguments".into()),
             }
         }
-        match (request, receipt) {
-            (Some(request), Some(receipt)) if request != receipt => {
-                Ok(HelperMode::Execute(Paths { request, receipt }))
+        match (request, receipt, expected_parent_pid) {
+            (Some(request), Some(receipt), Some(expected_parent_pid)) if request != receipt => {
+                Ok(HelperMode::Execute {
+                    paths: Paths { request, receipt },
+                    expected_parent_pid,
+                })
             }
-            _ => Err("MXC helper requires distinct --request and --receipt paths".into()),
+            _ => Err(
+                "MXC execute requires distinct --request/--receipt paths and --expected-parent-pid"
+                    .into(),
+            ),
         }
+    }
+
+    fn parse_expected_parent_pid(raw: &str) -> Result<u32, String> {
+        let pid = raw
+            .parse::<u32>()
+            .map_err(|_| "MXC expected parent PID must be a positive integer".to_string())?;
+        if pid == 0 || pid > i32::MAX as u32 {
+            return Err("MXC expected parent PID is outside the supported range".into());
+        }
+        Ok(pid)
     }
 
     fn read_private_json<T: DeserializeOwned>(path: &Path, max_bytes: usize) -> Result<T, String> {
@@ -149,9 +197,18 @@ mod linux {
             .map_err(|error| format!("invalid private MXC control JSON: {error}"))
     }
 
-    fn validate_request(request: &mut MxcControlRequest, control_dir: &Path) -> Result<(), String> {
+    fn validate_request(
+        request: &mut MxcControlRequest,
+        control_dir: &Path,
+        expected_parent_pid: u32,
+    ) -> Result<(), String> {
         if request.schema_version != MXC_CONTROL_SCHEMA_VERSION {
             return Err("unsupported MXC control schema version".into());
+        }
+        if request.supervisor_pid != expected_parent_pid {
+            return Err(
+                "MXC control request supervisor PID does not match the helper parent".into(),
+            );
         }
         if request.timeout_ms == 0 {
             return Err("MXC workload timeout must be a positive number of milliseconds".into());
@@ -660,7 +717,7 @@ mod linux {
             .map_err(|error| format!("cannot persist MXC terminal receipt: {error}"))
     }
 
-    fn run(paths: Paths) -> i32 {
+    fn run(paths: Paths, expected_parent_pid: u32) -> i32 {
         let control_dir = match paths.request.parent() {
             Some(parent) if paths.receipt.parent() == Some(parent) => parent,
             _ => return STDERR_ERROR_EXIT,
@@ -678,7 +735,7 @@ mod linux {
                 return STDERR_ERROR_EXIT;
             }
         };
-        if let Err(message) = validate_request(&mut request, control_dir) {
+        if let Err(message) = validate_request(&mut request, control_dir, expected_parent_pid) {
             let receipt = MxcTerminalReceipt::BackendError {
                 schema_version: MXC_CONTROL_SCHEMA_VERSION,
                 message: bounded_message(message),
@@ -867,7 +924,28 @@ mod linux {
     }
 
     pub fn main() -> i32 {
-        if let Err(message) = set_parent_death_signal() {
+        let mode = match parse_mode(std::env::args().skip(1)) {
+            Ok(mode) => mode,
+            Err(message) => {
+                eprintln!("{}", bounded_message(message));
+                return STDERR_ERROR_EXIT;
+            }
+        };
+        let parent_guard = match &mode {
+            HelperMode::Execute {
+                expected_parent_pid,
+                ..
+            }
+            | HelperMode::Probe {
+                expected_parent_pid: Some(expected_parent_pid),
+                ..
+            } => set_parent_death_signal(*expected_parent_pid),
+            HelperMode::Probe {
+                expected_parent_pid: None,
+                ..
+            } => verify_standalone_probe_parent(),
+        };
+        if let Err(message) = parent_guard {
             eprintln!("{}", bounded_message(message));
             return STDERR_ERROR_EXIT;
         }
@@ -879,9 +957,12 @@ mod linux {
             }
         };
         std::env::set_var("PATH", control_path);
-        match parse_mode(std::env::args().skip(1)) {
-            Ok(HelperMode::Execute(paths)) => run(paths),
-            Ok(HelperMode::Probe(roots)) => match probe(roots) {
+        match mode {
+            HelperMode::Execute {
+                paths,
+                expected_parent_pid,
+            } => run(paths, expected_parent_pid),
+            HelperMode::Probe { roots, .. } => match probe(roots) {
                 Ok((major, minor, patch)) => {
                     println!(
                         "CYRENE_MXC_PROBE_OK backend=mxc sdk=1.0.1 containment=bubblewrap bwrap={major}.{minor}.{patch}"
@@ -893,19 +974,19 @@ mod linux {
                     STDERR_ERROR_EXIT
                 }
             },
-            Err(message) => {
-                eprintln!("{message}");
-                STDERR_ERROR_EXIT
-            }
         }
     }
 
-    fn set_parent_death_signal() -> Result<(), String> {
+    fn set_parent_death_signal(expected_parent_pid: u32) -> Result<(), String> {
         // Capture before installing the signal, then recheck to close the race
-        // where the service parent exits during helper startup.
-        let expected_parent = unsafe { libc::getppid() };
-        if expected_parent <= 1 {
-            return Err("MXC helper has no live service parent".into());
+        // where the supervisor exits during helper startup. PID 1 is valid
+        // when it is the operator-configured service supervisor.
+        let expected_parent = expected_parent_pid as libc::pid_t;
+        let actual_parent = unsafe { libc::getppid() };
+        if actual_parent != expected_parent {
+            return Err(format!(
+                "MXC helper parent PID mismatch: expected {expected_parent_pid}, actual {actual_parent}"
+            ));
         }
         // SAFETY: PR_SET_PDEATHSIG accepts a signal number and no pointers.
         let result = unsafe {
@@ -923,8 +1004,20 @@ mod linux {
                 io::Error::last_os_error()
             ));
         }
-        if unsafe { libc::getppid() } != expected_parent {
-            return Err("MXC service parent exited during helper startup".into());
+        let actual_parent = unsafe { libc::getppid() };
+        if actual_parent != expected_parent {
+            return Err(format!(
+                "MXC supervisor exited during helper startup: expected {expected_parent_pid}, actual {actual_parent}"
+            ));
+        }
+        Ok(())
+    }
+
+    fn verify_standalone_probe_parent() -> Result<(), String> {
+        if unsafe { libc::getppid() } != 0 || std::process::id() != 1 {
+            return Err(
+                "--standalone-probe is only allowed when the helper itself is PID 1".into(),
+            );
         }
         Ok(())
     }
@@ -932,7 +1025,8 @@ mod linux {
     #[cfg(test)]
     mod tests {
         use super::{
-            consume_start_marker, parse_bubblewrap_version, valid_start_marker, wrapped_command,
+            consume_start_marker, parse_bubblewrap_version, parse_mode, set_parent_death_signal,
+            valid_start_marker, verify_standalone_probe_parent, wrapped_command, HelperMode,
             MINIMUM_BUBBLEWRAP_VERSION,
         };
         use std::io::Cursor;
@@ -960,6 +1054,76 @@ mod linux {
             let fixed = parse_bubblewrap_version(b"bubblewrap 0.13.1\n").unwrap();
             assert!(old < MINIMUM_BUBBLEWRAP_VERSION);
             assert!(fixed >= MINIMUM_BUBBLEWRAP_VERSION);
+        }
+
+        #[test]
+        fn execute_requires_an_expected_supervisor_and_probe_bypass_is_narrow() {
+            assert!(parse_mode(
+                ["--execute", "--request", "request", "--receipt", "receipt"]
+                    .into_iter()
+                    .map(str::to_string)
+            )
+            .is_err());
+
+            assert!(matches!(
+                parse_mode(
+                    [
+                        "--execute",
+                        "--expected-parent-pid",
+                        "1",
+                        "--request",
+                        "request",
+                        "--receipt",
+                        "receipt"
+                    ]
+                    .into_iter()
+                    .map(str::to_string)
+                ),
+                Ok(HelperMode::Execute {
+                    expected_parent_pid: 1,
+                    ..
+                })
+            ));
+            assert!(parse_mode(
+                [
+                    "--execute",
+                    "--standalone-probe",
+                    "--expected-parent-pid",
+                    "1",
+                    "--request",
+                    "request",
+                    "--receipt",
+                    "receipt"
+                ]
+                .into_iter()
+                .map(str::to_string)
+            )
+            .is_err());
+            assert!(matches!(
+                parse_mode(
+                    [
+                        "--probe",
+                        "--standalone-probe",
+                        "--workspace-root",
+                        "/workspace"
+                    ]
+                    .into_iter()
+                    .map(str::to_string)
+                ),
+                Ok(HelperMode::Probe {
+                    expected_parent_pid: None,
+                    ..
+                })
+            ));
+        }
+
+        #[test]
+        fn mismatched_expected_parent_is_rejected_before_setting_pdeathsig() {
+            let current_parent = unsafe { libc::getppid() } as u32;
+            let mismatched = if current_parent == 1 { 2 } else { 1 };
+            let error = set_parent_death_signal(mismatched).unwrap_err();
+            assert!(error.contains("parent PID mismatch"));
+            assert!(verify_standalone_probe_parent().is_err());
         }
     }
 }

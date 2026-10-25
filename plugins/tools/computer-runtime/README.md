@@ -46,7 +46,7 @@ MXC pins `mxc-sdk = 1.0.1`, selects the public V1 Bubblewrap containment explici
 
 Selection runs a real startup containment probe with the configured workspace mounts and network policy. Each command also verifies the fixed Bubblewrap executable is at least 0.12.0 and requires a private startup marker plus a bounded terminal receipt before accepting an exit code. Package Bubblewrap 0.13.1; versions below 0.12.0 are rejected because they contain a setup-time symlink escape. A missing helper, unsupported namespace, outdated Bubblewrap, invalid receipt, or probe failure is reported explicitly and never switches execution to `managed`.
 
-An operator can run `cyrene-mxc-exec --probe --workspace-root <absolute-root>` for the same bounded containment check. It prints the verified MXC SDK and Bubblewrap versions only after the workspace mount and network-deny probe actually starts inside Bubblewrap. The plugin server logs the selected backend and verified Bubblewrap version at startup.
+An operator can run `cyrene-mxc-exec --probe --expected-parent-pid "$$" --workspace-root <absolute-root>` from a shell for the same bounded containment check. The expected parent PID must identify the process that launches the helper; the helper compares it to its actual parent, installs a parent-death signal, then checks again before probing. In a parentless PID-namespace-init diagnostic, `--probe --standalone-probe` is also supported only when the helper itself is PID 1 with PPID 0. That mode has a 10-second SDK deadline and cannot run workloads. Probe output includes verified MXC SDK and Bubblewrap versions only after the workspace mount and network-deny probe actually starts inside Bubblewrap. The plugin server logs the selected backend and verified Bubblewrap version at startup.
 
 MXC provides Linux process namespace isolation while sharing the host kernel; it is not a microVM. Some container hosts deny the namespace operations required by Bubblewrap. In that case the startup probe fails and the MXC-selected server does not start.
 
@@ -88,7 +88,7 @@ MXC 固定使用 `mxc-sdk = 1.0.1`，明确选择公开 V1 Bubblewrap containmen
 
 选择 MXC 时会用实际工作区挂载和网络策略执行启动隔离探测。每条命令还会核验固定 Bubblewrap 可执行文件版本至少为 0.12.0，并要求可信启动标记和有界终端回执后才接受退出码。建议打包 Bubblewrap 0.13.1；低于 0.12.0 的版本存在 setup 阶段符号链接逃逸问题，会被拒绝。Helper 缺失、命名空间不可用、Bubblewrap 版本过旧、回执无效或探测失败都会明确报错，不会自动切换到 `managed`。
 
-运维人员可运行 `cyrene-mxc-exec --probe --workspace-root <绝对路径>` 执行同样的有界隔离检查。只有工作区挂载和拒绝网络的探测任务确实在 Bubblewrap 内启动后，命令才会打印核验过的 MXC SDK 与 Bubblewrap 版本。Plugin server 启动日志也会记录实际选择的后端和核验过的 Bubblewrap 版本。
+运维人员可在 shell 中运行 `cyrene-mxc-exec --probe --expected-parent-pid "$$" --workspace-root <绝对路径>` 执行同样的有界隔离检查。预期父 PID 必须是启动 helper 的进程；helper 会将它与实际父进程比较、安装父进程退出信号，并在启动探测前再次检查。在无父进程的 PID namespace init 诊断场景中，也支持 `--probe --standalone-probe`，但仅当 helper 自身是 PID 1 且 PPID 为 0 时可用；该模式具有 10 秒 SDK 截止时间且不能运行工作负载。只有工作区挂载和拒绝网络的探测任务确实在 Bubblewrap 内启动后，命令才会打印核验过的 MXC SDK 与 Bubblewrap 版本。Plugin server 启动日志也会记录实际选择的后端和核验过的 Bubblewrap 版本。
 
 MXC 提供 Linux 进程命名空间隔离并共享宿主内核，不是 microVM。部分容器宿主会拒绝 Bubblewrap 需要的命名空间操作；此时启动探测失败，选择了 MXC 的服务不会启动。
 

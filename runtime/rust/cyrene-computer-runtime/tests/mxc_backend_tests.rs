@@ -84,6 +84,7 @@ fn write_control_request(
     workspace: &Path,
     command: String,
     timeout_ms: u32,
+    supervisor_pid: u32,
 ) -> (PathBuf, PathBuf) {
     use std::os::unix::fs::PermissionsExt;
 
@@ -91,6 +92,7 @@ fn write_control_request(
     let receipt_path = control_dir.join("receipt.json");
     let request = MxcControlRequest {
         schema_version: MXC_CONTROL_SCHEMA_VERSION,
+        supervisor_pid,
         command,
         start_marker: "CYRENE_MXC_STARTED_0123456789abcdef0123456789abcdef".into(),
         timeout_ms,
@@ -110,6 +112,16 @@ fn write_control_request(
     std::fs::write(&request_path, serde_json::to_vec(&request).unwrap()).unwrap();
     std::fs::set_permissions(&request_path, std::fs::Permissions::from_mode(0o600)).unwrap();
     (request_path, receipt_path)
+}
+
+fn update_supervisor_pid(request_path: &Path, supervisor_pid: u32) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut request: MxcControlRequest =
+        serde_json::from_slice(&std::fs::read(request_path).unwrap()).unwrap();
+    request.supervisor_pid = supervisor_pid;
+    std::fs::write(request_path, serde_json::to_vec(&request).unwrap()).unwrap();
+    std::fs::set_permissions(request_path, std::fs::Permissions::from_mode(0o600)).unwrap();
 }
 
 #[tokio::test]
@@ -373,10 +385,17 @@ async fn mxc_backpressure_obeys_deadline_and_reaps_detached_descendants() {
 async fn mxc_helper_enforces_its_own_sdk_deadline() {
     let workspace = tempdir().unwrap();
     let control = tempdir().unwrap();
-    let (request_path, receipt_path) =
-        write_control_request(control.path(), workspace.path(), "sleep 30".into(), 400);
+    let (request_path, receipt_path) = write_control_request(
+        control.path(),
+        workspace.path(),
+        "sleep 30".into(),
+        400,
+        std::process::id(),
+    );
     let mut helper = Command::new(helper_path())
         .arg("--execute")
+        .arg("--expected-parent-pid")
+        .arg(std::process::id().to_string())
         .arg("--request")
         .arg(&request_path)
         .arg("--receipt")
@@ -405,6 +424,147 @@ async fn mxc_helper_enforces_its_own_sdk_deadline() {
 }
 
 #[tokio::test]
+async fn mxc_helper_rejects_mismatched_supervisor_before_workload_start() {
+    let workspace = tempdir().unwrap();
+    let marker = workspace.path().join("must-not-start.txt");
+    let control = tempdir().unwrap();
+    let actual_parent = std::process::id();
+    let wrong_parent = if actual_parent == 1 { 2 } else { 1 };
+    let (request_path, receipt_path) = write_control_request(
+        control.path(),
+        workspace.path(),
+        format!("printf started > {}", quote(&marker)),
+        5_000,
+        actual_parent,
+    );
+
+    let mismatched_cli = Command::new(helper_path())
+        .arg("--execute")
+        .arg("--expected-parent-pid")
+        .arg(wrong_parent.to_string())
+        .arg("--request")
+        .arg(&request_path)
+        .arg("--receipt")
+        .arg(&receipt_path)
+        .output()
+        .unwrap();
+    assert_eq!(mismatched_cli.status.code(), Some(70));
+    assert!(String::from_utf8_lossy(&mismatched_cli.stderr).contains("parent PID mismatch"));
+    assert!(!marker.exists());
+    assert!(!receipt_path.exists());
+
+    let second_control = tempdir().unwrap();
+    let (second_request, second_receipt) = write_control_request(
+        second_control.path(),
+        workspace.path(),
+        format!("printf started > {}", quote(&marker)),
+        5_000,
+        wrong_parent,
+    );
+    let mismatched_request = Command::new(helper_path())
+        .arg("--execute")
+        .arg("--expected-parent-pid")
+        .arg(actual_parent.to_string())
+        .arg("--request")
+        .arg(&second_request)
+        .arg("--receipt")
+        .arg(&second_receipt)
+        .output()
+        .unwrap();
+    assert_eq!(mismatched_request.status.code(), Some(70));
+    assert!(!marker.exists());
+    let receipt: MxcTerminalReceipt =
+        serde_json::from_slice(&std::fs::read(second_receipt).unwrap()).unwrap();
+    assert!(matches!(
+        receipt,
+        MxcTerminalReceipt::BackendError { ref message, .. }
+            if message.contains("supervisor PID does not match")
+    ));
+}
+
+#[tokio::test]
+async fn mxc_pid1_supervisor_can_start_backend_and_execute_workload() {
+    const CHILD_MODE: &str = "CYRENE_MXC_PID1_SUPERVISOR_CHILD";
+    if std::env::var_os(CHILD_MODE).is_some() {
+        assert_eq!(std::process::id(), 1, "test harness must be PID 1");
+        let workspace = tempdir().unwrap();
+        let artifacts = tempdir().unwrap();
+        let service = runtime(workspace.path(), artifacts.path(), helper_path());
+        assert_eq!(service.bubblewrap_version(), Some("0.13.1"));
+        let response = service
+            .execute_command(request("printf supervisor-pid1-ok", workspace.path()), None)
+            .await;
+        let evidence = evidence(response);
+        assert_eq!(evidence.exit_code, 0);
+        assert_eq!(evidence.stdout, "supervisor-pid1-ok");
+        println!(
+            "CYRENE_MXC_PID1_RUNTIME_EXECUTED supervisor_pid={}",
+            std::process::id()
+        );
+        return;
+    }
+
+    let test_binary = std::env::current_exe().unwrap();
+    let output = Command::new("unshare")
+        .args([
+            "--user",
+            "--map-root-user",
+            "--mount",
+            "--pid",
+            "--fork",
+            "--mount-proc",
+        ])
+        .arg(test_binary)
+        .args([
+            "--exact",
+            "mxc_pid1_supervisor_can_start_backend_and_execute_workload",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(CHILD_MODE, "1")
+        .output()
+        .unwrap();
+    let child_stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success(),
+        "PID 1 MXC supervisor failed: stdout={} stderr={}",
+        child_stdout,
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        child_stdout.contains("CYRENE_MXC_PID1_RUNTIME_EXECUTED supervisor_pid=1"),
+        "the nested test harness did not run the PID 1 service: {child_stdout}"
+    );
+}
+
+#[tokio::test]
+async fn mxc_standalone_probe_is_supported_only_as_parentless_pid1() {
+    let workspace = tempdir().unwrap();
+    let output = Command::new("unshare")
+        .args([
+            "--user",
+            "--map-root-user",
+            "--mount",
+            "--pid",
+            "--fork",
+            "--mount-proc",
+        ])
+        .arg(helper_path())
+        .args(["--probe", "--standalone-probe", "--workspace-root"])
+        .arg(workspace.path())
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        output.status.success(),
+        "parentless PID 1 probe failed: stdout={stdout} stderr={stderr}"
+    );
+    assert!(stdout.contains("CYRENE_MXC_PROBE_OK backend=mxc sdk=1.0.1"));
+    assert!(stdout.contains("bwrap=0.13.1"));
+}
+
+#[tokio::test]
 async fn killing_only_the_mxc_helper_parent_reaps_namespace_descendants() {
     let workspace = tempdir().unwrap();
     let control = tempdir().unwrap();
@@ -416,10 +576,14 @@ async fn killing_only_the_mxc_helper_parent_reaps_namespace_descendants() {
         quote(&late_marker),
     );
     let (request_path, receipt_path) =
-        write_control_request(control.path(), workspace.path(), command, 5_000);
+        write_control_request(control.path(), workspace.path(), command, 5_000, 0);
     let helper_pid_path = control.path().join("helper.pid");
+    let launcher_pid_path = control.path().join("launcher.pid");
+    let launcher_ready_path = control.path().join("launcher.ready");
     let launcher_script = format!(
-        "{} --execute --request {} --receipt {} & child=$!; printf '%s' \"$child\" > {}; wait \"$child\"",
+        "printf '%s' \"$$\" > {}; while [ ! -e {} ]; do sleep 0.01; done; {} --execute --expected-parent-pid \"$$\" --request {} --receipt {} & child=$!; printf '%s' \"$child\" > {}; wait \"$child\"",
+        quote(&launcher_pid_path),
+        quote(&launcher_ready_path),
         quote(&helper_path()),
         quote(&request_path),
         quote(&receipt_path),
@@ -433,6 +597,18 @@ async fn killing_only_the_mxc_helper_parent_reaps_namespace_descendants() {
         .stderr(Stdio::null())
         .spawn()
         .unwrap();
+    let launcher_pid: u32 = tokio::time::timeout(Duration::from_secs(2), async {
+        loop {
+            if let Ok(contents) = std::fs::read_to_string(&launcher_pid_path) {
+                break contents.parse().unwrap();
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("launcher should publish its process identity");
+    update_supervisor_pid(&request_path, launcher_pid);
+    std::fs::write(&launcher_ready_path, b"ready").unwrap();
     tokio::time::timeout(Duration::from_secs(4), async {
         loop {
             if started_marker.exists() {
