@@ -5,22 +5,35 @@ This binding exposes fixed `tool.provider.v1` operations over GitHub Cloud at
 file readback, pull requests, Actions runs/jobs/log excerpts, and CI status. Its
 bounded task operations can create and delete non-protected branches, create or
 compare-and-update one file, open a draft pull request, and rerun failed jobs for
-an exact task-branch CI attempt. Every repository target must match both a
+an exact task-branch CI attempt. Writable branch refs must use
+`cyrene/assistant/<task>`; the repository default branch is always protected.
+Branch deletion is refused while an open same-repository pull request uses it.
+Every repository target must match both a
 stable numeric repository ID and the configured owner/name pair. The provider
 accepts no arbitrary URL, command, or caller-supplied identity.
 
 Issue search always pins the configured repository and excludes pull requests.
-State, labels, update watermark, and page are structured inputs; free text does
-not accept GitHub query qualifiers. Results report `complete`, `truncated`, and
-`next_cursor`; GitHub's 1,000-result search ceiling is reported as incomplete.
-The update watermark accepts UTC RFC3339 with `Z` or `+00:00` and is normalized
-to the documented UTC offset syntax before the fixed search query is sent.
+State, labels, lower and upper update-window bounds, and page are structured
+inputs; free text does not accept GitHub query qualifiers. Results echo
+`page_cursor` and report `complete`, `truncated`, `incomplete_results`,
+`result_limit_reached`, and `next_cursor`. `complete` means this response
+alone contains all results, so page 2 can never claim the earlier page was
+included. The workflow must reconcile the ordered page receipts before moving
+its watermark. GitHub's 1,000-result search ceiling is reported explicitly.
+The update window accepts UTC RFC3339 with `Z` or `+00:00`; the provider
+normalizes both bounds to the documented UTC offset syntax before sending the
+fixed search query.
+CI status returns context and check-run counts with `complete`/`truncated`;
+responses over the first 100 items are explicitly incomplete and cannot be
+treated as a green result.
 Workflow logs follow only GitHub's short-lived redirect to the documented
 `productionresultssa*.blob.core.windows.net` hosts, omit the App token on that
-request, and return a redacted excerpt of at most 200 lines and 20,000 bytes.
+request, and return a best-effort excerpt with common credential patterns
+redacted, bounded to 200 lines and 20,000 bytes. This filter cannot identify
+every possible secret format.
 
-Writes require a task branch and exact SHA or file-blob precondition where
-applicable. Hidden files, workflow/CI controls, permissions, deployment and
+Writes require the dedicated assistant task namespace and an exact SHA or
+file-blob precondition where applicable. Hidden files, workflow/CI controls, permissions, deployment and
 production configuration paths are denied. A file is limited to 500,000 bytes.
 Create, delete, commit, draft-PR, and CI-rerun calls reconcile remote state
 before reporting success and never retry an unknown write outcome.
@@ -51,20 +64,25 @@ Run focused tests from this directory with
 
 此 binding 通过 GitHub Cloud `api.github.com` 暴露固定的 `tool.provider.v1`
 操作：仓库清单与 metadata、Issue 搜索、分支和文件回读、PR、Actions runs/jobs/日志摘录、
-commit/CI 状态。受限任务操作可创建/删除非保护分支、创建或按 SHA 比对更新单个文件、
-创建 draft PR，以及针对指定任务分支 CI attempt 重跑失败 job。每个仓库目标必须同时匹配
+commit/CI 状态。受限任务操作仅可在 `cyrene/assistant/<task>` 命名空间创建/删除分支、
+创建或按 SHA 比对更新单个文件、创建 draft PR，以及针对指定任务分支 CI attempt 重跑失败 job；
+仓库默认分支始终受保护，若同仓库的开放 PR 正在使用某分支则拒绝删除。每个仓库目标必须同时匹配
 稳定数字 repository ID 与配置的 owner/name。provider 不接受任意 URL、命令或调用方自选身份。
 
-Issue 搜索始终固定限定在配置仓库并排除 PR。state、labels、更新时间水位和 page 都是
-结构化字段；自由文本不能传 GitHub 搜索限定符。结果明确返回 `complete`、`truncated`
-和 `next_cursor`；达到 GitHub 搜索 API 的 1,000 条上限时会报告未完成。日志只跟随
+Issue 搜索始终固定限定在配置仓库并排除 PR。state、labels、更新时间窗口上下界和 page 都是
+结构化字段；自由文本不能传 GitHub 搜索限定符。结果回显 `page_cursor`，并返回
+`complete`、`truncated`、`incomplete_results`、`result_limit_reached` 和 `next_cursor`。
+`complete` 表示本次响应自身包含全部结果，因此第 2 页不会声称包含了第 1 页；workflow
+须按顺序核对每页真实回执后再推进水位。GitHub 搜索 API 的 1,000 条上限会明确报告。
+更新时间窗口接收 UTC RFC3339 的 `Z` 或 `+00:00` 格式，provider 会在发送固定搜索查询前将
+上下界都规范为 GitHub 文档说明的 UTC offset 形式。日志只跟随
 GitHub 短时重定向到文档所列的 `productionresultssa*.blob.core.windows.net` 主机，
-下载时不携带 App token，并只返回经过常见凭据格式脱敏的日志摘录（最多 200 行、
-20,000 字节）。
-更新时间水位接收 UTC RFC3339 的 `Z` 或 `+00:00` 格式，并在发送固定搜索查询前转换成
-GitHub 文档说明的 UTC offset 形式。
+下载时不携带 App token，日志摘录会尽力过滤常见凭据格式（最多 200 行、20,000 字节）；
+此过滤无法识别所有可能的密钥格式。
+CI 状态附带 status context/check-run 计数与 `complete`/`truncated`；超过首批 100 条时会
+明确标为不完整，不能当作 CI 全绿结果。
 
-写入要求使用任务分支，并在适用时绑定精确 commit SHA 或文件 blob SHA。隐藏文件、
+写入要求使用专属 assistant 任务分支，并在适用时绑定精确 commit SHA 或文件 blob SHA。隐藏文件、
 工作流/CI 控制、权限、部署和生产配置路径会被拒绝；单个文件最多 500,000 字节。
 创建分支、删除分支、提交文件、创建 draft PR 和重跑 CI 都会先核对远端状态再报告成功；
 结果未知时不会自动重试写入。

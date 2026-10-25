@@ -25,18 +25,7 @@ MAX_RESPONSE_BYTES = 1_000_000
 MAX_ACTIONS_LOG_BYTES = 2_000_000
 MAX_ACTIONS_LOG_EXCERPT_BYTES = 20_000
 _ACTIONS_LOG_HOST = re.compile(r"productionresultssa[0-9]{1,3}\.blob\.core\.windows\.net\Z")
-_PROTECTED_BRANCHES = frozenset(
-    {"main", "master", "develop", "release", "production", "staging"}
-)
-_PROTECTED_BRANCH_PREFIXES = (
-    "main/",
-    "master/",
-    "develop/",
-    "release/",
-    "production/",
-    "prod/",
-    "staging/",
-)
+TASK_BRANCH_PREFIX = "cyrene/assistant/"
 
 
 class GitHubApiFailure(RuntimeError):
@@ -312,6 +301,8 @@ class GitHubApi:
             }
         if current_sha.lower() != expected_sha.lower():
             raise GitHubApiFailure("BRANCH_HEAD_MISMATCH")
+        if self._branch_has_open_pull_request(repository, branch, token):
+            raise GitHubApiFailure("BRANCH_HAS_OPEN_PULL_REQUEST")
         path = f"{self._repository_path(repository)}/git/refs/heads/{quote(branch, safe='')}"
         try:
             self._request("DELETE", path, token, None, write=True)
@@ -504,6 +495,7 @@ class GitHubApi:
             if (
                 reconciled is not None
                 and reconciled.get("draft") is True
+                and reconciled["head_sha"].lower() == head_sha.lower()
                 and reconciled["title"] == title
                 and reconciled["body_sha256"] == _text_sha256(body)
             ):
@@ -610,6 +602,7 @@ class GitHubApi:
         token: str,
         *,
         updated_since: str | None = None,
+        updated_until: str | None = None,
         page_cursor: str = "1",
     ) -> dict[str, Any]:
         """Search only issues in one allowlisted repository with a fixed qualifier."""
@@ -635,6 +628,15 @@ class GitHubApi:
                 and not _valid_updated_since(updated_since)
             )
             or (
+                updated_until is not None
+                and not _valid_updated_since(updated_until)
+            )
+            or (
+                updated_since is not None
+                and updated_until is not None
+                and _parse_utc_timestamp(updated_since) > _parse_utc_timestamp(updated_until)
+            )
+            or (
                 not isinstance(query_text, str)
                 or (
                     query_text
@@ -652,12 +654,9 @@ class GitHubApi:
             query_parts.append(query_text)
         query_parts.extend(f'label:"{label}"' for label in labels)
         if updated_since is not None:
-            timestamp = (
-                updated_since[:-1] + "+00:00"
-                if updated_since.endswith("Z")
-                else updated_since
-            )
-            query_parts.append(f"updated:>={timestamp}")
+            query_parts.append(f"updated:>={_normalize_utc_timestamp(updated_since)}")
+        if updated_until is not None:
+            query_parts.append(f"updated:<={_normalize_utc_timestamp(updated_until)}")
         query = " ".join(query_parts)
         path = "/search/issues?" + urlencode(
             {
@@ -694,6 +693,11 @@ class GitHubApi:
                 raise GitHubApiFailure("REPOSITORY_IDENTITY_MISMATCH")
             issues.append(_issue_search_projection(item))
         page_number = int(page_cursor)
+        expected_page_items = min(
+            limit, max(0, total_count - (page_number - 1) * limit)
+        )
+        incomplete_results = incomplete_results or len(issues) < expected_page_items
+        result_limit_reached = total_count > 1000
         max_pages = (1000 + limit - 1) // limit
         next_cursor = (
             str(page_number + 1)
@@ -701,15 +705,21 @@ class GitHubApi:
             else None
         )
         complete = (
-            next_cursor is None
-            and total_count <= 1000
+            page_number == 1
+            and next_cursor is None
+            and total_count <= limit
+            and len(issues) == total_count
+            and not result_limit_reached
             and not incomplete_results
         )
         return {
             "issues": issues,
             "total_count": total_count,
+            "page_cursor": page_cursor,
             "truncated": not complete,
             "complete": complete,
+            "incomplete_results": incomplete_results,
+            "result_limit_reached": result_limit_reached,
             "next_cursor": next_cursor,
         }
 
@@ -1028,6 +1038,44 @@ class GitHubApi:
                 matches.append(projection)
         return matches
 
+    def _branch_has_open_pull_request(
+        self, repository: Repository, branch: str, token: str
+    ) -> bool:
+        """Refuse task-branch deletion while an open same-repository PR uses it."""
+
+        query = urlencode(
+            {
+                "state": "open",
+                "head": f"{repository.owner}:{branch}",
+                "per_page": 100,
+            }
+        )
+        values = _json_array(
+            self._request("GET", f"{self._repository_path(repository)}/pulls?{query}", token, None)
+        )
+        if len(values) > 100:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        for value in values:
+            head = value.get("head")
+            base = value.get("base")
+            head_repo = head.get("repo") if isinstance(head, Mapping) else None
+            base_repo = base.get("repo") if isinstance(base, Mapping) else None
+            head_ref = head.get("ref") if isinstance(head, Mapping) else None
+            if (
+                head_ref == branch
+                and isinstance(head_repo, Mapping)
+                and isinstance(base_repo, Mapping)
+                and str(head_repo.get("id")) == repository.repository_id
+                and head_repo.get("full_name") == repository.slug
+                and str(base_repo.get("id")) == repository.repository_id
+                and base_repo.get("full_name") == repository.slug
+                and value.get("state") == "open"
+            ):
+                return True
+        if len(values) == 100:
+            raise GitHubApiFailure("OPEN_PULL_REQUEST_SEARCH_TRUNCATED")
+        return False
+
     @staticmethod
     def _verify_pull_request_repositories(
         value: Mapping[str, Any], repository: Repository
@@ -1069,9 +1117,20 @@ class GitHubApi:
         )
         contexts = status.get("statuses")
         check_runs = checks.get("check_runs")
+        statuses_total_count = status.get("total_count")
+        check_runs_total_count = checks.get("total_count")
         if not isinstance(contexts, list) or not isinstance(check_runs, list):
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         if len(contexts) > 100 or len(check_runs) > 100:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        if (
+            isinstance(statuses_total_count, bool)
+            or not isinstance(statuses_total_count, int)
+            or statuses_total_count < len(contexts)
+            or isinstance(check_runs_total_count, bool)
+            or not isinstance(check_runs_total_count, int)
+            or check_runs_total_count < len(check_runs)
+        ):
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         projected_contexts = []
         for item in contexts:
@@ -1094,11 +1153,19 @@ class GitHubApi:
         state = status.get("state")
         if state not in {"pending", "success", "failure", "error"}:
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        complete = (
+            statuses_total_count == len(contexts)
+            and check_runs_total_count == len(check_runs)
+        )
         return {
             "commit_sha": commit_sha,
             "state": state.upper(),
+            "statuses_total_count": statuses_total_count,
             "statuses": projected_contexts,
+            "check_runs_total_count": check_runs_total_count,
             "check_runs": projected_checks,
+            "complete": complete,
+            "truncated": not complete,
         }
 
     def _verify_configured_repository(
@@ -1511,19 +1578,29 @@ def _valid_updated_since(value: str) -> bool:
     ) is None:
         return False
     try:
-        normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
-        datetime.fromisoformat(normalized)
+        _parse_utc_timestamp(value)
     except ValueError:
         return False
     return True
 
 
+def _normalize_utc_timestamp(value: str) -> str:
+    """Return GitHub search syntax with an explicit UTC offset."""
+
+    return value[:-1] + "+00:00" if value.endswith("Z") else value
+
+
+def _parse_utc_timestamp(value: str) -> datetime:
+    """Parse a validated UTC timestamp for date-window ordering checks."""
+
+    return datetime.fromisoformat(_normalize_utc_timestamp(value))
+
+
 def _is_task_branch(branch: str) -> bool:
-    """Return whether a branch is outside fixed production and integration refs."""
+    """Return whether a branch uses the reserved Cyrene assistant task namespace."""
 
     _require_branch_name(branch)
-    lowered = branch.casefold()
-    return lowered not in _PROTECTED_BRANCHES and not lowered.startswith(_PROTECTED_BRANCH_PREFIXES)
+    return branch.casefold().startswith(TASK_BRANCH_PREFIX)
 
 
 def _same_branch(left: str, right: str | None) -> bool:
@@ -1698,12 +1775,25 @@ def _redact_log_line(line: str) -> str:
     line = re.sub(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b", "[REDACTED_GITHUB_TOKEN]", line)
     line = re.sub(r"\bAKIA[0-9A-Z]{16}\b", "[REDACTED_AWS_KEY]", line)
     line = re.sub(r"\bBearer\s+[A-Za-z0-9._~+/-]{20,}", "Bearer [REDACTED]", line)
-    line = re.sub(
-        r"(?i)\b([A-Za-z0-9_-]*(?:token|secret|password|api[_-]?key|authorization)"
-        r"[A-Za-z0-9_-]*)\s*[:=]\s*([^\s,;]+)",
-        r"\1=[REDACTED]",
-        line,
+
+    def redact_assignment(match: re.Match[str]) -> str:
+        """Preserve JSON or shell key punctuation while replacing the value."""
+
+        raw_value = match.group("value")
+        if raw_value.startswith('"') and raw_value.endswith('"'):
+            replacement = '"[REDACTED]"'
+        elif raw_value.startswith("'") and raw_value.endswith("'"):
+            replacement = "'[REDACTED]'"
+        else:
+            replacement = "[REDACTED]"
+        return match.group("prefix") + replacement
+
+    secret_assignment = re.compile(
+        r"""(?i)(?P<prefix>["']?[A-Za-z0-9_-]*(?:token|secret|password|api[_-]?key|"""
+        r"""authorization|credential|private[_-]?key|access[_-]?key)[A-Za-z0-9_-]*["']?\s*[:=]\s*)"""
+        r"""(?P<value>"[^"]*"|'[^']*'|[^\s,;}]+)"""
     )
+    line = secret_assignment.sub(redact_assignment, line)
     return re.sub(r"\b[A-Za-z0-9+/]{80,}={0,2}\b", "[REDACTED_LONG_VALUE]", line)
 
 

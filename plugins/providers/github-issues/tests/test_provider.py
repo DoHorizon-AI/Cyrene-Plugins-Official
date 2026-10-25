@@ -553,7 +553,7 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
     settings = make_settings()
     profile_ref = "00000000-0000-4000-8000-000000000001"
     repo = {"repository_id": "12345", "repository": "owner/project"}
-    branch = "codex/assistant-task"
+    branch = "cyrene/assistant/lease-test"
     sha = "a" * 40
     cases: list[tuple[str, dict[str, Any], dict[str, Any]]] = [
         (
@@ -564,7 +564,8 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
                 "state": "OPEN",
                 "labels": ["bug"],
                 "updated_since": "2026-10-24T12:00:00Z",
-                "page_cursor": "2",
+                "updated_until": "2026-10-24T12:05:00+00:00",
+                "page_cursor": "1",
                 "limit": 20,
             },
             {**repo},
@@ -673,11 +674,20 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
             },
         ),
         (
+            "github.branch.create",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "branch": "feature/customer-fix",
+                "from_sha": "a" * 40,
+            },
+        ),
+        (
             "github.file.commit",
             {
                 "repository_id": "12345",
                 "repository": "owner/project",
-                "branch": "codex/task",
+                "branch": "cyrene/assistant/task",
                 "path": ".github/workflows/ci.yml",
                 "message": "change workflow",
                 "content_base64": "aGVsbG8=",
@@ -688,7 +698,7 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
             {
                 "repository_id": "12345",
                 "repository": "owner/project",
-                "branch": "codex/task",
+                "branch": "cyrene/assistant/task",
                 "path": "config/app-prod.json",
                 "message": "change production config",
                 "content_base64": "aGVsbG8=",
@@ -699,7 +709,7 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
             {
                 "repository_id": "12345",
                 "repository": "owner/project",
-                "branch": "codex/task",
+                "branch": "cyrene/assistant/task",
                 "path": "src/main.py",
                 "message": "write",
                 "content_base64": "not base64",
@@ -730,6 +740,73 @@ def test_github_write_scope_is_rejected_before_lease(
         provider_tool_id=tool_id,
         arguments_json=json.dumps(envelope, separators=(",", ":")),
     )
+    is_error, result = provider.on_invoke(
+        "tool.provider.v1", "call_tool", request.SerializeToString()
+    )
+
+    assert is_error is False
+    assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
+    assert account.calls == []
+    assert api.calls == []
+
+
+@pytest.mark.parametrize(
+    ("tool_id", "arguments", "profile_ref"),
+    [
+        (
+            "github.issues.search",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "state": [],
+                "limit": 1,
+            },
+            "00000000-0000-4000-8000-000000000001",
+        ),
+        (
+            "github.issue.state.update",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "issue_number": 7,
+                "state": {},
+            },
+            None,
+        ),
+        (
+            "github.pull_requests.list",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "state": [],
+            },
+            "00000000-0000-4000-8000-000000000001",
+        ),
+    ],
+)
+def test_non_string_state_values_are_rejected_without_escaping_validation(
+    tool_id: str,
+    arguments: Mapping[str, Any],
+    profile_ref: str | None,
+) -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    lease_ref = "12345678-1234-1234-1234-123456789abc"
+    envelope: dict[str, Any] = {
+        "payload": dict(arguments),
+        "lease_ref": lease_ref,
+        "trusted_context": signed_context(settings, arguments, lease_ref, tool_id, profile_ref),
+    }
+    if profile_ref is not None:
+        envelope["profile_ref"] = profile_ref
+    request = wire.CallToolRequest(
+        binding_id=settings.binding_id,
+        provider_tool_id=tool_id,
+        arguments_json=json.dumps(envelope, separators=(",", ":")),
+    )
+
     is_error, result = provider.on_invoke(
         "tool.provider.v1", "call_tool", request.SerializeToString()
     )
@@ -986,7 +1063,7 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
             return HttpResponse(
                 200,
                 {},
-                b'{"number":4,"state":"open","title":"Review","head":{"sha":"deadbeef1234567","ref":"codex/task","repo":{"id":12345,"full_name":"owner/project"}},"base":{"sha":"feedface1234567","ref":"main","repo":{"id":12345,"full_name":"owner/project"}},"repository":{"id":12345,"full_name":"owner/project"}}',
+                b'{"number":4,"state":"open","title":"Review","head":{"sha":"deadbeef1234567","ref":"cyrene/assistant/task","repo":{"id":12345,"full_name":"owner/project"}},"base":{"sha":"feedface1234567","ref":"main","repo":{"id":12345,"full_name":"owner/project"}},"repository":{"id":12345,"full_name":"owner/project"}}',
             )
         if path.endswith("/actions/runs?per_page=100&branch=main"):
             return HttpResponse(
@@ -998,13 +1075,13 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
             return HttpResponse(
                 200,
                 {},
-                b'{"state":"success","statuses":[{"context":"tests","state":"success"}]}',
+                b'{"state":"success","total_count":1,"statuses":[{"context":"tests","state":"success"}]}',
             )
         if path.endswith("/commits/deadbeef1234567/check-runs?per_page=100"):
             return HttpResponse(
                 200,
                 {},
-                b'{"check_runs":[{"name":"unit","status":"completed","conclusion":"success"}]}',
+                b'{"total_count":1,"check_runs":[{"name":"unit","status":"completed","conclusion":"success"}]}',
             )
         raise AssertionError(path)
 
@@ -1017,11 +1094,58 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert pull_request["pull_request"]["head_sha"] == "deadbeef1234567"
     workflow_runs = api.list_workflow_runs(repository, "token", branch="main")
     assert workflow_runs["workflow_runs"][0]["status"] == "COMPLETED"
-    assert api.get_ci_status(repository, "deadbeef1234567", "token")["state"] == "SUCCESS"
+    ci = api.get_ci_status(repository, "deadbeef1234567", "token")
+    assert ci["state"] == "SUCCESS"
+    assert ci["complete"] is True
+    assert ci["truncated"] is False
     assert observed.count("/repos/owner/project") == 6
     assert all(
         path.startswith(("/repos/owner/project", "/installation/repositories")) for path in observed
     )
+
+
+def test_ci_status_reports_incomplete_check_run_pages_instead_of_implying_green() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"state":"success","total_count":0,"statuses":[]}',
+            )
+        if path.endswith(
+            "/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100"
+        ):
+            checks = [
+                {"name": f"check-{index}", "status": "completed", "conclusion": "success"}
+                for index in range(100)
+            ]
+            return HttpResponse(
+                200,
+                {},
+                json.dumps({"total_count": 101, "check_runs": checks}).encode(),
+            )
+        raise AssertionError(path)
+
+    result = GitHubApi(settings, transport=transport).get_ci_status(
+        repository, "a" * 40, "token"
+    )
+
+    assert result["state"] == "SUCCESS"
+    assert len(result["check_runs"]) == 100
+    assert result["check_runs_total_count"] == 101
+    assert result["complete"] is False
+    assert result["truncated"] is True
 
 
 def _workflow_run_response(
@@ -1029,7 +1153,7 @@ def _workflow_run_response(
     status: str = "completed",
     conclusion: str | None = "failure",
     attempt: int = 1,
-    branch: str = "codex/task",
+    branch: str = "cyrene/assistant/task",
     head_sha: str = "a" * 40,
 ) -> bytes:
     """Build a stable API response for bounded Actions lifecycle tests."""
@@ -1069,7 +1193,7 @@ def test_issue_search_is_repo_qualified_and_projects_only_issue_results() -> Non
             {},
             json.dumps(
                 {
-                    "total_count": 2,
+                    "total_count": 1,
                     "incomplete_results": False,
                     "items": [
                         {
@@ -1096,11 +1220,15 @@ def test_issue_search_is_repo_qualified_and_projects_only_issue_results() -> Non
         1,
         "token",
         updated_since="2026-10-24T12:00:00Z",
-        page_cursor="2",
+        updated_until="2026-10-24T12:05:00+00:00",
+        page_cursor="1",
     )
 
-    assert result["total_count"] == 2
+    assert result["total_count"] == 1
     assert result["complete"] is True
+    assert result["truncated"] is False
+    assert result["incomplete_results"] is False
+    assert result["result_limit_reached"] is False
     assert result["next_cursor"] is None
     assert result["issues"][0]["number"] == 7
     assert result["issues"][0]["body_excerpt"] == "Issue details"
@@ -1108,7 +1236,47 @@ def test_issue_search_is_repo_qualified_and_projects_only_issue_results() -> Non
     assert "repo%3Aowner%2Fproject+is%3Aissue+is%3Aopen+workflow+status" in observed[-1]
     assert "label%3A%22bug%22" in observed[-1]
     assert "updated%3A%3E%3D2026-10-24T12%3A00%3A00%2B00%3A00" in observed[-1]
-    assert "page=2" in observed[-1]
+    assert "updated%3A%3C%3D2026-10-24T12%3A05%3A00%2B00%3A00" in observed[-1]
+    assert "page=1" in observed[-1]
+
+
+def test_issue_search_terminal_page_does_not_claim_to_contain_prior_page() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        issue = {
+            "id": 555,
+            "number": 7,
+            "state": "open",
+            "title": "Last issue",
+            "repository_url": "https://api.github.com/repos/owner/project",
+        }
+        return HttpResponse(
+            200,
+            {},
+            json.dumps(
+                {"total_count": 2, "incomplete_results": False, "items": [issue]}
+            ).encode(),
+        )
+
+    result = GitHubApi(settings, transport=transport).search_issues(
+        repository, "", "ALL", [], 1, "token", page_cursor="2"
+    )
+
+    assert result["page_cursor"] == "2"
+    assert result["complete"] is False
+    assert result["truncated"] is True
+    assert result["next_cursor"] is None
+    assert result["incomplete_results"] is False
 
 
 def test_issue_search_marks_the_github_1000_result_ceiling_incomplete() -> None:
@@ -1124,19 +1292,30 @@ def test_issue_search_marks_the_github_1000_result_ceiling_incomplete() -> None:
     ) -> HttpResponse:
         if path == "/repos/owner/project":
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
-        assert path.endswith("per_page=50&page=20")
+        assert path.endswith("per_page=1&page=1000")
+        issue = {
+            "id": 555,
+            "number": 7,
+            "state": "open",
+            "title": "Last issue",
+            "repository_url": "https://api.github.com/repos/owner/project",
+        }
         return HttpResponse(
             200,
             {},
-            b'{"total_count":1201,"incomplete_results":false,"items":[]}',
+            json.dumps(
+                {"total_count": 1001, "incomplete_results": False, "items": [issue]}
+            ).encode(),
         )
 
     result = GitHubApi(settings, transport=transport).search_issues(
-        repository, "", "ALL", [], 50, "token", page_cursor="20"
+        repository, "", "ALL", [], 1, "token", page_cursor="1000"
     )
 
     assert result["complete"] is False
     assert result["truncated"] is True
+    assert result["result_limit_reached"] is True
+    assert result["incomplete_results"] is False
     assert result["next_cursor"] is None
 
 
@@ -1154,7 +1333,7 @@ def test_draft_pull_request_creation_reads_back_exact_same_repository_branches()
         "html_url": "https://github.com/owner/project/pull/4",
         "head": {
             "sha": head_sha,
-            "ref": "codex/task",
+            "ref": "cyrene/assistant/task",
             "repo": {"id": 12345, "full_name": "owner/project"},
         },
         "base": {
@@ -1174,12 +1353,12 @@ def test_draft_pull_request_creation_reads_back_exact_same_repository_branches()
     ) -> HttpResponse:
         if path == "/repos/owner/project":
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
-        if path.endswith("/git/ref/heads/codex%2Ftask"):
+        if path.endswith("/git/ref/heads/cyrene%2Fassistant%2Ftask"):
             return HttpResponse(
                 200,
                 {},
                 json.dumps(
-                    {"ref": "refs/heads/codex/task", "object": {"sha": head_sha}}
+                    {"ref": "refs/heads/cyrene/assistant/task", "object": {"sha": head_sha}}
                 ).encode(),
             )
         if path.endswith("/git/ref/heads/develop"):
@@ -1196,7 +1375,7 @@ def test_draft_pull_request_creation_reads_back_exact_same_repository_branches()
             assert json.loads(body or b"{}") == {
                 "title": "Automated task",
                 "body": "Evidence",
-                "head": "codex/task",
+                "head": "cyrene/assistant/task",
                 "base": "develop",
                 "draft": True,
             }
@@ -1206,7 +1385,7 @@ def test_draft_pull_request_creation_reads_back_exact_same_repository_branches()
         raise AssertionError((method, path))
 
     result = GitHubApi(settings, transport=transport).create_draft_pull_request(
-        repository, "codex/task", "develop", "Automated task", "Evidence", "token"
+        repository, "cyrene/assistant/task", "develop", "Automated task", "Evidence", "token"
     )
 
     assert result["status"] == "CONFIRMED"
@@ -1218,6 +1397,145 @@ def test_draft_pull_request_creation_reads_back_exact_same_repository_branches()
         "base_sha": base_sha,
         "is_draft": True,
     }
+
+
+def test_uncertain_draft_pr_is_not_confirmed_after_head_branch_advances() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    original_sha = "1" * 40
+    advanced_sha = "2" * 40
+    base_sha = "3" * 40
+    pull_request = {
+        "number": 8,
+        "state": "open",
+        "title": "Automated task",
+        "body": "Evidence",
+        "draft": True,
+        "html_url": "https://github.com/owner/project/pull/8",
+        "head": {
+            "sha": advanced_sha,
+            "ref": "cyrene/assistant/task",
+            "repo": {"id": 12345, "full_name": "owner/project"},
+        },
+        "base": {
+            "sha": base_sha,
+            "ref": "develop",
+            "repo": {"id": 12345, "full_name": "owner/project"},
+        },
+        "repository": {"id": 12345, "full_name": "owner/project"},
+    }
+    pr_search_count = 0
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal pr_search_count
+        if path == "/repos/owner/project":
+            return HttpResponse(
+                200,
+                {},
+                b'{"id":12345,"full_name":"owner/project","default_branch":"develop"}',
+            )
+        if path.endswith("/git/ref/heads/cyrene%2Fassistant%2Ftask"):
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {
+                        "ref": "refs/heads/cyrene/assistant/task",
+                        "object": {"sha": original_sha},
+                    }
+                ).encode(),
+            )
+        if path.endswith("/git/ref/heads/develop"):
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {"ref": "refs/heads/develop", "object": {"sha": base_sha}}
+                ).encode(),
+            )
+        if path.startswith("/repos/owner/project/pulls?"):
+            pr_search_count += 1
+            if pr_search_count == 1:
+                return HttpResponse(200, {}, b"[]")
+            return HttpResponse(200, {}, json.dumps([pull_request]).encode())
+        if method == "POST" and path == "/repos/owner/project/pulls":
+            raise TimeoutError("PR was created at the advanced head before response loss")
+        raise AssertionError((method, path))
+
+    with pytest.raises(GitHubApiFailure) as failure:
+        GitHubApi(settings, transport=transport).create_draft_pull_request(
+            repository,
+            "cyrene/assistant/task",
+            "develop",
+            "Automated task",
+            "Evidence",
+            "token",
+        )
+
+    assert failure.value.code == "UPSTREAM_UNCERTAIN"
+    assert failure.value.uncertain is True
+
+
+def test_task_branch_delete_is_refused_while_same_repo_open_pr_uses_branch() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    branch = "cyrene/assistant/task"
+    sha = "4" * 40
+    observed: list[tuple[str, str]] = []
+    open_pull_request = {
+        "number": 9,
+        "state": "open",
+        "head": {
+            "ref": branch,
+            "repo": {"id": 12345, "full_name": "owner/project"},
+        },
+        "base": {
+            "ref": "develop",
+            "repo": {"id": 12345, "full_name": "owner/project"},
+        },
+    }
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed.append((method, path))
+        if path == "/repos/owner/project":
+            return HttpResponse(
+                200,
+                {},
+                b'{"id":12345,"full_name":"owner/project","default_branch":"develop"}',
+            )
+        if path.endswith("/git/ref/heads/cyrene%2Fassistant%2Ftask"):
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {
+                        "ref": f"refs/heads/{branch}",
+                        "object": {"sha": sha},
+                    }
+                ).encode(),
+            )
+        if path.startswith("/repos/owner/project/pulls?"):
+            return HttpResponse(200, {}, json.dumps([open_pull_request]).encode())
+        raise AssertionError((method, path))
+
+    with pytest.raises(GitHubApiFailure, match="BRANCH_HAS_OPEN_PULL_REQUEST"):
+        GitHubApi(settings, transport=transport).delete_branch(
+            repository, branch, sha, "token"
+        )
+
+    assert not any(method == "DELETE" for method, _ in observed)
 
 
 def test_actions_jobs_and_logs_are_run_scoped_bounded_and_redacted() -> None:
@@ -1260,18 +1578,24 @@ def test_actions_jobs_and_logs_are_run_scoped_bounded_and_redacted() -> None:
             200,
             {},
             b"start\nAWS_SECRET_ACCESS_KEY=aws-secret-value\n"
-            + f"failure {fake_token}\nlast line\n".encode(),
+            + f"failure {fake_token}\nlast line\n".encode()
+            + b'{"AWS_SECRET_ACCESS_KEY":"json-aws-secret"}\n'
+            + b'{"token":"short-secret-value"}\n',
         )
 
     api = GitHubApi(settings, transport=transport)
     jobs = api.list_workflow_jobs(repository, "99", 10, "token")
-    logs = api.read_job_log_excerpt(repository, "99", "100", 3, "token")
+    logs = api.read_job_log_excerpt(repository, "99", "100", 5, "token")
 
     assert jobs["jobs"][0]["job_id"] == "100"
     assert logs["job_id"] == "100"
     assert "failure [REDACTED_GITHUB_TOKEN]" in logs["excerpt"]
     assert "AWS_SECRET_ACCESS_KEY=[REDACTED]" in logs["excerpt"]
+    assert '"AWS_SECRET_ACCESS_KEY":"[REDACTED]"' in logs["excerpt"]
+    assert '"token":"[REDACTED]"' in logs["excerpt"]
     assert "aws-secret-value" not in logs["excerpt"]
+    assert "json-aws-secret" not in logs["excerpt"]
+    assert "short-secret-value" not in logs["excerpt"]
     assert "start" not in logs["excerpt"]
     external_requests = [item for item in observed if item[1] != "api.github.com"]
     assert len(external_requests) == 1
@@ -1327,29 +1651,34 @@ def test_branch_create_reconciles_exact_ref_and_delete_checks_expected_head() ->
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
         if path.endswith("/commits/" + sha):
             return HttpResponse(200, {}, json.dumps({"sha": sha}).encode())
-        if path.endswith("/git/ref/heads/codex%2Ftask") and method == "GET":
+        if path.endswith("/git/ref/heads/cyrene%2Fassistant%2Ftask") and method == "GET":
             if any(item[0] == "POST" for item in observed):
                 return HttpResponse(
                     200,
                     {},
                     json.dumps(
-                        {"ref": "refs/heads/codex/task", "object": {"sha": sha}}
+                        {"ref": "refs/heads/cyrene/assistant/task", "object": {"sha": sha}}
                     ).encode(),
                 )
             return HttpResponse(404, {}, b"")
         if path.endswith("/git/refs") and method == "POST":
-            assert json.loads(body or b"{}") == {"ref": "refs/heads/codex/task", "sha": sha}
+            assert json.loads(body or b"{}") == {
+                "ref": "refs/heads/cyrene/assistant/task",
+                "sha": sha,
+            }
             return HttpResponse(
                 201,
                 {},
-                json.dumps({"ref": "refs/heads/codex/task", "object": {"sha": sha}}).encode(),
+                json.dumps(
+                    {"ref": "refs/heads/cyrene/assistant/task", "object": {"sha": sha}}
+                ).encode(),
             )
         if method == "DELETE":
             raise TimeoutError("connection ended after request")
         raise AssertionError((method, path))
 
     api = GitHubApi(settings, transport=transport)
-    created = api.create_branch(repository, "codex/task", sha, "token")
+    created = api.create_branch(repository, "cyrene/assistant/task", sha, "token")
     assert created["verified"] is True
     assert created["commit_sha"] == sha
 
@@ -1370,14 +1699,16 @@ def test_branch_delete_reconciles_ambiguous_delete_to_absent() -> None:
         nonlocal delete_sent
         if path == "/repos/owner/project":
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
-        if path.endswith("/git/ref/heads/codex%2Ftask"):
+        if path.startswith("/repos/owner/project/pulls?"):
+            return HttpResponse(200, {}, b"[]")
+        if path.endswith("/git/ref/heads/cyrene%2Fassistant%2Ftask"):
             if delete_sent:
                 return HttpResponse(404, {}, b"")
             return HttpResponse(
                 200,
                 {},
                 json.dumps(
-                    {"ref": "refs/heads/codex/task", "object": {"sha": sha}}
+                    {"ref": "refs/heads/cyrene/assistant/task", "object": {"sha": sha}}
                 ).encode(),
             )
         if method == "DELETE":
@@ -1386,10 +1717,10 @@ def test_branch_delete_reconciles_ambiguous_delete_to_absent() -> None:
         raise AssertionError((method, path))
 
     api = GitHubApi(settings, transport=transport)
-    result = api.delete_branch(repository, "codex/task", sha, "token")
+    result = api.delete_branch(repository, "cyrene/assistant/task", sha, "token")
     assert result == {
         "status": "CONFIRMED",
-        "branch": "codex/task",
+        "branch": "cyrene/assistant/task",
         "deleted": True,
         "already_absent": False,
         "verified": True,
@@ -1443,7 +1774,7 @@ def test_file_commit_uses_blob_precondition_and_readback() -> None:
         nonlocal write_sent
         if path == "/repos/owner/project":
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
-        if path.endswith("/contents/src/main.py?ref=codex%2Ftask"):
+        if path.endswith("/contents/src/main.py?ref=cyrene%2Fassistant%2Ftask"):
             if not write_sent:
                 return HttpResponse(404, {}, b"")
             return HttpResponse(
@@ -1463,7 +1794,7 @@ def test_file_commit_uses_blob_precondition_and_readback() -> None:
             assert json.loads(body or b"{}") == {
                 "message": "Add source",
                 "content": encoded,
-                "branch": "codex/task",
+                "branch": "cyrene/assistant/task",
             }
             return HttpResponse(
                 201,
@@ -1479,7 +1810,7 @@ def test_file_commit_uses_blob_precondition_and_readback() -> None:
 
     api = GitHubApi(settings, transport=transport)
     result = api.commit_file(
-        repository, "codex/task", "src/main.py", "Add source", encoded, None, "token"
+        repository, "cyrene/assistant/task", "src/main.py", "Add source", encoded, None, "token"
     )
     assert result["verified"] is True
     assert result["blob_sha"] == blob_sha
@@ -1525,7 +1856,7 @@ def test_file_update_uses_expected_blob_sha_and_reconciles_lost_response() -> No
         nonlocal write_reached_github
         if path == "/repos/owner/project":
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
-        if path.endswith("/contents/src/main.py?ref=codex%2Ftask"):
+        if path.endswith("/contents/src/main.py?ref=cyrene%2Fassistant%2Ftask"):
             if write_reached_github:
                 return file_response(new_encoded, new_sha)
             return file_response(old_encoded, old_sha)
@@ -1533,7 +1864,7 @@ def test_file_update_uses_expected_blob_sha_and_reconciles_lost_response() -> No
             assert json.loads(body or b"{}") == {
                 "message": "Update source",
                 "content": new_encoded,
-                "branch": "codex/task",
+                "branch": "cyrene/assistant/task",
                 "sha": old_sha,
             }
             write_reached_github = True
@@ -1542,7 +1873,7 @@ def test_file_update_uses_expected_blob_sha_and_reconciles_lost_response() -> No
 
     result = GitHubApi(settings, transport=transport).commit_file(
         repository,
-        "codex/task",
+        "cyrene/assistant/task",
         "src/main.py",
         "Update source",
         new_encoded,

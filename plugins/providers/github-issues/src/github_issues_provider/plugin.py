@@ -30,7 +30,7 @@ from .account_center import (
     AccountCenterUnavailable,
     require_credential,
 )
-from .github_api import GitHubApi, GitHubApiFailure
+from .github_api import TASK_BRANCH_PREFIX, GitHubApi, GitHubApiFailure
 from .settings import ConfigurationError, ProviderSettings
 from .trust import (
     TrustedContextError,
@@ -234,6 +234,10 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
                     "type": "string",
                     "pattern": r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)$",
                 },
+                "updated_until": {
+                    "type": "string",
+                    "pattern": r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)$",
+                },
                 "page_cursor": {
                     "type": "string",
                     "pattern": "^[1-9][0-9]{0,3}$",
@@ -307,7 +311,9 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
     {
         "provider_tool_id": "github.branch.create",
         "display_name": "Create GitHub Task Branch",
-        "description": "Create a safe non-protected task branch from an exact repository commit.",
+        "description": (
+            "Create a branch under cyrene/assistant/<task> from an exact repository commit."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -322,7 +328,10 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
     {
         "provider_tool_id": "github.branch.delete",
         "display_name": "Delete GitHub Task Branch",
-        "description": "Delete a safe task branch only when its head matches the expected SHA.",
+        "description": (
+            "Delete a cyrene/assistant/<task> branch only when its head matches the expected SHA "
+            "and no open pull request uses it."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -338,7 +347,8 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         "provider_tool_id": "github.file.commit",
         "display_name": "Commit a File to a GitHub Task Branch",
         "description": (
-            "Create a bounded file or update it with an expected blob SHA on a safe task branch. "
+            "Create a bounded file or update it with an expected blob SHA under "
+            "cyrene/assistant/<task>. "
             "Workflow, deployment, and production configuration paths are denied."
         ),
         "input_schema": {
@@ -365,7 +375,9 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
     {
         "provider_tool_id": "github.pull_request.draft.create",
         "display_name": "Create GitHub Draft Pull Request",
-        "description": "Create and read back a draft pull request from a safe task branch.",
+        "description": (
+            "Create and read back a draft pull request from a cyrene/assistant/<task> branch."
+        ),
         "input_schema": {
             "type": "object",
             "properties": {
@@ -405,7 +417,8 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         "provider_tool_id": "github.actions.rerun_failed",
         "display_name": "Rerun Failed GitHub Actions Jobs",
         "description": (
-            "Rerun failed jobs only for an exact failed task-branch CI attempt and verify "
+            "Rerun failed jobs only for an exact failed cyrene/assistant/<task> CI attempt "
+            "and verify "
             "the new state."
         ),
         "input_schema": {
@@ -703,6 +716,9 @@ class GitHubIssuesProvider:
                     credential.access_token,
                     updated_since=(
                         str(arguments["updated_since"]) if "updated_since" in arguments else None
+                    ),
+                    updated_until=(
+                        str(arguments["updated_until"]) if "updated_until" in arguments else None
                     ),
                     page_cursor=str(arguments.get("page_cursor", "1")),
                 )
@@ -1061,11 +1077,13 @@ def _valid_arguments(
         limit = arguments.get("limit")
         page_cursor = arguments.get("page_cursor", "1")
         updated_since = arguments.get("updated_since")
+        updated_until = arguments.get("updated_until")
         return (
             ("query" not in arguments or (
                 isinstance(query, str)
                 and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _.-]{0,127}", query) is not None
             ))
+            and isinstance(arguments.get("state"), str)
             and arguments.get("state") in {"OPEN", "CLOSED", "ALL"}
             and isinstance(labels, list)
             and len(labels) <= 10
@@ -1081,6 +1099,18 @@ def _valid_arguments(
                     isinstance(updated_since, str)
                     and _valid_updated_since(updated_since)
                 )
+            )
+            and (
+                "updated_until" not in arguments
+                or (
+                    isinstance(updated_until, str)
+                    and _valid_updated_since(updated_until)
+                )
+            )
+            and (
+                updated_since is None
+                or updated_until is None
+                or _updated_timestamp(updated_since) <= _updated_timestamp(updated_until)
             )
             and isinstance(page_cursor, str)
             and re.fullmatch(r"[1-9][0-9]{0,3}", page_cursor) is not None
@@ -1105,9 +1135,11 @@ def _valid_arguments(
         body = arguments.get("body")
         return isinstance(body, str) and 1 <= len(body) <= 65_536
     if tool_id == "github.issue.state.update":
-        return arguments.get("state") in {"OPEN", "CLOSED"}
+        state = arguments.get("state")
+        return isinstance(state, str) and state in {"OPEN", "CLOSED"}
     if tool_id == "github.pull_requests.list":
-        return arguments.get("state") in {"OPEN", "CLOSED", "ALL"}
+        state = arguments.get("state")
+        return isinstance(state, str) and state in {"OPEN", "CLOSED", "ALL"}
     if tool_id == "github.branch.get":
         return _valid_branch_name(arguments.get("branch"))
     if tool_id == "github.branch.create":
@@ -1209,6 +1241,13 @@ def _valid_updated_since(value: str) -> bool:
     return True
 
 
+def _updated_timestamp(value: str) -> datetime:
+    """Parse a validated UTC timestamp for window ordering checks."""
+
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(normalized)
+
+
 def _valid_branch_name(value: Any) -> bool:
     """Validate branch syntax before lease redemption or URL construction."""
 
@@ -1228,14 +1267,11 @@ def _valid_branch_name(value: Any) -> bool:
 
 
 def _valid_task_branch(value: Any) -> bool:
-    """Reject protected refs for autonomous branch writes."""
+    """Require the reserved Cyrene assistant task-branch namespace."""
 
     if not _valid_branch_name(value):
         return False
-    lowered = value.casefold()
-    protected = {"main", "master", "develop", "release", "production", "staging"}
-    prefixes = ("main/", "master/", "develop/", "release/", "production/", "prod/", "staging/")
-    return lowered not in protected and not lowered.startswith(prefixes)
+    return value.casefold().startswith(TASK_BRANCH_PREFIX)
 
 
 def _valid_file_path(value: Any) -> bool:
