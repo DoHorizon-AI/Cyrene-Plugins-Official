@@ -87,6 +87,17 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "github.pull_request.get",
         "github.actions.runs.list",
         "github.ci.status",
+        "github.issues.search",
+        "github.branch.get",
+        "github.file.get",
+        "github.actions.jobs.list",
+        "github.actions.job.logs.read",
+        "github.branch.create",
+        "github.branch.delete",
+        "github.file.commit",
+        "github.pull_request.draft.create",
+        "github.pull_request.draft.find",
+        "github.actions.rerun_failed",
         "github.vendor.cli.execute",
         *PROVIDER_OPERATIONS,
     },
@@ -2329,21 +2340,50 @@ def _safe_provider_target(
                 raise AccountCenterError("invalid_request")
             return {}
         allowed = {"repository_id", "repository"}
+        required = {"repository_id", "repository"}
         if operation_id in {
             "github.issue.get",
             "github.issue.comment.create",
             "github.issue.state.update",
         }:
             allowed.add("issue_number")
+            required.add("issue_number")
         elif operation_id == "github.pull_request.get":
             allowed.add("pull_number")
+            required.add("pull_number")
         elif operation_id == "github.actions.runs.list":
             allowed.update({"branch", "commit_sha"})
         elif operation_id == "github.ci.status":
             allowed.add("commit_sha")
-        if set(target) - allowed or not {"repository_id", "repository"}.issubset(
-            target
-        ):
+            required.add("commit_sha")
+        elif operation_id == "github.issues.search":
+            pass  # Search filters are argument-digest-bound, not resource locators.
+        elif operation_id in {
+            "github.branch.get",
+            "github.branch.create",
+            "github.branch.delete",
+        }:
+            allowed.add("branch")
+            required.add("branch")
+        elif operation_id in {"github.file.get", "github.file.commit"}:
+            allowed.update({"branch", "path"})
+            required.update({"branch", "path"})
+        elif operation_id == "github.actions.jobs.list":
+            allowed.add("run_id")
+            required.add("run_id")
+        elif operation_id == "github.actions.job.logs.read":
+            allowed.update({"run_id", "job_id"})
+            required.update({"run_id", "job_id"})
+        elif operation_id in {
+            "github.pull_request.draft.create",
+            "github.pull_request.draft.find",
+        }:
+            allowed.update({"head_branch", "base_branch"})
+            required.update({"head_branch", "base_branch"})
+        elif operation_id == "github.actions.rerun_failed":
+            allowed.add("run_id")
+            required.add("run_id")
+        if set(target) - allowed or not required.issubset(target):
             raise AccountCenterError("invalid_request")
         repository_id = _numeric_id(target["repository_id"])
         repository = target["repository"]
@@ -2362,21 +2402,32 @@ def _safe_provider_target(
                 ):
                     raise AccountCenterError("invalid_request")
                 normalized[field] = number
-        for field in ("branch", "commit_sha"):
+        for field in ("branch", "head_branch", "base_branch"):
             if field in target:
                 text = target[field]
-                pattern = (
-                    r"[A-Za-z0-9._/-]{1,255}"
-                    if field == "branch"
-                    else r"[0-9a-fA-F]{7,64}"
-                )
-                if (
-                    not isinstance(text, str)
-                    or not re.fullmatch(pattern, text)
-                    or ".." in text.split("/")
-                ):
+                if not _github_branch_locator(text):
                     raise AccountCenterError("invalid_request")
                 normalized[field] = text
+        if "path" in target:
+            path = target["path"]
+            if not _github_path_locator(path):
+                raise AccountCenterError("invalid_request")
+            normalized["path"] = path
+        for field in ("run_id", "job_id"):
+            if field in target:
+                identifier = target[field]
+                if not isinstance(identifier, str) or not re.fullmatch(
+                    r"[1-9][0-9]{0,19}", identifier
+                ):
+                    raise AccountCenterError("invalid_request")
+                normalized[field] = identifier
+        if "commit_sha" in target:
+            commit_sha = target["commit_sha"]
+            if not isinstance(commit_sha, str) or not re.fullmatch(
+                r"[0-9a-fA-F]{7,64}", commit_sha
+            ):
+                raise AccountCenterError("invalid_request")
+            normalized["commit_sha"] = commit_sha
         return normalized
     if provider == "huggingface":
         if operation_id == "huggingface.vendor.cli.execute":
@@ -2430,6 +2481,38 @@ def _safe_provider_target(
             raise AccountCenterError("invalid_request")
         return normalized
     raise AccountCenterError("authorization_denied")
+
+
+def _github_branch_locator(value: Any) -> bool:
+    """Validate a bounded Git reference locator without normalizing its identity."""
+
+    return not (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 255
+        or re.fullmatch(r"[A-Za-z0-9._/-]+", value) is None
+        or value.startswith("/")
+        or value.endswith(("/", "."))
+        or "//" in value
+        or "@{" in value
+        or any(
+            part in {"", ".", ".."} or part.startswith(".") or part.endswith(".lock")
+            for part in value.split("/")
+        )
+    )
+
+
+def _github_path_locator(value: Any) -> bool:
+    """Validate a bounded repository-relative file locator."""
+
+    return not (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 512
+        or re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", value) is None
+        or any(
+            part in {"", ".", ".."} or part.startswith(".")
+            for part in value.split("/")
+        )
+    )
 
 
 def _provider_target_allowed(

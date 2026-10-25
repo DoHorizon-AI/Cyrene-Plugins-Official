@@ -26,15 +26,27 @@ fixed search query.
 CI status returns context and check-run counts with `complete`/`truncated`;
 responses over the first 100 items are explicitly incomplete and cannot be
 treated as a green result.
+Actions run and job lists also return `total_count`, `complete`, and
+`truncated`; consumers can distinguish the bounded first page from the full
+set.
+Failed-job reruns require a repository-scoped `source_workflow_ids` allowlist;
+an absent or empty entry denies every rerun. The request binds the expected
+workflow ID and task branch, and the provider rereads the run before retrying.
 Workflow logs follow only GitHub's short-lived redirect to the documented
 `productionresultssa*.blob.core.windows.net` hosts, omit the App token on that
 request, and return a best-effort excerpt with common credential patterns
 redacted, bounded to 200 lines and 20,000 bytes. This filter cannot identify
 every possible secret format.
 
-Writes require the dedicated assistant task namespace and an exact SHA or
-file-blob precondition where applicable. Hidden files, workflow/CI controls, permissions, deployment and
-production configuration paths are denied. A file is limited to 500,000 bytes.
+Writes require the dedicated assistant task namespace and exact SHA preconditions
+where the GitHub API supports them. Branch deletion checks the expected SHA
+and current default branch immediately before deletion, but GitHub exposes no
+atomic conditional delete. The host must hold the same repository-and-branch
+lifecycle lock across ref writes, draft-PR creation or closure, and deletion of
+that unique task branch. This lock cannot serialize changes made directly in
+GitHub, so a concurrent external edit or PR remains outside the guarantee.
+Hidden files, workflow/CI controls, permissions, deployment and production
+configuration paths are denied. A file is limited to 500,000 bytes.
 Create, delete, commit, draft-PR, and CI-rerun calls reconcile remote state
 before reporting success and never retry an unknown write outcome.
 
@@ -81,8 +93,15 @@ GitHub 短时重定向到文档所列的 `productionresultssa*.blob.core.windows
 此过滤无法识别所有可能的密钥格式。
 CI 状态附带 status context/check-run 计数与 `complete`/`truncated`；超过首批 100 条时会
 明确标为不完整，不能当作 CI 全绿结果。
+Actions run 和 job 列表也会返回 `total_count`、`complete` 与 `truncated`，调用方可以区分有界
+首批结果与完整集合。
+失败 job 重跑还需要按仓库配置的 `source_workflow_ids` 正向 allowlist；缺失或空列表时一律拒绝。
+请求会绑定期望 workflow ID 和任务分支，provider 在重跑前重新读取并核对上游 run。
 
-写入要求使用专属 assistant 任务分支，并在适用时绑定精确 commit SHA 或文件 blob SHA。隐藏文件、
+写入要求使用专属 assistant 任务分支，并在 API 支持时绑定精确 SHA。删除分支前会重新读取并
+核对 expected SHA 和当前默认分支，但 GitHub 没有原子化的条件删除 API；宿主必须对同一仓库和
+唯一任务分支使用同一生命周期锁，覆盖 ref 写入、draft PR 创建或关闭以及分支删除。此锁无法
+串行化直接在 GitHub 上进行的更改，因此并发外部编辑或 PR 不在保证范围内。隐藏文件、
 工作流/CI 控制、权限、部署和生产配置路径会被拒绝；单个文件最多 500,000 字节。
 创建分支、删除分支、提交文件、创建 draft PR 和重跑 CI 都会先核对远端状态再报告成功；
 结果未知时不会自动重试写入。

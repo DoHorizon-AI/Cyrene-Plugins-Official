@@ -426,6 +426,8 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
             "properties": {
                 **_REPOSITORY_PROPERTIES,
                 "run_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "workflow_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "expected_head_branch": {"type": "string", "maxLength": 255},
                 "expected_head_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
                 "expected_attempt": {"type": "integer", "minimum": 1, "maximum": 2147483647},
             },
@@ -433,6 +435,8 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
                 "repository_id",
                 "repository",
                 "run_id",
+                "workflow_id",
+                "expected_head_branch",
                 "expected_head_sha",
                 "expected_attempt",
             ],
@@ -781,6 +785,8 @@ class GitHubIssuesProvider:
                 result = api.rerun_failed_jobs(
                     repository,
                     str(arguments["run_id"]),
+                    str(arguments["workflow_id"]),
+                    str(arguments["expected_head_branch"]),
                     str(arguments["expected_head_sha"]),
                     int(arguments["expected_attempt"]),
                     credential.access_token,
@@ -1117,11 +1123,23 @@ def _valid_arguments(
             and _bounded_int(limit, 1, 50)
             and int(page_cursor) <= (1000 + limit - 1) // limit
         )
-    if tool_id in {"github.actions.jobs.list", "github.actions.job.logs.read"}:
+    if tool_id in {
+        "github.actions.jobs.list",
+        "github.actions.job.logs.read",
+        "github.actions.rerun_failed",
+    }:
         if not _provider_id(arguments.get("run_id")):
             return False
         if tool_id == "github.actions.jobs.list":
             return _bounded_int(arguments.get("limit"), 1, 100)
+        if tool_id == "github.actions.rerun_failed":
+            attempt = arguments.get("expected_attempt")
+            return (
+                _provider_id(arguments.get("workflow_id"))
+                and _valid_task_branch(arguments.get("expected_head_branch"))
+                and _full_sha(arguments.get("expected_head_sha"))
+                and _bounded_int(attempt, 1, 2_147_483_647)
+            )
         return _provider_id(arguments.get("job_id")) and _bounded_int(
             arguments.get("max_lines"), 1, 200
         )
@@ -1188,13 +1206,6 @@ def _valid_arguments(
             and 1 <= len(arguments["title"]) <= 256
             and isinstance(arguments.get("body"), str)
             and len(arguments["body"]) <= 65_536
-        )
-    if tool_id == "github.actions.rerun_failed":
-        attempt = arguments.get("expected_attempt")
-        return (
-            _provider_id(arguments.get("run_id"))
-            and _full_sha(arguments.get("expected_head_sha"))
-            and _bounded_int(attempt, 1, 2_147_483_647)
         )
     if "branch" in arguments and not _valid_branch_name(arguments["branch"]):
         return False
@@ -1307,14 +1318,21 @@ def _valid_file_path(value: Any) -> bool:
         "codeowners",
         "azure-pipelines.yml",
         "azure-pipelines.yaml",
+        "bitbucket-pipelines.yml",
+        "bitbucket-pipelines.yaml",
+        "buildkite.yml",
+        "buildkite.yaml",
         "docker-compose.yml",
         "docker-compose.yaml",
         "compose.yml",
         "compose.yaml",
+        "jenkinsfile",
         ".gitmodules",
     }
     sensitive_name = re.compile(
-        r"(?:^|[._-])(?:prod|production|permissions|authorization|access-control)(?:[._-]|$)"
+        r"(?:^|[._-])(?:prod|production|staging|release|publish|deploy|deployment|"
+        r"infra|infrastructure|terraform|helm|k8s|kubernetes|permissions|authorization|"
+        r"access-control)(?:[._-]|$)"
     )
     return not (
         any(part in {"", ".", ".."} or part.startswith(".") for part in parts)

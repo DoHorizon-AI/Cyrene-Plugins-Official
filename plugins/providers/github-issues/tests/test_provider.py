@@ -11,7 +11,7 @@ import hmac
 import json
 import time
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import fields, replace
 from typing import Any
 
 import pytest
@@ -50,7 +50,21 @@ def make_settings() -> ProviderSettings:
         allowed_installation_ids=frozenset({"99"}),
         allowed_events=frozenset({"issues"}),
         allowed_actions=frozenset({"opened", "closed", "reopened"}),
+        source_workflow_ids={"12345": frozenset({"22"})},
     )
+
+
+def test_workflow_allowlist_is_optional_for_existing_settings_constructors() -> None:
+    configured = make_settings()
+    previous_constructor_arguments = {
+        item.name: getattr(configured, item.name)
+        for item in fields(ProviderSettings)
+        if item.name != "source_workflow_ids"
+    }
+
+    settings = ProviderSettings(**previous_constructor_arguments)
+
+    assert settings.source_workflow_ids == {}
 
 
 class FakeAccountCenter:
@@ -178,7 +192,7 @@ class FakeGitHubApi:
 
     def rerun_failed_jobs(self, *args: Any) -> dict[str, Any]:
         self.calls.append(("rerun_failed", args))
-        return {"status": "REQUESTED", "verified": True}
+        return {"status": "QUEUED", "verified": True}
 
 
 class FakeCliRunner:
@@ -628,6 +642,8 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
             {
                 **repo,
                 "run_id": "12345",
+                "workflow_id": "22",
+                "expected_head_branch": branch,
                 "expected_head_sha": sha,
                 "expected_attempt": 2,
             },
@@ -690,6 +706,17 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
                 "branch": "cyrene/assistant/task",
                 "path": ".github/workflows/ci.yml",
                 "message": "change workflow",
+                "content_base64": "aGVsbG8=",
+            },
+        ),
+        (
+            "github.file.commit",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "branch": "cyrene/assistant/task",
+                "path": "infrastructure.yaml",
+                "message": "update deployment",
                 "content_base64": "aGVsbG8=",
             },
         ),
@@ -804,6 +831,46 @@ def test_non_string_state_values_are_rejected_without_escaping_validation(
     request = wire.CallToolRequest(
         binding_id=settings.binding_id,
         provider_tool_id=tool_id,
+        arguments_json=json.dumps(envelope, separators=(",", ":")),
+    )
+
+    is_error, result = provider.on_invoke(
+        "tool.provider.v1", "call_tool", request.SerializeToString()
+    )
+
+    assert is_error is False
+    assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
+    assert account.calls == []
+    assert api.calls == []
+
+
+def test_issue_search_rejects_an_inverted_updated_window_before_lease() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    arguments = {
+        "repository_id": "12345",
+        "repository": "owner/project",
+        "query": "bug",
+        "state": "OPEN",
+        "updated_since": "2026-10-24T12:05:00Z",
+        "updated_until": "2026-10-24T12:00:00Z",
+        "limit": 20,
+    }
+    lease_ref = "12345678-1234-1234-1234-123456789abc"
+    profile_ref = "00000000-0000-4000-8000-000000000001"
+    envelope = {
+        "payload": arguments,
+        "lease_ref": lease_ref,
+        "profile_ref": profile_ref,
+        "trusted_context": signed_context(
+            settings, arguments, lease_ref, "github.issues.search", profile_ref
+        ),
+    }
+    request = wire.CallToolRequest(
+        binding_id=settings.binding_id,
+        provider_tool_id="github.issues.search",
         arguments_json=json.dumps(envelope, separators=(",", ":")),
     )
 
@@ -1069,9 +1136,9 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
             return HttpResponse(
                 200,
                 {},
-                b'{"workflow_runs":[{"id":99,"name":"CI","status":"completed","conclusion":"success","head_sha":"deadbeef1234567","head_branch":"main","run_attempt":1}]}',
+                b'{"total_count":1,"workflow_runs":[{"id":99,"workflow_id":11,"name":"CI","path":".github/workflows/ci.yml","status":"completed","conclusion":"success","head_sha":"deadbeef1234567","head_branch":"main","run_attempt":1}]}',
             )
-        if path.endswith("/commits/deadbeef1234567/status"):
+        if path.endswith("/commits/deadbeef1234567/status?per_page=100"):
             return HttpResponse(
                 200,
                 {},
@@ -1094,6 +1161,8 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert pull_request["pull_request"]["head_sha"] == "deadbeef1234567"
     workflow_runs = api.list_workflow_runs(repository, "token", branch="main")
     assert workflow_runs["workflow_runs"][0]["status"] == "COMPLETED"
+    assert workflow_runs["complete"] is True
+    assert workflow_runs["truncated"] is False
     ci = api.get_ci_status(repository, "deadbeef1234567", "token")
     assert ci["state"] == "SUCCESS"
     assert ci["complete"] is True
@@ -1102,6 +1171,41 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert all(
         path.startswith(("/repos/owner/project", "/installation/repositories")) for path in observed
     )
+
+
+def test_workflow_run_list_reports_truncated_first_page() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path == "/repos/owner/project/actions/runs?per_page=100":
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {
+                        "total_count": 101,
+                        "workflow_runs": [json.loads(_workflow_run_response())],
+                    }
+                ).encode(),
+            )
+        raise AssertionError((method, path))
+
+    result = GitHubApi(settings, transport=transport).list_workflow_runs(
+        repository, "token"
+    )
+
+    assert result["total_count"] == 101
+    assert result["complete"] is False
+    assert result["truncated"] is True
 
 
 def test_ci_status_reports_incomplete_check_run_pages_instead_of_implying_green() -> None:
@@ -1117,7 +1221,9 @@ def test_ci_status_reports_incomplete_check_run_pages_instead_of_implying_green(
     ) -> HttpResponse:
         if path == "/repos/owner/project":
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
-        if path.endswith("/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status"):
+        if path.endswith(
+            "/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status?per_page=100"
+        ):
             return HttpResponse(
                 200,
                 {},
@@ -1155,13 +1261,16 @@ def _workflow_run_response(
     attempt: int = 1,
     branch: str = "cyrene/assistant/task",
     head_sha: str = "a" * 40,
+    workflow_id: int = 22,
 ) -> bytes:
     """Build a stable API response for bounded Actions lifecycle tests."""
 
     return json.dumps(
         {
             "id": 99,
+            "workflow_id": workflow_id,
             "name": "Source CI",
+            "path": ".github/workflows/ci.yml",
             "status": status,
             "conclusion": conclusion,
             "head_sha": head_sha,
@@ -1538,6 +1647,105 @@ def test_task_branch_delete_is_refused_while_same_repo_open_pr_uses_branch() -> 
     assert not any(method == "DELETE" for method, _ in observed)
 
 
+def test_task_branch_delete_rechecks_head_after_pull_request_scan() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    branch = "cyrene/assistant/task"
+    expected_sha = "4" * 40
+    advanced_sha = "5" * 40
+    reference_reads = 0
+    observed: list[tuple[str, str]] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal reference_reads
+        observed.append((method, path))
+        if path == "/repos/owner/project":
+            return HttpResponse(
+                200,
+                {},
+                b'{"id":12345,"full_name":"owner/project","default_branch":"develop"}',
+            )
+        if path.endswith("/git/ref/heads/cyrene%2Fassistant%2Ftask"):
+            reference_reads += 1
+            sha = expected_sha if reference_reads == 1 else advanced_sha
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {"ref": f"refs/heads/{branch}", "object": {"sha": sha}}
+                ).encode(),
+            )
+        if path.startswith("/repos/owner/project/pulls?"):
+            return HttpResponse(200, {}, b"[]")
+        raise AssertionError((method, path))
+
+    with pytest.raises(GitHubApiFailure, match="BRANCH_HEAD_MISMATCH"):
+        GitHubApi(settings, transport=transport).delete_branch(
+            repository, branch, expected_sha, "token"
+        )
+
+    assert reference_reads == 2
+    assert not any(method == "DELETE" for method, _ in observed)
+
+
+def test_task_branch_delete_rechecks_default_branch_after_pull_request_scan() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    branch = "cyrene/assistant/task"
+    sha = "4" * 40
+    repository_reads = 0
+    observed: list[tuple[str, str]] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal repository_reads
+        observed.append((method, path))
+        if path == "/repos/owner/project":
+            repository_reads += 1
+            default_branch = "develop" if repository_reads == 1 else branch
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {
+                        "id": 12345,
+                        "full_name": "owner/project",
+                        "default_branch": default_branch,
+                    }
+                ).encode(),
+            )
+        if path.endswith("/git/ref/heads/cyrene%2Fassistant%2Ftask"):
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {"ref": f"refs/heads/{branch}", "object": {"sha": sha}}
+                ).encode(),
+            )
+        if path.startswith("/repos/owner/project/pulls?"):
+            return HttpResponse(200, {}, b"[]")
+        raise AssertionError((method, path))
+
+    with pytest.raises(GitHubApiFailure, match="PROTECTED_BRANCH"):
+        GitHubApi(settings, transport=transport).delete_branch(
+            repository, branch, sha, "token"
+        )
+
+    assert repository_reads == 2
+    assert not any(method == "DELETE" for method, _ in observed)
+
+
 def test_actions_jobs_and_logs_are_run_scoped_bounded_and_redacted() -> None:
     settings = make_settings()
     repository = settings.repositories[0]
@@ -1580,14 +1788,18 @@ def test_actions_jobs_and_logs_are_run_scoped_bounded_and_redacted() -> None:
             b"start\nAWS_SECRET_ACCESS_KEY=aws-secret-value\n"
             + f"failure {fake_token}\nlast line\n".encode()
             + b'{"AWS_SECRET_ACCESS_KEY":"json-aws-secret"}\n'
-            + b'{"token":"short-secret-value"}\n',
+            + b'{"token":"short-secret-value"}\n'
+            + json.dumps({"token": 'prefix"LEAKED_SUFFIX'}).encode()
+            + b"\n",
         )
 
     api = GitHubApi(settings, transport=transport)
     jobs = api.list_workflow_jobs(repository, "99", 10, "token")
-    logs = api.read_job_log_excerpt(repository, "99", "100", 5, "token")
+    logs = api.read_job_log_excerpt(repository, "99", "100", 6, "token")
 
     assert jobs["jobs"][0]["job_id"] == "100"
+    assert jobs["complete"] is True
+    assert jobs["truncated"] is False
     assert logs["job_id"] == "100"
     assert "failure [REDACTED_GITHUB_TOKEN]" in logs["excerpt"]
     assert "AWS_SECRET_ACCESS_KEY=[REDACTED]" in logs["excerpt"]
@@ -1596,6 +1808,7 @@ def test_actions_jobs_and_logs_are_run_scoped_bounded_and_redacted() -> None:
     assert "aws-secret-value" not in logs["excerpt"]
     assert "json-aws-secret" not in logs["excerpt"]
     assert "short-secret-value" not in logs["excerpt"]
+    assert "LEAKED_SUFFIX" not in logs["excerpt"]
     assert "start" not in logs["excerpt"]
     external_requests = [item for item in observed if item[1] != "api.github.com"]
     assert len(external_requests) == 1
@@ -1923,16 +2136,91 @@ def test_failed_ci_rerun_requires_exact_task_branch_attempt_and_reads_new_attemp
         raise AssertionError((method, path))
 
     api = GitHubApi(settings, transport=transport)
-    result = api.rerun_failed_jobs(repository, "99", sha, 1, "token")
+    result = api.rerun_failed_jobs(
+        repository, "99", "22", "cyrene/assistant/task", sha, 1, "token"
+    )
     assert result == {
         "status": "QUEUED",
         "conclusion": None,
         "run_id": "99",
         "attempt": 2,
         "head_sha": sha,
+        "head_branch": "cyrene/assistant/task",
+        "workflow_id": "22",
+        "workflow_name": "Source CI",
+        "workflow_path": ".github/workflows/ci.yml",
         "verified": True,
     }
     assert run_read_count == 2
+
+
+def test_ci_rerun_rejects_a_workflow_id_mismatch_with_the_exact_run_receipt() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    sha = "e" * 40
+    rerun_calls = 0
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal rerun_calls
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/actions/runs/99") and method == "GET":
+            return HttpResponse(
+                200,
+                {},
+                _workflow_run_response(head_sha=sha, attempt=1, workflow_id=23),
+            )
+        if path.endswith("/rerun-failed-jobs"):
+            rerun_calls += 1
+            return HttpResponse(201, {}, b"")
+        raise AssertionError((method, path))
+
+    api = GitHubApi(settings, transport=transport)
+    with pytest.raises(GitHubApiFailure, match="RUN_PRECONDITION_FAILED"):
+        api.rerun_failed_jobs(
+            repository, "99", "22", "cyrene/assistant/task", sha, 1, "token"
+        )
+
+    assert rerun_calls == 0
+
+
+def test_ci_rerun_fails_closed_when_repository_has_no_source_workflow_allowlist() -> None:
+    settings = replace(make_settings(), source_workflow_ids={})
+    repository = settings.repositories[0]
+    observed_paths: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed_paths.append(path)
+        return HttpResponse(
+            200,
+            {},
+            b'{"id":12345,"full_name":"owner/project","default_branch":"develop"}',
+        )
+
+    with pytest.raises(GitHubApiFailure, match="WORKFLOW_NOT_ALLOWLISTED"):
+        GitHubApi(settings, transport=transport).rerun_failed_jobs(
+            repository,
+            "99",
+            "22",
+            "cyrene/assistant/task",
+            "a" * 40,
+            1,
+            "token",
+        )
+
+    assert observed_paths == ["/repos/owner/project"]
 
 
 def test_failed_ci_rerun_reports_missing_actions_write_permission_truthfully() -> None:
@@ -1962,7 +2250,9 @@ def test_failed_ci_rerun_reports_missing_actions_write_permission_truthfully() -
 
     api = GitHubApi(settings, transport=transport)
     with pytest.raises(GitHubApiFailure) as failure:
-        api.rerun_failed_jobs(repository, "99", sha, 1, "token")
+        api.rerun_failed_jobs(
+            repository, "99", "22", "cyrene/assistant/task", sha, 1, "token"
+        )
 
     assert failure.value.code == "AUTHORIZATION_DENIED"
     assert failure.value.uncertain is False

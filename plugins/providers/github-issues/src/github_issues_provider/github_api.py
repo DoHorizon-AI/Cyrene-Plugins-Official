@@ -283,7 +283,13 @@ class GitHubApi:
     def delete_branch(
         self, repository: Repository, branch: str, expected_sha: str, token: str
     ) -> dict[str, Any]:
-        """Delete a task branch only at its exact expected head, then read it back."""
+        """Delete a task ref after a final SHA check and read back its absence.
+
+        GitHub's ref-delete API has no atomic expected-SHA parameter, so the
+        caller must serialize this branch's full lifecycle, including ref
+        writes and pull-request opening/closing, during deletion. This host
+        lock cannot serialize manual changes made directly in GitHub.
+        """
 
         default_branch = self._verify_configured_repository(repository, token)
         _require_task_branch(branch)
@@ -303,6 +309,19 @@ class GitHubApi:
             raise GitHubApiFailure("BRANCH_HEAD_MISMATCH")
         if self._branch_has_open_pull_request(repository, branch, token):
             raise GitHubApiFailure("BRANCH_HAS_OPEN_PULL_REQUEST")
+        current_default_branch = self._verify_configured_repository(repository, token)
+        _reject_default_branch(branch, current_default_branch)
+        final_sha = self._read_ref_sha(repository, branch, token)
+        if final_sha is None:
+            return {
+                "status": "CONFIRMED",
+                "branch": branch,
+                "deleted": True,
+                "already_absent": True,
+                "verified": True,
+            }
+        if final_sha.lower() != expected_sha.lower():
+            raise GitHubApiFailure("BRANCH_HEAD_MISMATCH")
         path = f"{self._repository_path(repository)}/git/refs/heads/{quote(branch, safe='')}"
         try:
             self._request("DELETE", path, token, None, write=True)
@@ -588,9 +607,22 @@ class GitHubApi:
         path = f"{self._repository_path(repository)}/actions/runs?{urlencode(query)}"
         value = _json_object(self._request("GET", path, token, None))
         runs = value.get("workflow_runs")
-        if not isinstance(runs, list) or len(runs) > 100:
+        total_count = value.get("total_count")
+        if (
+            not isinstance(runs, list)
+            or len(runs) > 100
+            or isinstance(total_count, bool)
+            or not isinstance(total_count, int)
+            or total_count < len(runs)
+        ):
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
-        return {"workflow_runs": [_workflow_run_projection(item) for item in runs]}
+        complete = total_count == len(runs)
+        return {
+            "workflow_runs": [_workflow_run_projection(item) for item in runs],
+            "total_count": total_count,
+            "complete": complete,
+            "truncated": not complete,
+        }
 
     def search_issues(
         self,
@@ -746,7 +778,13 @@ class GitHubApi:
         ):
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         projected = [_job_projection(item, expected_run_id=run_id) for item in jobs]
-        return {"jobs": projected, "total_count": total_count, "truncated": total_count > len(jobs)}
+        complete = total_count == len(jobs)
+        return {
+            "jobs": projected,
+            "total_count": total_count,
+            "complete": complete,
+            "truncated": not complete,
+        }
 
     def read_job_log_excerpt(
         self, repository: Repository, run_id: str, job_id: str, max_lines: int, token: str
@@ -854,6 +892,8 @@ class GitHubApi:
         self,
         repository: Repository,
         run_id: str,
+        expected_workflow_id: str,
+        expected_head_branch: str,
         expected_head_sha: str,
         expected_attempt: int,
         token: str,
@@ -863,9 +903,17 @@ class GitHubApi:
         default_branch = self._verify_configured_repository(repository, token)
         if not re.fullmatch(r"[0-9a-fA-F]{40}", expected_head_sha):
             raise GitHubApiFailure("INVALID_ARGUMENTS")
+        _require_task_branch(expected_head_branch)
+        allowed_workflow_ids = self._settings.source_workflow_ids.get(
+            repository.repository_id, frozenset()
+        )
+        if not allowed_workflow_ids or expected_workflow_id not in allowed_workflow_ids:
+            raise GitHubApiFailure("WORKFLOW_NOT_ALLOWLISTED")
         run = self._get_workflow_run(repository, run_id, token)
         if (
-            run["head_sha"].lower() != expected_head_sha.lower()
+            run["workflow_id"] != expected_workflow_id
+            or run["head_branch"] != expected_head_branch
+            or run["head_sha"].lower() != expected_head_sha.lower()
             or run["run_attempt"] != expected_attempt
         ):
             raise GitHubApiFailure("RUN_PRECONDITION_FAILED")
@@ -897,7 +945,9 @@ class GitHubApi:
                     "WRITE_OUTCOME_UNCONFIRMED", uncertain=True
                 ) from readback_error
             if (
-                readback["head_sha"].lower() == expected_head_sha.lower()
+                readback["workflow_id"] == expected_workflow_id
+                and readback["head_branch"] == expected_head_branch
+                and readback["head_sha"].lower() == expected_head_sha.lower()
                 and (
                     readback["run_attempt"] > expected_attempt
                     or readback["status"] != "COMPLETED"
@@ -910,7 +960,9 @@ class GitHubApi:
         except GitHubApiFailure as readback_error:
             raise GitHubApiFailure("WRITE_OUTCOME_UNCONFIRMED", uncertain=True) from readback_error
         if (
-            readback["head_sha"].lower() != expected_head_sha.lower()
+            readback["workflow_id"] != expected_workflow_id
+            or readback["head_branch"] != expected_head_branch
+            or readback["head_sha"].lower() != expected_head_sha.lower()
             or (
                 readback["run_attempt"] <= expected_attempt
                 and readback["status"] == "COMPLETED"
@@ -1102,7 +1154,7 @@ class GitHubApi:
         status = _json_object(
             self._request(
                 "GET",
-                f"{self._repository_path(repository)}/commits/{quoted_sha}/status",
+                f"{self._repository_path(repository)}/commits/{quoted_sha}/status?per_page=100",
                 token,
                 None,
             )
@@ -1393,6 +1445,7 @@ def _workflow_run_projection(value: Mapping[str, Any]) -> dict[str, Any]:
     """Project one Actions run with bounded status and commit metadata."""
 
     run_id = value.get("id")
+    workflow_id = value.get("workflow_id")
     name = value.get("name")
     status = value.get("status")
     conclusion = value.get("conclusion")
@@ -1403,6 +1456,9 @@ def _workflow_run_projection(value: Mapping[str, Any]) -> dict[str, Any]:
     if (
         isinstance(run_id, bool)
         or not isinstance(run_id, int)
+        or isinstance(workflow_id, bool)
+        or not isinstance(workflow_id, int)
+        or workflow_id < 1
         or not isinstance(name, str)
         or status
         not in {
@@ -1437,6 +1493,7 @@ def _workflow_run_projection(value: Mapping[str, Any]) -> dict[str, Any]:
         raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
     return {
         "run_id": str(run_id),
+        "workflow_id": str(workflow_id),
         "name": name[:256],
         "status": status.upper(),
         "conclusion": conclusion.upper() if isinstance(conclusion, str) else None,
@@ -1656,14 +1713,21 @@ def _require_safe_file_path(path: str) -> None:
         "codeowners",
         "azure-pipelines.yml",
         "azure-pipelines.yaml",
+        "bitbucket-pipelines.yml",
+        "bitbucket-pipelines.yaml",
+        "buildkite.yml",
+        "buildkite.yaml",
         "docker-compose.yml",
         "docker-compose.yaml",
         "compose.yml",
         "compose.yaml",
+        "jenkinsfile",
         ".gitmodules",
     }
     sensitive_name = re.compile(
-        r"(?:^|[._-])(?:prod|production|permissions|authorization|access-control)(?:[._-]|$)"
+        r"(?:^|[._-])(?:prod|production|staging|release|publish|deploy|deployment|"
+        r"infra|infrastructure|terraform|helm|k8s|kubernetes|permissions|authorization|"
+        r"access-control)(?:[._-]|$)"
     )
     if (
         any(part in {"", ".", ".."} or part.startswith(".") for part in parts)
@@ -1764,6 +1828,10 @@ def _rerun_result(run: Mapping[str, Any]) -> dict[str, Any]:
         "run_id": run["run_id"],
         "attempt": run["run_attempt"],
         "head_sha": run["head_sha"],
+        "head_branch": run["head_branch"],
+        "workflow_id": run["workflow_id"],
+        "workflow_name": run["name"],
+        "workflow_path": run["workflow_path"],
         "verified": True,
     }
 
@@ -1791,7 +1859,7 @@ def _redact_log_line(line: str) -> str:
     secret_assignment = re.compile(
         r"""(?i)(?P<prefix>["']?[A-Za-z0-9_-]*(?:token|secret|password|api[_-]?key|"""
         r"""authorization|credential|private[_-]?key|access[_-]?key)[A-Za-z0-9_-]*["']?\s*[:=]\s*)"""
-        r"""(?P<value>"[^"]*"|'[^']*'|[^\s,;}]+)"""
+        r"""(?P<value>"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}]+)"""
     )
     line = secret_assignment.sub(redact_assignment, line)
     return re.sub(r"\b[A-Za-z0-9+/]{80,}={0,2}\b", "[REDACTED_LONG_VALUE]", line)
