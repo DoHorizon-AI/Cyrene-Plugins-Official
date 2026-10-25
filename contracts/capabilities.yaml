@@ -820,6 +820,20 @@ capabilities:
         verification_level: DISPATCH_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-09-13
+      - ref: cyrene.tools.computer-runtime
+        source: plugins/tools/computer-runtime/plugin.manifest.json
+        kind: tool-provider
+        language: rust
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        maturity: migrating
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-10-24
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs
       - contracts/tck/tool-provider-v1

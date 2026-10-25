@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -293,6 +294,37 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(list_plugins(language="RUST", catalog=self.catalog)), 1)
         self.assertEqual(len(list_plugins(language="Python", catalog=self.catalog)), 21)
 
+    def test_computer_runtime_methods_are_scoped_to_their_capability(self) -> None:
+        """Multi-capability runtime methods must remain explicitly attributable."""
+        manifest_path = (
+            REPO_ROOT / "plugins/tools/computer-runtime/plugin.manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        methods_by_capability = {
+            capability: sorted(
+                method["name"]
+                for method in manifest["methods"]
+                if method["capability"] == capability
+            )
+            for capability in manifest["capabilities"]
+        }
+
+        self.assertEqual(
+            methods_by_capability,
+            {
+                "computer.runtime.v1": [
+                    "CreateArtifact",
+                    "ExecuteCommand",
+                    "ExecuteCommandStream",
+                    "GetArtifact",
+                    "ListDir",
+                    "ReadFile",
+                    "WriteFile",
+                ],
+                "tool.provider.v1": ["call_tool", "list_tools"],
+            },
+        )
+
     def test_export_format_and_field_integrity(self) -> None:
         """4. Test plugins-catalog.json export format, schemaVersion, and field integrity."""
         import tempfile
@@ -382,7 +414,7 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(by_service["Cyrene-Echo"]), 3)
         self.assertEqual(len(by_service["Cyrene-Reactor"]), 3)
         self.assertEqual(len(by_service["Cyrene-Yield"]), 3)
-        self.assertEqual(len(by_service["Cyrene-Exchange"]), 11)
+        self.assertEqual(len(by_service["Cyrene-Exchange"]), 12)
         self.assertEqual(
             set(by_service["Cyrene-Exchange"]),
             {
@@ -397,6 +429,7 @@ class PluginCatalogTest(unittest.TestCase):
                 "cyrene.providers.github-issues",
                 "cyrene.providers.huggingface",
                 "cyrene.providers.model-api-connector",
+                "cyrene.tools.computer-runtime",
             },
         )
         self.assertEqual(len(by_service["Cyrene-Catalyst"]), 5)

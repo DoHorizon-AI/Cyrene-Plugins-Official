@@ -173,15 +173,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "6dd6edbcd2c073e61b490a9e40512e0946af68c7854788aee785df4ca3f24f11",
-      "size_bytes": 26030
+      "sha256": "cdc9088dbf88849d5ddcd1bfdc69922427ac861b565f1b1769c6c9eea08819dc",
+      "size_bytes": 26470
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "ca7ee2edc5c31d376ef371327968602316d2f4f1b48a388def8317dcb603c566",
-      "size_bytes": 36974
+      "sha256": "739113bedeef22cf2d572d5a32b11ed1d62702c83a1bb46cc31888b4f8fc9a10",
+      "size_bytes": 37867
     },
     {
       "kind": "file",
@@ -3015,8 +3015,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/computer-runtime/plugin.manifest.json",
-      "sha256": "cb51c3057a293aab6a7ab53d06dede3f4b9c01c9a5fa7bf0c3e36bf4d6630ccc",
-      "size_bytes": 2078
+      "sha256": "f5625ec809dd61db6075ff586024fa128a8f94eb6806a60dfe08c1e566d722a0",
+      "size_bytes": 2379
     },
     {
       "kind": "file",
@@ -6753,8 +6753,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "a6df467887eace57745686042934825d3f7975d5ea63fd7bdac89486ec540026",
-      "size_bytes": 19100
+      "sha256": "3f89cb3e98baa3f9062f8109751185f9ee2767caa68a08fa7483d9387e120f14",
+      "size_bytes": 20274
     },
     {
       "kind": "file",
