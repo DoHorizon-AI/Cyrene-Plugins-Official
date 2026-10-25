@@ -15,36 +15,43 @@
   ],
   "methods": [
     {
+      "capability": "computer.runtime.v1",
       "name": "ExecuteCommand",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "ExecuteCommandStream",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "ReadFile",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "WriteFile",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "ListDir",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "CreateArtifact",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "GetArtifact",
       "interfaceVersion": "1",
       "executionMode": "service"
