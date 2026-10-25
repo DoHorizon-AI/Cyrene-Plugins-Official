@@ -16,10 +16,14 @@ from typing import Any
 
 import pytest
 from cyrene_account_center_contracts import AuthMaterial, canonical_json
+from cyrene_plugin_runtime import DirectPayload
 from cyrene_plugin_runtime.vendor_cli import VendorCliResult
 
 from github_issues_provider._generated import tool_provider_pb2 as wire
-from github_issues_provider.account_center import AccountCenterUnavailable
+from github_issues_provider.account_center import (
+    AccountCenterDirectLeaseClient,
+    AccountCenterUnavailable,
+)
 from github_issues_provider.github_api import GitHubApi, GitHubApiFailure, HttpResponse
 from github_issues_provider.plugin import (
     CALL_TOOL_RESPONSE_TYPE_URL,
@@ -52,6 +56,58 @@ def make_settings() -> ProviderSettings:
         allowed_actions=frozenset({"opened", "closed", "reopened"}),
         source_workflow_ids={"12345": frozenset({"22"})},
     )
+
+
+def test_account_center_direct_lease_rpc_preserves_profile_reference() -> None:
+    settings = make_settings()
+
+    class DirectClient:
+        def __init__(self) -> None:
+            self.call: dict[str, Any] | None = None
+
+        def invoke(self, **kwargs: Any) -> DirectPayload:
+            self.call = kwargs
+            return DirectPayload(
+                type_url=(
+                    "type.googleapis.com/cyrene.account.center.v1."
+                    "RedeemProviderCredentialLeaseResponse"
+                ),
+                value=json.dumps(
+                    {
+                        "access_token": "synthetic-provider-token",
+                        "token_type": "Bearer",
+                        "external_subject": "github-owner",
+                        "expires_at": 2_000_000_000,
+                    },
+                    separators=(",", ":"),
+                ).encode(),
+            )
+
+    transport = DirectClient()
+    client = AccountCenterDirectLeaseClient(settings, client=transport)
+    payload = {
+        "lease_ref": "12345678-1234-1234-1234-123456789abc",
+        "profile_ref": "00000000-0000-4000-8000-000000000001",
+        "operation_id": "github.repository.get",
+        "target": {"repository_id": "12345", "repository": "owner/project"},
+        "arguments_sha256": "a" * 64,
+    }
+    actor = {
+        "issuer": "https://identity.example.test",
+        "subject": "member-7",
+        "organization_id": "org-2",
+        "workspace_id": "workspace-9",
+        "binding_id": settings.account_center_binding_id,
+    }
+
+    material = client.redeem_provider_credential_lease(payload, actor)
+
+    assert material.external_subject == "github-owner"
+    assert transport.call is not None
+    assert transport.call["method"] == "redeem_provider_credential_lease"
+    envelope = json.loads(transport.call["request"].value)
+    assert envelope["payload"] == payload
+    assert envelope["trusted_context"]["binding_id"] == settings.account_center_binding_id
 
 
 def test_workflow_allowlist_is_optional_for_existing_settings_constructors() -> None:

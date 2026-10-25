@@ -205,6 +205,7 @@ class RedeemProviderCredentialLeaseRequest:
     """One-time redemption fields that must match the original lease exactly."""
 
     lease_ref: str
+    profile_ref: str
     operation_id: str
     target: dict[str, Any]
     arguments_sha256: str

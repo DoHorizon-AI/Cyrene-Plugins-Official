@@ -17,10 +17,15 @@ from typing import Any
 
 import pytest
 from cyrene_account_center_contracts import canonical_json
+from cyrene_plugin_runtime import DirectPayload
 from cyrene_plugin_runtime.vendor_cli import VendorCliResult
 
 from huggingface_provider._generated import tool_provider_pb2 as wire
-from huggingface_provider.account_center import AccountCenterUnavailable, _auth_material
+from huggingface_provider.account_center import (
+    AccountCenterDirectLeaseClient,
+    AccountCenterUnavailable,
+    _auth_material,
+)
 from huggingface_provider.huggingface_api import HuggingFaceApiFailure
 from huggingface_provider.plugin import (
     CALL_TOOL_RESPONSE_TYPE_URL,
@@ -65,6 +70,55 @@ def make_settings() -> ProviderSettings:
         exchange_verification_key=EXCHANGE_KEY,
         provider_signing_key=PROVIDER_KEY,
     )
+
+
+def test_account_center_direct_lease_rpc_preserves_profile_reference() -> None:
+    settings = make_settings()
+
+    class DirectClient:
+        def __init__(self) -> None:
+            self.call: dict[str, Any] | None = None
+
+        def invoke(self, **kwargs: Any) -> DirectPayload:
+            self.call = kwargs
+            return DirectPayload(
+                type_url=(
+                    "type.googleapis.com/cyrene.account.center.v1."
+                    "RedeemProviderCredentialLeaseResponse"
+                ),
+                value=json.dumps(
+                    {
+                        "access_token": "synthetic-provider-token",
+                        "token_type": "Bearer",
+                        "external_subject": "hf-owner",
+                        "expires_at": 2_000_000_000,
+                    },
+                    separators=(",", ":"),
+                ).encode(),
+            )
+
+    transport = DirectClient()
+    client = AccountCenterDirectLeaseClient(settings, client=transport)
+    payload = {
+        "lease_ref": "00000000-0000-4000-8000-000000000002",
+        "profile_ref": "00000000-0000-4000-8000-000000000001",
+        "operation_id": "huggingface.repo.get",
+        "target": {"repo_type": "model", "repo_id": "owner/model"},
+        "arguments_sha256": "b" * 64,
+    }
+    actor = {
+        **ACTOR,
+        "binding_id": settings.account_center_binding_id,
+    }
+
+    material = client.redeem_provider_credential_lease(payload, actor)
+
+    assert material.external_subject == "hf-owner"
+    assert transport.call is not None
+    assert transport.call["method"] == "redeem_provider_credential_lease"
+    envelope = json.loads(transport.call["request"].value)
+    assert envelope["payload"] == payload
+    assert envelope["trusted_context"]["binding_id"] == settings.account_center_binding_id
 
 
 class FakeAccountCenter:

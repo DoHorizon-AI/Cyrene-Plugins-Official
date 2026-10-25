@@ -31,7 +31,9 @@ METHOD = "redeem_provider_credential_lease"
 REQUEST_TYPE_URL = (
     "type.googleapis.com/cyrene.account.center.v1.RedeemProviderCredentialLeaseRequest"
 )
-RESPONSE_TYPE_URL = "type.googleapis.com/cyrene.account.center.v1.RedeemCredentialLeaseResponse"
+RESPONSE_TYPE_URL = (
+    "type.googleapis.com/cyrene.account.center.v1.RedeemProviderCredentialLeaseResponse"
+)
 MAX_RPC_RESPONSE_BYTES = 64 * 1024
 
 
