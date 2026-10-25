@@ -6760,8 +6760,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "68db99d507e46f174ccabfed7657a4720fa2344fa213db2b3310d675928d673a",
-      "size_bytes": 28334
+      "sha256": "0a53693cde3b1e93084ad55e0eac9b29eb5febfcf3b749a76c79491c0ed6d547",
+      "size_bytes": 28379
     },
     {
       "kind": "file",
