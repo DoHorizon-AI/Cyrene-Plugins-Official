@@ -42,11 +42,23 @@ class AccountCenterEndpoint:
         request_type_url: str | None = None,
         **_: Any,
     ) -> tuple[bool, Any]:
-        if capability != "account.center.v1" or action != "redeem_credential_lease":
+        if capability != "account.center.v1" or action not in {
+            "redeem_credential_lease",
+            "redeem_provider_credential_lease",
+        }:
             return False, "METHOD_NOT_FOUND: unsupported capability method"
-        if request_type_url != (
-            "type.googleapis.com/cyrene.account.center.v1.RedeemCredentialLeaseRequest"
-        ):
+        request_type_name = (
+            "RedeemProviderCredentialLeaseRequest"
+            if action == "redeem_provider_credential_lease"
+            else "RedeemCredentialLeaseRequest"
+        )
+        response_type_name = (
+            "RedeemProviderCredentialLeaseResponse"
+            if action == "redeem_provider_credential_lease"
+            else "RedeemCredentialLeaseResponse"
+        )
+        type_url_prefix = "type.googleapis.com/cyrene.account.center.v1."
+        if request_type_url != type_url_prefix + request_type_name:
             return False, "INVALID_REQUEST: request contract mismatch"
         envelope = json.loads(payload)
         request = envelope["payload"]
@@ -59,7 +71,7 @@ class AccountCenterEndpoint:
             expected_caller_id="plugins.github-issues",
         ):
             return False, "PERMISSION_DENIED: signed provider context rejected"
-        self.calls.append({"payload": request, "context": context})
+        self.calls.append({"method": action, "payload": request, "context": context})
         result = {
             "access_token": "private-github-user-token",
             "token_type": "Bearer",
@@ -67,9 +79,7 @@ class AccountCenterEndpoint:
             "expires_at": int(time.time()) + 1800,
         }
         return True, DirectPayload(
-            type_url=(
-                "type.googleapis.com/cyrene.account.center.v1.RedeemCredentialLeaseResponse"
-            ),
+            type_url=type_url_prefix + response_type_name,
             value=canonical_json(result),
         )
 
@@ -198,6 +208,29 @@ def test_runtime_entrypoint_builds_and_uses_resolved_account_center_client(
         assert call["context"]["binding_id"] == "account-center.binding.one"
         assert call["context"]["method"] == "redeem_credential_lease"
         assert "private-github-user-token" not in response.outcome.content[0].json.json
+
+        profile_payload = {
+            "lease_ref": "00000000-0000-4000-8000-000000000002",
+            "profile_ref": "00000000-0000-4000-8000-000000000001",
+            "operation_id": "github.repository.get",
+            "target": {"repository_id": "12345", "repository": "owner/project"},
+            "arguments_sha256": "a" * 64,
+        }
+        credential = provider._account_center.redeem_provider_credential_lease(
+            profile_payload,
+            {
+                "issuer": "https://identity.example.test",
+                "subject": "member-27",
+                "organization_id": "org-4",
+                "workspace_id": "workspace-8",
+                "binding_id": "account-center.binding.one",
+            },
+        )
+        assert credential.external_subject == "github-user-42"
+        profile_call = endpoint.calls[1]
+        assert profile_call["method"] == "redeem_provider_credential_lease"
+        assert profile_call["payload"] == profile_payload
+        assert profile_call["context"]["binding_id"] == "account-center.binding.one"
 
         for source_workflow_ids in (
             {"99999": ["22"]},

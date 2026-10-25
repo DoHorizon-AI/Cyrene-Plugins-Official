@@ -2,14 +2,34 @@
 
 import hashlib
 import hmac
+from dataclasses import asdict
 
 import pytest
 from cyrene_account_center_contracts import (
+    RedeemProviderCredentialLeaseRequest,
     canonical_json,
     payload_sha256,
     sign_context,
     verify_context,
 )
+
+
+def test_provider_lease_request_contract_keeps_profile_scope() -> None:
+    request = RedeemProviderCredentialLeaseRequest(
+        lease_ref="00000000-0000-4000-8000-000000000002",
+        profile_ref="00000000-0000-4000-8000-000000000001",
+        operation_id="github.repository.get",
+        target={"repository_id": "123", "repository": "owner/repo"},
+        arguments_sha256="a" * 64,
+    )
+
+    assert asdict(request) == {
+        "lease_ref": "00000000-0000-4000-8000-000000000002",
+        "profile_ref": "00000000-0000-4000-8000-000000000001",
+        "operation_id": "github.repository.get",
+        "target": {"repository_id": "123", "repository": "owner/repo"},
+        "arguments_sha256": "a" * 64,
+    }
 
 
 def test_rfc8785_canonical_vector_matches_javascript_key_and_number_order() -> None:
