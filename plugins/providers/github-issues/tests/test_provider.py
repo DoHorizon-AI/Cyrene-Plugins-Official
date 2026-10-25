@@ -316,8 +316,60 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
     schemas = [json.loads(tool.input_schema_json) for tool in catalog.tools]
     assert all(schema["additionalProperties"] is False for schema in schemas)
     assert schemas[2]["properties"]["state"]["enum"] == ["OPEN", "CLOSED"]
+    rerun_tool = next(
+        tool for tool in catalog.tools if tool.provider_tool_id == "github.actions.rerun_failed"
+    )
+    rerun_schema = json.loads(rerun_tool.input_schema_json)
+    assert "expected_workflow_id" in rerun_schema["required"]
+    assert "expected_workflow_id" in rerun_schema["properties"]
+    assert "workflow_id" not in rerun_schema["properties"]
     assert schemas[-1]["required"] == ["argv"]
     assert schemas[-1]["additionalProperties"] is False
+
+
+def test_rerun_tool_rejects_noncanonical_workflow_id_argument_name() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    arguments = {
+        "repository_id": "12345",
+        "repository": "owner/project",
+        "run_id": "99",
+        "workflow_id": "22",
+        "expected_head_branch": "cyrene/assistant/task",
+        "expected_head_sha": "a" * 40,
+        "expected_attempt": 1,
+    }
+
+    lease_ref = "12345678-1234-1234-1234-123456789abc"
+    profile_ref = "00000000-0000-4000-8000-000000000001"
+    envelope = {
+        "payload": arguments,
+        "lease_ref": lease_ref,
+        "profile_ref": profile_ref,
+        "trusted_context": signed_context(
+            settings,
+            arguments,
+            lease_ref,
+            "github.actions.rerun_failed",
+            profile_ref=profile_ref,
+        ),
+    }
+    request = wire.CallToolRequest(
+        binding_id=settings.binding_id,
+        provider_tool_id="github.actions.rerun_failed",
+        arguments_json=json.dumps(envelope, separators=(",", ":")),
+    )
+
+    ok, result = provider.on_invoke(
+        "tool.provider.v1", "call_tool", request.SerializeToString()
+    )
+
+    assert ok is False
+    assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
+    assert account.calls == []
+    assert api.calls == []
 
 
 def test_vendor_cli_uses_profile_lease_and_returns_suppressed_receipt() -> None:
@@ -642,7 +694,7 @@ def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_diges
             {
                 **repo,
                 "run_id": "12345",
-                "workflow_id": "22",
+                "expected_workflow_id": "22",
                 "expected_head_branch": branch,
                 "expected_head_sha": sha,
                 "expected_attempt": 2,

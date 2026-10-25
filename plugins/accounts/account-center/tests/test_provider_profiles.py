@@ -151,7 +151,7 @@ GITHUB_TYPED_TARGET_CASES = [
         {
             **GITHUB_TARGET,
             "run_id": "987654321",
-            "workflow_id": "987654323",
+            "expected_workflow_id": "987654323",
             "expected_head_branch": "cyrene/assistant/task-1",
             "expected_head_sha": "c" * 40,
             "expected_attempt": 2,

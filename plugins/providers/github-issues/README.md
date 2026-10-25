@@ -31,7 +31,8 @@ Actions run and job lists also return `total_count`, `complete`, and
 set.
 Failed-job reruns require a repository-scoped `source_workflow_ids` allowlist;
 an absent or empty entry denies every rerun. The request binds the expected
-workflow ID and task branch, and the provider rereads the run before retrying.
+`expected_workflow_id` and task branch, and the provider rereads the run before
+retrying.
 Workflow logs follow only GitHub's short-lived redirect to the documented
 `productionresultssa*.blob.core.windows.net` hosts, omit the App token on that
 request, and return a best-effort excerpt with common credential patterns
@@ -96,7 +97,7 @@ CI 状态附带 status context/check-run 计数与 `complete`/`truncated`；超�
 Actions run 和 job 列表也会返回 `total_count`、`complete` 与 `truncated`，调用方可以区分有界
 首批结果与完整集合。
 失败 job 重跑还需要按仓库配置的 `source_workflow_ids` 正向 allowlist；缺失或空列表时一律拒绝。
-请求会绑定期望 workflow ID 和任务分支，provider 在重跑前重新读取并核对上游 run。
+请求会绑定 `expected_workflow_id` 和任务分支，provider 在重跑前重新读取并核对上游 run。
 
 写入要求使用专属 assistant 任务分支，并在 API 支持时绑定精确 SHA。删除分支前会重新读取并
 核对 expected SHA 和当前默认分支，但 GitHub 没有原子化的条件删除 API；宿主必须对同一仓库和

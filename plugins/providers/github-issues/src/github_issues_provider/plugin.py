@@ -426,7 +426,7 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
             "properties": {
                 **_REPOSITORY_PROPERTIES,
                 "run_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
-                "workflow_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "expected_workflow_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
                 "expected_head_branch": {"type": "string", "maxLength": 255},
                 "expected_head_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
                 "expected_attempt": {"type": "integer", "minimum": 1, "maximum": 2147483647},
@@ -435,7 +435,7 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
                 "repository_id",
                 "repository",
                 "run_id",
-                "workflow_id",
+                "expected_workflow_id",
                 "expected_head_branch",
                 "expected_head_sha",
                 "expected_attempt",
@@ -785,7 +785,7 @@ class GitHubIssuesProvider:
                 result = api.rerun_failed_jobs(
                     repository,
                     str(arguments["run_id"]),
-                    str(arguments["workflow_id"]),
+                    str(arguments["expected_workflow_id"]),
                     str(arguments["expected_head_branch"]),
                     str(arguments["expected_head_sha"]),
                     int(arguments["expected_attempt"]),
@@ -1135,7 +1135,7 @@ def _valid_arguments(
         if tool_id == "github.actions.rerun_failed":
             attempt = arguments.get("expected_attempt")
             return (
-                _provider_id(arguments.get("workflow_id"))
+                _provider_id(arguments.get("expected_workflow_id"))
                 and _valid_task_branch(arguments.get("expected_head_branch"))
                 and _full_sha(arguments.get("expected_head_sha"))
                 and _bounded_int(attempt, 1, 2_147_483_647)

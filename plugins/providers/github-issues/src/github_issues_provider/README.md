@@ -4,7 +4,7 @@ This directory implements the GitHub Issues and repository status `tool.provider
 
 The fixed catalog includes repo-scoped issue search with state, labels, update-window bounds, and bounded pagination; Actions run/job lists with explicit completeness counts; best-effort log excerpts with common credential patterns redacted; exact branch/file/PR readbacks; task-branch creation/deletion; compare-and-update file commits; draft-PR creation; and exact-attempt failed-CI reruns. Every new operation uses a one-use GitHub App profile lease. Locator targets match the corresponding write and readback operations, while the canonical argument digest binds query text, content, and preconditions.
 
-Failed-job reruns require an operator-supplied per-repository `source_workflow_ids` allowlist. A missing or empty entry denies reruns; each request also binds the expected workflow ID and task branch and rechecks the actual run before POST.
+Failed-job reruns require an operator-supplied per-repository `source_workflow_ids` allowlist. A missing or empty entry denies reruns; each request also binds `expected_workflow_id` and the task branch and rechecks the actual run before POST.
 
 | File | Responsibility |
 | --- | --- |
