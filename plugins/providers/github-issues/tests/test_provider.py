@@ -107,6 +107,18 @@ class FakeGitHubApi:
     def __init__(self) -> None:
         self.calls: list[tuple[str, tuple[Any, ...]]] = []
 
+    def list_repositories(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("repositories", args))
+        return {
+            "repositories": [
+                {
+                    "repository_id": "12345",
+                    "repository": "owner/project",
+                    "private": True,
+                }
+            ]
+        }
+
     def get_issue(self, *args: Any) -> dict[str, Any]:
         self.calls.append(("get", args))
         return {
@@ -325,6 +337,29 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
     assert "workflow_id" not in rerun_schema["properties"]
     assert schemas[-1]["required"] == ["argv"]
     assert schemas[-1]["additionalProperties"] is False
+
+
+def test_repository_list_dispatch_accepts_schema_without_required_fields() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "github.repository.list",
+        {},
+        profile_ref="00000000-0000-4000-8000-000000000001",
+    )
+
+    assert is_error is False
+    assert result["repositories"] == [
+        {"repository_id": "12345", "repository": "owner/project", "private": True}
+    ]
+    assert len(account.calls) == 1
+    assert api.calls[0][0] == "repositories"
+    assert "installation-token-must-not-escape" not in json.dumps(result)
 
 
 def test_rerun_tool_rejects_noncanonical_workflow_id_argument_name() -> None:
