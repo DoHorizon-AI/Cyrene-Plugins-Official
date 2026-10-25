@@ -38,6 +38,8 @@ const DIRECTORY_LIST: &str = "computer.directory.list";
 const MAX_COMMAND_BYTES: usize = 32 * 1024;
 const MAX_WORKSPACE_PATH_BYTES: usize = 4 * 1024;
 const MAX_TOOL_READ_BYTES: usize = 64 * 1024;
+// Keep JSON integer offsets exactly representable across host implementations.
+const MAX_TOOL_READ_OFFSET: i64 = (1_i64 << 53) - 1;
 const MAX_TOOL_RESULT_JSON_BYTES: usize = 1_450_000;
 const SCRATCH_LIFETIME_NOTICE: &str = " Workspace files are scratch, not durable task state. In the Teams Cloud v1 profile they are cleared when the runner container restarts; use GitHub tools for repository changes that must persist.";
 
@@ -88,7 +90,7 @@ impl ComputerToolProvider {
             "additionalProperties": false,
             "properties": {
                 "path": {"type": "string", "minLength": 1, "maxLength": 1024, "x-maxUtf8Bytes": MAX_WORKSPACE_PATH_BYTES, "description": "Workspace-relative file path."},
-                "offset": {"type": "integer", "minimum": 0},
+                "offset": {"type": "integer", "minimum": 0, "maximum": MAX_TOOL_READ_OFFSET},
                 "length": {"type": "integer", "minimum": 0, "maximum": MAX_TOOL_READ_BYTES}
             },
             "required": ["path", "length"]
@@ -302,11 +304,15 @@ impl ComputerToolProvider {
             }
         };
         let offset = match optional_i64(&arguments, "offset") {
-            Ok(value) if value.is_none_or(|offset| offset >= 0) => value,
+            Ok(value)
+                if value.is_none_or(|offset| (0..=MAX_TOOL_READ_OFFSET).contains(&offset)) =>
+            {
+                value
+            }
             Ok(_) => {
                 return call_error(
                     ToolProviderErrorCode::InvalidArguments,
-                    "offset must be non-negative".into(),
+                    format!("offset must be between zero and {MAX_TOOL_READ_OFFSET}"),
                     false,
                 )
             }
@@ -660,6 +666,7 @@ fn domain_error(code: i32, message: String, retryable: bool) -> CallToolResponse
 mod tests {
     use super::*;
     use cyrene_plugin_contracts::tool_provider_v1::{call_tool_response, list_tools_response};
+    use prost::Message;
     use std::fs;
     use tempfile::tempdir;
 
@@ -679,6 +686,7 @@ mod tests {
         let workspace = tempdir().unwrap();
         let provider = provider(workspace.path());
         let response = provider.list_tools(None);
+        let response = ListToolsResponse::decode(response.encode_to_vec().as_slice()).unwrap();
         let Some(list_tools_response::Result::Catalog(catalog)) = response.result else {
             panic!("expected fixed catalog");
         };
@@ -703,6 +711,12 @@ mod tests {
             read_schema["properties"]["length"]["maximum"],
             MAX_TOOL_READ_BYTES
         );
+        let maximum_offset = read_schema["properties"]["offset"]["maximum"]
+            .as_i64()
+            .expect(
+                "offset maximum must fit the host's signed 64-bit bound after protobuf transport",
+            );
+        assert_eq!(maximum_offset, MAX_TOOL_READ_OFFSET);
         assert!(read_schema["required"]
             .as_array()
             .unwrap()
@@ -900,5 +914,32 @@ mod tests {
             provider.list_tools(Some("another-binding")).result,
             Some(list_tools_response::Result::Error(_))
         ));
+    }
+
+    #[tokio::test]
+    async fn file_read_rejects_offsets_above_the_json_safe_integer_bound() {
+        let workspace = tempdir().unwrap();
+        let provider = provider(workspace.path());
+        fs::write(workspace.path().join("note.txt"), "content").unwrap();
+
+        let response = provider
+            .call_tool(&CallToolRequest {
+                binding_id: COMPUTER_BINDING_ID.into(),
+                provider_tool_id: FILE_READ.into(),
+                arguments_json: json!({
+                    "path": "note.txt",
+                    "offset": MAX_TOOL_READ_OFFSET + 1,
+                    "length": 0
+                })
+                .to_string(),
+                catalog_version: Some(CATALOG_VERSION.into()),
+            })
+            .await;
+
+        let Some(call_tool_response::Result::Error(error)) = response.result else {
+            panic!("expected out-of-range offset to fail as invalid arguments");
+        };
+        assert_eq!(error.code, ToolProviderErrorCode::InvalidArguments as i32);
+        assert!(error.message.contains(&MAX_TOOL_READ_OFFSET.to_string()));
     }
 }
