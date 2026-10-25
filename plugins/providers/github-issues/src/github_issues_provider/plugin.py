@@ -1045,7 +1045,7 @@ def _valid_arguments(
     """Enforce the static input contract before hashing or provider access."""
 
     schema = _TOOL_BY_ID[tool_id]["input_schema"]
-    required = set(schema["required"])
+    required = set(schema.get("required", []))
     allowed = set(schema["properties"])
     supplied = set(arguments)
     if not required.issubset(supplied) or supplied - allowed:
