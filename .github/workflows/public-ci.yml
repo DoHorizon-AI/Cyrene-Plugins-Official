@@ -480,6 +480,27 @@ jobs:
       - name: Verify shared Workspace contract fingerprints
         run: bash contracts/check-workspace-contract-digests.sh
 
+  mxc-feature:
+    name: public-ci / mxc-feature-compile-and-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Compile and unit-test the optional Linux MXC backend
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --check
+          cargo clippy --locked --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --features mxc --all-targets -- -D warnings
+          cargo test --locked --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --features mxc --lib --bins
+          cargo test --locked --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --features mxc --test mxc_backend_tests --no-run
+          cargo clippy --locked --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml --features mxc --all-targets -- -D warnings
+          cargo test --locked --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml --features mxc
+      # Real containment acceptance runs separately on a verified Linux host.
+      # This job does not change hosted-runner namespace or security policies.
+
   rust-native:
     name: public-ci / rust-native
     runs-on: ubuntu-latest

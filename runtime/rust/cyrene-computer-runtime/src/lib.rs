@@ -32,8 +32,11 @@ use tokio::sync::mpsc;
 pub use artifact::ArtifactStore;
 pub use browser::BrowserService;
 pub use filesystem::FilesystemService;
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+pub use sandbox::MicrosoftMxcSandboxProviderAdapter;
 pub use sandbox::{
-    BoundedManagedExecutionProvider, ExternalSandboxProviderAdapter, IsolationLevel,
+    BoundedManagedExecutionProvider, ComputerExecutionBackend, ExternalSandboxProviderAdapter,
+    IsolationLevel,
 };
 pub use security::{EnvironmentFilter, OutputCollector, PathValidator};
 pub use shell::ShellProcessRunner;
@@ -80,11 +83,13 @@ impl Default for ComputerRuntimeLimits {
 /// Unified high-level service facade for Computer Runtime v1.
 /// Computer Runtime v1 的统一高层 service facade。
 pub struct ComputerRuntimeService {
-    shell: ShellProcessRunner,
+    shell: Arc<ShellProcessRunner>,
+    external_sandbox: Option<Arc<dyn ExternalSandboxProviderAdapter>>,
     fs: FilesystemService,
     artifacts: ArtifactStore,
     browser: BrowserService,
-    isolation_level: IsolationLevel,
+    execution_backend: ComputerExecutionBackend,
+    bubblewrap_version: Option<String>,
 }
 
 impl ComputerRuntimeService {
@@ -113,15 +118,17 @@ impl ComputerRuntimeService {
     ) -> Self {
         let validator = PathValidator::new(allowed_roots);
         let env_filter = EnvironmentFilter::new();
+        let shell = Arc::new(ShellProcessRunner::with_limits(
+            validator.clone(),
+            env_filter,
+            limits.command_default_timeout_ms,
+            limits.command_max_timeout_ms,
+            limits.max_output_bytes,
+        ));
 
         Self {
-            shell: ShellProcessRunner::with_limits(
-                validator.clone(),
-                env_filter,
-                limits.command_default_timeout_ms,
-                limits.command_max_timeout_ms,
-                limits.max_output_bytes,
-            ),
+            shell,
+            external_sandbox: None,
             fs: FilesystemService::with_limits(
                 validator,
                 limits.max_file_bytes,
@@ -133,12 +140,94 @@ impl ComputerRuntimeService {
                 limits.max_artifact_bytes,
             ),
             browser: BrowserService::new(),
-            isolation_level: IsolationLevel::BoundedManagedExecution,
+            execution_backend: ComputerExecutionBackend::Managed,
+            bubblewrap_version: None,
+        }
+    }
+
+    /// Creates a runtime with the deployment-selected backend.
+    ///
+    /// MXC is available only when the Linux `mxc` feature is compiled and a
+    /// trusted sibling helper is present. Selecting MXC never falls back to
+    /// managed execution.
+    pub fn with_execution_backend(
+        allowed_roots: Vec<PathBuf>,
+        artifact_dir: PathBuf,
+        limits: ComputerRuntimeLimits,
+        backend: ComputerExecutionBackend,
+        helper_path: Option<PathBuf>,
+    ) -> Result<Self, String> {
+        match backend {
+            ComputerExecutionBackend::Managed => Ok(Self::with_limits_and_artifact_dir(
+                allowed_roots,
+                artifact_dir,
+                limits,
+            )),
+            ComputerExecutionBackend::MicrosoftMxc => {
+                #[cfg(all(feature = "mxc", target_os = "linux"))]
+                {
+                    let validator = PathValidator::new(allowed_roots);
+                    let shell = Arc::new(ShellProcessRunner::with_limits(
+                        validator.clone(),
+                        EnvironmentFilter::new(),
+                        limits.command_default_timeout_ms,
+                        limits.command_max_timeout_ms,
+                        limits.max_output_bytes,
+                    ));
+                    let helper_path = helper_path.ok_or_else(|| {
+                        "MXC backend selected but no trusted helper path was configured".to_string()
+                    })?;
+                    let adapter = Arc::new(
+                        MicrosoftMxcSandboxProviderAdapter::new(
+                            helper_path,
+                            validator.clone(),
+                            Arc::clone(&shell),
+                        )
+                        .map_err(|error| error.message)?,
+                    );
+                    let bubblewrap_version = adapter.bubblewrap_version().to_string();
+                    Ok(Self {
+                        shell,
+                        external_sandbox: Some(adapter),
+                        fs: FilesystemService::with_limits(
+                            validator,
+                            limits.max_file_bytes,
+                            limits.max_directory_entries,
+                            limits.max_directory_depth,
+                        ),
+                        artifacts: ArtifactStore::with_storage_dir_and_limit(
+                            artifact_dir,
+                            limits.max_artifact_bytes,
+                        ),
+                        browser: BrowserService::new(),
+                        execution_backend: ComputerExecutionBackend::MicrosoftMxc,
+                        bubblewrap_version: Some(bubblewrap_version),
+                    })
+                }
+                #[cfg(not(all(feature = "mxc", target_os = "linux")))]
+                {
+                    let _ = (allowed_roots, artifact_dir, limits, helper_path);
+                    Err("MXC backend selected but this build has no Linux MXC feature".into())
+                }
+            }
         }
     }
 
     pub fn isolation_level(&self) -> IsolationLevel {
-        self.isolation_level
+        match self.execution_backend {
+            ComputerExecutionBackend::Managed => IsolationLevel::BoundedManagedExecution,
+            ComputerExecutionBackend::MicrosoftMxc => IsolationLevel::MicrosoftMxcProcessNamespace,
+        }
+    }
+
+    /// Returns the host-selected process execution backend.
+    pub fn execution_backend(&self) -> ComputerExecutionBackend {
+        self.execution_backend
+    }
+
+    /// Returns the version verified by the optional external backend's startup probe.
+    pub fn bubblewrap_version(&self) -> Option<&str> {
+        self.bubblewrap_version.as_deref()
     }
 
     // ── Shell Commands ─────────────────────────────────────────────────
@@ -148,6 +237,19 @@ impl ComputerRuntimeService {
         request: CommandExecutionRequest,
         cancel_flag: Option<Arc<AtomicBool>>,
     ) -> CommandExecutionResponse {
+        if let Some(provider) = &self.external_sandbox {
+            return match provider
+                .execute_isolated_cancellable(request, cancel_flag)
+                .await
+            {
+                Ok(response) => response,
+                Err(error) => CommandExecutionResponse {
+                    result: Some(
+                        computer_runtime_v1::command_execution_response::Result::Error(error),
+                    ),
+                },
+            };
+        }
         self.shell.execute_command(request, cancel_flag).await
     }
 
@@ -157,6 +259,11 @@ impl ComputerRuntimeService {
         cancel_flag: Option<Arc<AtomicBool>>,
         sender: mpsc::Sender<CommandStreamEvent>,
     ) -> Result<(), ComputerError> {
+        if let Some(provider) = &self.external_sandbox {
+            return provider
+                .execute_isolated_stream(request, cancel_flag, sender)
+                .await;
+        }
         self.shell
             .execute_command_stream(request, cancel_flag, sender)
             .await

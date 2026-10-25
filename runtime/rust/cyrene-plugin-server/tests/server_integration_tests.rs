@@ -31,10 +31,16 @@ use cyrene_agent_runtime::adapter::{snapshot_tool_catalog, SnapshotToolProvider}
 use cyrene_agent_runtime::engine::cancel::CancellationToken;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::MockModelProvider;
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+use cyrene_computer_runtime::{
+    ComputerExecutionBackend, ComputerRuntimeLimits, ComputerRuntimeService,
+};
 use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse,
 };
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+use cyrene_plugin_contracts::computer_runtime_v1::CommandExecutionRequest;
 use cyrene_plugin_contracts::computer_runtime_v1::{
     create_artifact_response, get_artifact_response, list_dir_response, ComputerErrorCode,
     CreateArtifactRequest, CreateArtifactResponse, GetArtifactRequest, GetArtifactResponse,
@@ -93,6 +99,29 @@ async fn start_server(
     let endpoint = format!("http://{}", addr);
     let client = DirectPluginRuntimeClient::connect(endpoint).await.unwrap();
 
+    (client, addr)
+}
+
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+async fn start_server_with_small_client_window(
+    service: DirectPluginRuntimeServiceImpl,
+) -> (DirectPluginRuntimeClient<Channel>, SocketAddr) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let incoming = TcpListenerStream::new(listener);
+    tokio::spawn(async move {
+        Server::builder()
+            .add_service(DirectPluginRuntimeServer::new(service))
+            .serve_with_incoming(incoming)
+            .await
+            .unwrap();
+    });
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let endpoint = tonic::transport::Endpoint::from_shared(format!("http://{addr}"))
+        .unwrap()
+        .initial_stream_window_size(Some(1024))
+        .initial_connection_window_size(Some(1024));
+    let client = DirectPluginRuntimeClient::connect(endpoint).await.unwrap();
     (client, addr)
 }
 
@@ -1107,4 +1136,178 @@ async fn test_r09_fail_closed_guarantees() {
         }
         InvocationResult::Payload(_) => panic!("Expected fail-closed error for corrupted payload"),
     }
+}
+
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+#[tokio::test]
+async fn test_computer_stream_reports_missing_mxc_receipt_before_end() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let artifacts = tempfile::tempdir().unwrap();
+    let helper_dir = tempfile::tempdir().unwrap();
+    let helper_path = helper_dir.path().join("cyrene-mxc-exec");
+    std::fs::write(
+        &helper_path,
+        b"#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then echo 'CYRENE_MXC_PROBE_OK backend=mxc sdk=1.0.1 containment=bubblewrap bwrap=0.13.1'; exit 0; fi\nexit 0\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&helper_path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let computer = Arc::new(
+        ComputerRuntimeService::with_execution_backend(
+            vec![workspace.path().to_path_buf()],
+            artifacts.path().to_path_buf(),
+            ComputerRuntimeLimits::default(),
+            ComputerExecutionBackend::MicrosoftMxc,
+            Some(helper_path),
+        )
+        .expect("the injected helper passes the controlled startup probe"),
+    );
+    let service = DirectPluginRuntimeServiceImpl::with_computer_runtime_for_tests(computer);
+    let (mut client, _) = start_server(service).await;
+    let payload = CommandExecutionRequest {
+        command: "echo command-output-must-not-imply-success".into(),
+        cwd: Some(workspace.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(5_000),
+        max_output_bytes: None,
+    }
+    .encode_to_vec();
+    let mut stream = client
+        .invoke_stream(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "execute_command_stream".into(),
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest"
+                .into(),
+            payload,
+            request_id: "mxc-missing-receipt-stream".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    let mut errors = 0;
+    let mut ended = false;
+    while let Some(item) = stream.message().await.unwrap() {
+        match item.event {
+            Some(proto::direct_stream_item::Event::Error(error)) => {
+                errors += 1;
+                assert_eq!(error.code, Code::ExecutionFailed as i32);
+                assert_eq!(error.domain_code, "COMPUTER_STREAM_EXECUTION_ERROR");
+                assert!(error.message.contains("terminal receipt"));
+            }
+            Some(proto::direct_stream_item::Event::Payload(payload)) => {
+                let event =
+                    cyrene_plugin_contracts::computer_runtime_v1::CommandStreamEvent::decode(
+                        payload.value.as_slice(),
+                    )
+                    .unwrap();
+                assert!(!matches!(
+                    event.event,
+                    Some(
+                        cyrene_plugin_contracts::computer_runtime_v1::command_stream_event::Event::ExitEvidence(_)
+                    )
+                ));
+            }
+            Some(proto::direct_stream_item::Event::End(_)) => ended = true,
+            None => panic!("stream item must have a terminal event"),
+        }
+    }
+    assert_eq!(errors, 1, "emit one explicit error, without a duplicate");
+    assert!(
+        ended,
+        "the stream still closes with its structural End item"
+    );
+}
+
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+#[tokio::test]
+async fn test_computer_grpc_stream_reserves_error_and_end_while_client_pauses_reads() {
+    let workspace = tempfile::tempdir().unwrap();
+    let artifacts = tempfile::tempdir().unwrap();
+    let limits = ComputerRuntimeLimits {
+        command_default_timeout_ms: 1_000,
+        command_max_timeout_ms: 1_000,
+        ..ComputerRuntimeLimits::default()
+    };
+    let computer = Arc::new(
+        ComputerRuntimeService::with_execution_backend(
+            vec![workspace.path().to_path_buf()],
+            artifacts.path().to_path_buf(),
+            limits.clone(),
+            ComputerExecutionBackend::Managed,
+            None,
+        )
+        .unwrap(),
+    );
+    let service = DirectPluginRuntimeServiceImpl::with_computer_runtime_and_limits_for_tests(
+        computer, limits,
+    );
+    let (mut client, _) = start_server_with_small_client_window(service).await;
+    let payload = CommandExecutionRequest {
+        command: "head -c 65536 /dev/zero | tr '\\0' x; head -c 65536 /dev/zero | tr '\\0' y >&2"
+            .into(),
+        cwd: Some(workspace.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(1_000),
+        max_output_bytes: None,
+    }
+    .encode_to_vec();
+    let mut stream = client
+        .invoke_stream(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "execute_command_stream".into(),
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest"
+                .into(),
+            payload,
+            request_id: "computer-stream-paused-reader".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    // Leave the real gRPC consumer idle until the bounded relay reaches its
+    // downstream deadline, then resume and verify its reserved terminal slots.
+    tokio::time::sleep(Duration::from_millis(1_300)).await;
+
+    let mut payload_count = 0;
+    let mut timeout_errors = 0;
+    let mut terminal_error_seen = false;
+    let mut ended = false;
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while let Some(item) = stream.message().await.unwrap() {
+            match item.event {
+                Some(proto::direct_stream_item::Event::Error(error)) => {
+                    timeout_errors += 1;
+                    terminal_error_seen = true;
+                    assert_eq!(error.code, Code::DeadlineExceeded as i32);
+                    assert_eq!(error.domain_code, "COMPUTER_STREAM_TIMEOUT");
+                    assert!(error.message.contains("downstream backpressure"));
+                }
+                Some(proto::direct_stream_item::Event::Payload(_)) => {
+                    assert!(!terminal_error_seen, "progress must precede terminal error");
+                    payload_count += 1;
+                }
+                Some(proto::direct_stream_item::Event::End(_)) => {
+                    assert!(terminal_error_seen, "End must follow the terminal error");
+                    ended = true;
+                    break;
+                }
+                None => panic!("stream item must contain an event"),
+            }
+        }
+    })
+    .await
+    .expect("resumed gRPC stream should drain its queued terminal result");
+
+    assert!(
+        payload_count > 0,
+        "the paused stream should retain progress"
+    );
+    assert_eq!(timeout_errors, 1, "emit exactly one reserved timeout error");
+    assert!(ended, "reserved End must follow the error");
 }

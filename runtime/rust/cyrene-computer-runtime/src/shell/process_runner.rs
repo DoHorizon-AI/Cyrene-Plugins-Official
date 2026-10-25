@@ -10,7 +10,6 @@
 // │  4. 协作式取消与流式事件单调递增保证                                │
 // └─────────────────────────────────────────────────────────────────────┘
 
-use sha2::{Digest, Sha256};
 use std::process::Stdio;
 use std::sync::atomic::{AtomicBool, AtomicI64, Ordering};
 use std::sync::Arc;
@@ -27,8 +26,8 @@ use cyrene_plugin_contracts::computer_runtime_v1::{
 };
 
 use crate::security::{
-    EnvironmentFilter, OutputCollector, PathValidator, ABSOLUTE_MAX_OUTPUT_BYTES,
-    DEFAULT_MAX_OUTPUT_BYTES,
+    combined_output_hash, EnvironmentFilter, OutputCollector, PathValidator,
+    ABSOLUTE_MAX_OUTPUT_BYTES, DEFAULT_MAX_OUTPUT_BYTES,
 };
 
 pub struct ShellProcessRunner {
@@ -43,6 +42,68 @@ pub struct ShellProcessRunner {
 /// 请求 future 被丢弃时终止该命令的整个进程组。
 struct ProcessGroupGuard {
     pid: Option<u32>,
+}
+
+/// Incrementally decodes one output stream while preserving UTF-8 sequences
+/// split across asynchronous reads and enforcing the final display byte cap.
+struct Utf8ChunkDecoder {
+    pending: Vec<u8>,
+    max_display_bytes: usize,
+    displayed_bytes: usize,
+}
+
+impl Utf8ChunkDecoder {
+    fn new(max_display_bytes: usize) -> Self {
+        Self {
+            pending: Vec::with_capacity(4),
+            max_display_bytes,
+            displayed_bytes: 0,
+        }
+    }
+
+    fn push(&mut self, bytes: &[u8]) -> String {
+        self.decode(bytes, false)
+    }
+
+    fn finish(&mut self) -> String {
+        self.decode(&[], true)
+    }
+
+    fn decode(&mut self, bytes: &[u8], end_of_stream: bool) -> String {
+        self.pending.extend_from_slice(bytes);
+        let process_len = complete_utf8_prefix(&self.pending, end_of_stream);
+        let decoded = String::from_utf8_lossy(&self.pending[..process_len]);
+        let remaining = self.max_display_bytes.saturating_sub(self.displayed_bytes);
+        let text = truncate_stream_text(&decoded, remaining);
+        self.displayed_bytes = self.displayed_bytes.saturating_add(text.len());
+        self.pending.drain(..process_len);
+        if end_of_stream {
+            self.pending.clear();
+        }
+        text
+    }
+}
+
+/// Finds the largest prefix whose UTF-8 interpretation is settled.
+/// Incomplete final code points remain pending until a later read or EOF.
+fn complete_utf8_prefix(bytes: &[u8], end_of_stream: bool) -> usize {
+    if end_of_stream {
+        return bytes.len();
+    }
+    let mut offset = 0;
+    while offset < bytes.len() {
+        match std::str::from_utf8(&bytes[offset..]) {
+            Ok(_) => return bytes.len(),
+            Err(error) => {
+                let invalid_start = offset + error.valid_up_to();
+                match error.error_len() {
+                    Some(invalid_len) => offset = invalid_start + invalid_len,
+                    None => return invalid_start,
+                }
+            }
+        }
+    }
+    bytes.len()
 }
 
 impl ProcessGroupGuard {
@@ -274,24 +335,17 @@ impl ShellProcessRunner {
         }
 
         let duration_ms = start_time.elapsed().as_millis() as i64;
-        let (stdout_str, stdout_truncated) = stdout_collector.into_string_lossy();
-        let (stderr_str, stderr_truncated) = stderr_collector.into_string_lossy();
-
-        // Calculate SHA-256 evidence hash of output (T76)
-        // 计算输出的 SHA-256 证据哈希（T76）。
-        let mut hasher = Sha256::new();
-        hasher.update(stdout_str.as_bytes());
-        hasher.update(b"|");
-        hasher.update(stderr_str.as_bytes());
-        let sha256_hash = format!("{:x}", hasher.finalize());
+        let stdout = stdout_collector.into_output();
+        let stderr = stderr_collector.into_output();
+        let sha256_hash = combined_output_hash(&stdout, &stderr);
 
         let evidence = ExecutionEvidence {
             exit_code,
             duration_ms,
-            stdout: stdout_str,
-            stderr: stderr_str,
-            stdout_truncated,
-            stderr_truncated,
+            stdout: stdout.text,
+            stderr: stderr.text,
+            stdout_truncated: stdout.truncated,
+            stderr_truncated: stderr.truncated,
             sha256_hash,
             // The runtime measures wall time and captured output, not CPU or
             // process memory. Keep those unavailable counters absent.
@@ -314,6 +368,7 @@ impl ShellProcessRunner {
         let seq = AtomicI64::new(1);
         let start_time = Instant::now();
         let timeout_duration = self.requested_timeout(request.timeout_ms)?;
+        let deadline = tokio::time::Instant::now() + timeout_duration;
 
         let cwd = self.path_validator.validate_cwd(request.cwd.as_deref())?;
         let sanitized_env = self.env_filter.sanitize_environment(&request.env);
@@ -343,6 +398,8 @@ impl ShellProcessRunner {
         let output_limit = self.requested_output_limit(request.max_output_bytes);
         let mut stdout_accum = OutputCollector::new(Some(output_limit as i64));
         let mut stderr_accum = OutputCollector::new(Some(output_limit as i64));
+        let mut stdout_decoder = Utf8ChunkDecoder::new(output_limit);
+        let mut stderr_decoder = Utf8ChunkDecoder::new(output_limit);
 
         let stream_fut = async {
             let mut stdout_buf = [0u8; 4096];
@@ -368,38 +425,108 @@ impl ShellProcessRunner {
                     }
                     res = child_stdout.read(&mut stdout_buf), if !stdout_done => {
                         match res {
-                            Ok(0) => stdout_done = true,
+                            Ok(0) => {
+                                stdout_done = true;
+                                let text = stdout_decoder.finish();
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StdoutChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
                             Ok(n) => {
                                 let chunk = &stdout_buf[..n];
                                 let retained = stdout_accum.append(chunk);
-                                if retained > 0 {
-                                    let text = String::from_utf8_lossy(&chunk[..retained]).to_string();
-                                    let _ = sender.send(CommandStreamEvent {
-                                        sequence_number: seq.fetch_add(1, Ordering::SeqCst),
-                                        timestamp_ms: Self::current_epoch_ms(),
-                                        event: Some(command_stream_event::Event::StdoutChunk(text)),
-                                    }).await;
+                                let text = stdout_decoder.push(&chunk[..retained]);
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StdoutChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
                                 }
                             }
-                            Err(_) => stdout_done = true,
+                            Err(_) => {
+                                stdout_done = true;
+                                let text = stdout_decoder.finish();
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StdoutChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
                         }
                     }
                     res = child_stderr.read(&mut stderr_buf), if !stderr_done => {
                         match res {
-                            Ok(0) => stderr_done = true,
+                            Ok(0) => {
+                                stderr_done = true;
+                                let text = stderr_decoder.finish();
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StderrChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
                             Ok(n) => {
                                 let chunk = &stderr_buf[..n];
                                 let retained = stderr_accum.append(chunk);
-                                if retained > 0 {
-                                    let text = String::from_utf8_lossy(&chunk[..retained]).to_string();
-                                    let _ = sender.send(CommandStreamEvent {
-                                        sequence_number: seq.fetch_add(1, Ordering::SeqCst),
-                                        timestamp_ms: Self::current_epoch_ms(),
-                                        event: Some(command_stream_event::Event::StderrChunk(text)),
-                                    }).await;
+                                let text = stderr_decoder.push(&chunk[..retained]);
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StderrChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
                                 }
                             }
-                            Err(_) => stderr_done = true,
+                            Err(_) => {
+                                stderr_done = true;
+                                let text = stderr_decoder.finish();
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StderrChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
                         }
                     }
                 }
@@ -414,7 +541,7 @@ impl ShellProcessRunner {
             Ok(status.code().unwrap_or(-1))
         };
 
-        let exit_result = timeout(timeout_duration, stream_fut).await;
+        let exit_result = tokio::time::timeout_at(deadline, stream_fut).await;
 
         match exit_result {
             Ok(Ok(code)) => {
@@ -422,34 +549,32 @@ impl ShellProcessRunner {
                     group.disarm();
                 }
                 let duration_ms = start_time.elapsed().as_millis() as i64;
-                let (stdout_str, stdout_truncated) = stdout_accum.into_string_lossy();
-                let (stderr_str, stderr_truncated) = stderr_accum.into_string_lossy();
-
-                let mut hasher = Sha256::new();
-                hasher.update(stdout_str.as_bytes());
-                hasher.update(b"|");
-                hasher.update(stderr_str.as_bytes());
-                let sha256_hash = format!("{:x}", hasher.finalize());
+                let stdout = stdout_accum.into_output();
+                let stderr = stderr_accum.into_output();
+                let sha256_hash = combined_output_hash(&stdout, &stderr);
 
                 let evidence = ExecutionEvidence {
                     exit_code: code,
                     duration_ms,
-                    stdout: stdout_str,
-                    stderr: stderr_str,
-                    stdout_truncated,
-                    stderr_truncated,
+                    stdout: stdout.text,
+                    stderr: stderr.text,
+                    stdout_truncated: stdout.truncated,
+                    stderr_truncated: stderr.truncated,
                     sha256_hash,
                     resource_usage: None,
                 };
 
-                let _ = sender
-                    .send(CommandStreamEvent {
+                send_stream_event_until(
+                    &sender,
+                    CommandStreamEvent {
                         sequence_number: seq.fetch_add(1, Ordering::SeqCst),
                         timestamp_ms: Self::current_epoch_ms(),
                         event: Some(command_stream_event::Event::ExitEvidence(evidence)),
-                    })
-                    .await;
-                Ok(())
+                    },
+                    deadline,
+                    cancel_flag,
+                )
+                .await
             }
             Ok(Err(err)) => {
                 if let Some(group) = process_group.as_ref() {
@@ -459,14 +584,14 @@ impl ShellProcessRunner {
                 if let Some(group) = process_group.as_mut() {
                     group.disarm();
                 }
-                let _ = sender
-                    .send(CommandStreamEvent {
+                try_send_terminal_event(
+                    &sender,
+                    CommandStreamEvent {
                         sequence_number: seq.fetch_add(1, Ordering::SeqCst),
                         timestamp_ms: Self::current_epoch_ms(),
                         event: Some(command_stream_event::Event::StreamError(err)),
-                    })
-                    .await;
-                Ok(())
+                    },
+                )
             }
             Err(_) => {
                 if let Some(group) = process_group.as_ref() {
@@ -481,19 +606,22 @@ impl ShellProcessRunner {
                     message: "Stream command execution timed out".to_string(),
                     retryable: false,
                 };
-                let _ = sender
-                    .send(CommandStreamEvent {
+                try_send_terminal_event(
+                    &sender,
+                    CommandStreamEvent {
                         sequence_number: seq.fetch_add(1, Ordering::SeqCst),
                         timestamp_ms: Self::current_epoch_ms(),
                         event: Some(command_stream_event::Event::StreamError(err)),
-                    })
-                    .await;
-                Ok(())
+                    },
+                )
             }
         }
     }
 
-    fn requested_timeout(&self, requested_ms: Option<i64>) -> Result<Duration, ComputerError> {
+    pub(crate) fn requested_timeout(
+        &self,
+        requested_ms: Option<i64>,
+    ) -> Result<Duration, ComputerError> {
         let timeout_ms = match requested_ms {
             Some(value) if value <= 0 => {
                 return Err(ComputerError {
@@ -508,10 +636,99 @@ impl ShellProcessRunner {
         Ok(Duration::from_millis(timeout_ms))
     }
 
-    fn requested_output_limit(&self, requested_bytes: Option<i64>) -> usize {
+    pub(crate) fn requested_output_limit(&self, requested_bytes: Option<i64>) -> usize {
         match requested_bytes {
             Some(value) if value > 0 => (value as usize).min(self.max_output_bytes),
             _ => self.max_output_bytes,
         }
+    }
+}
+
+fn truncate_stream_text(value: &str, max_bytes: usize) -> String {
+    let mut end = value.len().min(max_bytes);
+    while !value.is_char_boundary(end) {
+        end -= 1;
+    }
+    value[..end].to_string()
+}
+
+async fn wait_for_cancellation(cancel_flag: Option<Arc<AtomicBool>>) {
+    loop {
+        if cancel_flag
+            .as_ref()
+            .is_some_and(|flag| flag.load(Ordering::SeqCst))
+        {
+            return;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+}
+
+async fn send_stream_event_until(
+    sender: &mpsc::Sender<CommandStreamEvent>,
+    event: CommandStreamEvent,
+    deadline: tokio::time::Instant,
+    cancel_flag: Option<Arc<AtomicBool>>,
+) -> Result<(), ComputerError> {
+    tokio::select! {
+        result = tokio::time::timeout_at(deadline, sender.send(event)) => {
+            match result {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(_)) => Err(ComputerError {
+                    code: ComputerErrorCode::ExecutionDenied as i32,
+                    message: "Streaming receiver closed before command completion".into(),
+                    retryable: false,
+                }),
+                Err(_) => Err(ComputerError {
+                    code: ComputerErrorCode::CommandTimeout as i32,
+                    message: "Stream command exceeded its deadline while sending output".into(),
+                    retryable: false,
+                }),
+            }
+        }
+        _ = wait_for_cancellation(cancel_flag) => Err(ComputerError {
+            code: ComputerErrorCode::CommandTimeout as i32,
+            message: "Stream command was cancelled while sending output".into(),
+            retryable: false,
+        }),
+    }
+}
+
+fn try_send_terminal_event(
+    sender: &mpsc::Sender<CommandStreamEvent>,
+    event: CommandStreamEvent,
+) -> Result<(), ComputerError> {
+    sender.try_send(event).map_err(|error| ComputerError {
+        code: ComputerErrorCode::ExecutionDenied as i32,
+        message: format!("Could not enqueue terminal stream event: {error}"),
+        retryable: false,
+    })
+}
+
+#[cfg(test)]
+mod utf8_chunk_decoder_tests {
+    use super::Utf8ChunkDecoder;
+
+    #[test]
+    fn preserves_split_multibyte_characters_and_replaces_invalid_eof_bytes() {
+        let mut decoder = Utf8ChunkDecoder::new(64);
+        let mut output = String::new();
+        for byte in [0xe4, 0xbd, 0xa0, 0xff, 0xe2, 0x82] {
+            output.push_str(&decoder.push(&[byte]));
+        }
+        output.push_str(&decoder.finish());
+        assert_eq!(output, "你��");
+    }
+
+    #[test]
+    fn applies_display_limit_after_incremental_lossy_conversion() {
+        let mut decoder = Utf8ChunkDecoder::new(4);
+        let mut output = String::new();
+        for byte in [0xe4, 0xbd, 0xa0, 0xff] {
+            output.push_str(&decoder.push(&[byte]));
+        }
+        output.push_str(&decoder.finish());
+        assert_eq!(output, "你");
+        assert!(output.len() <= 4);
     }
 }
