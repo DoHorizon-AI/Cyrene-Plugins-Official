@@ -2,6 +2,9 @@
 
 #![cfg(all(feature = "mxc", target_os = "linux"))]
 
+use cyrene_computer_runtime::sandbox::mxc_protocol::{
+    MxcControlRequest, MxcTerminalReceipt, MXC_CONTROL_SCHEMA_VERSION,
+};
 use cyrene_computer_runtime::{
     computer_runtime_v1::{
         command_execution_response, command_stream_event, CommandExecutionRequest,
@@ -13,6 +16,7 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::net::TcpListener;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
@@ -57,6 +61,55 @@ fn evidence(
 
 fn quote(path: &Path) -> String {
     format!("'{}'", path.to_string_lossy().replace('\'', "'\\''"))
+}
+
+fn expected_output_hash(stdout: &[u8], stderr: &[u8]) -> String {
+    fn stream_digest(bytes: &[u8]) -> [u8; 32] {
+        Sha256::digest(bytes).into()
+    }
+
+    let stdout_digest = stream_digest(stdout);
+    let stderr_digest = stream_digest(stderr);
+    let mut hasher = Sha256::new();
+    hasher.update(b"cyrene.computer.output.v1\0");
+    hasher.update((stdout.len() as u64).to_be_bytes());
+    hasher.update(stdout_digest);
+    hasher.update((stderr.len() as u64).to_be_bytes());
+    hasher.update(stderr_digest);
+    format!("{:x}", hasher.finalize())
+}
+
+fn write_control_request(
+    control_dir: &Path,
+    workspace: &Path,
+    command: String,
+    timeout_ms: u32,
+) -> (PathBuf, PathBuf) {
+    use std::os::unix::fs::PermissionsExt;
+
+    let request_path = control_dir.join("request.json");
+    let receipt_path = control_dir.join("receipt.json");
+    let request = MxcControlRequest {
+        schema_version: MXC_CONTROL_SCHEMA_VERSION,
+        command,
+        start_marker: "CYRENE_MXC_STARTED_0123456789abcdef0123456789abcdef".into(),
+        timeout_ms,
+        workspace_roots: vec![workspace.to_string_lossy().into_owned()],
+        working_directory: workspace.to_string_lossy().into_owned(),
+        environment: [
+            (
+                "PATH".into(),
+                "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin".into(),
+            ),
+            ("HOME".into(), "/tmp/cyrene-home".into()),
+            ("TMPDIR".into(), "/tmp".into()),
+        ]
+        .into_iter()
+        .collect(),
+    };
+    std::fs::write(&request_path, serde_json::to_vec(&request).unwrap()).unwrap();
+    std::fs::set_permissions(&request_path, std::fs::Permissions::from_mode(0o600)).unwrap();
+    (request_path, receipt_path)
 }
 
 #[tokio::test]
@@ -184,11 +237,10 @@ async fn mxc_drains_both_pipes_while_applying_the_shared_output_limit() {
     assert!(evidence.stderr_truncated);
     assert!(evidence.stdout.len() <= 4096);
     assert!(evidence.stderr.len() <= 4096);
-    let mut hasher = Sha256::new();
-    hasher.update(evidence.stdout.as_bytes());
-    hasher.update(b"|");
-    hasher.update(evidence.stderr.as_bytes());
-    assert_eq!(evidence.sha256_hash, format!("{:x}", hasher.finalize()));
+    assert_eq!(
+        evidence.sha256_hash,
+        expected_output_hash(&vec![b'x'; 200_000], &vec![b'y'; 200_000])
+    );
 }
 
 #[tokio::test]
@@ -228,11 +280,188 @@ async fn mxc_streams_workload_output_without_leaking_the_start_marker() {
     assert!(!stdout.contains("CYRENE_MXC_STARTED_"));
     let terminal = terminal.expect("verified terminal evidence");
     assert_eq!(terminal.exit_code, 0);
-    let mut hasher = Sha256::new();
-    hasher.update(terminal.stdout.as_bytes());
-    hasher.update(b"|");
-    hasher.update(terminal.stderr.as_bytes());
-    assert_eq!(terminal.sha256_hash, format!("{:x}", hasher.finalize()));
+    assert_eq!(
+        terminal.sha256_hash,
+        expected_output_hash(b"first\nsecond\n", b"")
+    );
+}
+
+#[tokio::test]
+async fn mxc_stream_caps_lossy_invalid_utf8_and_hashes_the_raw_bytes() {
+    let workspace = tempdir().unwrap();
+    let artifact_root = tempdir().unwrap();
+    let service = Arc::new(runtime(
+        workspace.path(),
+        artifact_root.path(),
+        helper_path(),
+    ));
+    let (sender, mut receiver) = mpsc::channel(64);
+    let command_service = Arc::clone(&service);
+    let command = request(
+        "head -c 65536 /dev/zero | tr '\\0' '\\377'",
+        workspace.path(),
+    );
+    let task = tokio::spawn(async move {
+        command_service
+            .execute_command_stream(command, None, sender)
+            .await
+    });
+    let mut streamed_stdout_bytes = 0usize;
+    let mut terminal = None;
+    while let Some(event) = receiver.recv().await {
+        match event.event {
+            Some(command_stream_event::Event::StdoutChunk(chunk)) => {
+                streamed_stdout_bytes += chunk.len();
+            }
+            Some(command_stream_event::Event::ExitEvidence(evidence)) => terminal = Some(evidence),
+            Some(command_stream_event::Event::StreamError(error)) => {
+                panic!("MXC invalid UTF-8 stream failed: {}", error.message)
+            }
+            _ => {}
+        }
+    }
+    task.await.unwrap().unwrap();
+    let terminal = terminal.expect("stream includes terminal evidence");
+    assert!(streamed_stdout_bytes <= 64 * 1024);
+    assert!(terminal.stdout.len() <= 64 * 1024);
+    assert!(terminal.stdout_truncated);
+    assert_eq!(
+        terminal.sha256_hash,
+        expected_output_hash(&vec![0xff; 65_536], b"")
+    );
+}
+
+#[tokio::test]
+async fn mxc_backpressure_obeys_deadline_and_reaps_detached_descendants() {
+    let workspace = tempdir().unwrap();
+    let artifact_root = tempdir().unwrap();
+    let service = Arc::new(runtime(
+        workspace.path(),
+        artifact_root.path(),
+        helper_path(),
+    ));
+    let marker = workspace.path().join("backpressure-descendant.txt");
+    let mut command = request(
+        format!(
+            "setsid /bin/sh -c 'sleep 1; printf alive > {}' >/dev/null 2>&1 & while :; do printf x; done",
+            quote(&marker)
+        ),
+        workspace.path(),
+    );
+    command.timeout_ms = Some(500);
+    let (sender, receiver) = mpsc::channel(1);
+    let command_service = Arc::clone(&service);
+    let started = tokio::time::Instant::now();
+    let result = tokio::time::timeout(Duration::from_secs(2), async move {
+        command_service
+            .execute_command_stream(command, None, sender)
+            .await
+    })
+    .await
+    .expect("backpressured stream must return by its deadline");
+    drop(receiver);
+    assert!(matches!(
+        result,
+        Err(ref error) if error.code == ComputerErrorCode::CommandTimeout as i32
+    ));
+    assert!(started.elapsed() < Duration::from_secs(2));
+    tokio::time::sleep(Duration::from_millis(1300)).await;
+    assert!(!marker.exists());
+}
+
+#[tokio::test]
+async fn mxc_helper_enforces_its_own_sdk_deadline() {
+    let workspace = tempdir().unwrap();
+    let control = tempdir().unwrap();
+    let (request_path, receipt_path) =
+        write_control_request(control.path(), workspace.path(), "sleep 30".into(), 400);
+    let mut helper = Command::new(helper_path())
+        .arg("--execute")
+        .arg("--request")
+        .arg(&request_path)
+        .arg("--receipt")
+        .arg(&receipt_path)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    let started = std::time::Instant::now();
+    let status = loop {
+        if let Some(status) = helper.try_wait().unwrap() {
+            break status;
+        }
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "the MXC helper ignored its private SDK deadline"
+        );
+        tokio::time::sleep(Duration::from_millis(20)).await;
+    };
+    assert!(!status.success());
+    assert!(started.elapsed() < Duration::from_secs(3));
+    let receipt: MxcTerminalReceipt =
+        serde_json::from_slice(&std::fs::read(receipt_path).unwrap()).unwrap();
+    assert!(matches!(receipt, MxcTerminalReceipt::TimedOut { .. }));
+}
+
+#[tokio::test]
+async fn killing_only_the_mxc_helper_parent_reaps_namespace_descendants() {
+    let workspace = tempdir().unwrap();
+    let control = tempdir().unwrap();
+    let started_marker = workspace.path().join("workload-started.txt");
+    let late_marker = workspace.path().join("parent-death-descendant.txt");
+    let command = format!(
+        "printf started > {}; setsid /bin/sh -c 'sleep 1; printf alive > {}' >/dev/null 2>&1 & sleep 30",
+        quote(&started_marker),
+        quote(&late_marker),
+    );
+    let (request_path, receipt_path) =
+        write_control_request(control.path(), workspace.path(), command, 5_000);
+    let helper_pid_path = control.path().join("helper.pid");
+    let launcher_script = format!(
+        "{} --execute --request {} --receipt {} & child=$!; printf '%s' \"$child\" > {}; wait \"$child\"",
+        quote(&helper_path()),
+        quote(&request_path),
+        quote(&receipt_path),
+        quote(&helper_pid_path),
+    );
+    let mut launcher = Command::new("/bin/bash")
+        .arg("-c")
+        .arg(launcher_script)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .spawn()
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(4), async {
+        loop {
+            if started_marker.exists() {
+                break;
+            }
+            if let Some(status) = launcher.try_wait().unwrap() {
+                panic!("MXC launcher exited before workload start: {status}");
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("MXC workload should start before the parent-death probe");
+    let helper_pid: u32 = std::fs::read_to_string(&helper_pid_path)
+        .unwrap()
+        .parse()
+        .unwrap();
+
+    // Kill only the launcher process. The helper's PDEATHSIG must kill it;
+    // Bubblewrap's own die-with-parent policy must then reap the workload.
+    let kill_result = unsafe { libc::kill(launcher.id() as i32, libc::SIGKILL) };
+    assert_eq!(kill_result, 0);
+    let _ = launcher.wait();
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    assert!(!late_marker.exists());
+    assert!(
+        !PathBuf::from(format!("/proc/{helper_pid}")).exists(),
+        "MXC helper survived the death of its service parent"
+    );
 }
 
 #[tokio::test]

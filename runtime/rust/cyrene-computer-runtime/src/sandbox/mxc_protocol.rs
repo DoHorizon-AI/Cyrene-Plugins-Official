@@ -25,6 +25,12 @@ pub fn trusted_control_directories(executable_path: &Path) -> Result<Vec<PathBuf
         .ok_or_else(|| "MXC helper executable has no parent directory".to_string())?
         .canonicalize()
         .map_err(|error| format!("cannot resolve MXC helper directory: {error}"))?;
+    if helper_directory
+        .to_str()
+        .is_none_or(|value| value.is_empty() || value.contains(':'))
+    {
+        return Err("MXC helper directory cannot be represented safely in PATH".into());
+    }
     let mut directories = Vec::new();
     for candidate in [
         helper_directory,
@@ -53,15 +59,69 @@ pub fn trusted_control_path(directories: &[PathBuf]) -> Result<String, String> {
     let entries = directories
         .iter()
         .map(|path| {
-            path.to_str()
-                .map(str::to_string)
-                .ok_or_else(|| "MXC control directory is not valid UTF-8".to_string())
+            if !path.is_absolute() {
+                return Err("MXC control directory must be absolute".to_string());
+            }
+            let value = path
+                .to_str()
+                .ok_or_else(|| "MXC control directory is not valid UTF-8".to_string())?;
+            if value.is_empty() || value.contains(':') {
+                return Err(
+                    "MXC control directory contains a PATH separator or empty entry".into(),
+                );
+            }
+            let canonical = path.canonicalize().map_err(|error| {
+                format!(
+                    "cannot resolve MXC control directory '{}': {error}",
+                    path.display()
+                )
+            })?;
+            if canonical.to_str() != Some(value) {
+                return Err("MXC control directory must be canonical".into());
+            }
+            Ok(value.to_string())
         })
         .collect::<Result<Vec<_>, _>>()?;
-    if entries.is_empty() {
+    if entries.is_empty() || entries.iter().any(String::is_empty) {
         return Err("no trusted MXC control directories are available".into());
     }
     Ok(entries.join(":"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{trusted_control_path, MxcControlRequest};
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    #[test]
+    fn trusted_path_rejects_separator_injection_and_noncanonical_entries() {
+        let temp = tempfile::tempdir().unwrap();
+        let injected = temp.path().join("trusted:/writable");
+        std::fs::create_dir_all(&injected).unwrap();
+        let canonical = injected.canonicalize().unwrap();
+        assert!(trusted_control_path(&[canonical]).is_err());
+
+        let ordinary = temp.path().canonicalize().unwrap();
+        let noncanonical = PathBuf::from(format!("{}/.", ordinary.display()));
+        assert!(trusted_control_path(&[noncanonical]).is_err());
+    }
+
+    #[test]
+    fn control_request_carries_an_explicit_workload_deadline() {
+        let request = MxcControlRequest {
+            schema_version: 1,
+            command: "true".into(),
+            start_marker: "CYRENE_MXC_STARTED_0123456789abcdef0123456789abcdef".into(),
+            timeout_ms: 321,
+            workspace_roots: vec!["/workspace".into()],
+            working_directory: "/workspace".into(),
+            environment: BTreeMap::new(),
+        };
+        let json = serde_json::to_string(&request).unwrap();
+        let decoded: MxcControlRequest = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.timeout_ms, 321);
+    }
 }
 
 /// Rejects writable workspace roots that overlap the helper or its fixed PATH.
@@ -89,6 +149,7 @@ pub struct MxcControlRequest {
     pub schema_version: u32,
     pub command: String,
     pub start_marker: String,
+    pub timeout_ms: u32,
     pub workspace_roots: Vec<String>,
     pub working_directory: String,
     pub environment: BTreeMap<String, String>,

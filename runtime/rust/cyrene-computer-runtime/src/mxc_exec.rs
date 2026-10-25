@@ -153,6 +153,9 @@ mod linux {
         if request.schema_version != MXC_CONTROL_SCHEMA_VERSION {
             return Err("unsupported MXC control schema version".into());
         }
+        if request.timeout_ms == 0 {
+            return Err("MXC workload timeout must be a positive number of milliseconds".into());
+        }
         if request.command.trim().is_empty()
             || request.command.len() > MAX_COMMAND_BYTES
             || request.command.contains('\0')
@@ -318,6 +321,7 @@ mod linux {
         workspace_roots: Vec<String>,
         working_directory: String,
         environment: Vec<(String, String)>,
+        timeout_ms: u32,
     ) -> ContainerRequest {
         let mut request = ContainerRequest::new(command);
         request.containment = Containment::Bubblewrap;
@@ -339,6 +343,7 @@ mod linux {
         request.working_directory = Some(working_directory);
         request.environment = Some(environment);
         request.inherit_default_environment = Some(false);
+        request.timeout_ms = Some(timeout_ms);
         request
     }
 
@@ -565,6 +570,7 @@ mod linux {
             roots,
             working_directory,
             environment,
+            10_000,
         );
         let mut process = v1::spawn(request, SpawnOptions { telemetry: None })
             .map_err(|error| format!("MXC Bubblewrap containment probe failed: {error}"))?;
@@ -707,6 +713,7 @@ mod linux {
             request.workspace_roots.clone(),
             request.working_directory.clone(),
             request.environment.into_iter().collect(),
+            request.timeout_ms,
         );
 
         let mut process = match v1::spawn(container_request, SpawnOptions { telemetry: None }) {
@@ -775,12 +782,25 @@ mod linux {
         }
         let stdout_reader = forward_stream(stdout, io::stdout(), Arc::clone(&write_failed));
 
+        let workload_deadline = started + Duration::from_millis(u64::from(request.timeout_ms));
         let wait_result = loop {
             if write_failed.load(Ordering::SeqCst) {
                 if let Err(error) = process.kill() {
                     break Err(io::Error::other(format!(
                         "workload output forwarding failed and MXC kill failed: {error}"
                     )));
+                }
+            }
+            if Instant::now() >= workload_deadline {
+                let kill_result = process.kill();
+                let reap_result = process.wait();
+                match (kill_result, reap_result) {
+                    (Ok(()), Ok(_)) | (Err(_), Ok(_)) => break Ok(WaitResult::TimedOut),
+                    (_, Err(error)) => {
+                        break Err(io::Error::other(format!(
+                            "MXC helper deadline expired and workload reap failed: {error}"
+                        )))
+                    }
                 }
             }
             match process.try_wait() {
@@ -847,6 +867,10 @@ mod linux {
     }
 
     pub fn main() -> i32 {
+        if let Err(message) = set_parent_death_signal() {
+            eprintln!("{}", bounded_message(message));
+            return STDERR_ERROR_EXIT;
+        }
         let control_path = match fixed_control_path() {
             Ok(path) => path,
             Err(message) => {
@@ -874,6 +898,35 @@ mod linux {
                 STDERR_ERROR_EXIT
             }
         }
+    }
+
+    fn set_parent_death_signal() -> Result<(), String> {
+        // Capture before installing the signal, then recheck to close the race
+        // where the service parent exits during helper startup.
+        let expected_parent = unsafe { libc::getppid() };
+        if expected_parent <= 1 {
+            return Err("MXC helper has no live service parent".into());
+        }
+        // SAFETY: PR_SET_PDEATHSIG accepts a signal number and no pointers.
+        let result = unsafe {
+            libc::prctl(
+                libc::PR_SET_PDEATHSIG,
+                libc::SIGKILL,
+                0usize,
+                0usize,
+                0usize,
+            )
+        };
+        if result != 0 {
+            return Err(format!(
+                "cannot set MXC helper parent-death signal: {}",
+                io::Error::last_os_error()
+            ));
+        }
+        if unsafe { libc::getppid() } != expected_parent {
+            return Err("MXC service parent exited during helper startup".into());
+        }
+        Ok(())
     }
 
     #[cfg(test)]

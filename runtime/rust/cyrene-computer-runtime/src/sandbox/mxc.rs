@@ -26,7 +26,7 @@ use std::io::{Read, Write};
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
@@ -78,7 +78,7 @@ struct PreparedInvocation {
     receipt_path: PathBuf,
     working_directory: String,
     control_environment: HashMap<String, String>,
-    output_limit_bytes: usize,
+    timeout_ms: u32,
 }
 
 /// Aborts the shared runner future if the adapter stream is abandoned.
@@ -145,6 +145,8 @@ impl MicrosoftMxcSandboxProviderAdapter {
         let working_directory = self.path_validator.validate_cwd(request.cwd.as_deref())?;
         let working_directory = path_to_utf8(&working_directory)?;
         let start_marker = new_start_marker()?;
+        let timeout = self.runner.requested_timeout(request.timeout_ms)?;
+        let timeout_ms = timeout.as_millis().min(u32::MAX as u128).max(1) as u32;
         let workspace_roots = self
             .workspace_roots
             .iter()
@@ -173,6 +175,7 @@ impl MicrosoftMxcSandboxProviderAdapter {
             schema_version: MXC_CONTROL_SCHEMA_VERSION,
             command: request.command.clone(),
             start_marker,
+            timeout_ms,
             workspace_roots,
             working_directory: working_directory.clone(),
             environment: workload_environment.into_iter().collect::<BTreeMap<_, _>>(),
@@ -239,7 +242,7 @@ impl MicrosoftMxcSandboxProviderAdapter {
             receipt_path,
             working_directory,
             control_environment,
-            output_limit_bytes: self.runner.requested_output_limit(request.max_output_bytes),
+            timeout_ms,
         })
     }
 
@@ -252,7 +255,7 @@ impl MicrosoftMxcSandboxProviderAdapter {
             command: MXC_LAUNCH_SCRIPT.into(),
             cwd: Some(invocation.working_directory.clone()),
             env: invocation.control_environment.clone(),
-            timeout_ms: original.timeout_ms,
+            timeout_ms: Some(i64::from(invocation.timeout_ms)),
             max_output_bytes: original.max_output_bytes,
         }
     }
@@ -296,7 +299,12 @@ impl MicrosoftMxcSandboxProviderAdapter {
                 }
                 evidence.exit_code = exit_code;
                 evidence.duration_ms = duration_ms.min(i64::MAX as u64) as i64;
-                append_warnings(&mut evidence, warnings, invocation.output_limit_bytes);
+                if !warnings.is_empty() {
+                    return Err(denied(format!(
+                        "MXC reported unexpected workload warnings: {}",
+                        warnings.join("; ")
+                    )));
+                }
                 Ok(CommandExecutionResponse {
                     result: Some(command_execution_response::Result::Evidence(evidence)),
                 })
@@ -329,12 +337,15 @@ impl MicrosoftMxcSandboxProviderAdapter {
         sender: mpsc::Sender<CommandStreamEvent>,
     ) -> Result<(), ComputerError> {
         let invocation = self.prepare_invocation(&request)?;
+        let deadline =
+            tokio::time::Instant::now() + Duration::from_millis(u64::from(invocation.timeout_ms));
         let helper_request = self.helper_request(&request, &invocation);
         let (internal_sender, mut internal_receiver) = mpsc::channel(16);
         let runner = Arc::clone(&self.runner);
+        let command_cancel = cancel_flag.clone();
         let task = tokio::spawn(async move {
             runner
-                .execute_command_stream(helper_request, cancel_flag, internal_sender)
+                .execute_command_stream(helper_request, command_cancel, internal_sender)
                 .await
         });
         let mut abort_task = AbortTaskOnDrop(Some(task.abort_handle()));
@@ -342,27 +353,48 @@ impl MicrosoftMxcSandboxProviderAdapter {
         let mut launcher_evidence: Option<ExecutionEvidence> = None;
         let mut stream_error = None;
 
-        while let Some(event) = internal_receiver.recv().await {
+        loop {
+            let event = tokio::select! {
+                event = internal_receiver.recv() => event,
+                _ = tokio::time::sleep_until(deadline) => {
+                    return Err(timeout_error("MXC stream exceeded its absolute deadline"));
+                }
+                _ = wait_for_cancellation(cancel_flag.clone()) => {
+                    return Err(timeout_error("MXC stream was cancelled"));
+                }
+                _ = sender.closed() => {
+                    return Err(denied("MXC stream receiver closed before completion"));
+                }
+            };
+            let Some(event) = event else { break };
             match event.event {
                 Some(command_stream_event::Event::StdoutChunk(text)) => {
                     sequence_number += 1;
-                    let _ = sender
-                        .send(CommandStreamEvent {
+                    send_event_until(
+                        &sender,
+                        CommandStreamEvent {
                             sequence_number,
                             timestamp_ms: event.timestamp_ms,
                             event: Some(command_stream_event::Event::StdoutChunk(text)),
-                        })
-                        .await;
+                        },
+                        deadline,
+                        cancel_flag.clone(),
+                    )
+                    .await?;
                 }
                 Some(command_stream_event::Event::StderrChunk(text)) => {
                     sequence_number += 1;
-                    let _ = sender
-                        .send(CommandStreamEvent {
+                    send_event_until(
+                        &sender,
+                        CommandStreamEvent {
                             sequence_number,
                             timestamp_ms: event.timestamp_ms,
                             event: Some(command_stream_event::Event::StderrChunk(text)),
-                        })
-                        .await;
+                        },
+                        deadline,
+                        cancel_flag.clone(),
+                    )
+                    .await?;
                 }
                 Some(command_stream_event::Event::ExitEvidence(evidence)) => {
                     launcher_evidence = Some(evidence);
@@ -373,19 +405,22 @@ impl MicrosoftMxcSandboxProviderAdapter {
                 None => {}
             }
         }
-        let runner_result = task.await;
+        let runner_result = tokio::select! {
+            result = task => result,
+            _ = tokio::time::sleep_until(deadline) => {
+                return Err(timeout_error("MXC launcher exceeded its absolute deadline"));
+            }
+            _ = wait_for_cancellation(cancel_flag.clone()) => {
+                return Err(timeout_error("MXC launcher was cancelled"));
+            }
+            _ = sender.closed() => {
+                return Err(denied("MXC stream receiver closed before completion"));
+            }
+        };
         abort_task.0 = None;
 
         if let Some(error) = stream_error {
-            sequence_number += 1;
-            let _ = sender
-                .send(CommandStreamEvent {
-                    sequence_number,
-                    timestamp_ms: current_epoch_ms(),
-                    event: Some(command_stream_event::Event::StreamError(error)),
-                })
-                .await;
-            return Ok(());
+            return Err(error);
         }
         match runner_result {
             Err(error) => return Err(denied(format!("MXC launcher task failed: {error}"))),
@@ -405,100 +440,42 @@ impl MicrosoftMxcSandboxProviderAdapter {
             } if schema_version == MXC_CONTROL_SCHEMA_VERSION && evidence.exit_code == 0 => {
                 evidence.exit_code = exit_code;
                 evidence.duration_ms = duration_ms.min(i64::MAX as u64) as i64;
-                for warning in warnings {
-                    let text = format!("[MXC warning] {warning}\n");
-                    let available = invocation
-                        .output_limit_bytes
-                        .saturating_sub(evidence.stderr.len());
-                    let retained = truncate_utf8(&text, available);
-                    if retained.len() < text.len() {
-                        evidence.stderr_truncated = true;
-                    }
-                    if !retained.is_empty() {
-                        sequence_number += 1;
-                        let _ = sender
-                            .send(CommandStreamEvent {
-                                sequence_number,
-                                timestamp_ms: current_epoch_ms(),
-                                event: Some(command_stream_event::Event::StderrChunk(
-                                    retained.clone(),
-                                )),
-                            })
-                            .await;
-                        evidence.stderr.push_str(&retained);
-                    }
+                if !warnings.is_empty() {
+                    return Err(denied(format!(
+                        "MXC reported unexpected workload warnings: {}",
+                        warnings.join("; ")
+                    )));
                 }
-                evidence.sha256_hash = output_hash(&evidence.stdout, &evidence.stderr);
                 sequence_number += 1;
-                let _ = sender
-                    .send(CommandStreamEvent {
+                send_event_until(
+                    &sender,
+                    CommandStreamEvent {
                         sequence_number,
                         timestamp_ms: current_epoch_ms(),
                         event: Some(command_stream_event::Event::ExitEvidence(evidence)),
-                    })
-                    .await;
+                    },
+                    deadline,
+                    cancel_flag,
+                )
+                .await?;
                 Ok(())
             }
             MxcTerminalReceipt::TimedOut {
                 schema_version,
                 message,
                 ..
-            } if schema_version == MXC_CONTROL_SCHEMA_VERSION => {
-                sequence_number += 1;
-                let _ = sender
-                    .send(CommandStreamEvent {
-                        sequence_number,
-                        timestamp_ms: current_epoch_ms(),
-                        event: Some(command_stream_event::Event::StreamError(timeout_error(
-                            message,
-                        ))),
-                    })
-                    .await;
-                Ok(())
-            }
+            } if schema_version == MXC_CONTROL_SCHEMA_VERSION => Err(timeout_error(message)),
             MxcTerminalReceipt::BackendError {
                 schema_version,
                 message,
-            } if schema_version == MXC_CONTROL_SCHEMA_VERSION => {
-                sequence_number += 1;
-                let _ = sender
-                    .send(CommandStreamEvent {
-                        sequence_number,
-                        timestamp_ms: current_epoch_ms(),
-                        event: Some(command_stream_event::Event::StreamError(denied(message))),
-                    })
-                    .await;
-                Ok(())
-            }
+            } if schema_version == MXC_CONTROL_SCHEMA_VERSION => Err(denied(message)),
             MxcTerminalReceipt::BackendUnavailable {
                 schema_version,
                 message,
-            } if schema_version == MXC_CONTROL_SCHEMA_VERSION => {
-                sequence_number += 1;
-                let _ = sender
-                    .send(CommandStreamEvent {
-                        sequence_number,
-                        timestamp_ms: current_epoch_ms(),
-                        event: Some(command_stream_event::Event::StreamError(denied(format!(
-                            "MXC backend unavailable before workload start: {message}"
-                        )))),
-                    })
-                    .await;
-                Ok(())
-            }
-            _ => {
-                sequence_number += 1;
-                let _ = sender
-                    .send(CommandStreamEvent {
-                        sequence_number,
-                        timestamp_ms: current_epoch_ms(),
-                        event: Some(command_stream_event::Event::StreamError(denied(
-                            "MXC helper terminal receipt is missing or invalid",
-                        ))),
-                    })
-                    .await;
-                Ok(())
-            }
+            } if schema_version == MXC_CONTROL_SCHEMA_VERSION => Err(denied(format!(
+                "MXC backend unavailable before workload start: {message}"
+            ))),
+            _ => Err(denied("MXC helper terminal receipt is missing or invalid")),
         }
     }
 }
@@ -763,39 +740,37 @@ fn read_receipt(path: &Path) -> Result<MxcTerminalReceipt, ComputerError> {
         .map_err(|error| denied(format!("MXC terminal receipt is invalid: {error}")))
 }
 
-fn append_warnings(
-    evidence: &mut ExecutionEvidence,
-    warnings: Vec<String>,
-    output_limit_bytes: usize,
-) {
-    for warning in warnings {
-        let text = format!("[MXC warning] {warning}\n");
-        let available = output_limit_bytes.saturating_sub(evidence.stderr.len());
-        let retained = truncate_utf8(&text, available);
-        if retained.len() < text.len() {
-            evidence.stderr_truncated = true;
+async fn wait_for_cancellation(cancel_flag: Option<Arc<AtomicBool>>) {
+    loop {
+        if cancel_flag
+            .as_ref()
+            .is_some_and(|flag| flag.load(Ordering::SeqCst))
+        {
+            return;
         }
-        evidence.stderr.push_str(&retained);
+        tokio::time::sleep(Duration::from_millis(10)).await;
     }
-    evidence.sha256_hash = output_hash(&evidence.stdout, &evidence.stderr);
 }
 
-fn truncate_utf8(value: &str, max_bytes: usize) -> String {
-    let mut end = value.len().min(max_bytes);
-    while !value.is_char_boundary(end) {
-        end -= 1;
+async fn send_event_until(
+    sender: &mpsc::Sender<CommandStreamEvent>,
+    event: CommandStreamEvent,
+    deadline: tokio::time::Instant,
+    cancel_flag: Option<Arc<AtomicBool>>,
+) -> Result<(), ComputerError> {
+    tokio::select! {
+        result = tokio::time::timeout_at(deadline, sender.send(event)) => {
+            match result {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(_)) => Err(denied("MXC stream receiver closed before completion")),
+                Err(_) => Err(timeout_error("MXC stream exceeded its deadline while forwarding output")),
+            }
+        }
+        _ = wait_for_cancellation(cancel_flag) => {
+            Err(timeout_error("MXC stream was cancelled while forwarding output"))
+        }
+        _ = sender.closed() => Err(denied("MXC stream receiver closed before completion")),
     }
-    value[..end].to_string()
-}
-
-fn output_hash(stdout: &str, stderr: &str) -> String {
-    use sha2::{Digest, Sha256};
-
-    let mut hasher = Sha256::new();
-    hasher.update(stdout.as_bytes());
-    hasher.update(b"|");
-    hasher.update(stderr.as_bytes());
-    format!("{:x}", hasher.finalize())
 }
 
 fn valid_env_key(key: &str) -> bool {

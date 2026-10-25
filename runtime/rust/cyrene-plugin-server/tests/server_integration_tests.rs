@@ -31,10 +31,16 @@ use cyrene_agent_runtime::adapter::{snapshot_tool_catalog, SnapshotToolProvider}
 use cyrene_agent_runtime::engine::cancel::CancellationToken;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::MockModelProvider;
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+use cyrene_computer_runtime::{
+    ComputerExecutionBackend, ComputerRuntimeLimits, ComputerRuntimeService,
+};
 use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse,
 };
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+use cyrene_plugin_contracts::computer_runtime_v1::CommandExecutionRequest;
 use cyrene_plugin_contracts::computer_runtime_v1::{
     create_artifact_response, get_artifact_response, list_dir_response, ComputerErrorCode,
     CreateArtifactRequest, CreateArtifactResponse, GetArtifactRequest, GetArtifactResponse,
@@ -1107,4 +1113,88 @@ async fn test_r09_fail_closed_guarantees() {
         }
         InvocationResult::Payload(_) => panic!("Expected fail-closed error for corrupted payload"),
     }
+}
+
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+#[tokio::test]
+async fn test_computer_stream_reports_missing_mxc_receipt_before_end() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let artifacts = tempfile::tempdir().unwrap();
+    let helper_dir = tempfile::tempdir().unwrap();
+    let helper_path = helper_dir.path().join("cyrene-mxc-exec");
+    std::fs::write(
+        &helper_path,
+        b"#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then echo 'CYRENE_MXC_PROBE_OK backend=mxc sdk=1.0.1 containment=bubblewrap bwrap=0.13.1'; exit 0; fi\nexit 0\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&helper_path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let computer = Arc::new(
+        ComputerRuntimeService::with_execution_backend(
+            vec![workspace.path().to_path_buf()],
+            artifacts.path().to_path_buf(),
+            ComputerRuntimeLimits::default(),
+            ComputerExecutionBackend::MicrosoftMxc,
+            Some(helper_path),
+        )
+        .expect("the injected helper passes the controlled startup probe"),
+    );
+    let service = DirectPluginRuntimeServiceImpl::with_computer_runtime_for_tests(computer);
+    let (mut client, _) = start_server(service).await;
+    let payload = CommandExecutionRequest {
+        command: "echo command-output-must-not-imply-success".into(),
+        cwd: Some(workspace.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(5_000),
+        max_output_bytes: None,
+    }
+    .encode_to_vec();
+    let mut stream = client
+        .invoke_stream(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "execute_command_stream".into(),
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest"
+                .into(),
+            payload,
+            request_id: "mxc-missing-receipt-stream".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    let mut errors = 0;
+    let mut ended = false;
+    while let Some(item) = stream.message().await.unwrap() {
+        match item.event {
+            Some(proto::direct_stream_item::Event::Error(error)) => {
+                errors += 1;
+                assert_eq!(error.code, Code::ExecutionFailed as i32);
+                assert_eq!(error.domain_code, "COMPUTER_STREAM_EXECUTION_ERROR");
+                assert!(error.message.contains("terminal receipt"));
+            }
+            Some(proto::direct_stream_item::Event::Payload(payload)) => {
+                let event =
+                    cyrene_plugin_contracts::computer_runtime_v1::CommandStreamEvent::decode(
+                        payload.value.as_slice(),
+                    )
+                    .unwrap();
+                assert!(!matches!(
+                    event.event,
+                    Some(
+                        cyrene_plugin_contracts::computer_runtime_v1::command_stream_event::Event::ExitEvidence(_)
+                    )
+                ));
+            }
+            Some(proto::direct_stream_item::Event::End(_)) => ended = true,
+            None => panic!("stream item must have a terminal event"),
+        }
+    }
+    assert_eq!(errors, 1, "emit one explicit error, without a duplicate");
+    assert!(
+        ended,
+        "the stream still closes with its structural End item"
+    );
 }

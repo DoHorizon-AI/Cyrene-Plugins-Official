@@ -20,6 +20,7 @@
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -38,12 +39,14 @@ use cyrene_memory_runtime::backend::sqlite::SqliteMemoryBackend;
 use cyrene_memory_runtime::embedding::ContractModelEmbeddingClient;
 use cyrene_memory_runtime::CyreneMemoryService;
 
+const COMPUTER_STREAM_TERMINAL_GRACE: Duration = Duration::from_millis(100);
+
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse, AgentStreamEvent,
 };
 use cyrene_plugin_contracts::computer_runtime_v1::{
-    CommandExecutionRequest, CommandStreamEvent, CreateArtifactRequest, GetArtifactRequest,
-    ListDirRequest, ReadFileRequest, WriteFileRequest,
+    CommandExecutionRequest, CommandStreamEvent, ComputerError, ComputerErrorCode,
+    CreateArtifactRequest, GetArtifactRequest, ListDirRequest, ReadFileRequest, WriteFileRequest,
 };
 use cyrene_plugin_contracts::memory_provider_v1::{
     DeleteMemoryRequest, GetMemoryRequest, RecallMemoryRequest, StoreMemoryRequest,
@@ -98,6 +101,8 @@ pub struct DirectPluginRuntimeServiceImpl {
     computer_tools: Arc<ComputerToolProvider>,
     mcp: Option<Arc<McpToolProvider>>,
     simulated_agent_dependencies: bool,
+    command_default_timeout_ms: u64,
+    command_max_timeout_ms: u64,
 }
 
 /// Host-side `ToolCatalogSource` over the configured MCP tool provider.
@@ -263,6 +268,17 @@ impl DirectPluginRuntimeServiceImpl {
         )
     }
 
+    #[cfg(all(test, feature = "mxc", target_os = "linux"))]
+    pub fn with_computer_runtime_for_tests(computer: Arc<ComputerRuntimeService>) -> Self {
+        Self::with_runtime(
+            computer,
+            ComputerRuntimeLimits::default(),
+            None,
+            false,
+            None,
+        )
+    }
+
     fn with_runtime(
         computer: Arc<ComputerRuntimeService>,
         limits: ComputerRuntimeLimits,
@@ -270,13 +286,15 @@ impl DirectPluginRuntimeServiceImpl {
         simulated_agent_dependencies: bool,
         memory: Option<Arc<CyreneMemoryService>>,
     ) -> Self {
-        let computer_tools = Arc::new(ComputerToolProvider::new(computer.clone(), limits));
+        let computer_tools = Arc::new(ComputerToolProvider::new(computer.clone(), limits.clone()));
         Self {
             memory,
             computer,
             computer_tools,
             mcp,
             simulated_agent_dependencies,
+            command_default_timeout_ms: limits.command_default_timeout_ms,
+            command_max_timeout_ms: limits.command_max_timeout_ms,
         }
     }
 
@@ -309,6 +327,15 @@ impl DirectPluginRuntimeServiceImpl {
             })),
         }
     }
+}
+
+fn computer_stream_error(error: ComputerError) -> DirectStreamItem {
+    let (code, domain_code) = if error.code == ComputerErrorCode::CommandTimeout as i32 {
+        (Code::DeadlineExceeded, "COMPUTER_STREAM_TIMEOUT")
+    } else {
+        (Code::ExecutionFailed, "COMPUTER_STREAM_EXECUTION_ERROR")
+    };
+    DirectPluginRuntimeServiceImpl::fail_closed_stream_error(code, error.message, domain_code)
 }
 
 #[allow(dead_code)]
@@ -1234,56 +1261,135 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 };
 
                 let computer = self.computer.clone();
+                let default_timeout_ms = self.command_default_timeout_ms;
+                let maximum_timeout_ms = self.command_max_timeout_ms;
                 tokio::spawn(async move {
                     let (event_tx, mut event_rx) = mpsc::channel::<CommandStreamEvent>(64);
                     let cancel_flag = Arc::new(AtomicBool::new(false));
+                    let timeout_ms = match cmd_req.timeout_ms {
+                        Some(value) if value <= 0 => default_timeout_ms,
+                        Some(value) => (value as u64).min(maximum_timeout_ms),
+                        None => default_timeout_ms,
+                    };
+                    // The runtime enforces the command timeout. This bounded
+                    // relay margin lets the host deliver its terminal error
+                    // without extending workload execution.
+                    let deadline = tokio::time::Instant::now()
+                        + Duration::from_millis(timeout_ms.max(1))
+                        + COMPUTER_STREAM_TERMINAL_GRACE;
 
                     let comp = computer.clone();
                     let command_cancel = Arc::clone(&cancel_flag);
-                    tokio::spawn(async move {
-                        let _ = comp
-                            .execute_command_stream(cmd_req, Some(command_cancel), event_tx)
-                            .await;
+                    let mut command_task = tokio::spawn(async move {
+                        comp.execute_command_stream(cmd_req, Some(command_cancel), event_tx)
+                            .await
                     });
+                    let mut client_cancelled = false;
+                    let mut stream_error_sent = false;
+                    let mut relay_deadline_expired = false;
 
                     loop {
-                        tokio::select! {
-                            event = event_rx.recv() => {
-                                let Some(event) = event else {
-                                    break;
-                                };
-                                let mut buf = Vec::new();
-                                event.encode(&mut buf).unwrap();
-                                let item = DirectStreamItem {
-                                    event: Some(Event::Payload(DirectPayload {
-                                        type_url:
-                                            "type.cyrene.io/cyrene.computer.runtime.v1.CommandStreamEvent"
-                                                .into(),
-                                        value: buf,
-                                        event_type: String::new(),
-                                    })),
-                                };
-                                if tx.send(Ok(item)).await.is_err() {
-                                    // The client dropped the stream: stop the managed
-                                    // command instead of orphaning its process group.
-                                    cancel_flag.store(true, Ordering::SeqCst);
-                                    break;
-                                }
-                            }
-                            _ = tx.closed() => {
-                                // The client dropped the stream: stop the managed
-                                // command instead of orphaning its process group.
-                                cancel_flag.store(true, Ordering::SeqCst);
+                        let event = tokio::select! {
+                            event = event_rx.recv() => event,
+                            _ = tokio::time::sleep_until(deadline) => {
+                                relay_deadline_expired = true;
                                 break;
                             }
+                            _ = tx.closed() => {
+                                cancel_flag.store(true, Ordering::SeqCst);
+                                client_cancelled = true;
+                                break;
+                            }
+                        };
+                        let Some(event) = event else {
+                            break;
+                        };
+                        if matches!(
+                            event.event,
+                            Some(cyrene_plugin_contracts::computer_runtime_v1::command_stream_event::Event::StreamError(_))
+                        ) {
+                            stream_error_sent = true;
+                        }
+                        let mut buf = Vec::new();
+                        event.encode(&mut buf).unwrap();
+                        let item = DirectStreamItem {
+                            event: Some(Event::Payload(DirectPayload {
+                                type_url:
+                                    "type.cyrene.io/cyrene.computer.runtime.v1.CommandStreamEvent"
+                                        .into(),
+                                value: buf,
+                                event_type: String::new(),
+                            })),
+                        };
+                        let sent = tokio::select! {
+                            result = tokio::time::timeout_at(deadline, tx.send(Ok(item))) => {
+                                matches!(result, Ok(Ok(())))
+                            }
+                            _ = tx.closed() => false,
+                        };
+                        if !sent {
+                            client_cancelled = tx.is_closed();
+                            relay_deadline_expired = !client_cancelled;
+                            cancel_flag.store(true, Ordering::SeqCst);
+                            break;
                         }
                     }
 
-                    let _ = tx
-                        .send(Ok(DirectStreamItem {
+                    if client_cancelled || relay_deadline_expired {
+                        cancel_flag.store(true, Ordering::SeqCst);
+                        command_task.abort();
+                        let _ = command_task.await;
+                        if relay_deadline_expired {
+                            let timeout_item = Self::fail_closed_stream_error(
+                                Code::DeadlineExceeded,
+                                "Computer stream exceeded its deadline under downstream backpressure",
+                                "COMPUTER_STREAM_TIMEOUT",
+                            );
+                            let _ = tx.try_send(Ok(timeout_item));
+                        }
+                        return;
+                    }
+
+                    let execution_result = tokio::select! {
+                        result = &mut command_task => Some(result),
+                        _ = tokio::time::sleep_until(deadline) => None,
+                        _ = tx.closed() => None,
+                    };
+                    if execution_result.is_none() {
+                        cancel_flag.store(true, Ordering::SeqCst);
+                        command_task.abort();
+                        let _ = command_task.await;
+                        let timeout_item = Self::fail_closed_stream_error(
+                            Code::DeadlineExceeded,
+                            "Computer command did not finish before its deadline",
+                            "COMPUTER_STREAM_TIMEOUT",
+                        );
+                        let _ = tx.try_send(Ok(timeout_item));
+                        return;
+                    }
+                    if !stream_error_sent {
+                        let error_item = match execution_result {
+                            Some(Ok(Ok(()))) => None,
+                            Some(Ok(Err(error))) => Some(computer_stream_error(error)),
+                            Some(Err(error)) => Some(Self::fail_closed_stream_error(
+                                Code::ExecutionFailed,
+                                format!("Computer stream task failed: {error}"),
+                                "COMPUTER_STREAM_TASK_FAILED",
+                            )),
+                            None => None,
+                        };
+                        if let Some(error) = error_item {
+                            let _ = tokio::time::timeout_at(deadline, tx.send(Ok(error))).await;
+                        }
+                    }
+
+                    let _ = tokio::time::timeout_at(
+                        deadline,
+                        tx.send(Ok(DirectStreamItem {
                             event: Some(Event::End(DirectStreamEnd {})),
-                        }))
-                        .await;
+                        })),
+                    )
+                    .await;
                 });
 
                 Ok(Response::new(Box::pin(ReceiverStream::new(rx))))

@@ -21,6 +21,8 @@ The Plugin binding ID is `computer-runtime`; the Exchange provider profile is `c
 
 Inputs reject unknown properties. File and directory tools reject absolute paths and parent-directory components; filesystem validation also checks the resolved path against the configured root. Directory walks do not follow symlinks. Oversized reads, writes, directory results, and command output return explicit errors rather than silently truncating tool responses.
 
+`sha256_hash` is a domain-separated summary of the complete raw stdout and stderr streams. It hashes each stream independently and combines its byte length and SHA-256 digest in a fixed order; it therefore changes when bytes beyond the displayed 64 KiB limit differ, and invalid UTF-8 bytes are hashed before display conversion. The displayed text remains capped at the configured UTF-8 byte limit.
+
 ## Deployment boundary
 
 The runner listens on h2c gRPC port `50051` and trusts the private container network. A separate mTLS proxy authenticates callers and forwards only approved Exchange traffic. The runner itself receives no proxy certificates, HMAC keys, model or connector credentials, Docker socket, or host administrative access. Mount only the workspace and artifact directory as writable paths; keep application source and runtime read-only, drop Linux capabilities, set `no-new-privileges`, and disable network egress.
@@ -94,3 +96,5 @@ cargo build --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml --featu
 可选限制通过 `CYRENE_COMPUTER_COMMAND_DEFAULT_TIMEOUT_MS`、`CYRENE_COMPUTER_COMMAND_MAX_TIMEOUT_MS`、`CYRENE_COMPUTER_MAX_OUTPUT_BYTES`、`CYRENE_COMPUTER_MAX_FILE_BYTES`、`CYRENE_COMPUTER_MAX_DIRECTORY_ENTRIES`、`CYRENE_COMPUTER_MAX_DIRECTORY_DEPTH` 和 `CYRENE_COMPUTER_MAX_ARTIFACT_BYTES` 配置。默认单次命令 30 秒、最长 10 分钟、每个输出流 64 KiB、单个文件写入 1 MiB、工具每次读取 64 KiB、目录最多 2,048 项且深度 32、每个制品 16 MiB。为兼容传输封套，命令最多 15 分钟、每个输出流最多 64 KiB、单个文件写入最多 1 MiB、目录最多 10,000 项且深度 64。直接制品调用最多 16 MiB。
 
 执行证据报告墙钟耗时和输出哈希；尚无可靠操作系统计数时，不填写 CPU 时间或峰值内存。这是在低权限容器中的有界受管执行，不宣称可以抵御恶意代码突破容器边界。
+
+`sha256_hash` 是完整原始 stdout 和 stderr 的带域分隔摘要：分别计算两条流的字节长度和 SHA-256，再按固定顺序组合。因此，即使显示文本超过 64 KiB 而被截断，尾部字节变化仍会改变摘要；无效 UTF-8 也在转换为显示文本之前参与哈希。最终显示文本仍按配置的 UTF-8 字节上限截断。
