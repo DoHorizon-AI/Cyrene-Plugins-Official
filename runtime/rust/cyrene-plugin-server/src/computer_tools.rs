@@ -39,6 +39,7 @@ const MAX_COMMAND_BYTES: usize = 32 * 1024;
 const MAX_WORKSPACE_PATH_BYTES: usize = 4 * 1024;
 const MAX_TOOL_READ_BYTES: usize = 64 * 1024;
 const MAX_TOOL_RESULT_JSON_BYTES: usize = 1_450_000;
+const SCRATCH_LIFETIME_NOTICE: &str = " Workspace files are scratch, not durable task state. In the Teams Cloud v1 profile they are cleared when the runner container restarts; use GitHub tools for repository changes that must persist.";
 
 /// A fixed `tool.provider.v1` facade over the one configured Computer Runtime.
 ///
@@ -119,7 +120,9 @@ impl ComputerToolProvider {
         let tools = vec![
             descriptor(
                 COMMAND_EXECUTE,
-                "Execute a bounded shell command in the isolated workspace.",
+                &format!(
+                    "Execute a bounded shell command in the isolated workspace.{SCRATCH_LIFETIME_NOTICE}"
+                ),
                 command_schema,
                 json!({
                     "type": "object",
@@ -132,7 +135,9 @@ impl ComputerToolProvider {
             ),
             descriptor(
                 FILE_READ,
-                "Read 0 to 65536 bytes from a workspace-relative file; length is required.",
+                &format!(
+                    "Read 0 to 65536 bytes from a workspace-relative file; length is required.{SCRATCH_LIFETIME_NOTICE}"
+                ),
                 file_read_schema,
                 json!({
                     "type": "object",
@@ -146,13 +151,17 @@ impl ComputerToolProvider {
             ),
             descriptor(
                 FILE_WRITE,
-                "Write bounded bytes to a workspace-relative file.",
+                &format!(
+                    "Write bounded bytes to a workspace-relative file.{SCRATCH_LIFETIME_NOTICE}"
+                ),
                 file_write_schema,
                 json!({"type": "object", "properties": {"bytes_written": {"type": "integer", "maximum": self.limits.max_file_bytes}}}),
             ),
             descriptor(
                 DIRECTORY_LIST,
-                "List a bounded workspace-relative directory tree without following symlinks.",
+                &format!(
+                    "List a bounded workspace-relative directory tree without following symlinks.{SCRATCH_LIFETIME_NOTICE}"
+                ),
                 directory_schema,
                 json!({"type": "object", "properties": {"entries": {"type": "array", "maxItems": self.limits.max_directory_entries, "description": "Results exceeding the 1.45 MB transport envelope fail explicitly."}}}),
             ),
@@ -683,6 +692,12 @@ mod tests {
             .tools
             .iter()
             .all(|tool| tool.binding_id == COMPUTER_BINDING_ID));
+        assert!(catalog.tools.iter().all(|tool| {
+            tool.description.contains("scratch, not durable task state")
+                && tool.description.contains("Teams Cloud v1 profile")
+                && tool.description.contains("runner container restarts")
+                && tool.description.contains("GitHub tools")
+        }));
         let read_schema: Value = serde_json::from_str(&catalog.tools[1].input_schema_json).unwrap();
         assert_eq!(
             read_schema["properties"]["length"]["maximum"],

@@ -58,6 +58,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return run_health_check(&host, port).await;
     }
 
+    // Initialize the configured service before publishing a readiness marker.
+    // 配置服务成功后再发布就绪标记，避免启动失败被调用方误判为可用。
+    let service = DirectPluginRuntimeServiceImpl::from_environment()
+        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
+
     let addr: SocketAddr = format!("{}:{}", host, port).parse()?;
     let listener = TcpListener::bind(addr).await?;
     let bound_addr = listener.local_addr()?;
@@ -67,8 +72,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("[CYRENE_SERVER_STARTED] addr={}", bound_addr);
     std::io::stdout().flush().ok();
 
-    let service = DirectPluginRuntimeServiceImpl::from_environment()
-        .map_err(|error| std::io::Error::new(std::io::ErrorKind::InvalidInput, error))?;
     let incoming = TcpListenerStream::new(listener);
 
     Server::builder()

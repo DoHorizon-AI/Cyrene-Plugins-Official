@@ -3015,8 +3015,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/computer-runtime/README.md",
-      "sha256": "5d0aa318953638387ff90cde0ad767ddfe7995aa63b9b7cae75cf3350afda7ec",
-      "size_bytes": 12140
+      "sha256": "39adb9692fd5c234c71c0d114721887401d515d8ad5fc3d07a65ca74fe4897f1",
+      "size_bytes": 13630
     },
     {
       "kind": "file",
@@ -4471,15 +4471,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/computer_tools.rs",
-      "sha256": "de9f2a02b809730ed7f120092aafa664f1e34e143564b8a11fd6f1441594d508",
-      "size_bytes": 35965
+      "sha256": "9921fbd0aae7d4c26e7ba33e8019cb92387b80975bc3295ef250644b7d998a00",
+      "size_bytes": 36836
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/main.rs",
-      "sha256": "86cafb4dfe5ee2ea8dffd98e281ff445b2cc8453e653567267343362c4453190",
-      "size_bytes": 4201
+      "sha256": "ceecaec8aa6ad765dea2577d9510c4ca670ab88dabe7eececf93a1cf227e640d",
+      "size_bytes": 4382
     },
     {
       "kind": "file",
@@ -4849,8 +4849,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/VerticalIntegrationTest.java",
-      "sha256": "ab8275e53e071edbb5853b9a09a0ed3eb56f453ba14178bf5129b23565759b3c",
-      "size_bytes": 17058
+      "sha256": "2e42eb8981d533c177e7d8a879b37a3742c42997081e5659b7a07e2c2e5de7e4",
+      "size_bytes": 18072
     },
     {
       "kind": "file",
@@ -6795,8 +6795,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "68db99d507e46f174ccabfed7657a4720fa2344fa213db2b3310d675928d673a",
-      "size_bytes": 28334
+      "sha256": "0a53693cde3b1e93084ad55e0eac9b29eb5febfcf3b749a76c79491c0ed6d547",
+      "size_bytes": 28379
     },
     {
       "kind": "file",
