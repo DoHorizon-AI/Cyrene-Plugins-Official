@@ -40,6 +40,7 @@ use cyrene_memory_runtime::embedding::ContractModelEmbeddingClient;
 use cyrene_memory_runtime::CyreneMemoryService;
 
 const COMPUTER_STREAM_TERMINAL_GRACE: Duration = Duration::from_millis(100);
+const COMPUTER_STREAM_CHANNEL_CAPACITY: usize = 8;
 
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse, AgentStreamEvent,
@@ -277,6 +278,14 @@ impl DirectPluginRuntimeServiceImpl {
             false,
             None,
         )
+    }
+
+    #[cfg(all(test, feature = "mxc", target_os = "linux"))]
+    pub fn with_computer_runtime_and_limits_for_tests(
+        computer: Arc<ComputerRuntimeService>,
+        limits: ComputerRuntimeLimits,
+    ) -> Self {
+        Self::with_runtime(computer, limits, None, false, None)
     }
 
     fn with_runtime(
@@ -1130,7 +1139,14 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
     ) -> Result<Response<Self::InvokeStreamStream>, Status> {
         let req = request.into_inner();
 
-        let (tx, rx) = mpsc::channel(64);
+        let stream_capacity = if req.capability == "computer.runtime.v1"
+            && canonical_method(&req.capability, &req.method) == "execute_command_stream"
+        {
+            COMPUTER_STREAM_CHANNEL_CAPACITY
+        } else {
+            64
+        };
+        let (tx, rx) = mpsc::channel(stream_capacity);
 
         if req.interface_version != "1" {
             let _ = tx
@@ -1264,6 +1280,18 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                 let default_timeout_ms = self.command_default_timeout_ms;
                 let maximum_timeout_ms = self.command_max_timeout_ms;
                 tokio::spawn(async move {
+                    // Keep two queue positions reserved for the terminal
+                    // Error (when needed) and End records. Payload forwarding
+                    // can fill the rest of the client queue, but cannot evict
+                    // or starve the terminal outcome.
+                    let error_permit = match tx.clone().reserve_owned().await {
+                        Ok(permit) => permit,
+                        Err(_) => return,
+                    };
+                    let end_permit = match tx.clone().reserve_owned().await {
+                        Ok(permit) => permit,
+                        Err(_) => return,
+                    };
                     let (event_tx, mut event_rx) = mpsc::channel::<CommandStreamEvent>(64);
                     let cancel_flag = Arc::new(AtomicBool::new(false));
                     let timeout_ms = match cmd_req.timeout_ms {
@@ -1339,13 +1367,16 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         cancel_flag.store(true, Ordering::SeqCst);
                         command_task.abort();
                         let _ = command_task.await;
-                        if relay_deadline_expired {
+                        if relay_deadline_expired && !tx.is_closed() {
                             let timeout_item = Self::fail_closed_stream_error(
                                 Code::DeadlineExceeded,
                                 "Computer stream exceeded its deadline under downstream backpressure",
                                 "COMPUTER_STREAM_TIMEOUT",
                             );
-                            let _ = tx.try_send(Ok(timeout_item));
+                            error_permit.send(Ok(timeout_item));
+                            end_permit.send(Ok(DirectStreamItem {
+                                event: Some(Event::End(DirectStreamEnd {})),
+                            }));
                         }
                         return;
                     }
@@ -1359,12 +1390,17 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                         cancel_flag.store(true, Ordering::SeqCst);
                         command_task.abort();
                         let _ = command_task.await;
-                        let timeout_item = Self::fail_closed_stream_error(
-                            Code::DeadlineExceeded,
-                            "Computer command did not finish before its deadline",
-                            "COMPUTER_STREAM_TIMEOUT",
-                        );
-                        let _ = tx.try_send(Ok(timeout_item));
+                        if !tx.is_closed() {
+                            let timeout_item = Self::fail_closed_stream_error(
+                                Code::DeadlineExceeded,
+                                "Computer command did not finish before its deadline",
+                                "COMPUTER_STREAM_TIMEOUT",
+                            );
+                            error_permit.send(Ok(timeout_item));
+                            end_permit.send(Ok(DirectStreamItem {
+                                event: Some(Event::End(DirectStreamEnd {})),
+                            }));
+                        }
                         return;
                     }
                     if !stream_error_sent {
@@ -1379,17 +1415,17 @@ impl DirectPluginRuntime for DirectPluginRuntimeServiceImpl {
                             None => None,
                         };
                         if let Some(error) = error_item {
-                            let _ = tokio::time::timeout_at(deadline, tx.send(Ok(error))).await;
+                            error_permit.send(Ok(error));
+                        } else {
+                            drop(error_permit);
                         }
+                    } else {
+                        drop(error_permit);
                     }
 
-                    let _ = tokio::time::timeout_at(
-                        deadline,
-                        tx.send(Ok(DirectStreamItem {
-                            event: Some(Event::End(DirectStreamEnd {})),
-                        })),
-                    )
-                    .await;
+                    end_permit.send(Ok(DirectStreamItem {
+                        event: Some(Event::End(DirectStreamEnd {})),
+                    }));
                 });
 
                 Ok(Response::new(Box::pin(ReceiverStream::new(rx))))

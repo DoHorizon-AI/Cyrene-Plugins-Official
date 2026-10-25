@@ -581,6 +581,43 @@ async fn test_streaming_command_and_partial_stream_t80() {
 }
 
 #[tokio::test]
+async fn test_streaming_utf8_chunks_match_terminal_evidence_across_read_boundaries() {
+    let tmp = tempdir().unwrap();
+    let service = ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]);
+    let (tx, mut rx) = mpsc::channel::<CommandStreamEvent>(16);
+    let req = CommandExecutionRequest {
+        command: "printf '\\344'; sleep 0.02; printf '\\275'; sleep 0.02; printf '\\240'; sleep 0.02; printf '\\377'; { printf '\\345'; sleep 0.02; printf '\\245'; sleep 0.02; printf '\\275'; sleep 0.02; printf '\\376'; } >&2".into(),
+        cwd: Some(tmp.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(5_000),
+        max_output_bytes: None,
+    };
+
+    let execute = tokio::spawn(async move { service.execute_command_stream(req, None, tx).await });
+    let mut streamed_stdout = String::new();
+    let mut streamed_stderr = String::new();
+    let mut evidence = None;
+    while let Some(event) = rx.recv().await {
+        match event.event {
+            Some(command_stream_event::Event::StdoutChunk(text)) => streamed_stdout.push_str(&text),
+            Some(command_stream_event::Event::StderrChunk(text)) => streamed_stderr.push_str(&text),
+            Some(command_stream_event::Event::ExitEvidence(value)) => evidence = Some(value),
+            Some(command_stream_event::Event::StreamError(error)) => {
+                panic!("UTF-8 stream failed: {}", error.message)
+            }
+            None => {}
+        }
+    }
+    execute.await.unwrap().unwrap();
+
+    let evidence = evidence.expect("stream should end with execution evidence");
+    assert_eq!(streamed_stdout, "你�");
+    assert_eq!(streamed_stderr, "好�");
+    assert_eq!(streamed_stdout, evidence.stdout);
+    assert_eq!(streamed_stderr, evidence.stderr);
+}
+
+#[tokio::test]
 async fn test_streaming_command_does_not_send_beyond_output_quota() {
     let workspace = tempdir().unwrap();
     let artifacts = tempdir().unwrap();

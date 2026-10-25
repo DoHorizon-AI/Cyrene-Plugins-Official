@@ -44,6 +44,68 @@ struct ProcessGroupGuard {
     pid: Option<u32>,
 }
 
+/// Incrementally decodes one output stream while preserving UTF-8 sequences
+/// split across asynchronous reads and enforcing the final display byte cap.
+struct Utf8ChunkDecoder {
+    pending: Vec<u8>,
+    max_display_bytes: usize,
+    displayed_bytes: usize,
+}
+
+impl Utf8ChunkDecoder {
+    fn new(max_display_bytes: usize) -> Self {
+        Self {
+            pending: Vec::with_capacity(4),
+            max_display_bytes,
+            displayed_bytes: 0,
+        }
+    }
+
+    fn push(&mut self, bytes: &[u8]) -> String {
+        self.decode(bytes, false)
+    }
+
+    fn finish(&mut self) -> String {
+        self.decode(&[], true)
+    }
+
+    fn decode(&mut self, bytes: &[u8], end_of_stream: bool) -> String {
+        self.pending.extend_from_slice(bytes);
+        let process_len = complete_utf8_prefix(&self.pending, end_of_stream);
+        let decoded = String::from_utf8_lossy(&self.pending[..process_len]);
+        let remaining = self.max_display_bytes.saturating_sub(self.displayed_bytes);
+        let text = truncate_stream_text(&decoded, remaining);
+        self.displayed_bytes = self.displayed_bytes.saturating_add(text.len());
+        self.pending.drain(..process_len);
+        if end_of_stream {
+            self.pending.clear();
+        }
+        text
+    }
+}
+
+/// Finds the largest prefix whose UTF-8 interpretation is settled.
+/// Incomplete final code points remain pending until a later read or EOF.
+fn complete_utf8_prefix(bytes: &[u8], end_of_stream: bool) -> usize {
+    if end_of_stream {
+        return bytes.len();
+    }
+    let mut offset = 0;
+    while offset < bytes.len() {
+        match std::str::from_utf8(&bytes[offset..]) {
+            Ok(_) => return bytes.len(),
+            Err(error) => {
+                let invalid_start = offset + error.valid_up_to();
+                match error.error_len() {
+                    Some(invalid_len) => offset = invalid_start + invalid_len,
+                    None => return invalid_start,
+                }
+            }
+        }
+    }
+    bytes.len()
+}
+
 impl ProcessGroupGuard {
     fn new(pid: u32) -> Self {
         Self { pid: Some(pid) }
@@ -336,8 +398,8 @@ impl ShellProcessRunner {
         let output_limit = self.requested_output_limit(request.max_output_bytes);
         let mut stdout_accum = OutputCollector::new(Some(output_limit as i64));
         let mut stderr_accum = OutputCollector::new(Some(output_limit as i64));
-        let mut stdout_display_bytes = 0usize;
-        let mut stderr_display_bytes = 0usize;
+        let mut stdout_decoder = Utf8ChunkDecoder::new(output_limit);
+        let mut stderr_decoder = Utf8ChunkDecoder::new(output_limit);
 
         let stream_fut = async {
             let mut stdout_buf = [0u8; 4096];
@@ -363,16 +425,9 @@ impl ShellProcessRunner {
                     }
                     res = child_stdout.read(&mut stdout_buf), if !stdout_done => {
                         match res {
-                            Ok(0) => stdout_done = true,
-                            Ok(n) => {
-                                let chunk = &stdout_buf[..n];
-                                stdout_accum.append(chunk);
-                                let lossy = String::from_utf8_lossy(chunk);
-                                let text = truncate_stream_text(
-                                    &lossy,
-                                    output_limit.saturating_sub(stdout_display_bytes),
-                                );
-                                stdout_display_bytes = stdout_display_bytes.saturating_add(text.len());
+                            Ok(0) => {
+                                stdout_done = true;
+                                let text = stdout_decoder.finish();
                                 if !text.is_empty() {
                                     send_stream_event_until(
                                         &sender,
@@ -386,21 +441,46 @@ impl ShellProcessRunner {
                                     ).await?;
                                 }
                             }
-                            Err(_) => stdout_done = true,
+                            Ok(n) => {
+                                let chunk = &stdout_buf[..n];
+                                let retained = stdout_accum.append(chunk);
+                                let text = stdout_decoder.push(&chunk[..retained]);
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StdoutChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
+                            Err(_) => {
+                                stdout_done = true;
+                                let text = stdout_decoder.finish();
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StdoutChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
                         }
                     }
                     res = child_stderr.read(&mut stderr_buf), if !stderr_done => {
                         match res {
-                            Ok(0) => stderr_done = true,
-                            Ok(n) => {
-                                let chunk = &stderr_buf[..n];
-                                stderr_accum.append(chunk);
-                                let lossy = String::from_utf8_lossy(chunk);
-                                let text = truncate_stream_text(
-                                    &lossy,
-                                    output_limit.saturating_sub(stderr_display_bytes),
-                                );
-                                stderr_display_bytes = stderr_display_bytes.saturating_add(text.len());
+                            Ok(0) => {
+                                stderr_done = true;
+                                let text = stderr_decoder.finish();
                                 if !text.is_empty() {
                                     send_stream_event_until(
                                         &sender,
@@ -414,7 +494,39 @@ impl ShellProcessRunner {
                                     ).await?;
                                 }
                             }
-                            Err(_) => stderr_done = true,
+                            Ok(n) => {
+                                let chunk = &stderr_buf[..n];
+                                let retained = stderr_accum.append(chunk);
+                                let text = stderr_decoder.push(&chunk[..retained]);
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StderrChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
+                            Err(_) => {
+                                stderr_done = true;
+                                let text = stderr_decoder.finish();
+                                if !text.is_empty() {
+                                    send_stream_event_until(
+                                        &sender,
+                                        CommandStreamEvent {
+                                            sequence_number: seq.fetch_add(1, Ordering::SeqCst),
+                                            timestamp_ms: Self::current_epoch_ms(),
+                                            event: Some(command_stream_event::Event::StderrChunk(text)),
+                                        },
+                                        deadline,
+                                        cancel_flag.clone(),
+                                    ).await?;
+                                }
+                            }
                         }
                     }
                 }
@@ -591,4 +703,32 @@ fn try_send_terminal_event(
         message: format!("Could not enqueue terminal stream event: {error}"),
         retryable: false,
     })
+}
+
+#[cfg(test)]
+mod utf8_chunk_decoder_tests {
+    use super::Utf8ChunkDecoder;
+
+    #[test]
+    fn preserves_split_multibyte_characters_and_replaces_invalid_eof_bytes() {
+        let mut decoder = Utf8ChunkDecoder::new(64);
+        let mut output = String::new();
+        for byte in [0xe4, 0xbd, 0xa0, 0xff, 0xe2, 0x82] {
+            output.push_str(&decoder.push(&[byte]));
+        }
+        output.push_str(&decoder.finish());
+        assert_eq!(output, "你��");
+    }
+
+    #[test]
+    fn applies_display_limit_after_incremental_lossy_conversion() {
+        let mut decoder = Utf8ChunkDecoder::new(4);
+        let mut output = String::new();
+        for byte in [0xe4, 0xbd, 0xa0, 0xff] {
+            output.push_str(&decoder.push(&[byte]));
+        }
+        output.push_str(&decoder.finish());
+        assert_eq!(output, "你");
+        assert!(output.len() <= 4);
+    }
 }

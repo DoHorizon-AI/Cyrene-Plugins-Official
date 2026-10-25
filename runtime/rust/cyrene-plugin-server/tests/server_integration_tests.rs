@@ -102,6 +102,29 @@ async fn start_server(
     (client, addr)
 }
 
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+async fn start_server_with_small_client_window(
+    service: DirectPluginRuntimeServiceImpl,
+) -> (DirectPluginRuntimeClient<Channel>, SocketAddr) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let incoming = TcpListenerStream::new(listener);
+    tokio::spawn(async move {
+        Server::builder()
+            .add_service(DirectPluginRuntimeServer::new(service))
+            .serve_with_incoming(incoming)
+            .await
+            .unwrap();
+    });
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let endpoint = tonic::transport::Endpoint::from_shared(format!("http://{addr}"))
+        .unwrap()
+        .initial_stream_window_size(Some(1024))
+        .initial_connection_window_size(Some(1024));
+    let client = DirectPluginRuntimeClient::connect(endpoint).await.unwrap();
+    (client, addr)
+}
+
 #[tokio::test]
 async fn test_production_host_does_not_advertise_simulated_capabilities() {
     let (mut client, _addr) = start_production_server().await;
@@ -1197,4 +1220,94 @@ async fn test_computer_stream_reports_missing_mxc_receipt_before_end() {
         ended,
         "the stream still closes with its structural End item"
     );
+}
+
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+#[tokio::test]
+async fn test_computer_grpc_stream_reserves_error_and_end_while_client_pauses_reads() {
+    let workspace = tempfile::tempdir().unwrap();
+    let artifacts = tempfile::tempdir().unwrap();
+    let limits = ComputerRuntimeLimits {
+        command_default_timeout_ms: 1_000,
+        command_max_timeout_ms: 1_000,
+        ..ComputerRuntimeLimits::default()
+    };
+    let computer = Arc::new(
+        ComputerRuntimeService::with_execution_backend(
+            vec![workspace.path().to_path_buf()],
+            artifacts.path().to_path_buf(),
+            limits.clone(),
+            ComputerExecutionBackend::Managed,
+            None,
+        )
+        .unwrap(),
+    );
+    let service = DirectPluginRuntimeServiceImpl::with_computer_runtime_and_limits_for_tests(
+        computer, limits,
+    );
+    let (mut client, _) = start_server_with_small_client_window(service).await;
+    let payload = CommandExecutionRequest {
+        command: "head -c 65536 /dev/zero | tr '\\0' x; head -c 65536 /dev/zero | tr '\\0' y >&2"
+            .into(),
+        cwd: Some(workspace.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(1_000),
+        max_output_bytes: None,
+    }
+    .encode_to_vec();
+    let mut stream = client
+        .invoke_stream(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "execute_command_stream".into(),
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest"
+                .into(),
+            payload,
+            request_id: "computer-stream-paused-reader".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    // Leave the real gRPC consumer idle until the bounded relay reaches its
+    // downstream deadline, then resume and verify its reserved terminal slots.
+    tokio::time::sleep(Duration::from_millis(1_300)).await;
+
+    let mut payload_count = 0;
+    let mut timeout_errors = 0;
+    let mut terminal_error_seen = false;
+    let mut ended = false;
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while let Some(item) = stream.message().await.unwrap() {
+            match item.event {
+                Some(proto::direct_stream_item::Event::Error(error)) => {
+                    timeout_errors += 1;
+                    terminal_error_seen = true;
+                    assert_eq!(error.code, Code::DeadlineExceeded as i32);
+                    assert_eq!(error.domain_code, "COMPUTER_STREAM_TIMEOUT");
+                    assert!(error.message.contains("downstream backpressure"));
+                }
+                Some(proto::direct_stream_item::Event::Payload(_)) => {
+                    assert!(!terminal_error_seen, "progress must precede terminal error");
+                    payload_count += 1;
+                }
+                Some(proto::direct_stream_item::Event::End(_)) => {
+                    assert!(terminal_error_seen, "End must follow the terminal error");
+                    ended = true;
+                    break;
+                }
+                None => panic!("stream item must contain an event"),
+            }
+        }
+    })
+    .await
+    .expect("resumed gRPC stream should drain its queued terminal result");
+
+    assert!(
+        payload_count > 0,
+        "the paused stream should retain progress"
+    );
+    assert_eq!(timeout_errors, 1, "emit exactly one reserved timeout error");
+    assert!(ended, "reserved End must follow the error");
 }

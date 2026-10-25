@@ -4212,15 +4212,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/shell/process_runner.rs",
-      "sha256": "fb1113bde04dc3a0c88096c17d35f1fc24ae278a7b6bd38a2bd82709514c6173",
-      "size_bytes": 24446
+      "sha256": "2756338800d2f967c753d598a1e4971ec7989704fd1ce02d8a0a7d7b914dc7a3",
+      "size_bytes": 30288
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/tests/computer_runtime_tests.rs",
-      "sha256": "8da0966262448e5ed1e10d6fc5a66d4a93796fb1a0a6d32e63998067d84f7078",
-      "size_bytes": 38152
+      "sha256": "eb978f8b3b47113fc8fe12caa6e40271d50976a09d8fa51d8ad01eaa78c0075f",
+      "size_bytes": 39956
     },
     {
       "kind": "file",
@@ -4485,8 +4485,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
-      "sha256": "406c4b2b9765486ec4907e79a6e3eaab8f2d6eb11cff02f7af33fd2ee4e629dc",
-      "size_bytes": 64246
+      "sha256": "0d4a945716a3600f7d22358730d6597d8fa39d818fcd035f2481796f8b865bd9",
+      "size_bytes": 65962
     },
     {
       "kind": "file",
@@ -4499,8 +4499,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "3156579658030fe2b2520b5856f1d211a10f109bf536c2d64d8b88afd53daa40",
-      "size_bytes": 46034
+      "sha256": "9ef35cf25fd07779b761d31a7336e70c0bbd5ecd48ca34a4a9f23c46b26d3fac",
+      "size_bytes": 50633
     },
     {
       "kind": "file",
