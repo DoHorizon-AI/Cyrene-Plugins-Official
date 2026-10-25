@@ -1,3 +1,3 @@
 pub mod artifact_store;
 
-pub use artifact_store::ArtifactStore;
+pub use artifact_store::{ArtifactStore, MAX_INLINE_PAYLOAD_BYTES};

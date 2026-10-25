@@ -101,7 +101,10 @@ async fn test_production_host_does_not_advertise_simulated_capabilities() {
     let (mut client, _addr) = start_production_server().await;
 
     let health = client.health(HealthRequest {}).await.unwrap().into_inner();
-    assert_eq!(health.capabilities, vec!["computer.runtime.v1"]);
+    assert_eq!(
+        health.capabilities,
+        vec!["computer.runtime.v1", "tool.provider.v1"]
+    );
 
     let request = AgentRunRequest::default();
     let response = client
@@ -132,7 +135,7 @@ async fn test_r08_health_check() {
     let resp = client.health(HealthRequest {}).await.unwrap().into_inner();
 
     assert_eq!(resp.status, health_response::Status::Serving as i32);
-    assert_eq!(resp.plugin_id, "cyrene.plugin.rust.server");
+    assert_eq!(resp.plugin_id, "cyrene.tools.computer-runtime");
     assert_eq!(resp.plugin_version, "0.1.0");
     assert_eq!(
         resp.capabilities,
@@ -140,8 +143,80 @@ async fn test_r08_health_check() {
             "agent.runtime.v1".to_string(),
             "memory.provider.v1".to_string(),
             "computer.runtime.v1".to_string(),
+            "tool.provider.v1".to_string(),
         ]
     );
+}
+
+#[tokio::test]
+async fn test_fixed_computer_tools_are_listed_and_execute_through_existing_runtime() {
+    let (mut client, _addr) = start_production_server().await;
+    let list = ListToolsRequest { binding_id: None };
+    let response = client
+        .invoke(DirectInvocationRequest {
+            capability: "tool.provider.v1".into(),
+            method: "list_tools".into(),
+            interface_version: "1".into(),
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest".into(),
+            payload: list.encode_to_vec(),
+            request_id: "computer-catalog".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let Some(InvocationResult::Payload(payload)) = response.result else {
+        panic!("computer tool catalog should be returned as a payload");
+    };
+    let catalog = ListToolsResponse::decode(&payload.value[..]).unwrap();
+    let Some(list_tools_response::Result::Catalog(catalog)) = catalog.result else {
+        panic!("computer tool catalog should be available without MCP");
+    };
+    assert_eq!(catalog.tools.len(), 4);
+    assert!(catalog
+        .tools
+        .iter()
+        .all(|tool| tool.binding_id == "computer-runtime"));
+
+    let call = CallToolRequest {
+        binding_id: "computer-runtime".into(),
+        provider_tool_id: "computer.command.execute".into(),
+        arguments_json: r#"{"command":"printf direct-plugin-ok"}"#.into(),
+        catalog_version: Some(catalog.catalog_version),
+    };
+    let response = client
+        .invoke(DirectInvocationRequest {
+            capability: "tool.provider.v1".into(),
+            method: "call_tool".into(),
+            interface_version: "1".into(),
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest".into(),
+            payload: call.encode_to_vec(),
+            request_id: "computer-command".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let Some(InvocationResult::Payload(payload)) = response.result else {
+        panic!("computer tool call should return a payload");
+    };
+    let call_response = CallToolResponse::decode(&payload.value[..]).unwrap();
+    let Some(call_tool_response::Result::Outcome(outcome)) = call_response.result else {
+        panic!("computer command should return a domain outcome");
+    };
+    assert!(!outcome.is_error);
+    let Some(cyrene_plugin_contracts::tool_provider_v1::tool_content_part::Content::Json(result)) =
+        outcome
+            .content
+            .first()
+            .and_then(|part| part.content.as_ref())
+    else {
+        panic!("computer command result should be JSON");
+    };
+    let result: serde_json::Value = serde_json::from_str(&result.json).unwrap();
+    assert_eq!(result["exit_code"], 0);
+    assert_eq!(result["stdout"], "direct-plugin-ok");
+    assert_eq!(result["resource_usage"], serde_json::Value::Null);
 }
 
 #[tokio::test]
@@ -715,7 +790,7 @@ fn fake_mcp_server_config() -> McpServerConfig {
 }
 
 #[tokio::test]
-async fn test_w3_tool_provider_without_bindings_fails_closed() {
+async fn test_computer_tool_provider_is_available_without_mcp_bindings() {
     let (mut client, _addr) = start_production_server().await;
 
     let mut buf = Vec::new();
@@ -737,12 +812,18 @@ async fn test_w3_tool_provider_without_bindings_fails_closed() {
         .unwrap()
         .into_inner();
 
-    match response.result.unwrap() {
-        InvocationResult::Error(error) => assert_eq!(error.code, Code::Unavailable as i32),
-        InvocationResult::Payload(_) => {
-            panic!("an unconfigured tool provider must fail closed")
-        }
-    }
+    let Some(InvocationResult::Payload(payload)) = response.result else {
+        panic!("the fixed computer tool provider should be available without MCP bindings");
+    };
+    let list_response = ListToolsResponse::decode(&payload.value[..]).unwrap();
+    let Some(list_tools_response::Result::Catalog(catalog)) = list_response.result else {
+        panic!("the computer catalog should be returned");
+    };
+    assert_eq!(catalog.tools.len(), 4);
+    assert!(catalog
+        .tools
+        .iter()
+        .all(|tool| tool.binding_id == "computer-runtime"));
 }
 
 #[tokio::test]
@@ -779,8 +860,10 @@ async fn test_w3_mcp_tool_provider_dispatch() {
         list_tools_response::Result::Catalog(catalog) => catalog,
         list_tools_response::Result::Error(error) => panic!("list_tools error: {error:?}"),
     };
-    assert_eq!(catalog.tools.len(), 3);
-    assert!(catalog.catalog_version.starts_with("sha256:"));
+    assert_eq!(catalog.tools.len(), 7);
+    assert!(catalog
+        .catalog_version
+        .starts_with("computer-runtime-v1-four-tools+sha256:"));
     assert!(catalog
         .tools
         .iter()

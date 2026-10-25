@@ -266,6 +266,8 @@ dependencies = [
  "libc",
  "prost 0.12.6",
  "prost-types 0.12.6",
+ "serde",
+ "serde_json",
  "sha2",
  "tempfile",
  "tokio",
@@ -334,6 +336,7 @@ name = "cyrene-plugin-server"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "base64 0.22.1",
  "cyrene-agent-runtime",
  "cyrene-computer-runtime",
  "cyrene-connector-wecom",
