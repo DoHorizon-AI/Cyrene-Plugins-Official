@@ -130,6 +130,56 @@ class FakeGitHubApi:
         self.calls.append(("pull_request", args))
         return {"pull_request": {"number": args[1], "state": "OPEN"}}
 
+    def search_issues(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append(("issues_search", (*args, kwargs)))
+        return {
+            "issues": [],
+            "total_count": 0,
+            "truncated": False,
+            "complete": True,
+            "next_cursor": None,
+        }
+
+    def get_branch(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("branch_get", args))
+        return {"branch": args[1], "exists": True, "commit_sha": "a" * 40}
+
+    def get_file(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("file_get", args))
+        return {"branch": args[1], "path": args[2], "exists": False}
+
+    def list_workflow_jobs(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("jobs_list", args))
+        return {"jobs": [], "total_count": 0, "truncated": False}
+
+    def read_job_log_excerpt(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("job_logs", args))
+        return {"job_id": args[2], "excerpt": "", "truncated": False}
+
+    def create_branch(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("branch_create", args))
+        return {"status": "CONFIRMED", "verified": True}
+
+    def delete_branch(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("branch_delete", args))
+        return {"status": "CONFIRMED", "verified": True}
+
+    def commit_file(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("file_commit", args))
+        return {"status": "CONFIRMED", "verified": True}
+
+    def create_draft_pull_request(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("draft_pr_create", args))
+        return {"status": "CONFIRMED", "verified": True}
+
+    def find_draft_pull_request(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("draft_pr_find", args))
+        return {"exists": False, "count": 0, "duplicate": False, "pull_requests": []}
+
+    def rerun_failed_jobs(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("rerun_failed", args))
+        return {"status": "REQUESTED", "verified": True}
+
 
 class FakeCliRunner:
     """Record the fixed process request and return local-only process evidence."""
@@ -236,6 +286,17 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
         "github.pull_request.get",
         "github.actions.runs.list",
         "github.ci.status",
+        "github.issues.search",
+        "github.branch.get",
+        "github.file.get",
+        "github.actions.jobs.list",
+        "github.actions.job.logs.read",
+        "github.branch.create",
+        "github.branch.delete",
+        "github.file.commit",
+        "github.pull_request.draft.create",
+        "github.pull_request.draft.find",
+        "github.actions.rerun_failed",
         "github_vendor_cli",
     ]
     schemas = [json.loads(tool.input_schema_json) for tool in catalog.tools]
@@ -488,6 +549,197 @@ def test_profile_lease_binds_exact_target_and_reads_pull_request() -> None:
     assert api.calls[0][0] == "pull_request"
 
 
+def test_new_github_tools_use_profile_leases_with_locator_targets_and_full_digests() -> None:
+    settings = make_settings()
+    profile_ref = "00000000-0000-4000-8000-000000000001"
+    repo = {"repository_id": "12345", "repository": "owner/project"}
+    branch = "codex/assistant-task"
+    sha = "a" * 40
+    cases: list[tuple[str, dict[str, Any], dict[str, Any]]] = [
+        (
+            "github.issues.search",
+            {
+                **repo,
+                "query": "workflow status",
+                "state": "OPEN",
+                "labels": ["bug"],
+                "updated_since": "2026-10-24T12:00:00Z",
+                "page_cursor": "2",
+                "limit": 20,
+            },
+            {**repo},
+        ),
+        ("github.branch.get", {**repo, "branch": branch}, {**repo, "branch": branch}),
+        (
+            "github.file.get",
+            {**repo, "branch": branch, "path": "src/main.py"},
+            {**repo, "branch": branch, "path": "src/main.py"},
+        ),
+        (
+            "github.actions.jobs.list",
+            {**repo, "run_id": "12345", "limit": 20},
+            {**repo, "run_id": "12345"},
+        ),
+        (
+            "github.actions.job.logs.read",
+            {**repo, "run_id": "12345", "job_id": "67890", "max_lines": 50},
+            {**repo, "run_id": "12345", "job_id": "67890"},
+        ),
+        (
+            "github.branch.create",
+            {**repo, "branch": branch, "from_sha": sha},
+            {**repo, "branch": branch},
+        ),
+        (
+            "github.branch.delete",
+            {**repo, "branch": branch, "expected_sha": sha},
+            {**repo, "branch": branch},
+        ),
+        (
+            "github.file.commit",
+            {
+                **repo,
+                "branch": branch,
+                "path": "src/main.py",
+                "message": "Update source",
+                "content_base64": "aGVsbG8=",
+            },
+            {**repo, "branch": branch, "path": "src/main.py"},
+        ),
+        (
+            "github.pull_request.draft.create",
+            {
+                **repo,
+                "head_branch": branch,
+                "base_branch": "develop",
+                "title": "Automated task",
+                "body": "Evidence and changes",
+            },
+            {**repo, "head_branch": branch, "base_branch": "develop"},
+        ),
+        (
+            "github.pull_request.draft.find",
+            {**repo, "head_branch": branch, "base_branch": "develop"},
+            {**repo, "head_branch": branch, "base_branch": "develop"},
+        ),
+        (
+            "github.actions.rerun_failed",
+            {
+                **repo,
+                "run_id": "12345",
+                "expected_head_sha": sha,
+                "expected_attempt": 2,
+            },
+            {**repo, "run_id": "12345"},
+        ),
+    ]
+
+    for index, (tool_id, arguments, expected_target) in enumerate(cases):
+        account = FakeAccountCenter()
+        api = FakeGitHubApi()
+        provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+        error, result = invoke_tool(
+            provider,
+            settings,
+            tool_id,
+            arguments,
+            lease_ref=f"12345678-1234-1234-1234-{index:012d}",
+            profile_ref=profile_ref,
+        )
+
+        assert error is False, (tool_id, result)
+        payload, trusted_context = account.calls[0]
+        assert payload["profile_ref"] == profile_ref
+        assert payload["operation_id"] == tool_id
+        assert payload["target"] == expected_target
+        assert payload["arguments_sha256"] == hashlib.sha256(
+            canonical_json(arguments)
+        ).hexdigest()
+        assert trusted_context["method"] == "redeem_provider_credential_lease"
+        assert "installation-token-must-not-escape" not in json.dumps(result)
+        assert api.calls
+
+
+@pytest.mark.parametrize(
+    ("tool_id", "arguments"),
+    [
+        (
+            "github.branch.create",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "branch": "main",
+                "from_sha": "a" * 40,
+            },
+        ),
+        (
+            "github.file.commit",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "branch": "codex/task",
+                "path": ".github/workflows/ci.yml",
+                "message": "change workflow",
+                "content_base64": "aGVsbG8=",
+            },
+        ),
+        (
+            "github.file.commit",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "branch": "codex/task",
+                "path": "config/app-prod.json",
+                "message": "change production config",
+                "content_base64": "aGVsbG8=",
+            },
+        ),
+        (
+            "github.file.commit",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "branch": "codex/task",
+                "path": "src/main.py",
+                "message": "write",
+                "content_base64": "not base64",
+            },
+        ),
+    ],
+)
+def test_github_write_scope_is_rejected_before_lease(
+    tool_id: str, arguments: Mapping[str, Any]
+) -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+
+    lease_ref = "12345678-1234-1234-1234-123456789abc"
+    profile_ref = "00000000-0000-4000-8000-000000000001"
+    envelope = {
+        "payload": dict(arguments),
+        "lease_ref": lease_ref,
+        "profile_ref": profile_ref,
+        "trusted_context": signed_context(
+            settings, arguments, lease_ref, tool_id, profile_ref=profile_ref
+        ),
+    }
+    request = wire.CallToolRequest(
+        binding_id=settings.binding_id,
+        provider_tool_id=tool_id,
+        arguments_json=json.dumps(envelope, separators=(",", ":")),
+    )
+    is_error, result = provider.on_invoke(
+        "tool.provider.v1", "call_tool", request.SerializeToString()
+    )
+
+    assert is_error is False
+    assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
+    assert account.calls == []
+    assert api.calls == []
+
+
 def test_lease_reference_is_one_use_and_not_redeemed_again_after_replay() -> None:
     settings = make_settings()
     account = FakeAccountCenter()
@@ -734,13 +986,13 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
             return HttpResponse(
                 200,
                 {},
-                b'{"number":4,"state":"open","title":"Review","head":{"sha":"deadbeef1234567"},"base":{"ref":"main"},"repository":{"id":12345,"full_name":"owner/project"}}',
+                b'{"number":4,"state":"open","title":"Review","head":{"sha":"deadbeef1234567","ref":"codex/task","repo":{"id":12345,"full_name":"owner/project"}},"base":{"sha":"feedface1234567","ref":"main","repo":{"id":12345,"full_name":"owner/project"}},"repository":{"id":12345,"full_name":"owner/project"}}',
             )
         if path.endswith("/actions/runs?per_page=100&branch=main"):
             return HttpResponse(
                 200,
                 {},
-                b'{"workflow_runs":[{"id":99,"name":"CI","status":"completed","conclusion":"success","head_sha":"deadbeef1234567"}]}',
+                b'{"workflow_runs":[{"id":99,"name":"CI","status":"completed","conclusion":"success","head_sha":"deadbeef1234567","head_branch":"main","run_attempt":1}]}',
             )
         if path.endswith("/commits/deadbeef1234567/status"):
             return HttpResponse(
@@ -770,6 +1022,620 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert all(
         path.startswith(("/repos/owner/project", "/installation/repositories")) for path in observed
     )
+
+
+def _workflow_run_response(
+    *,
+    status: str = "completed",
+    conclusion: str | None = "failure",
+    attempt: int = 1,
+    branch: str = "codex/task",
+    head_sha: str = "a" * 40,
+) -> bytes:
+    """Build a stable API response for bounded Actions lifecycle tests."""
+
+    return json.dumps(
+        {
+            "id": 99,
+            "name": "Source CI",
+            "status": status,
+            "conclusion": conclusion,
+            "head_sha": head_sha,
+            "head_branch": branch,
+            "run_attempt": attempt,
+        }
+    ).encode()
+
+
+def test_issue_search_is_repo_qualified_and_projects_only_issue_results() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    observed: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed.append(path)
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        assert host == "api.github.com"
+        assert method == "GET"
+        return HttpResponse(
+            200,
+            {},
+            json.dumps(
+                {
+                    "total_count": 2,
+                    "incomplete_results": False,
+                    "items": [
+                        {
+                            "id": 555,
+                            "number": 7,
+                            "state": "open",
+                            "title": "Investigate",
+                            "body": "Issue details",
+                            "html_url": "https://github.com/owner/project/issues/7",
+                            "repository_url": "https://api.github.com/repos/owner/project",
+                            "updated_at": "2026-10-24T12:00:00Z",
+                        }
+                    ],
+                }
+            ).encode(),
+        )
+
+    api = GitHubApi(settings, transport=transport)
+    result = api.search_issues(
+        repository,
+        "workflow status",
+        "OPEN",
+        ["bug"],
+        1,
+        "token",
+        updated_since="2026-10-24T12:00:00Z",
+        page_cursor="2",
+    )
+
+    assert result["total_count"] == 2
+    assert result["complete"] is True
+    assert result["next_cursor"] is None
+    assert result["issues"][0]["number"] == 7
+    assert result["issues"][0]["body_excerpt"] == "Issue details"
+    assert "repository_url" not in result["issues"][0]
+    assert "repo%3Aowner%2Fproject+is%3Aissue+is%3Aopen+workflow+status" in observed[-1]
+    assert "label%3A%22bug%22" in observed[-1]
+    assert "updated%3A%3E%3D2026-10-24T12%3A00%3A00%2B00%3A00" in observed[-1]
+    assert "page=2" in observed[-1]
+
+
+def test_issue_search_marks_the_github_1000_result_ceiling_incomplete() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        assert path.endswith("per_page=50&page=20")
+        return HttpResponse(
+            200,
+            {},
+            b'{"total_count":1201,"incomplete_results":false,"items":[]}',
+        )
+
+    result = GitHubApi(settings, transport=transport).search_issues(
+        repository, "", "ALL", [], 50, "token", page_cursor="20"
+    )
+
+    assert result["complete"] is False
+    assert result["truncated"] is True
+    assert result["next_cursor"] is None
+
+
+def test_draft_pull_request_creation_reads_back_exact_same_repository_branches() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    head_sha = "e" * 40
+    base_sha = "f" * 40
+    pull_request = {
+        "number": 4,
+        "state": "open",
+        "title": "Automated task",
+        "body": "Evidence",
+        "draft": True,
+        "html_url": "https://github.com/owner/project/pull/4",
+        "head": {
+            "sha": head_sha,
+            "ref": "codex/task",
+            "repo": {"id": 12345, "full_name": "owner/project"},
+        },
+        "base": {
+            "sha": base_sha,
+            "ref": "develop",
+            "repo": {"id": 12345, "full_name": "owner/project"},
+        },
+        "repository": {"id": 12345, "full_name": "owner/project"},
+    }
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/git/ref/heads/codex%2Ftask"):
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {"ref": "refs/heads/codex/task", "object": {"sha": head_sha}}
+                ).encode(),
+            )
+        if path.endswith("/git/ref/heads/develop"):
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {"ref": "refs/heads/develop", "object": {"sha": base_sha}}
+                ).encode(),
+            )
+        if path.startswith("/repos/owner/project/pulls?"):
+            return HttpResponse(200, {}, b"[]")
+        if method == "POST" and path == "/repos/owner/project/pulls":
+            assert json.loads(body or b"{}") == {
+                "title": "Automated task",
+                "body": "Evidence",
+                "head": "codex/task",
+                "base": "develop",
+                "draft": True,
+            }
+            return HttpResponse(201, {}, json.dumps(pull_request).encode())
+        if path.endswith("/pulls/4"):
+            return HttpResponse(200, {}, json.dumps(pull_request).encode())
+        raise AssertionError((method, path))
+
+    result = GitHubApi(settings, transport=transport).create_draft_pull_request(
+        repository, "codex/task", "develop", "Automated task", "Evidence", "token"
+    )
+
+    assert result["status"] == "CONFIRMED"
+    assert result["verified"] is True
+    assert result["pull_request"] == {
+        "number": 4,
+        "url": "https://github.com/owner/project/pull/4",
+        "head_sha": head_sha,
+        "base_sha": base_sha,
+        "is_draft": True,
+    }
+
+
+def test_actions_jobs_and_logs_are_run_scoped_bounded_and_redacted() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    observed: list[tuple[str, str, Mapping[str, str]]] = []
+    signed_log_url = (
+        "https://productionresultssa30.blob.core.windows.net/job/log.txt?sig=short-lived"
+    )
+    fake_token = "gh" + "p_" + "abcdefghijklmnopqrstuvwxyz0123456789"
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed.append((method, host, dict(headers)))
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/actions/runs/99"):
+            return HttpResponse(200, {}, _workflow_run_response())
+        if path.endswith("/actions/runs/99/jobs?per_page=10"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"total_count":1,"jobs":[{"id":100,"run_id":99,"name":"test","status":"completed","conclusion":"failure","steps":[]}]}',
+            )
+        if path.endswith("/actions/jobs/100"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"id":100,"run_id":99,"name":"test","status":"completed","conclusion":"failure","steps":[]}',
+            )
+        if path.endswith("/actions/jobs/100/logs"):
+            return HttpResponse(302, {"location": signed_log_url}, b"")
+        assert host == "productionresultssa30.blob.core.windows.net"
+        return HttpResponse(
+            200,
+            {},
+            b"start\nAWS_SECRET_ACCESS_KEY=aws-secret-value\n"
+            + f"failure {fake_token}\nlast line\n".encode(),
+        )
+
+    api = GitHubApi(settings, transport=transport)
+    jobs = api.list_workflow_jobs(repository, "99", 10, "token")
+    logs = api.read_job_log_excerpt(repository, "99", "100", 3, "token")
+
+    assert jobs["jobs"][0]["job_id"] == "100"
+    assert logs["job_id"] == "100"
+    assert "failure [REDACTED_GITHUB_TOKEN]" in logs["excerpt"]
+    assert "AWS_SECRET_ACCESS_KEY=[REDACTED]" in logs["excerpt"]
+    assert "aws-secret-value" not in logs["excerpt"]
+    assert "start" not in logs["excerpt"]
+    external_requests = [item for item in observed if item[1] != "api.github.com"]
+    assert len(external_requests) == 1
+    assert "Authorization" not in external_requests[0][2]
+
+
+def test_actions_log_rejects_untrusted_redirect_hosts() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    observed_hosts: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed_hosts.append(host)
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/actions/runs/99"):
+            return HttpResponse(200, {}, _workflow_run_response())
+        if path.endswith("/actions/jobs/100"):
+            return HttpResponse(
+                200,
+                {},
+                b'{"id":100,"run_id":99,"name":"test","status":"completed","conclusion":"failure","steps":[]}',
+            )
+        return HttpResponse(302, {"location": "https://attacker.invalid/logs"}, b"")
+
+    api = GitHubApi(settings, transport=transport)
+    with pytest.raises(GitHubApiFailure, match="LOG_DOWNLOAD_REDIRECT_REJECTED"):
+        api.read_job_log_excerpt(repository, "99", "100", 20, "token")
+    assert "attacker.invalid" not in observed_hosts
+
+
+def test_branch_create_reconciles_exact_ref_and_delete_checks_expected_head() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    sha = "a" * 40
+    observed: list[tuple[str, str]] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed.append((method, path))
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/commits/" + sha):
+            return HttpResponse(200, {}, json.dumps({"sha": sha}).encode())
+        if path.endswith("/git/ref/heads/codex%2Ftask") and method == "GET":
+            if any(item[0] == "POST" for item in observed):
+                return HttpResponse(
+                    200,
+                    {},
+                    json.dumps(
+                        {"ref": "refs/heads/codex/task", "object": {"sha": sha}}
+                    ).encode(),
+                )
+            return HttpResponse(404, {}, b"")
+        if path.endswith("/git/refs") and method == "POST":
+            assert json.loads(body or b"{}") == {"ref": "refs/heads/codex/task", "sha": sha}
+            return HttpResponse(
+                201,
+                {},
+                json.dumps({"ref": "refs/heads/codex/task", "object": {"sha": sha}}).encode(),
+            )
+        if method == "DELETE":
+            raise TimeoutError("connection ended after request")
+        raise AssertionError((method, path))
+
+    api = GitHubApi(settings, transport=transport)
+    created = api.create_branch(repository, "codex/task", sha, "token")
+    assert created["verified"] is True
+    assert created["commit_sha"] == sha
+
+
+def test_branch_delete_reconciles_ambiguous_delete_to_absent() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    sha = "b" * 40
+    delete_sent = False
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal delete_sent
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/git/ref/heads/codex%2Ftask"):
+            if delete_sent:
+                return HttpResponse(404, {}, b"")
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {"ref": "refs/heads/codex/task", "object": {"sha": sha}}
+                ).encode(),
+            )
+        if method == "DELETE":
+            delete_sent = True
+            raise TimeoutError("unknown delete result")
+        raise AssertionError((method, path))
+
+    api = GitHubApi(settings, transport=transport)
+    result = api.delete_branch(repository, "codex/task", sha, "token")
+    assert result == {
+        "status": "CONFIRMED",
+        "branch": "codex/task",
+        "deleted": True,
+        "already_absent": False,
+        "verified": True,
+    }
+
+
+def test_repository_renamed_default_branch_is_protected_from_task_deletion() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    observed: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed.append(path)
+        return HttpResponse(
+            200,
+            {},
+            b'{"id":12345,"full_name":"owner/project","default_branch":"trunk"}',
+        )
+
+    api = GitHubApi(settings, transport=transport)
+    with pytest.raises(GitHubApiFailure, match="PROTECTED_BRANCH"):
+        api.delete_branch(repository, "trunk", "a" * 40, "token")
+
+    assert observed == ["/repos/owner/project"]
+
+
+def test_file_commit_uses_blob_precondition_and_readback() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    content = b"print('hello')\n"
+    encoded = base64.b64encode(content).decode()
+    blob_sha = hashlib.sha1(
+        f"blob {len(content)}\0".encode() + content, usedforsecurity=False
+    ).hexdigest()
+    commit_sha = "c" * 40
+    write_sent = False
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal write_sent
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/contents/src/main.py?ref=codex%2Ftask"):
+            if not write_sent:
+                return HttpResponse(404, {}, b"")
+            return HttpResponse(
+                200,
+                {},
+                json.dumps(
+                    {
+                        "path": "src/main.py",
+                        "sha": blob_sha,
+                        "encoding": "base64",
+                        "content": encoded,
+                    }
+                ).encode(),
+            )
+        if method == "PUT":
+            write_sent = True
+            assert json.loads(body or b"{}") == {
+                "message": "Add source",
+                "content": encoded,
+                "branch": "codex/task",
+            }
+            return HttpResponse(
+                201,
+                {},
+                json.dumps(
+                    {
+                        "content": {"sha": blob_sha},
+                        "commit": {"sha": commit_sha},
+                    }
+                ).encode(),
+            )
+        raise AssertionError((method, path))
+
+    api = GitHubApi(settings, transport=transport)
+    result = api.commit_file(
+        repository, "codex/task", "src/main.py", "Add source", encoded, None, "token"
+    )
+    assert result["verified"] is True
+    assert result["blob_sha"] == blob_sha
+    assert result["commit_sha"] == commit_sha
+
+
+def test_file_update_uses_expected_blob_sha_and_reconciles_lost_response() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    old_content = b"old source\n"
+    new_content = b"updated source\n"
+    old_encoded = base64.b64encode(old_content).decode()
+    new_encoded = base64.b64encode(new_content).decode()
+    old_sha = hashlib.sha1(
+        f"blob {len(old_content)}\0".encode() + old_content, usedforsecurity=False
+    ).hexdigest()
+    new_sha = hashlib.sha1(
+        f"blob {len(new_content)}\0".encode() + new_content, usedforsecurity=False
+    ).hexdigest()
+    write_reached_github = False
+
+    def file_response(encoded: str, blob_sha: str) -> HttpResponse:
+        return HttpResponse(
+            200,
+            {},
+            json.dumps(
+                {
+                    "path": "src/main.py",
+                    "sha": blob_sha,
+                    "encoding": "base64",
+                    "content": encoded,
+                }
+            ).encode(),
+        )
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal write_reached_github
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/contents/src/main.py?ref=codex%2Ftask"):
+            if write_reached_github:
+                return file_response(new_encoded, new_sha)
+            return file_response(old_encoded, old_sha)
+        if method == "PUT":
+            assert json.loads(body or b"{}") == {
+                "message": "Update source",
+                "content": new_encoded,
+                "branch": "codex/task",
+                "sha": old_sha,
+            }
+            write_reached_github = True
+            raise TimeoutError("server applied the commit before the response was lost")
+        raise AssertionError((method, path))
+
+    result = GitHubApi(settings, transport=transport).commit_file(
+        repository,
+        "codex/task",
+        "src/main.py",
+        "Update source",
+        new_encoded,
+        old_sha,
+        "token",
+    )
+
+    assert result["status"] == "CONFIRMED"
+    assert result["blob_sha"] == new_sha
+    assert result["commit_sha"] is None
+    assert result["reconciled"] is True
+
+
+def test_failed_ci_rerun_requires_exact_task_branch_attempt_and_reads_new_attempt() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    sha = "d" * 40
+    run_read_count = 0
+    rerun_sent = False
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal run_read_count, rerun_sent
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/actions/runs/99") and method == "GET":
+            run_read_count += 1
+            if rerun_sent:
+                return HttpResponse(
+                    200,
+                    {},
+                    _workflow_run_response(
+                        status="queued", conclusion=None, attempt=2, head_sha=sha
+                    ),
+                )
+            return HttpResponse(
+                200, {}, _workflow_run_response(head_sha=sha, attempt=1)
+            )
+        if path.endswith("/rerun-failed-jobs") and method == "POST":
+            rerun_sent = True
+            return HttpResponse(201, {}, b"")
+        raise AssertionError((method, path))
+
+    api = GitHubApi(settings, transport=transport)
+    result = api.rerun_failed_jobs(repository, "99", sha, 1, "token")
+    assert result == {
+        "status": "QUEUED",
+        "conclusion": None,
+        "run_id": "99",
+        "attempt": 2,
+        "head_sha": sha,
+        "verified": True,
+    }
+    assert run_read_count == 2
+
+
+def test_failed_ci_rerun_reports_missing_actions_write_permission_truthfully() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    sha = "d" * 40
+    rerun_calls = 0
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        nonlocal rerun_calls
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith("/actions/runs/99") and method == "GET":
+            return HttpResponse(
+                200, {}, _workflow_run_response(head_sha=sha, attempt=1)
+            )
+        if path.endswith("/rerun-failed-jobs") and method == "POST":
+            rerun_calls += 1
+            return HttpResponse(403, {}, b'{"message":"Actions: write permission required"}')
+        raise AssertionError((method, path))
+
+    api = GitHubApi(settings, transport=transport)
+    with pytest.raises(GitHubApiFailure) as failure:
+        api.rerun_failed_jobs(repository, "99", sha, 1, "token")
+
+    assert failure.value.code == "AUTHORIZATION_DENIED"
+    assert failure.value.uncertain is False
+    assert rerun_calls == 1
 
 
 def test_rate_limit_and_server_failures_are_bounded_and_retry_hints_are_preserved() -> None:
