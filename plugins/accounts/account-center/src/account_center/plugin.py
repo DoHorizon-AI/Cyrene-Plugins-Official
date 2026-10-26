@@ -1153,6 +1153,7 @@ class AccountCenterPlugin:
                 "auth_status": row["auth_status"],
                 "external_subject": row["external_subject"],
                 "expires_at": row["credential_expires_at"],
+                "credential_revision": row["credential_revision"],
             }
             if row["provider"] == "huggingface" and row["auth_mode"] == "device_oauth":
                 if row["oauth_scopes_json"] is None:

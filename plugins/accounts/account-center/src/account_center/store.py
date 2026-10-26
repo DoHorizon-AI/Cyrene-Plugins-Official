@@ -1254,7 +1254,7 @@ class AccountStore:
             rows = db.execute(
                 "SELECT profile_ref,provider,identity_ref,target_scope_json,auth_status,"
                 "external_subject,credential_expires_at,status,created_at,updated_at,"
-                "auth_mode,oauth_scopes_json,access_mode "
+                "auth_mode,oauth_scopes_json,access_mode,credential_revision "
                 "FROM provider_profiles WHERE anchor_issuer=? AND anchor_subject=? "
                 "AND organization_id=? AND workspace_id IS ? AND status='active' "
                 "ORDER BY created_at,profile_ref",

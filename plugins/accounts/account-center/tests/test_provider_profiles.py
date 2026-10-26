@@ -820,6 +820,7 @@ def test_huggingface_link_rotation_is_host_secret_only_and_identity_pinned(
     assert listed["profiles"][0]["profile_ref"] == profile_ref
     assert "credential_secret_ref" not in listed["profiles"][0]
     assert "credential_blob" not in listed["profiles"][0]
+    assert listed["profiles"][0]["credential_revision"] == 0
 
     with pytest.raises(AccountCenterError, match="external_identity_mismatch"):
         harness.call(
@@ -907,6 +908,7 @@ def test_huggingface_device_oauth_refresh_persists_rotation_and_survives_restart
     listed = harness.call("list_provider_profiles", {})["profiles"][0]
     assert listed["oauth_scopes"] is None
     assert listed["auth_mode"] == "device_oauth"
+    initial_revision = listed["credential_revision"]
 
     _, redemption = _huggingface_oauth_lease(harness, profile_ref, scope)
     result = harness.call(
@@ -926,6 +928,10 @@ def test_huggingface_device_oauth_refresh_persists_rotation_and_survives_restart
     assert stored_refresh == "oauth_refresh_rotated"
     assert b"oauth_refresh_rotated" not in bytes(row["credential_refresh_blob"])
     assert row["credential_refresh_expires_at"] == 17_200
+    assert (
+        harness.call("list_provider_profiles", {})["profiles"][0]["credential_revision"]
+        > initial_revision
+    )
 
     harness.plugin = harness._new_plugin()
     _, resumed_redemption = _huggingface_oauth_lease(harness, profile_ref, scope)
