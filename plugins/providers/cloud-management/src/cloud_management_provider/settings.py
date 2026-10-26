@@ -34,6 +34,10 @@ _GCP_PROJECT = re.compile(r"[a-z][a-z0-9-]{4,28}[a-z0-9]\Z")
 _GCP_ZONE = re.compile(r"[a-z]+-[a-z0-9]+-[a-z]\Z")
 _GCP_NAME_PREFIX = re.compile(r"[a-z]([-a-z0-9]{0,60})?\Z")
 _GCP_NAME_PREFIX_WITH_DASH = re.compile(r"[a-z][-a-z0-9]{0,61}\Z")
+_GCP_SOURCE_IMAGE = re.compile(
+    r"projects/[a-z][a-z0-9-]{4,28}[a-z0-9]/global/images/"
+    r"(?:family/[a-z][a-z0-9-]{0,62}|[a-z][a-z0-9-]{0,62})\Z"
+)
 _RUNPOD_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 _RUNPOD_NAME_PREFIX = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,62}\Z")
 _RUNPOD_SCOPE_VALUE = re.compile(r"[A-Za-z0-9][A-Za-z0-9 ._:-]{0,127}\Z")
@@ -326,7 +330,14 @@ def _parse_scope(provider: str, raw: object) -> Mapping[str, Any]:
             "deployment_api_version": deployment_version,
         }
     if provider == "gcp":
-        allowed = {"project_id", "zones", "instance_name_prefixes"}
+        allowed = {
+            "project_id",
+            "zones",
+            "instance_name_prefixes",
+            "disk_name_prefixes",
+            "disk_size_gb_range",
+            "disk_source_images",
+        }
         if set(raw) - allowed:
             raise ConfigurationError("GCP scope has unsupported fields")
         project_id = _required_text(raw.get("project_id"), "project_id", 30)
@@ -334,6 +345,7 @@ def _parse_scope(provider: str, raw: object) -> Mapping[str, Any]:
             raise ConfigurationError("GCP project_id is invalid")
         zones = _text_list(raw.get("zones"), "zones", 1, 100)
         prefixes = _text_list(raw.get("instance_name_prefixes"), "instance_name_prefixes", 1, 100)
+        disk_prefixes = _text_list(raw.get("disk_name_prefixes", []), "disk_name_prefixes", 0, 100)
         if any(not _GCP_ZONE.fullmatch(zone) for zone in zones):
             raise ConfigurationError("GCP zone is invalid")
         if any(
@@ -341,10 +353,31 @@ def _parse_scope(provider: str, raw: object) -> Mapping[str, Any]:
             for prefix in prefixes
         ):
             raise ConfigurationError("GCP instance name prefix is invalid")
+        if any(
+            not (_GCP_NAME_PREFIX.fullmatch(prefix) or _GCP_NAME_PREFIX_WITH_DASH.fullmatch(prefix))
+            for prefix in disk_prefixes
+        ):
+            raise ConfigurationError("GCP disk name prefix is invalid")
+        size_range_raw = raw.get("disk_size_gb_range")
+        size_range: Mapping[str, int] | None = None
+        if size_range_raw is not None:
+            if not isinstance(size_range_raw, Mapping) or set(size_range_raw) != {"min", "max"}:
+                raise ConfigurationError("GCP disk_size_gb_range must contain min and max")
+            minimum = _bounded_int(size_range_raw.get("min"), "disk_size_gb_range.min", 10, 1024)
+            maximum = _bounded_int(size_range_raw.get("max"), "disk_size_gb_range.max", 10, 1024)
+            if minimum > maximum:
+                raise ConfigurationError("GCP disk size range minimum exceeds maximum")
+            size_range = {"min": minimum, "max": maximum}
+        source_images = _text_list(raw.get("disk_source_images", []), "disk_source_images", 0, 100)
+        if any(not _GCP_SOURCE_IMAGE.fullmatch(image) for image in source_images):
+            raise ConfigurationError("GCP disk source image must be an exact project image path")
         return {
             "project_id": project_id,
             "zones": tuple(zones),
             "instance_name_prefixes": tuple(prefixes),
+            "disk_name_prefixes": tuple(disk_prefixes),
+            "disk_size_gb_range": size_range,
+            "disk_source_images": tuple(source_images),
         }
     allowed = {
         "pod_ids",

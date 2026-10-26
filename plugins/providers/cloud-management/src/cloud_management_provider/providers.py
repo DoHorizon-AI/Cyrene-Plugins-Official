@@ -53,8 +53,31 @@ _RUNPOD_LOG_MAX_OUTPUT_BYTES = 16 * 1024
 _RUNPOD_LOG_READ_CHUNK_BYTES = 1
 _RUNPOD_LOG_READ_SECONDS = 8.0
 _MAX_OPERATION_AGE = timedelta(days=30)
+_GCP_OPERATION_LOOKUP_PAGE_SIZE = 100
+_GCP_OPERATION_LOOKUP_MAX_PAGES = 5
+_GCP_OPERATION_REQUEST_WINDOW = timedelta(minutes=5)
 _RESOURCE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 _GCP_INSTANCE_NAME = re.compile(r"[a-z]([-a-z0-9]{0,61}[a-z0-9])?\Z")
+_GCP_LABEL_KEY = re.compile(r"[a-z][a-z0-9_-]{0,62}\Z")
+_GCP_LABEL_VALUE = re.compile(r"[a-z0-9_-]{0,63}\Z")
+_GCP_ALLOWED_DISK_TYPES = {"pd-standard", "pd-balanced", "pd-ssd"}
+_GCP_SENSITIVE_LABEL_TOKENS = {
+    "credential",
+    "credentials",
+    "password",
+    "secret",
+    "token",
+}
+_GCP_SENSITIVE_LABEL_KEYS = {
+    "access-key",
+    "access_key",
+    "api-key",
+    "api_key",
+    "client-secret",
+    "client_secret",
+    "private-key",
+    "private_key",
+}
 _AZURE_RESOURCE_ID = re.compile(
     r"/subscriptions/(?P<subscription>[0-9a-fA-F-]{36})/"
     r"resourceGroups/(?P<group>[A-Za-z0-9_.() -]{1,90})/"
@@ -296,6 +319,24 @@ class CloudManagementExecutor:
                     write_receipt = _runpod_update_receipt(update_body)
                 except ProviderFailure as error:
                     preparation_error = error
+            if (
+                tool_id == "cloud_resource_create"
+                and profile.provider == "gcp"
+                and _gcp_target_is_disk(arguments.get("target"))
+            ):
+                try:
+                    zone, disk_name = _gcp_disk_target(profile, arguments.get("target"))
+                    disk_body, source_image, expected_labels = _gcp_disk_create_body(
+                        profile,
+                        zone,
+                        disk_name,
+                        _object(arguments.get("parameters"), "parameters"),
+                    )
+                    write_receipt = _gcp_disk_operation_receipt(
+                        disk_body, source_image, expected_labels
+                    )
+                except ProviderFailure as error:
+                    preparation_error = error
             operation_ref = self._new_operation_ref(
                 profile,
                 tool_id,
@@ -386,7 +427,11 @@ class CloudManagementExecutor:
         if tool_id in {"cloud_resource_create", "cloud_resource_deploy"}:
             _require_keys(arguments, {"profile_ref", "target", "parameters"})
             return self._create_resource(
-                profile, tool_id, arguments["target"], arguments["parameters"]
+                profile,
+                tool_id,
+                arguments["target"],
+                arguments["parameters"],
+                request_id=request_id,
             )
         if tool_id == "cloud_resource_update":
             _require_keys(arguments, {"profile_ref", "target", "parameters"})
@@ -403,7 +448,7 @@ class CloudManagementExecutor:
             "cloud_resource_delete",
         }:
             _require_keys(arguments, {"profile_ref", "target"})
-            return self._change_state(profile, tool_id, arguments["target"])
+            return self._change_state(profile, tool_id, arguments["target"], request_id=request_id)
         if tool_id == "cloud_operation_status":
             _require_keys(arguments, {"profile_ref", "operation_ref"})
             return self._operation_status(profile, arguments["operation_ref"])
@@ -520,25 +565,35 @@ class CloudManagementExecutor:
                 else False,
             }
         if profile.provider == "gcp":
-            zone = _gcp_list_target(profile, target)
+            zone, resource_kind = _gcp_list_target(profile, target)
             token, _ = self._gcp_token(profile)
             project = quote(str(profile.scope["project_id"]), safe="-")
             encoded_zone = quote(zone, safe="-")
+            collection = "disks" if resource_kind == "disk" else "instances"
             result = self._request(
                 "GET",
-                f"{GCP_BASE}/projects/{project}/zones/{encoded_zone}/instances",
+                f"{GCP_BASE}/projects/{project}/zones/{encoded_zone}/{collection}",
                 token=token,
                 params={"maxResults": "100", **_gcp_page_params(cursor)},
             )
             body = result.body if isinstance(result.body, Mapping) else {}
-            resources = [
-                _gcp_summary(item)
-                for item in body.get("items", [])
-                if isinstance(item, Mapping)
-                and _gcp_name_in_scope(profile, str(item.get("name", "")))
-            ]
+            if resource_kind == "disk":
+                resources = [
+                    _gcp_disk_summary(item)
+                    for item in body.get("items", [])
+                    if isinstance(item, Mapping)
+                    and _gcp_disk_name_in_scope(profile, str(item.get("name", "")))
+                ]
+            else:
+                resources = [
+                    _gcp_summary(item)
+                    for item in body.get("items", [])
+                    if isinstance(item, Mapping)
+                    and _gcp_name_in_scope(profile, str(item.get("name", "")))
+                ]
             return {
                 "provider": "gcp",
+                "resource_kind": resource_kind,
                 "resources": resources,
                 "next_page_token": body.get("nextPageToken"),
             }
@@ -573,6 +628,20 @@ class CloudManagementExecutor:
             result = self._azure_get_resource(profile, token, resource_id)
             return {"provider": "azure", "resource": _azure_summary(result.body)}
         if profile.provider == "gcp":
+            if _gcp_target_is_disk(target):
+                zone, name = _gcp_disk_target(profile, target)
+                try:
+                    resource = self._gcp_get_disk(profile, zone, name)
+                except ProviderFailure as error:
+                    if error.code != "RESOURCE_NOT_FOUND":
+                        raise
+                    return {
+                        "provider": "gcp",
+                        "resource": {"name": name, "zone": zone, "status": "ABSENT"},
+                        "actual_state": "ABSENT",
+                        "release_confirmed": True,
+                    }
+                return {"provider": "gcp", "resource": _gcp_disk_summary(resource)}
             zone, name = _gcp_instance_target(profile, target)
             token, _ = self._gcp_token(profile)
             project = quote(str(profile.scope["project_id"]), safe="-")
@@ -589,7 +658,13 @@ class CloudManagementExecutor:
         return {"provider": "runpod", "resource": _runpod_summary(body)}
 
     def _create_resource(
-        self, profile: CloudProfile, tool_id: str, target: object, parameters: object
+        self,
+        profile: CloudProfile,
+        tool_id: str,
+        target: object,
+        parameters: object,
+        *,
+        request_id: str | None = None,
     ) -> dict[str, Any]:
         """Create or deploy one bounded Azure resource, GCE instance, or Pod."""
 
@@ -636,8 +711,61 @@ class CloudManagementExecutor:
             )
             return self._mutation_response(profile, "create", {"resource_id": resource_id}, result)
         if profile.provider == "gcp":
+            if _gcp_target_is_disk(target):
+                if tool_id != "cloud_resource_create":
+                    raise ProviderFailure("UNSUPPORTED_OPERATION")
+                zone, name = _gcp_disk_target(profile, target)
+                if not isinstance(request_id, str) or not request_id:
+                    raise ProviderFailure("INVALID_ARGUMENTS")
+                disk_body, source_image, expected_labels = _gcp_disk_create_body(
+                    profile, zone, name, body
+                )
+                token, _ = self._gcp_token(profile)
+                project = quote(str(profile.scope["project_id"]), safe="-")
+                result = self._request(
+                    "POST",
+                    f"{GCP_BASE}/projects/{project}/zones/{quote(zone, safe='-')}/disks",
+                    token=token,
+                    params={
+                        "requestId": _gcp_request_id(profile, request_id),
+                        "sourceImage": source_image,
+                    },
+                    json_body=disk_body,
+                )
+                operation_name = (
+                    result.body.get("name") if isinstance(result.body, Mapping) else None
+                )
+                vendor_operation = _gcp_disk_operation_receipt(
+                    disk_body, source_image, expected_labels
+                )
+                if isinstance(operation_name, str) and _RESOURCE_NAME.fullmatch(operation_name):
+                    vendor_operation["name"] = operation_name
+                response = self._mutation_response(
+                    profile,
+                    "create",
+                    {"kind": "disk", "zone": zone, "disk_name": name},
+                    result,
+                    vendor_operation=vendor_operation,
+                    request_id=request_id,
+                )
+                response.update(
+                    {
+                        "state": "PENDING",
+                        "vendor_state": (
+                            result.body.get("status", "UNKNOWN")
+                            if isinstance(result.body, Mapping)
+                            else "UNKNOWN"
+                        ),
+                        "expected_state": "READY",
+                        "desired_state": "READY",
+                        "actual_state": "UNKNOWN",
+                        "readiness": "UNKNOWN",
+                    }
+                )
+                return response
             zone, name = _gcp_instance_target(profile, target)
             _ensure_gcp_create_body(profile, name, body)
+            normalized_body = _ensure_gcp_existing_disks(profile, zone, body)
             token, _ = self._gcp_token(profile)
             project = quote(str(profile.scope["project_id"]), safe="-")
             result = self._request(
@@ -645,7 +773,7 @@ class CloudManagementExecutor:
                 f"{GCP_BASE}/projects/{project}/zones/{quote(zone, safe='-')}/instances",
                 token=token,
                 params={"requestId": str(uuid.uuid4())},
-                json_body={"name": name, **body},
+                json_body={"name": name, **normalized_body},
             )
             return self._mutation_response(
                 profile, "create", {"zone": zone, "instance_name": name}, result
@@ -725,7 +853,14 @@ class CloudManagementExecutor:
             operation_ref=operation_ref,
         )
 
-    def _change_state(self, profile: CloudProfile, tool_id: str, target: object) -> dict[str, Any]:
+    def _change_state(
+        self,
+        profile: CloudProfile,
+        tool_id: str,
+        target: object,
+        *,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
         """Start, stop, or delete one supported resource without internal retries."""
 
         action = {
@@ -759,6 +894,116 @@ class CloudManagementExecutor:
         if profile.provider == "gcp":
             if action == "restart":
                 raise ProviderFailure("UNSUPPORTED_OPERATION")
+            if action == "delete" and _gcp_target_is_disk(target):
+                zone, name = _gcp_disk_target(profile, target)
+                if not isinstance(request_id, str) or not request_id:
+                    raise ProviderFailure("INVALID_ARGUMENTS")
+                token, _ = self._gcp_token(profile)
+                project = quote(str(profile.scope["project_id"]), safe="-")
+                disk_url = (
+                    f"{GCP_BASE}/projects/{project}/zones/{quote(zone, safe='-')}"
+                    f"/disks/{quote(name, safe='-')}"
+                )
+                try:
+                    result = self._request(
+                        "DELETE",
+                        disk_url,
+                        token=token,
+                        params={"requestId": _gcp_request_id(profile, request_id)},
+                        allow_empty=True,
+                    )
+                except ProviderFailure as error:
+                    if error.code != "RESOURCE_NOT_FOUND":
+                        raise
+                    try:
+                        self._gcp_get_disk(profile, zone, name)
+                    except ProviderFailure as read_error:
+                        if read_error.code != "RESOURCE_NOT_FOUND":
+                            return {
+                                "state": "UNKNOWN_RESULT",
+                                "reason_code": "DELETE_ABSENCE_READBACK_UNAVAILABLE",
+                                "expected_state": "ABSENT",
+                                "desired_state": "ABSENT",
+                                "actual_state": "UNKNOWN",
+                                "readiness": "UNKNOWN",
+                                "release_confirmed": False,
+                                "operation_ref": self._new_operation_ref(
+                                    profile,
+                                    "cloud_resource_delete",
+                                    {"kind": "disk", "zone": zone, "disk_name": name},
+                                    request_id,
+                                ),
+                            }
+                        return {
+                            "state": "SUCCEEDED",
+                            "resource_ref": _resource_ref(
+                                profile,
+                                {"kind": "disk", "zone": zone, "disk_name": name},
+                            ),
+                            "expected_state": "ABSENT",
+                            "desired_state": "ABSENT",
+                            "actual_state": "ABSENT",
+                            "readiness": "NOT_READY",
+                            "release_confirmed": True,
+                            "operation_ref": self._new_operation_ref(
+                                profile,
+                                "cloud_resource_delete",
+                                {"kind": "disk", "zone": zone, "disk_name": name},
+                                request_id,
+                            ),
+                        }
+                    return {
+                        "state": "UNKNOWN_RESULT",
+                        "reason_code": "DELETE_RETURNED_NOT_FOUND_RESOURCE_PRESENT",
+                        "resource_ref": _resource_ref(
+                            profile,
+                            {"kind": "disk", "zone": zone, "disk_name": name},
+                        ),
+                        "expected_state": "ABSENT",
+                        "desired_state": "ABSENT",
+                        "actual_state": "PRESENT",
+                        "readiness": "UNKNOWN",
+                        "release_confirmed": False,
+                        "operation_ref": self._new_operation_ref(
+                            profile,
+                            "cloud_resource_delete",
+                            {"kind": "disk", "zone": zone, "disk_name": name},
+                            request_id,
+                        ),
+                    }
+                response = self._mutation_response(
+                    profile,
+                    "delete",
+                    {"kind": "disk", "zone": zone, "disk_name": name},
+                    result,
+                    vendor_operation={
+                        "kind": "gcp_zonal_disk",
+                        **(
+                            {"name": result.body["name"]}
+                            if isinstance(result.body, Mapping)
+                            and isinstance(result.body.get("name"), str)
+                            and _RESOURCE_NAME.fullmatch(str(result.body["name"]))
+                            else {}
+                        ),
+                    },
+                    request_id=request_id,
+                )
+                response.update(
+                    {
+                        "state": "PENDING",
+                        "vendor_state": (
+                            result.body.get("status", "UNKNOWN")
+                            if isinstance(result.body, Mapping)
+                            else "UNKNOWN"
+                        ),
+                        "expected_state": "ABSENT",
+                        "desired_state": "ABSENT",
+                        "actual_state": "UNKNOWN",
+                        "readiness": "UNKNOWN",
+                        "release_confirmed": False,
+                    }
+                )
+                return response
             zone, name = _gcp_instance_target(profile, target)
             token, _ = self._gcp_token(profile)
             project = quote(str(profile.scope["project_id"]), safe="-")
@@ -840,6 +1085,7 @@ class CloudManagementExecutor:
         *,
         vendor_operation: Mapping[str, Any] | None = None,
         operation_ref: str | None = None,
+        request_id: str | None = None,
     ) -> dict[str, Any]:
         """Normalize vendor LRO/resource responses without claiming readiness."""
 
@@ -862,7 +1108,7 @@ class CloudManagementExecutor:
                 "provider": profile.provider,
                 "operation": action,
                 "target": dict(target),
-                "request_id": str(uuid.uuid4()),
+                "request_id": request_id or str(uuid.uuid4()),
                 "created_at": _now(),
             }
             if vendor_operation is None:
@@ -1338,6 +1584,51 @@ class CloudManagementExecutor:
         """Poll the provider operation and confirm the target resource by read-back."""
 
         operation_body = self._gcp_operation_document(profile, operation)
+        target = operation.get("target")
+        if _gcp_target_is_disk(target):
+            operation_lookup_error: str | None = None
+            if not operation_body and operation.get("operation") == "create":
+                try:
+                    operation_body = self._gcp_find_disk_operation_by_request_id(profile, operation)
+                except ProviderFailure as error:
+                    if error.code not in {
+                        "AUTHENTICATION_FAILED",
+                        "PROVIDER_ERROR",
+                        "PROVIDER_TIMEOUT",
+                        "PROVIDER_UNAVAILABLE",
+                        "RATE_LIMITED",
+                        "SCOPE_DENIED",
+                    }:
+                        raise
+                    operation_lookup_error = error.code
+            operation_identity_verified = _gcp_operation_identity_matches(
+                profile, operation, operation_body
+            )
+            if not operation_identity_verified:
+                operation_body = {}
+            vendor = operation.get("vendor_operation")
+            vendor_record = dict(vendor) if isinstance(vendor, Mapping) else {}
+            if operation_identity_verified:
+                operation_name = operation_body.get("name")
+                target_id = operation_body.get("targetId")
+                vendor_record["name"] = operation_name
+                vendor_record["target_id"] = target_id
+                vendor_record["identity_verified"] = True
+            else:
+                vendor_record.pop("name", None)
+                vendor_record.pop("target_id", None)
+                vendor_record.pop("identity_verified", None)
+            operation = {**operation, "vendor_operation": vendor_record}
+            operation_state = _gcp_operation_state(operation_body) if operation_body else "PENDING"
+            errors = _gcp_operation_diagnostics(operation_body)
+            return self._gcp_disk_operation_status(
+                profile,
+                operation,
+                operation_body,
+                operation_state,
+                errors,
+                operation_lookup_error=operation_lookup_error,
+            )
         operation_state = _gcp_operation_state(operation_body) if operation_body else "PENDING"
         errors = _gcp_operation_diagnostics(operation_body)
         if operation_state in {"FAILED", "PENDING", "UNKNOWN_RESULT"}:
@@ -1347,7 +1638,6 @@ class CloudManagementExecutor:
                 "vendor_state": operation_body.get("status", "UNKNOWN"),
                 "errors": errors,
             }
-        target = operation.get("target")
         if not isinstance(target, Mapping):
             raise ProviderFailure("OPERATION_NOT_FOUND")
         zone, name = _gcp_instance_target(profile, target)
@@ -1394,6 +1684,201 @@ class CloudManagementExecutor:
             "expected_state": expected,
             "actual_state": actual,
             "readiness": "UNKNOWN",
+            "errors": errors,
+        }
+
+    def _gcp_disk_operation_status(
+        self,
+        profile: CloudProfile,
+        operation: Mapping[str, Any],
+        operation_body: Mapping[str, Any],
+        operation_state: str,
+        errors: list[dict[str, Any]],
+        *,
+        operation_lookup_error: str | None = None,
+    ) -> dict[str, Any]:
+        """Reconcile a zonal disk operation against both its LRO and Disk status."""
+
+        zone, name = _gcp_disk_target(profile, operation.get("target"))
+        action = operation.get("operation")
+        if action not in {"create", "delete"}:
+            raise ProviderFailure("OPERATION_NOT_FOUND")
+        vendor = operation.get("vendor_operation")
+        vendor_record = vendor if isinstance(vendor, Mapping) else {}
+        operation_name = vendor_record.get("name")
+        has_vendor_operation = isinstance(operation_name, str) and _RESOURCE_NAME.fullmatch(
+            operation_name
+        )
+        operation_identity_verified = vendor_record.get("identity_verified") is True
+        target_id = vendor_record.get("target_id")
+        expected_labels_raw = vendor_record.get("expected_labels")
+        expected_labels: dict[str, str] | None = None
+        if expected_labels_raw is not None:
+            expected_labels = _gcp_input_labels(expected_labels_raw)
+        expected_state = "READY" if action == "create" else "ABSENT"
+
+        if operation_state == "FAILED":
+            return {
+                "provider": "gcp",
+                "state": "FAILED",
+                "vendor_state": operation_body.get("status", "FAILED"),
+                "expected_state": expected_state,
+                "desired_state": expected_state,
+                "actual_state": "UNKNOWN",
+                "readiness": "UNKNOWN",
+                "release_confirmed": False,
+                "errors": errors,
+            }
+
+        try:
+            resource = self._gcp_get_disk(profile, zone, name)
+        except ProviderFailure as error:
+            if error.code != "RESOURCE_NOT_FOUND":
+                raise
+            if action == "delete" and (not has_vendor_operation or operation_state == "SUCCEEDED"):
+                return {
+                    "provider": "gcp",
+                    "state": "SUCCEEDED",
+                    "vendor_state": operation_body.get("status", "UNKNOWN"),
+                    "expected_state": "ABSENT",
+                    "desired_state": "ABSENT",
+                    "actual_state": "ABSENT",
+                    "readiness": "NOT_READY",
+                    "release_confirmed": True,
+                    "errors": errors,
+                }
+            if action == "delete" and operation_state == "PENDING":
+                return {
+                    "provider": "gcp",
+                    "state": "PENDING",
+                    "vendor_state": operation_body.get("status", "UNKNOWN"),
+                    "expected_state": "ABSENT",
+                    "desired_state": "ABSENT",
+                    "actual_state": "ABSENT",
+                    "readiness": "NOT_READY",
+                    "release_confirmed": False,
+                    "errors": errors,
+                }
+            return {
+                "provider": "gcp",
+                "state": "UNKNOWN_RESULT",
+                "vendor_state": operation_body.get("status", "UNKNOWN"),
+                "expected_state": expected_state,
+                "desired_state": expected_state,
+                "actual_state": "ABSENT",
+                "readiness": "NOT_READY",
+                "release_confirmed": action == "delete",
+                "reason_code": "DISK_READBACK_ABSENT_AFTER_CREATE",
+                "errors": errors,
+            }
+
+        status = resource.get("status")
+        if not isinstance(status, str) or len(status) > 32:
+            status = "UNKNOWN"
+        resource_id_matches = not operation_identity_verified or resource.get("id") == target_id
+        labels = _gcp_output_labels(resource.get("labels"))
+        labels_match = expected_labels is None or labels == expected_labels
+        expected_source_image = vendor_record.get("expected_source_image")
+        source_image_matches = expected_source_image is None or _gcp_source_image_matches(
+            resource.get("sourceImage"), expected_source_image
+        )
+        expected_size = vendor_record.get("expected_size_gb")
+        observed_size = resource.get("sizeGb")
+        size_matches = (
+            expected_size is None
+            or str(observed_size) == expected_size
+            and not isinstance(observed_size, bool)
+        )
+        expected_type = vendor_record.get("expected_disk_type")
+        observed_type = resource.get("type")
+        type_matches = (
+            expected_type is None
+            or isinstance(observed_type, str)
+            and observed_type.rsplit("/", 1)[-1] == expected_type
+        )
+        if action == "delete":
+            state = (
+                "PENDING"
+                if operation_identity_verified
+                and operation_state == "PENDING"
+                and resource_id_matches
+                else "UNKNOWN_RESULT"
+            )
+            return {
+                "provider": "gcp",
+                "state": state,
+                "vendor_state": operation_body.get("status", "UNKNOWN"),
+                "expected_state": "ABSENT",
+                "desired_state": "ABSENT",
+                "actual_state": status,
+                "readiness": "READY" if status == "READY" else "NOT_READY",
+                "release_confirmed": False,
+                **(
+                    {"reason_code": "DISK_TARGET_ID_READBACK_MISMATCH"}
+                    if not resource_id_matches
+                    else {}
+                ),
+                "errors": errors,
+            }
+
+        observed_configuration = _gcp_disk_configuration_snapshot(resource)
+        if not (
+            labels_match
+            and source_image_matches
+            and size_matches
+            and type_matches
+            and resource_id_matches
+        ):
+            return {
+                "provider": "gcp",
+                "state": "UNKNOWN_RESULT",
+                "vendor_state": operation_body.get("status", "UNKNOWN"),
+                "expected_state": "READY",
+                "desired_state": "READY",
+                "actual_state": status,
+                "readiness": "READY" if status == "READY" else "NOT_READY",
+                "release_confirmed": False,
+                "reason_code": (
+                    "DISK_TARGET_ID_READBACK_MISMATCH"
+                    if not resource_id_matches
+                    else "DISK_CONFIGURATION_READBACK_MISMATCH"
+                ),
+                "observed_configuration": observed_configuration,
+                "errors": errors,
+            }
+        if action == "create" and not operation_identity_verified:
+            return {
+                "provider": "gcp",
+                "state": "UNKNOWN_RESULT",
+                "vendor_state": operation_body.get("status", "UNKNOWN"),
+                "expected_state": "READY",
+                "desired_state": "READY",
+                "actual_state": status,
+                "readiness": "READY" if status == "READY" else "NOT_READY",
+                "release_confirmed": False,
+                "reason_code": "DISK_OPERATION_IDENTITY_UNVERIFIED",
+                "operation_lookup_error": operation_lookup_error,
+                "observed_configuration": observed_configuration,
+                "errors": errors,
+            }
+        if status == "FAILED":
+            state = "FAILED"
+        elif status == "READY" and operation_state in {"SUCCEEDED", "PENDING"}:
+            state = "SUCCEEDED" if operation_state == "SUCCEEDED" else "PENDING"
+        elif status in {"CREATING", "RESTORING"}:
+            state = "PENDING"
+        else:
+            state = "UNKNOWN_RESULT"
+        return {
+            "provider": "gcp",
+            "state": state,
+            "vendor_state": operation_body.get("status", "UNKNOWN"),
+            "expected_state": "READY",
+            "desired_state": "READY",
+            "actual_state": status,
+            "readiness": "READY" if status == "READY" else "NOT_READY",
+            "release_confirmed": False,
+            "observed_configuration": observed_configuration,
             "errors": errors,
         }
 
@@ -1568,6 +2053,111 @@ class CloudManagementExecutor:
             token=token,
         )
         return result.body if isinstance(result.body, Mapping) else {}
+
+    def _gcp_find_disk_operation_by_request_id(
+        self, profile: CloudProfile, operation: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
+        """Find one exact zonal disk operation after its POST response was lost."""
+
+        zone, disk_name = _gcp_disk_target(profile, operation.get("target"))
+        action = operation.get("operation")
+        request_id = operation.get("request_id")
+        created_at_value = operation.get("created_at")
+        if (
+            action not in {"create", "delete"}
+            or not isinstance(request_id, str)
+            or not isinstance(created_at_value, str)
+        ):
+            return {}
+        try:
+            created_at = datetime.fromisoformat(created_at_value.replace("Z", "+00:00"))
+        except ValueError:
+            return {}
+        if created_at.tzinfo is None:
+            return {}
+        client_operation_id = _gcp_request_id(profile, request_id)
+        token, _ = self._gcp_token(profile)
+        project = quote(str(profile.scope["project_id"]), safe="-")
+        zone_path = quote(zone, safe="-")
+        cursor: object = None
+
+        for _ in range(_GCP_OPERATION_LOOKUP_MAX_PAGES):
+            query: dict[str, str] = {
+                "maxResults": str(_GCP_OPERATION_LOOKUP_PAGE_SIZE),
+                "orderBy": "creationTimestamp desc",
+                **_gcp_page_params(cursor),
+            }
+            result = self._request(
+                "GET",
+                f"{GCP_BASE}/projects/{project}/zones/{zone_path}/operations",
+                token=token,
+                params=query,
+            )
+            body = result.body if isinstance(result.body, Mapping) else {}
+            items = body.get("items", [])
+            if isinstance(items, list):
+                for item in items:
+                    if not _gcp_operation_matches_disk_write(
+                        profile,
+                        item,
+                        zone=zone,
+                        disk_name=disk_name,
+                        action=str(action),
+                        client_operation_id=client_operation_id,
+                        created_at=created_at,
+                    ):
+                        continue
+                    operation_name = item.get("name")
+                    if not isinstance(operation_name, str) or not _RESOURCE_NAME.fullmatch(
+                        operation_name
+                    ):
+                        return {}
+                    try:
+                        current = self._gcp_operation_document(
+                            profile,
+                            {
+                                "vendor_operation": {"name": operation_name},
+                                "target": {"zone": zone},
+                            },
+                        )
+                    except ProviderFailure as error:
+                        if error.code == "RESOURCE_NOT_FOUND":
+                            return {}
+                        raise
+                    if _gcp_operation_matches_disk_write(
+                        profile,
+                        current,
+                        zone=zone,
+                        disk_name=disk_name,
+                        action=str(action),
+                        client_operation_id=client_operation_id,
+                        created_at=created_at,
+                    ):
+                        return current
+                    return {}
+            cursor = body.get("nextPageToken")
+            if cursor is None:
+                return {}
+            if not isinstance(cursor, str) or not 1 <= len(cursor) <= 4096:
+                return {}
+        return {}
+
+    def _gcp_get_disk(self, profile: CloudProfile, zone: str, name: str) -> Mapping[str, Any]:
+        """Read one project-scoped zonal disk through the fixed Compute Engine route."""
+
+        if zone not in profile.scope["zones"] or not _gcp_disk_name_in_scope(profile, name):
+            raise ProviderFailure("SCOPE_DENIED")
+        token, _ = self._gcp_token(profile)
+        project = quote(str(profile.scope["project_id"]), safe="-")
+        result = self._request(
+            "GET",
+            f"{GCP_BASE}/projects/{project}/zones/{quote(zone, safe='-')}"
+            f"/disks/{quote(name, safe='-')}",
+            token=token,
+        )
+        if not isinstance(result.body, Mapping):
+            raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+        return result.body
 
     def _runpod_logs(self, profile: CloudProfile, pod_id: str) -> dict[str, Any]:
         """Decode a bounded Runpod SSE tail and retain completed records on timeout."""
@@ -1962,8 +2552,38 @@ class CloudManagementExecutor:
                 )
         if profile.provider == "azure":
             self._validate_azure_cli_profile_scope(profile, argv)
+        elif profile.provider == "gcp":
+            self._validate_gcp_cli_profile_scope(profile, argv)
         elif profile.provider == "runpod":
             self._validate_runpod_cli_profile_scope(profile, argv)
+
+    def _validate_gcp_cli_profile_scope(self, profile: CloudProfile, argv: Sequence[str]) -> None:
+        """Allow only scoped read-only native probes for zonal persistent disks."""
+
+        if len(argv) < 2 or tuple(value.casefold() for value in argv[:2]) != (
+            "compute",
+            "disks",
+        ):
+            return
+        if not profile.scope.get("disk_name_prefixes"):
+            raise ProviderFailure("SCOPE_DENIED")
+        if len(argv) < 3:
+            raise ProviderFailure("INVALID_ARGUMENTS")
+        action = argv[2].casefold()
+        zones = _flag_values(argv, {"--zone", "-z"})
+        if len(zones) != 1 or zones[0] not in profile.scope["zones"]:
+            raise ProviderFailure("SCOPE_DENIED")
+        if action == "list":
+            return
+        if action == "describe":
+            if len(argv) < 4 or argv[3].startswith("-"):
+                raise ProviderFailure("INVALID_ARGUMENTS")
+            _gcp_disk_target(
+                profile,
+                {"kind": "disk", "zone": zones[0], "disk_name": argv[3]},
+            )
+            return
+        raise ProviderFailure("UNSUPPORTED_OPERATION")
 
     def _validate_azure_cli_profile_scope(self, profile: CloudProfile, argv: Sequence[str]) -> None:
         """Keep Azure native commands within the configured subscription and resource groups."""
@@ -2757,21 +3377,31 @@ def _looks_like_api_version(value: str) -> bool:
     return re.fullmatch(r"20[0-9]{2}-[0-9]{2}-[0-9]{2}(?:-preview)?", value) is not None
 
 
-def _gcp_list_target(profile: CloudProfile, target: object) -> str:
-    """Require one configured Compute Engine zone for instance enumeration."""
+def _gcp_list_target(profile: CloudProfile, target: object) -> tuple[str, str]:
+    """Require one configured Compute Engine zone and optional resource kind."""
 
-    if not isinstance(target, Mapping) or set(target) != {"zone"}:
+    if not isinstance(target, Mapping) or set(target) - {"kind", "zone"}:
         raise ProviderFailure("INVALID_ARGUMENTS")
     zone = target.get("zone")
     if not isinstance(zone, str) or zone not in profile.scope["zones"]:
         raise ProviderFailure("SCOPE_DENIED")
-    return zone
+    resource_kind = target.get("kind", "instance")
+    if resource_kind not in {"disk", "instance"}:
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    if resource_kind == "disk" and not profile.scope.get("disk_name_prefixes"):
+        raise ProviderFailure("SCOPE_DENIED")
+    return zone, str(resource_kind)
 
 
 def _gcp_instance_target(profile: CloudProfile, target: object) -> tuple[str, str]:
     """Validate one GCE instance name and zone against the profile scope."""
 
-    if not isinstance(target, Mapping) or set(target) != {"zone", "instance_name"}:
+    if not isinstance(target, Mapping) or set(target) not in (
+        {"zone", "instance_name"},
+        {"kind", "zone", "instance_name"},
+    ):
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    if target.get("kind", "instance") != "instance":
         raise ProviderFailure("INVALID_ARGUMENTS")
     zone, name = target.get("zone"), target.get("instance_name")
     if not isinstance(zone, str) or zone not in profile.scope["zones"]:
@@ -2785,10 +3415,265 @@ def _gcp_instance_target(profile: CloudProfile, target: object) -> tuple[str, st
     return zone, name
 
 
+def _gcp_target_is_disk(target: object) -> bool:
+    """Recognize a disk target before applying the provider-specific shape check."""
+
+    return isinstance(target, Mapping) and ("disk_name" in target or target.get("kind") == "disk")
+
+
+def _gcp_disk_target(profile: CloudProfile, target: object) -> tuple[str, str]:
+    """Validate one zonal disk name against the host-bound project, zone, and prefix."""
+
+    if not isinstance(target, Mapping) or set(target) not in (
+        {"zone", "disk_name"},
+        {"kind", "zone", "disk_name"},
+    ):
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    if target.get("kind", "disk") != "disk":
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    zone, name = target.get("zone"), target.get("disk_name")
+    if not isinstance(zone, str) or zone not in profile.scope["zones"]:
+        raise ProviderFailure("SCOPE_DENIED")
+    if (
+        not isinstance(name, str)
+        or not _GCP_INSTANCE_NAME.fullmatch(name)
+        or not _gcp_disk_name_in_scope(profile, name)
+    ):
+        raise ProviderFailure("SCOPE_DENIED")
+    return zone, name
+
+
 def _gcp_name_in_scope(profile: CloudProfile, name: str) -> bool:
     """Check an instance name against the fixed prefix set."""
 
     return any(name.startswith(prefix) for prefix in profile.scope["instance_name_prefixes"])
+
+
+def _gcp_disk_name_in_scope(profile: CloudProfile, name: str) -> bool:
+    """Check a zonal disk name against the separately configured disk prefixes."""
+
+    prefixes = profile.scope.get("disk_name_prefixes", ())
+    return any(name.startswith(prefix) for prefix in prefixes)
+
+
+def _gcp_disk_create_body(
+    profile: CloudProfile, zone: str, name: str, parameters: Mapping[str, Any]
+) -> tuple[dict[str, Any], str, dict[str, str]]:
+    """Validate the exact disk insert fields and reduce them to the REST body/query."""
+
+    if set(parameters) - {"sourceImage", "sizeGb", "type", "labels"}:
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    size_range = profile.scope.get("disk_size_gb_range")
+    source_images = profile.scope.get("disk_source_images", ())
+    if not isinstance(size_range, Mapping) or not source_images:
+        raise ProviderFailure("SCOPE_DENIED")
+    source_image = parameters.get("sourceImage")
+    if not isinstance(source_image, str) or source_image not in source_images:
+        raise ProviderFailure("SCOPE_DENIED")
+    size_gb = parameters.get("sizeGb")
+    if (
+        isinstance(size_gb, bool)
+        or not isinstance(size_gb, int)
+        or size_gb < size_range["min"]
+        or size_gb > size_range["max"]
+    ):
+        raise ProviderFailure("SCOPE_DENIED")
+    labels = _gcp_input_labels(parameters.get("labels", {}))
+    disk_body: dict[str, Any] = {"name": name, "sizeGb": str(size_gb)}
+    disk_type = parameters.get("type")
+    if disk_type is not None:
+        if not isinstance(disk_type, str) or disk_type not in _GCP_ALLOWED_DISK_TYPES:
+            raise ProviderFailure("SCOPE_DENIED")
+        disk_body["type"] = f"zones/{zone}/diskTypes/{disk_type}"
+    if labels:
+        disk_body["labels"] = labels
+    return disk_body, source_image, labels
+
+
+def _gcp_disk_operation_receipt(
+    disk_body: Mapping[str, Any], source_image: str, expected_labels: Mapping[str, str]
+) -> dict[str, Any]:
+    """Retain bounded expected disk fields for post-write read-back verification."""
+
+    receipt: dict[str, Any] = {
+        "kind": "gcp_zonal_disk",
+        "expected_labels": dict(expected_labels),
+        "expected_source_image": source_image,
+        "expected_size_gb": str(disk_body["sizeGb"]),
+    }
+    disk_type = disk_body.get("type")
+    if isinstance(disk_type, str):
+        receipt["expected_disk_type"] = disk_type.rsplit("/", 1)[-1]
+    return receipt
+
+
+def _gcp_input_labels(value: object) -> dict[str, str]:
+    """Validate a bounded GCE label map and reject explicit credential field names."""
+
+    if not isinstance(value, Mapping) or len(value) > 64:
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    labels: dict[str, str] = {}
+    for key, label_value in value.items():
+        if (
+            not isinstance(key, str)
+            or not _GCP_LABEL_KEY.fullmatch(key)
+            or _gcp_sensitive_label_key(key)
+            or not isinstance(label_value, str)
+            or not _GCP_LABEL_VALUE.fullmatch(label_value)
+        ):
+            raise ProviderFailure("INVALID_ARGUMENTS")
+        labels[key] = label_value
+    return labels
+
+
+def _gcp_output_labels(value: object) -> dict[str, str]:
+    """Project only bounded, syntactically valid, non-credential GCE labels."""
+
+    if not isinstance(value, Mapping):
+        return {}
+    result: dict[str, str] = {}
+    for key, label_value in list(value.items())[:64]:
+        if (
+            isinstance(key, str)
+            and _GCP_LABEL_KEY.fullmatch(key)
+            and not _gcp_sensitive_label_key(key)
+            and isinstance(label_value, str)
+            and _GCP_LABEL_VALUE.fullmatch(label_value)
+        ):
+            result[key] = label_value
+    return result
+
+
+def _gcp_sensitive_label_key(key: str) -> bool:
+    """Recognize credential-oriented label keys without substring false positives."""
+
+    if key in _GCP_SENSITIVE_LABEL_KEYS:
+        return True
+    tokens = re.split(r"[-_]", key)
+    return any(token in _GCP_SENSITIVE_LABEL_TOKENS for token in tokens)
+
+
+def _gcp_source_image_matches(observed: object, expected: str) -> bool:
+    """Compare a Disk source image to the exact allowlisted path in its operation receipt."""
+
+    if not isinstance(observed, str):
+        return False
+    if observed == expected:
+        return True
+    try:
+        parsed = urlsplit(observed)
+        port = parsed.port
+    except ValueError:
+        return False
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in {"www.googleapis.com", GCP_HOST}
+        or port not in (None, 443)
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+        or not parsed.path.startswith("/compute/v1/")
+    ):
+        return False
+    return parsed.path.removeprefix("/compute/v1/") == expected
+
+
+def _gcp_request_id(profile: CloudProfile, request_id: str) -> str:
+    """Derive GCE's required UUID from the real signed pre-dispatch request ID."""
+
+    value = uuid.uuid5(
+        uuid.NAMESPACE_URL,
+        f"cyrene-cloud-management:gcp:{profile.profile_ref}:{request_id}",
+    )
+    if value.int == 0:
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    return str(value)
+
+
+def _ensure_gcp_existing_disks(
+    profile: CloudProfile, zone: str, body: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Canonicalize existing zonal disk URLs while leaving legacy image boot disks intact."""
+
+    normalized = dict(body)
+    disks = body.get("disks")
+    if disks is None:
+        return normalized
+    if not isinstance(disks, list) or len(disks) > 16:
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    normalized_disks: list[dict[str, Any]] = []
+    for disk in disks:
+        if not isinstance(disk, Mapping):
+            raise ProviderFailure("INVALID_ARGUMENTS")
+        current = dict(disk)
+        if "source" in current:
+            if set(current) - {"source", "boot", "autoDelete", "deviceName", "mode"}:
+                raise ProviderFailure("INVALID_ARGUMENTS")
+            if any(
+                field_name in current and not isinstance(current[field_name], bool)
+                for field_name in ("boot", "autoDelete")
+            ):
+                raise ProviderFailure("INVALID_ARGUMENTS")
+            mode = current.get("mode", "READ_WRITE")
+            if not isinstance(mode, str) or mode not in {"READ_WRITE", "READ_ONLY"}:
+                raise ProviderFailure("INVALID_ARGUMENTS")
+            device_name = current.get("deviceName")
+            if device_name is not None and (
+                not isinstance(device_name, str)
+                or not re.fullmatch(r"[A-Za-z0-9_-]{1,63}", device_name)
+            ):
+                raise ProviderFailure("INVALID_ARGUMENTS")
+            current["source"] = _gcp_existing_disk_source(profile, zone, current["source"])
+        normalized_disks.append(current)
+    normalized["disks"] = normalized_disks
+    return normalized
+
+
+def _gcp_existing_disk_source(profile: CloudProfile, instance_zone: str, value: object) -> str:
+    """Allow only an explicitly scoped same-project zonal persistent disk URL."""
+
+    if not isinstance(value, str) or len(value) > 2048:
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    path = value
+    if value.startswith("https://"):
+        try:
+            parsed = urlsplit(value)
+            port = parsed.port
+        except ValueError as error:
+            raise ProviderFailure("SCOPE_DENIED") from error
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname not in {"www.googleapis.com", "compute.googleapis.com"}
+            or port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ProviderFailure("SCOPE_DENIED")
+        path = parsed.path
+        if not path.startswith("/compute/v1/"):
+            raise ProviderFailure("SCOPE_DENIED")
+        path = path.removeprefix("/compute/v1/")
+    match = re.fullmatch(
+        r"(?:projects/(?P<project>[a-z][a-z0-9-]{4,28}[a-z0-9])/)?"
+        r"zones/(?P<zone>[a-z]+-[a-z0-9]+-[a-z])/disks/(?P<name>[a-z]([-a-z0-9]{0,61}[a-z0-9])?)",
+        path,
+    )
+    if match is None:
+        raise ProviderFailure("INVALID_ARGUMENTS")
+    project = match.group("project") or str(profile.scope["project_id"])
+    source_zone = match.group("zone")
+    name = match.group("name")
+    if (
+        project != profile.scope["project_id"]
+        or source_zone != instance_zone
+        or source_zone not in profile.scope["zones"]
+        or not _gcp_disk_name_in_scope(profile, name)
+    ):
+        raise ProviderFailure("SCOPE_DENIED")
+    return f"projects/{project}/zones/{source_zone}/disks/{name}"
 
 
 def _gcp_page_params(cursor: object) -> dict[str, str]:
@@ -2820,6 +3705,167 @@ def _gcp_summary(value: object) -> dict[str, Any]:
         for key in ("id", "name", "zone", "machineType", "status", "creationTimestamp")
         if isinstance(value.get(key), (str, int, float, bool))
     }
+
+
+def _gcp_disk_summary(value: object) -> dict[str, Any]:
+    """Project safe zonal disk fields without exposing encryption-key material."""
+
+    if not isinstance(value, Mapping):
+        return {}
+    result = {
+        key: value[key]
+        for key in (
+            "id",
+            "name",
+            "zone",
+            "status",
+            "sizeGb",
+            "type",
+            "creationTimestamp",
+            "lastAttachTimestamp",
+            "lastDetachTimestamp",
+            "sourceImage",
+        )
+        if isinstance(value.get(key), (str, int, float, bool))
+    }
+    labels = _gcp_output_labels(value.get("labels"))
+    result["labels"] = labels
+    return result
+
+
+def _gcp_disk_configuration_snapshot(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Return safe observed disk configuration fields for unresolved create receipts."""
+
+    result: dict[str, Any] = {}
+    source_image = value.get("sourceImage")
+    if isinstance(source_image, str) and len(source_image) <= 512:
+        result["sourceImage"] = source_image
+    size_gb = value.get("sizeGb")
+    if isinstance(size_gb, (str, int)) and not isinstance(size_gb, bool):
+        result["sizeGb"] = str(size_gb)
+    disk_type = value.get("type")
+    if isinstance(disk_type, str) and len(disk_type) <= 512:
+        result["type"] = disk_type.rsplit("/", 1)[-1]
+    labels = _gcp_output_labels(value.get("labels"))
+    result["labels"] = labels
+    return result
+
+
+def _gcp_operation_matches_disk_write(
+    profile: CloudProfile,
+    value: object,
+    *,
+    zone: str,
+    disk_name: str,
+    action: str,
+    client_operation_id: str,
+    created_at: datetime,
+) -> bool:
+    """Match one operation by client ID, zonal disk target, action, and request time."""
+
+    if not isinstance(value, Mapping) or value.get("kind") != "compute#operation":
+        return False
+    if not isinstance(value.get("name"), str) or not _RESOURCE_NAME.fullmatch(value["name"]):
+        return False
+    if not _gcp_valid_target_id(value.get("targetId")):
+        return False
+    if str(value.get("clientOperationId", "")).casefold() != client_operation_id.casefold():
+        return False
+    if value.get("operationType") != {"create": "insert", "delete": "delete"}.get(action):
+        return False
+    if value.get("status") not in {"PENDING", "RUNNING", "DONE"}:
+        return False
+    if _gcp_cli_operation_zone(profile, value.get("zone")) != zone:
+        return False
+    if not _gcp_operation_target_link_matches(profile, value.get("targetLink"), zone, disk_name):
+        return False
+    insert_time = value.get("insertTime")
+    if not isinstance(insert_time, str):
+        return False
+    try:
+        inserted_at = datetime.fromisoformat(insert_time.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if inserted_at.tzinfo is None or created_at.tzinfo is None:
+        return False
+    return (
+        abs(inserted_at.astimezone(UTC) - created_at.astimezone(UTC))
+        <= _GCP_OPERATION_REQUEST_WINDOW
+    )
+
+
+def _gcp_operation_identity_matches(
+    profile: CloudProfile,
+    operation: Mapping[str, Any],
+    operation_body: object,
+) -> bool:
+    """Check a zonal disk LRO against the signed request, target, action, and time."""
+
+    if not isinstance(operation_body, Mapping):
+        return False
+    try:
+        zone, disk_name = _gcp_disk_target(profile, operation.get("target"))
+    except ProviderFailure:
+        return False
+    action = operation.get("operation")
+    request_id = operation.get("request_id")
+    created_at_raw = operation.get("created_at")
+    if action not in {"create", "delete"} or not isinstance(request_id, str):
+        return False
+    if not isinstance(created_at_raw, str):
+        return False
+    try:
+        created_at = datetime.fromisoformat(created_at_raw.replace("Z", "+00:00"))
+    except ValueError:
+        return False
+    if created_at.tzinfo is None:
+        return False
+    return _gcp_operation_matches_disk_write(
+        profile,
+        operation_body,
+        zone=zone,
+        disk_name=disk_name,
+        action=str(action),
+        client_operation_id=_gcp_request_id(profile, request_id),
+        created_at=created_at,
+    )
+
+
+def _gcp_valid_target_id(value: object) -> bool:
+    """Accept one nonzero uint64 target ID from a Compute Engine operation."""
+
+    if not isinstance(value, str) or not value.isascii() or not value.isdecimal():
+        return False
+    numeric = int(value)
+    return 0 < numeric <= (2**64 - 1)
+
+
+def _gcp_operation_target_link_matches(
+    profile: CloudProfile, value: object, zone: str, disk_name: str
+) -> bool:
+    """Require an operation targetLink to be the exact zonal disk resource path."""
+
+    if not isinstance(value, str):
+        return False
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError:
+        return False
+    if (
+        parsed.scheme != "https"
+        or parsed.hostname not in {"www.googleapis.com", GCP_HOST}
+        or port not in (None, 443)
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        return False
+    expected_path = (
+        f"/compute/v1/projects/{profile.scope['project_id']}/zones/{zone}/disks/{disk_name}"
+    )
+    return parsed.path == expected_path
 
 
 def _gcp_operation_state(value: Mapping[str, Any]) -> str:
@@ -3270,6 +4316,8 @@ def _resource_ref(profile: CloudProfile, target: Mapping[str, Any]) -> str:
 
     if isinstance(target.get("resource_id"), str):
         return str(target["resource_id"])
+    if isinstance(target.get("disk_name"), str):
+        return f"{profile.scope['project_id']}/{target.get('zone')}/{target['disk_name']}"
     if isinstance(target.get("instance_name"), str):
         return f"{profile.scope['project_id']}/{target.get('zone')}/{target['instance_name']}"
     if isinstance(target.get("pod_id"), str):

@@ -2294,15 +2294,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/README.md",
-      "sha256": "c9d5a2ee9757c7f75f0877aad0abcd7fc090acfb00c17c4ecbee9e61bff7a3e4",
-      "size_bytes": 7908
+      "sha256": "067402bb2040b556a9ba3d2649492954d175de7ce721bdc8d83b8488e625ff3f",
+      "size_bytes": 11197
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/configuration.schema.json",
-      "sha256": "ff542442456f6e1831336b7a081c314838fb5924bbd8d22815786de150c61485",
-      "size_bytes": 9382
+      "sha256": "3cf1a2333c79c618160014d0bf1ed934e68e4087c4136686035bfb571d422797",
+      "size_bytes": 10219
     },
     {
       "kind": "file",
@@ -2406,22 +2406,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/providers.py",
-      "sha256": "dddec13ddc7f1bcbf6fcb7cd02398bf6c4dc426c62d4e265ce391933a1aee2ec",
-      "size_bytes": 136215
+      "sha256": "9c7f9886acceb0136fc8b70a2a95a01eef74ed10e1b36854809cfbe750d3b9a6",
+      "size_bytes": 179089
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/settings.py",
-      "sha256": "41224adad8612de67fb9d53e3e009c864da5311c18a27f45f9d895d00e6a30ab",
-      "size_bytes": 25616
+      "sha256": "021e6ea48c06e88dcc144313dd3a79d673c78a61ba00f4a325708de0a151c8c4",
+      "size_bytes": 27411
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/tool_catalog.py",
-      "sha256": "fa3f2c88998567a27890157a912e24fa692bb02e4bd087f59aee6456500f7f4e",
-      "size_bytes": 8906
+      "sha256": "cee381b43b7c85813e365cd99293f91d56e7decbf3419403e21393e4425702fc",
+      "size_bytes": 9062
     },
     {
       "kind": "file",
@@ -2448,8 +2448,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "f124066640ad2494889b3cdb6a3ea0b8f4e29671e43180a185a9f44860999b72",
-      "size_bytes": 67211
+      "sha256": "50fc41ea4317066dfa94ccddd57780ec7054d20c571ae0928f87faf49ae54007",
+      "size_bytes": 101845
     },
     {
       "kind": "file",
