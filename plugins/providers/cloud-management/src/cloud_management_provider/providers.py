@@ -54,6 +54,7 @@ _RUNPOD_LOG_READ_CHUNK_BYTES = 1
 _RUNPOD_LOG_READ_SECONDS = 8.0
 _MAX_OPERATION_AGE = timedelta(days=30)
 _RESOURCE_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
+_RUNPOD_ID = re.compile(r"[A-Za-z0-9_-]{1,128}\Z")
 _GCP_INSTANCE_NAME = re.compile(r"[a-z]([-a-z0-9]{0,61}[a-z0-9])?\Z")
 _AZURE_RESOURCE_ID = re.compile(
     r"/subscriptions/(?P<subscription>[0-9a-fA-F-]{36})/"
@@ -272,7 +273,7 @@ class CloudManagementExecutor:
     ) -> dict[str, Any]:
         """Dispatch one catalogued tool, replay-guarding every mutation and CLI call."""
 
-        from .tool_catalog import TOOL_BY_ID
+        from .tool_catalog import READ_ONLY_TOOL_IDS, TOOL_BY_ID
 
         if tool_id not in TOOL_BY_ID:
             raise ProviderFailure("TOOL_NOT_FOUND")
@@ -283,6 +284,8 @@ class CloudManagementExecutor:
             profile = self._settings.profile(profile_ref)
         except ProfileNotFoundError as error:
             raise ProviderFailure("PROFILE_NOT_FOUND") from error
+        if profile.read_only and tool_id not in READ_ONLY_TOOL_IDS:
+            raise ProviderFailure("READ_ONLY_PROFILE")
         if tool_id in _WRITE_TOOLS:
             argument_digest = payload_sha256(dict(arguments))
             write_receipt: Mapping[str, Any] | None = None
@@ -433,52 +436,74 @@ class CloudManagementExecutor:
             if profile.provider == "azure":
                 token, expires_at = self._azure_token(profile)
                 sub = quote(str(profile.scope["subscription_id"]), safe="-")
-                self._request(
+                result = self._request(
                     "GET",
                     f"https://{AZURE_HOST}/subscriptions/{sub}",
                     token=token,
                     params={"api-version": AZURE_SUBSCRIPTION_API_VERSION},
                 )
+                subscription_id = result.body.get("subscriptionId") if isinstance(
+                    result.body, Mapping
+                ) else None
+                if (
+                    not isinstance(subscription_id, str)
+                    or subscription_id.casefold()
+                    != str(profile.scope["subscription_id"]).casefold()
+                ):
+                    raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
             elif profile.provider == "gcp":
                 token, expires_at = self._gcp_token(profile)
                 project = quote(str(profile.scope["project_id"]), safe="-")
                 zone = quote(str(profile.scope["zones"][0]), safe="-")
-                self._request(
+                result = self._request(
                     "GET",
                     f"{GCP_BASE}/projects/{project}/zones/{zone}/instances",
                     token=token,
                     params={"maxResults": "1"},
                 )
+                _gcp_instance_list(
+                    result.body, expected_zone=str(profile.scope["zones"][0]), allow_missing=True
+                )
             else:
                 token = self._runpod_token(profile)
-                self._request(
+                result = self._request(
                     "GET",
                     f"{RUNPOD_BASE}/pods",
                     token=token,
                     params={"limit": "1"},
                 )
+                _runpod_list_response(result.body)
             authentication_state = "VALID"
             authorization_state = "VALID"
             reason_code = None
         except CredentialMissingError:
             authentication_state = "MISSING"
-            authorization_state = "UNKNOWN"
+            authorization_state = "REAUTHORIZATION_REQUIRED"
             reason_code = "CREDENTIAL_MISSING"
         except ProviderFailure as error:
             if error.code == "AUTHENTICATION_FAILED":
                 authentication_state = "INVALID"
-                authorization_state = "UNKNOWN"
+                authorization_state = "REAUTHORIZATION_REQUIRED"
                 reason_code = error.code
             elif error.code == "SCOPE_DENIED":
                 authentication_state = "VALID"
-                authorization_state = "DENIED"
+                authorization_state = "PERMISSION_DENIED"
                 reason_code = error.code
-            elif error.code in {"PROVIDER_UNAVAILABLE", "PROVIDER_TIMEOUT", "PROVIDER_ERROR"}:
+            elif error.code in {
+                "CREDENTIAL_PROVIDER_UNAVAILABLE",
+                "PROVIDER_REDIRECT_REJECTED",
+                "PROVIDER_REJECTED",
+                "PROVIDER_UNAVAILABLE",
+                "PROVIDER_TIMEOUT",
+                "PROVIDER_ERROR",
+            }:
                 authentication_state = "UNKNOWN"
                 authorization_state = "UNKNOWN"
                 reason_code = error.code
             else:
-                raise
+                authentication_state = "UNKNOWN"
+                authorization_state = "UNKNOWN"
+                reason_code = error.code
         return {
             "profile_ref": profile.profile_ref,
             "provider": profile.provider,
@@ -511,13 +536,14 @@ class CloudManagementExecutor:
                 token=token,
                 params={"api-version": AZURE_RESOURCE_API_VERSION, "$top": "100"},
             )
-            items = result.body.get("value", []) if isinstance(result.body, Mapping) else []
+            items = _azure_resource_list(result.body)
+            next_link = result.body.get("nextLink")
+            if next_link is not None and not isinstance(next_link, str):
+                raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
             return {
                 "provider": "azure",
-                "resources": [_azure_summary(item) for item in items if isinstance(item, Mapping)],
-                "has_more": bool(result.body.get("nextLink"))
-                if isinstance(result.body, Mapping)
-                else False,
+                "resources": [_azure_summary(item) for item in items],
+                "has_more": bool(next_link),
             }
         if profile.provider == "gcp":
             zone = _gcp_list_target(profile, target)
@@ -530,17 +556,20 @@ class CloudManagementExecutor:
                 token=token,
                 params={"maxResults": "100", **_gcp_page_params(cursor)},
             )
-            body = result.body if isinstance(result.body, Mapping) else {}
+            body = result.body
+            items = _gcp_instance_list(body, expected_zone=zone, allow_missing=True)
+            next_page_token = body.get("nextPageToken")
+            if next_page_token is not None and not isinstance(next_page_token, str):
+                raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
             resources = [
                 _gcp_summary(item)
-                for item in body.get("items", [])
-                if isinstance(item, Mapping)
-                and _gcp_name_in_scope(profile, str(item.get("name", "")))
+                for item in items
+                if _gcp_name_in_scope(profile, str(item.get("name", "")))
             ]
             return {
                 "provider": "gcp",
                 "resources": resources,
-                "next_page_token": body.get("nextPageToken"),
+                "next_page_token": next_page_token,
             }
         _runpod_list_target(target)
         token = self._runpod_token(profile)
@@ -550,18 +579,17 @@ class CloudManagementExecutor:
                 raise ProviderFailure("INVALID_ARGUMENTS")
             query["cursor"] = cursor
         result = self._request("GET", f"{RUNPOD_BASE}/pods", token=token, params=query)
-        body = result.body if isinstance(result.body, Mapping) else {}
+        pods, next_cursor, has_next_page = _runpod_list_response(result.body)
         pods = [
             _runpod_summary(item)
-            for item in body.get("pods", [])
-            if isinstance(item, Mapping) and _runpod_pod_in_scope(profile, item)
+            for item in pods
+            if _runpod_pod_in_scope(profile, item)
         ]
-        pagination = body.get("pagination") if isinstance(body.get("pagination"), Mapping) else {}
         return {
             "provider": "runpod",
             "resources": pods,
-            "next_cursor": pagination.get("nextCursor"),
-            "has_next_page": pagination.get("hasNextPage") is True,
+            "next_cursor": next_cursor,
+            "has_next_page": has_next_page is True,
         }
 
     def _get_resource(self, profile: CloudProfile, target: object) -> dict[str, Any]:
@@ -655,8 +683,23 @@ class CloudManagementExecutor:
         token = self._runpod_token(profile)
         result = self._request("POST", f"{RUNPOD_BASE}/pods", token=token, json_body=runpod_body)
         result_target = {"pod_name": pod_name}
-        if isinstance(result.body, Mapping) and isinstance(result.body.get("id"), str):
-            result_target["pod_id"] = result.body["id"]
+        try:
+            created_pod = _validate_runpod_pod(result.body)
+            if created_pod.get("name") != pod_name:
+                raise ProviderFailure("TARGET_IDENTITY_MISMATCH")
+        except ProviderFailure:
+            response = self._mutation_response(profile, "create", result_target, result)
+            response.update(
+                {
+                    "state": "UNKNOWN_RESULT",
+                    "actual_state": "UNKNOWN",
+                    "readiness": "UNKNOWN",
+                    "reason_code": "INVALID_PROVIDER_RESPONSE",
+                    "reconciliation_available": True,
+                }
+            )
+            return response
+        result_target["pod_id"] = str(created_pod["id"])
         return self._mutation_response(profile, "create", result_target, result)
 
     def _update_resource(
@@ -1045,7 +1088,7 @@ class CloudManagementExecutor:
                     f"{RUNPOD_BASE}/pods/{quote(pod_id, safe='-_')}",
                     token=token,
                 )
-                body = result.body if isinstance(result.body, Mapping) else {}
+                body = _validate_runpod_pod(result.body)
                 if body.get("id") != pod_id:
                     raise ProviderFailure("TARGET_IDENTITY_MISMATCH")
                 if isinstance(pod_name, str) and body.get("name") != pod_name:
@@ -1141,13 +1184,11 @@ class CloudManagementExecutor:
                     "$top": "50",
                 },
             )
-            values = result.body.get("value", []) if isinstance(result.body, Mapping) else []
+            values = _response_mapping_list(result.body, "value")
             return {
                 "provider": "azure",
                 "available": True,
-                "logs": [
-                    _azure_activity_summary(item) for item in values if isinstance(item, Mapping)
-                ],
+                "logs": [_azure_activity_summary(item) for item in values],
             }
         if profile.provider == "gcp":
             operation_body = self._gcp_operation_document(profile, operation)
@@ -1501,7 +1542,7 @@ class CloudManagementExecutor:
             f"{RUNPOD_BASE}/pods/{quote(pod_id, safe='-_')}",
             token=token,
         )
-        body = result.body if isinstance(result.body, Mapping) else {}
+        body = _validate_runpod_pod(result.body)
         expected_name = target.get("pod_name") if isinstance(target, Mapping) else None
         if expected_name is not None and body.get("name") != expected_name:
             raise ProviderFailure("SCOPE_DENIED")
@@ -1567,7 +1608,18 @@ class CloudManagementExecutor:
             operation_url,
             token=token,
         )
-        return result.body if isinstance(result.body, Mapping) else {}
+        if not isinstance(result.body, Mapping):
+            raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+        body = result.body
+        if body.get("name") != vendor["name"] or body.get("status") not in {
+            "PENDING",
+            "RUNNING",
+            "DONE",
+        }:
+            raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+        if "error" in body and not isinstance(body.get("error"), Mapping):
+            raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+        return body
 
     def _runpod_logs(self, profile: CloudProfile, pod_id: str) -> dict[str, Any]:
         """Decode a bounded Runpod SSE tail and retain completed records on timeout."""
@@ -1694,12 +1746,11 @@ class CloudManagementExecutor:
 
         token = self._runpod_token(profile)
         result = self._request("GET", f"{RUNPOD_BASE}/pods", token=token, params={"limit": "1000"})
-        body = result.body if isinstance(result.body, Mapping) else {}
+        pods, _, _ = _runpod_list_response(result.body)
         matches = [
             item
-            for item in body.get("pods", [])
-            if isinstance(item, Mapping)
-            and item.get("name") == pod_name
+            for item in pods
+            if item.get("name") == pod_name
             and _runpod_pod_in_scope(profile, item)
         ]
         return matches[0] if len(matches) == 1 else None
@@ -2171,15 +2222,33 @@ class CloudManagementExecutor:
         """Acquire an Azure Resource Manager token through Managed Identity."""
 
         try:
+            from azure.core.exceptions import (
+                ClientAuthenticationError,
+                ServiceRequestError,
+                ServiceResponseError,
+            )
+            from azure.identity import CredentialUnavailableError, ManagedIdentityCredential
+        except Exception as error:
+            raise ProviderFailure("PROVIDER_ERROR") from error
+        try:
             credential = self._credentials.get(profile.profile_ref)
             if credential is None:
-                from azure.identity import ManagedIdentityCredential
-
                 credential = ManagedIdentityCredential(client_id=profile.client_id)
                 self._credentials[profile.profile_ref] = credential
             token = credential.get_token("https://management.azure.com/.default")
-        except Exception as error:
+        except (ServiceRequestError, ServiceResponseError) as error:
+            raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
+        except CredentialUnavailableError as error:
+            raise ProviderFailure("CREDENTIAL_PROVIDER_UNAVAILABLE", retryable=True) from error
+        except ClientAuthenticationError as error:
+            status_code = _exception_status_code(error)
+            if status_code == 403:
+                raise ProviderFailure("SCOPE_DENIED") from error
+            if status_code in {408, 429} or (status_code is not None and status_code >= 500):
+                raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
             raise ProviderFailure("AUTHENTICATION_FAILED") from error
+        except Exception as error:
+            raise ProviderFailure("PROVIDER_ERROR") from error
         return token.token, datetime.fromtimestamp(token.expires_on, UTC).isoformat().replace(
             "+00:00", "Z"
         )
@@ -2188,6 +2257,10 @@ class CloudManagementExecutor:
         """Load host-configured WIF credentials and obtain a short-lived token."""
 
         path = self._gcp_credential_path(profile)
+        try:
+            from google.auth.exceptions import RefreshError, TransportError
+        except Exception as error:
+            raise ProviderFailure("PROVIDER_ERROR") from error
         try:
             cached = self._credentials.get(profile.profile_ref)
             if cached is None:
@@ -2202,7 +2275,17 @@ class CloudManagementExecutor:
 
                 credentials.refresh(Request())
         except Exception as error:
-            raise ProviderFailure("AUTHENTICATION_FAILED") from error
+            if isinstance(error, TransportError) or _exception_caused_by(error, TransportError):
+                raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
+            if isinstance(error, RefreshError):
+                if error.retryable:
+                    raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
+                if _google_error_indicates_permission_denied(error):
+                    raise ProviderFailure("SCOPE_DENIED") from error
+                raise ProviderFailure("AUTHENTICATION_FAILED") from error
+            if isinstance(error, OSError):
+                raise ProviderFailure("CREDENTIAL_PROVIDER_UNAVAILABLE") from error
+            raise ProviderFailure("PROVIDER_ERROR") from error
         expires = getattr(credentials, "expiry", None)
         expiry = expires.astimezone(UTC).isoformat().replace("+00:00", "Z") if expires else None
         token = getattr(credentials, "token", None)
@@ -2253,13 +2336,17 @@ class CloudManagementExecutor:
                 headers=headers,
                 timeout=self._settings.timeout_seconds,
             ) as response:
+                if response.status_code in {301, 302, 303, 307, 308}:
+                    raise ProviderFailure("PROVIDER_REDIRECT_REJECTED")
+                if not 200 <= response.status_code < 300:
+                    if response.status_code >= 400:
+                        self._raise_http_error(response.status_code, method)
+                    raise ProviderFailure("PROVIDER_REJECTED")
                 data = bytearray()
                 for chunk in response.iter_bytes(8192):
                     if len(data) + len(chunk) > _MAX_HTTP_RESPONSE_BYTES:
                         raise ProviderFailure("RESPONSE_TOO_LARGE")
                     data.extend(chunk)
-                if response.status_code >= 400:
-                    self._raise_http_error(response.status_code, method)
                 if not data and allow_empty:
                     body: Any = {}
                 elif not data:
@@ -2683,6 +2770,18 @@ def _azure_summary(value: object) -> dict[str, Any]:
     } | {"provisioning_state": properties.get("provisioningState", "UNKNOWN")}
 
 
+def _azure_resource_list(body: object) -> list[Mapping[str, Any]]:
+    """Require the identity fields promised by ARM's resource collection response."""
+
+    items = _response_mapping_list(body, "value")
+    if any(
+        not all(isinstance(item.get(field), str) and item[field] for field in ("id", "name"))
+        for item in items
+    ):
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    return items
+
+
 def _azure_provisioning_state(value: Mapping[str, Any]) -> str:
     """Translate an ARM provisioning state into provider-neutral operation state."""
 
@@ -2820,6 +2919,42 @@ def _gcp_summary(value: object) -> dict[str, Any]:
         for key in ("id", "name", "zone", "machineType", "status", "creationTimestamp")
         if isinstance(value.get(key), (str, int, float, bool))
     }
+
+
+def _gcp_instance_list(
+    body: object, *, expected_zone: str, allow_missing: bool = False
+) -> list[Mapping[str, Any]]:
+    """Validate Compute Engine instance identity fields before scope filtering."""
+
+    items = _response_mapping_list(body, "items", allow_missing=allow_missing)
+    for item in items:
+        name = item.get("name")
+        zone = item.get("zone")
+        status = item.get("status")
+        if (
+            not isinstance(name, str)
+            or not _GCP_INSTANCE_NAME.fullmatch(name)
+            or not isinstance(zone, str)
+            or zone.rstrip("/").rsplit("/", 1)[-1] != expected_zone
+            or (status is not None and not isinstance(status, str))
+        ):
+            raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    return items
+
+
+def _response_mapping_list(
+    body: object, field_name: str, *, allow_missing: bool = False
+) -> list[Mapping[str, Any]]:
+    """Require a provider response collection instead of hiding malformed data as empty."""
+
+    if not isinstance(body, Mapping) or "error" in body:
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    if field_name not in body and allow_missing:
+        return []
+    value = body.get(field_name)
+    if not isinstance(value, list) or any(not isinstance(item, Mapping) for item in value):
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    return value
 
 
 def _gcp_operation_state(value: Mapping[str, Any]) -> str:
@@ -3169,6 +3304,54 @@ def _runpod_pod_in_scope(profile: CloudProfile, value: Mapping[str, Any]) -> boo
     )
 
 
+def _validate_runpod_pod(value: object) -> Mapping[str, Any]:
+    """Require Runpod v2 Pod identity and lifecycle fields before read-back success."""
+
+    if not isinstance(value, Mapping) or "error" in value:
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    pod_id = value.get("id")
+    name = value.get("name")
+    status = value.get("status")
+    if (
+        not isinstance(pod_id, str)
+        or not _RUNPOD_ID.fullmatch(pod_id)
+        or not isinstance(name, str)
+        or not 1 <= len(name) <= 128
+        or any(ord(character) < 32 for character in name)
+        or not isinstance(status, str)
+        or not 1 <= len(status) <= 64
+        or any(ord(character) < 32 for character in status)
+    ):
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    return value
+
+
+def _runpod_list_response(
+    body: object,
+) -> tuple[list[Mapping[str, Any]], str | None, bool]:
+    """Validate Runpod v2 collection items and pagination before filtering scope."""
+
+    pods = [
+        _validate_runpod_pod(item)
+        for item in _response_mapping_list(body, "pods")
+    ]
+    if not isinstance(body, Mapping):
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    pagination = body.get("pagination")
+    if not isinstance(pagination, Mapping):
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    next_cursor = pagination.get("nextCursor")
+    has_next_page = pagination.get("hasNextPage")
+    valid_cursor = isinstance(next_cursor, str) and 1 <= len(next_cursor) <= 4096
+    if (
+        (next_cursor is not None and not valid_cursor)
+        or not isinstance(has_next_page, bool)
+        or (has_next_page and not valid_cursor)
+    ):
+        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+    return pods, next_cursor, has_next_page
+
+
 def _runpod_summary(value: object) -> dict[str, Any]:
     """Return safe Pod state and cost fields without environment variables or SSH data."""
 
@@ -3292,6 +3475,62 @@ def _bounded_scalar(value: object) -> str | int | float | bool | None:
     ):
         return value
     return None
+
+
+def _exception_caused_by(error: BaseException, exception_type: type[BaseException]) -> bool:
+    """Check wrapped SDK causes without exposing provider exception text."""
+
+    visited: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in visited:
+        if isinstance(current, exception_type):
+            return True
+        visited.add(id(current))
+        current = current.__cause__ or current.__context__
+    return False
+
+
+def _exception_status_code(error: BaseException) -> int | None:
+    """Read only a numeric HTTP status from a wrapped SDK exception."""
+
+    visited: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in visited:
+        status_code = getattr(current, "status_code", None)
+        if isinstance(status_code, int) and not isinstance(status_code, bool):
+            return status_code
+        response = getattr(current, "response", None)
+        status_code = getattr(response, "status_code", None)
+        if isinstance(status_code, int) and not isinstance(status_code, bool):
+            return status_code
+        visited.add(id(current))
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def _google_error_indicates_permission_denied(error: BaseException) -> bool:
+    """Recognize safe structured IAM denial fields without inspecting error text."""
+
+    def is_denial(value: object, depth: int = 0) -> bool:
+        if depth > 3 or not isinstance(value, Mapping):
+            return False
+        for key in ("code", "status", "error"):
+            item = value.get(key)
+            if isinstance(item, int) and not isinstance(item, bool) and item == 403:
+                return True
+            if isinstance(item, str) and item.upper() in {
+                "403",
+                "ACCESS_DENIED",
+                "FORBIDDEN",
+                "INSUFFICIENT_PERMISSIONS",
+                "PERMISSION_DENIED",
+            }:
+                return True
+            if is_denial(item, depth + 1):
+                return True
+        return False
+
+    return any(is_denial(argument) for argument in error.args)
 
 
 def _now() -> str:

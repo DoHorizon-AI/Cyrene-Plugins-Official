@@ -54,7 +54,8 @@
       "required": ["profile_ref", "identity_ref"],
       "properties": {
         "profile_ref": {"type": "string", "pattern": "^[A-Za-z0-9._/-]{1,192}$"},
-        "identity_ref": {"type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,256}$"}
+        "identity_ref": {"type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,256}$"},
+        "read_only": {"type": "boolean", "default": false}
       }
     },
     "azureProfile": {

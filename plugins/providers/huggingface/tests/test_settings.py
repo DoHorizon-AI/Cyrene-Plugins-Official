@@ -6,8 +6,11 @@ No test setting contains or resolves a Hugging Face token. 中文：provider 本
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
+from jsonschema import Draft202012Validator
+from jsonschema.exceptions import ValidationError
 
 from huggingface_provider.settings import (
     ConfigurationError,
@@ -53,11 +56,51 @@ def test_activation_resolves_only_service_keys_and_allowlisted_repo_scope() -> N
     settings = ProviderSettings.from_environment(environ)
 
     assert settings.binding_id == "hf-binding"
+    assert settings.read_only is False
     assert settings.account_center_binding_id == "account-center-binding"
     assert settings.repositories[0].repo_id == "owner/model"
     assert settings.repositories[0].permissions == frozenset({"read", "write"})
     assert settings.exchange_verification_key == b"e" * 32
     assert settings.provider_signing_key == b"p" * 32
+
+
+def test_read_only_binding_requires_read_only_repository_grants() -> None:
+    environ, config = valid_config()
+    config["read_only"] = True
+    environ["CYRENE_CAPABILITY_CONFIGURATION_JSON"] = json.dumps(config)
+
+    with pytest.raises(ConfigurationError, match="cannot include write repository grants"):
+        ProviderSettings.from_environment(environ)
+
+    config["repositories"] = [
+        {"repo_type": "model", "repo_id": "owner/model", "permissions": ["read"]}
+    ]
+    environ["CYRENE_CAPABILITY_CONFIGURATION_JSON"] = json.dumps(config)
+    settings = ProviderSettings.from_environment(environ)
+
+    assert settings.read_only is True
+    assert settings.repositories[0].permissions == frozenset({"read"})
+
+    config["read_only"] = "true"
+    environ["CYRENE_CAPABILITY_CONFIGURATION_JSON"] = json.dumps(config)
+    with pytest.raises(ConfigurationError, match="read_only must be boolean"):
+        ProviderSettings.from_environment(environ)
+
+
+def test_read_only_binding_configuration_matches_closed_schema() -> None:
+    _environ, config = valid_config()
+    config["read_only"] = True
+    schema = json.loads(
+        (Path(__file__).parents[1] / "configuration.schema.json").read_text(encoding="utf-8")
+    )
+    with pytest.raises(ValidationError):
+        Draft202012Validator(schema).validate(config)
+
+    config["repositories"] = [
+        {"repo_type": "model", "repo_id": "owner/model", "permissions": ["read"]}
+    ]
+
+    Draft202012Validator(schema).validate(config)
 
 
 def test_provider_rejects_hf_token_in_its_host_secret_refs() -> None:

@@ -48,9 +48,10 @@ ACTOR = {
 }
 
 
-def make_settings() -> ProviderSettings:
+def make_settings(*, read_only: bool = False) -> ProviderSettings:
     """Build one Hub binding with explicit read and write scopes."""
 
+    model_permissions = {"read"} if read_only else {"read", "write"}
     return ProviderSettings(
         binding_id="hf.binding.test",
         account_center_binding_id="account-center.binding.test",
@@ -61,7 +62,7 @@ def make_settings() -> ProviderSettings:
         account_center_client_key_ref=None,
         host_secret_names={},
         repositories=(
-            RepositoryScope("model", "owner/model", frozenset({"read", "write"})),
+            RepositoryScope("model", "owner/model", frozenset(model_permissions)),
             RepositoryScope("dataset", "owner/data", frozenset({"read"})),
             RepositoryScope("space", "owner/demo", frozenset({"read"})),
         ),
@@ -69,6 +70,7 @@ def make_settings() -> ProviderSettings:
         exchange_caller_id="exchange",
         exchange_verification_key=EXCHANGE_KEY,
         provider_signing_key=PROVIDER_KEY,
+        read_only=read_only,
     )
 
 
@@ -331,6 +333,62 @@ def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
     assert account_context["method"] == "redeem_provider_credential_lease"
     assert account_context["binding_id"] == settings.account_center_binding_id
     assert api.calls[0][1][1] == "hf_private_test_token"
+
+
+def test_read_only_binding_hides_and_rejects_upload_and_native_cli() -> None:
+    """A host read-only flag filters the catalog and blocks direct signed mutations."""
+
+    settings = make_settings(read_only=True)
+    account_center = FakeAccountCenter()
+    api = FakeHubApi()
+    cli = FakeCliRunner()
+    provider = HuggingFaceProvider(
+        settings=settings,
+        account_center=account_center,
+        hub_api=api,
+        cli_runner=cli,
+    )
+    request = wire.ListToolsRequest(binding_id=settings.binding_id)
+
+    ok, result = provider.on_invoke("tool.provider.v1", "list_tools", request.SerializeToString())
+    catalog = wire.ListToolsResponse.FromString(result.value).catalog
+
+    assert ok is True
+    assert {item.provider_tool_id for item in catalog.tools} == {
+        "huggingface.models.list",
+        "huggingface.datasets.list",
+        "huggingface.spaces.list",
+        "huggingface.repo.get",
+        "huggingface.file.download",
+    }
+
+    upload_error, upload_result = invoke_tool(
+        provider,
+        settings,
+        "huggingface.file.upload",
+        {
+            "repo_type": "model",
+            "repo_id": "owner/model",
+            "revision": "main",
+            "path": "weights.bin",
+            "content_base64": base64.b64encode(b"fixture").decode("ascii"),
+            "read_only": False,
+        },
+    )
+    cli_error, cli_result = invoke_tool(
+        provider,
+        settings,
+        "hf_vendor_cli",
+        {"argv": ["models", "list"]},
+    )
+
+    assert upload_error is True
+    assert upload_result["error"]["code"] == "READ_ONLY_PROFILE"
+    assert cli_error is True
+    assert cli_result["error"]["code"] == "READ_ONLY_PROFILE"
+    assert account_center.calls == []
+    assert api.calls == []
+    assert cli.calls == []
 
 
 def test_account_center_profile_scope_digest_is_validated_before_provider_use() -> None:

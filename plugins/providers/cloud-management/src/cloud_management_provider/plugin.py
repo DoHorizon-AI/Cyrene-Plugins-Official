@@ -40,6 +40,7 @@ from .tool_catalog import (
     MAX_TOOL_REQUEST_BYTES,
     PLUGIN_ID,
     PLUGIN_VERSION,
+    READ_ONLY_TOOL_IDS,
     TOOL_BY_ID,
     TOOL_OPERATIONS,
 )
@@ -112,7 +113,14 @@ class CloudManagementProvider:
             return False, "INVALID_REQUEST: binding ID does not match"
         response = wire.ListToolsResponse()
         response.catalog.catalog_version = PLUGIN_VERSION
-        for definition in CANONICAL_TOOLS:
+        definitions = CANONICAL_TOOLS
+        if settings.profiles and all(profile.read_only for profile in settings.profiles.values()):
+            definitions = tuple(
+                definition
+                for definition in CANONICAL_TOOLS
+                if definition["provider_tool_id"] in READ_ONLY_TOOL_IDS
+            )
+        for definition in definitions:
             descriptor = response.catalog.tools.add()
             descriptor.binding_id = settings.binding_id
             descriptor.provider_tool_id = str(definition["provider_tool_id"])
