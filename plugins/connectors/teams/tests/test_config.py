@@ -57,6 +57,128 @@ def test_secret_is_loaded_from_file_reference_and_team_scope_is_explicit(
     assert settings.allowed_team_ids == frozenset({TEAM_ID})
     assert settings.port == 3978
     assert not hasattr(settings, "allowed_actor_aad_object_ids")
+    assert settings.delivery_state_dir is None
+    assert settings.delivery_admin_token is None
+
+
+def test_optional_durable_delivery_requires_private_independent_admin_token(
+    monkeypatch, tmp_path
+):
+    """Enable the spool only when state and its separate private token are set.
+
+    中文：只有 state 与独立私有 token 同时配置时才启用持久队列。
+    """
+
+    hmac_path = tmp_path / "navigator-hmac"
+    hmac_path.write_bytes(b"private-test-key-material-at-least-32-bytes")
+    admin_path = tmp_path / "delivery-admin"
+    admin_path.write_bytes(b"0123456789abcdef0123456789abcdef\n")
+    admin_path.chmod(0o400)
+    state_dir = tmp_path / "delivery-state"
+    _environment(
+        monkeypatch,
+        hmac_path,
+        TEAMS_NAVIGATOR_DELIVERY_STATE_DIR=str(state_dir),
+        TEAMS_DELIVERY_ADMIN_TOKEN_FILE=str(admin_path),
+    )
+
+    settings = IngressSettings.from_environment()
+
+    assert settings.delivery_state_dir == state_dir
+    assert settings.delivery_admin_token == b"0123456789abcdef0123456789abcdef"
+    assert settings.navigator_hmac_key != settings.delivery_admin_token
+    assert settings.delivery_admin_token.decode("ascii") not in repr(settings)
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"TEAMS_NAVIGATOR_DELIVERY_STATE_DIR": "/var/lib/cyrene/teams-delivery"},
+        {"TEAMS_DELIVERY_ADMIN_TOKEN_FILE": "/run/secrets/teams-delivery-admin-token"},
+    ],
+)
+def test_partial_durable_delivery_configuration_fails_closed(
+    monkeypatch, tmp_path, overrides
+):
+    """Never silently fall back to direct mode after partial spool config.
+
+    中文：部分 spool 配置不能静默退回 direct 模式。
+    """
+
+    secret_path = tmp_path / "navigator-hmac"
+    secret_path.write_bytes(b"private-test-key-material-at-least-32-bytes")
+    _environment(monkeypatch, secret_path, **overrides)
+
+    with pytest.raises(ConfigurationError, match="delivery"):
+        IngressSettings.from_environment()
+
+
+def test_admin_token_file_rejects_group_readable_mode(monkeypatch, tmp_path):
+    """Require owner-only mode for the separate internal admin token.
+
+    中文：内部管理 token 必须使用 owner-only 文件权限。
+    """
+
+    hmac_path = tmp_path / "navigator-hmac"
+    hmac_path.write_bytes(b"private-test-key-material-at-least-32-bytes")
+    admin_path = tmp_path / "delivery-admin"
+    admin_path.write_bytes(b"0123456789abcdef0123456789abcdef")
+    admin_path.chmod(0o640)
+    _environment(
+        monkeypatch,
+        hmac_path,
+        TEAMS_NAVIGATOR_DELIVERY_STATE_DIR=str(tmp_path / "delivery-state"),
+        TEAMS_DELIVERY_ADMIN_TOKEN_FILE=str(admin_path),
+    )
+
+    with pytest.raises(ConfigurationError, match="owner-only"):
+        IngressSettings.from_environment()
+
+
+def test_admin_token_file_rejects_symlink(monkeypatch, tmp_path):
+    """A mounted admin credential may not be redirected through a symlink.
+
+    中文：挂载的 admin credential 不能经由符号链接重定向。
+    """
+
+    hmac_path = tmp_path / "navigator-hmac"
+    hmac_path.write_bytes(b"private-test-key-material-at-least-32-bytes")
+    actual_path = tmp_path / "actual-admin-token"
+    actual_path.write_bytes(b"0123456789abcdef0123456789abcdef")
+    actual_path.chmod(0o400)
+    symlink_path = tmp_path / "delivery-admin"
+    symlink_path.symlink_to(actual_path)
+    _environment(
+        monkeypatch,
+        hmac_path,
+        TEAMS_NAVIGATOR_DELIVERY_STATE_DIR=str(tmp_path / "delivery-state"),
+        TEAMS_DELIVERY_ADMIN_TOKEN_FILE=str(symlink_path),
+    )
+
+    with pytest.raises(ConfigurationError, match="could not be read"):
+        IngressSettings.from_environment()
+
+
+def test_delivery_state_directory_must_be_absolute(monkeypatch, tmp_path):
+    """Reject process-working-directory dependent durability paths.
+
+    中文：持久 state 路径不能依赖进程工作目录。
+    """
+
+    hmac_path = tmp_path / "navigator-hmac"
+    hmac_path.write_bytes(b"private-test-key-material-at-least-32-bytes")
+    admin_path = tmp_path / "delivery-admin"
+    admin_path.write_bytes(b"0123456789abcdef0123456789abcdef")
+    admin_path.chmod(0o400)
+    _environment(
+        monkeypatch,
+        hmac_path,
+        TEAMS_NAVIGATOR_DELIVERY_STATE_DIR="relative-state",
+        TEAMS_DELIVERY_ADMIN_TOKEN_FILE=str(admin_path),
+    )
+
+    with pytest.raises(ConfigurationError, match="must be absolute"):
+        IngressSettings.from_environment()
 
 
 def test_empty_team_allowlist_fails_closed(monkeypatch, tmp_path):

@@ -10,6 +10,11 @@
 
 from __future__ import annotations
 
+import asyncio
+import concurrent.futures
+import json
+import sqlite3
+import threading
 import time
 from types import SimpleNamespace
 
@@ -65,6 +70,14 @@ class AdmissionNavigator:
             accepted=True, duplicate=len(self.events) > 1, status_code=202
         )
 
+    async def submit_body(self, body: bytes):
+        """Decode the canonical test body and reuse the Navigator fake.
+
+        中文：解析规范测试 body，并复用 Navigator fake 行为。
+        """
+
+        return await self.submit(json.loads(body))
+
     async def aclose(self):
         """Record client shutdown without external I/O.
 
@@ -74,7 +87,7 @@ class AdmissionNavigator:
         self.closed = True
 
 
-def _settings():
+def _settings(*, delivery_state_dir=None, delivery_admin_token=None):
     """Return private sidecar settings for one approved test team.
 
     中文：返回单个允许测试团队的私有侧车配置。
@@ -88,6 +101,8 @@ def _settings():
         navigator_hmac_key_id="teams-v1",
         navigator_hmac_key=b"fabricated-navigator-key-material-of-32-bytes",
         navigator_timeout_seconds=1,
+        delivery_state_dir=delivery_state_dir,
+        delivery_admin_token=delivery_admin_token,
     )
 
 
@@ -279,3 +294,243 @@ async def test_sdk_rejects_activity_service_url_not_bound_to_signed_claim(monkey
 
     assert response.status_code == 401
     assert navigator.events == []
+
+
+@pytest.mark.asyncio
+async def test_durable_ack_waits_for_sqlite_commit_not_navigator_forward(
+    monkeypatch, tmp_path
+):
+    """The authenticated Teams ACK follows SQLite commit while Navigator is pending.
+
+    中文：Teams ACK 等待 SQLite commit，但不等待 Navigator 后台投递。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+    token_value = b"0123456789abcdef0123456789abcdef"
+    forward_started = threading.Event()
+    release_forward = threading.Event()
+
+    class BlockingNavigator:
+        async def submit_body(self, body: bytes):
+            forward_started.set()
+            await asyncio.to_thread(release_forward.wait, 5)
+            return AdmissionResult(True, False, 202)
+
+        async def aclose(self):
+            return None
+
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=token_value,
+        ),
+        navigator=BlockingNavigator(),
+    )
+    committed = threading.Event()
+    release_ack = threading.Event()
+    original_enqueue = service.delivery_spool.enqueue
+
+    async def delay_after_commit(event):
+        result = await original_enqueue(event)
+        committed.set()
+        await asyncio.to_thread(release_ack.wait, 5)
+        return result
+
+    service.delivery_spool.enqueue = delay_after_commit
+    request_token = _service_token(private_key)
+    try:
+        with (
+            TestClient(service.http_app) as client,
+            concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor,
+        ):
+            response_future = executor.submit(
+                client.post,
+                "/api/messages",
+                json=_activity(activity_id="1749000000004"),
+                headers={"Authorization": f"Bearer {request_token}"},
+            )
+            assert committed.wait(timeout=5)
+            assert response_future.done() is False
+            with sqlite3.connect(service.delivery_spool.database_path) as connection:
+                row = connection.execute(
+                    "SELECT state, body FROM deliveries"
+                ).fetchone()
+            assert row is not None
+            assert row[0] == "queued"
+            assert b"@Cyrene inspect" in row[1]
+            release_ack.set()
+            response = response_future.result(timeout=5)
+            assert response.status_code == 200
+            assert forward_started.wait(timeout=2)
+    finally:
+        release_ack.set()
+        release_forward.set()
+        await service.close()
+
+
+@pytest.mark.asyncio
+async def test_spool_capacity_failure_returns_non_success_to_teams(
+    monkeypatch, tmp_path
+):
+    """A full queue cannot be converted into a successful Teams ACK.
+
+    中文：队列容量不足时必须向 Teams 返回非成功状态。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+    token_value = b"0123456789abcdef0123456789abcdef"
+
+    class UnusedNavigator:
+        async def submit_body(self, _body: bytes):
+            raise AssertionError("full queue must not forward")
+
+        async def aclose(self):
+            return None
+
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=token_value,
+        ),
+        navigator=UnusedNavigator(),
+    )
+    service.delivery_spool._max_rows = 0
+    try:
+        with TestClient(service.http_app) as client:
+            response = client.post(
+                "/api/messages",
+                json=_activity(activity_id="1749000000005"),
+                headers={"Authorization": f"Bearer {_service_token(private_key)}"},
+            )
+        assert not 200 <= response.status_code < 300
+        with sqlite3.connect(service.delivery_spool.database_path) as connection:
+            count = connection.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0]
+        assert count == 0
+    finally:
+        await service.close()
+
+
+@pytest.mark.asyncio
+async def test_duplicate_activity_is_idempotent_and_conflicting_body_is_rejected(
+    monkeypatch, tmp_path
+):
+    """Exact webhook redelivery reuses one row; changed bytes under the same ID fail.
+
+    中文：相同 webhook 正文重投只保留一行；同 ID 不同正文必须拒绝。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+    navigator = AdmissionNavigator()
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=b"0123456789abcdef0123456789abcdef",
+        ),
+        navigator=navigator,
+    )
+    token = _service_token(private_key)
+    headers = {"Authorization": f"Bearer {token}"}
+    original_activity = _activity(activity_id="1749000000006")
+    conflicting_activity = {
+        **original_activity,
+        "text": "changed under same activity id",
+    }
+    try:
+        with TestClient(service.http_app) as client:
+            first = client.post(
+                "/api/messages", json=original_activity, headers=headers
+            )
+            duplicate = client.post(
+                "/api/messages", json=original_activity, headers=headers
+            )
+            conflict = client.post(
+                "/api/messages", json=conflicting_activity, headers=headers
+            )
+
+        assert first.status_code == 200
+        assert duplicate.status_code == 200
+        assert not 200 <= conflict.status_code < 300
+        with sqlite3.connect(service.delivery_spool.database_path) as connection:
+            count = connection.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0]
+        assert count == 1
+    finally:
+        await service.close()
+
+
+@pytest.mark.asyncio
+async def test_durable_admin_routes_are_private_and_use_holder_revision_cas(tmp_path):
+    """Protect internal delivery control and return metadata-only status.
+
+    中文：内部投递管理接口要求独立 token，并只返回元数据。
+    """
+
+    token_value = b"0123456789abcdef0123456789abcdef"
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=token_value,
+        ),
+        navigator=AdmissionNavigator(),
+    )
+    headers = {"Authorization": f"Bearer {token_value.decode('ascii')}"}
+    cas = {"holder": "rollout-1", "expected_revision": 0}
+    try:
+        with TestClient(service.http_app) as client:
+            unauthorized = client.get("/_internal/teams/delivery/status")
+            assert unauthorized.status_code == 401
+            assert token_value.decode("ascii") not in unauthorized.text
+
+            status = client.get("/_internal/teams/delivery/status", headers=headers)
+            assert status.status_code == 200
+            assert status.json()["paused"] is False
+            assert status.json()["revision"] == 0
+            assert "holder" not in status.json()
+            assert "body" not in status.json()
+
+            paused = client.post(
+                "/_internal/teams/delivery/pause", headers=headers, json=cas
+            )
+            assert paused.status_code == 200
+            assert paused.json()["paused"] is True
+            assert paused.json()["revision"] == 1
+            assert paused.json()["active_delivery_count"] == 0
+
+            duplicate_pause = client.post(
+                "/_internal/teams/delivery/pause", headers=headers, json=cas
+            )
+            assert duplicate_pause.status_code == 200
+            assert duplicate_pause.json()["revision"] == 1
+
+            conflict = client.post(
+                "/_internal/teams/delivery/pause",
+                headers=headers,
+                json={"holder": "rollout-2", "expected_revision": 1},
+            )
+            assert conflict.status_code == 409
+            wrong_resume = client.post(
+                "/_internal/teams/delivery/resume",
+                headers=headers,
+                json={"holder": "rollout-2", "expected_revision": 1},
+            )
+            assert wrong_resume.status_code == 409
+
+            resumed = client.post(
+                "/_internal/teams/delivery/resume",
+                headers=headers,
+                json={"holder": "rollout-1", "expected_revision": 1},
+            )
+            assert resumed.status_code == 200
+            assert resumed.json()["paused"] is False
+            assert resumed.json()["revision"] == 2
+            repeated_resume = client.post(
+                "/_internal/teams/delivery/resume",
+                headers=headers,
+                json={"holder": "rollout-1", "expected_revision": 1},
+            )
+            assert repeated_resume.status_code == 200
+            assert repeated_resume.json()["revision"] == 2
+    finally:
+        await service.close()

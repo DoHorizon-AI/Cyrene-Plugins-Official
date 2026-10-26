@@ -11,7 +11,9 @@
 from __future__ import annotations
 
 import asyncio
+import hmac
 import os
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any
 
@@ -19,13 +21,21 @@ from typing import Any
 # come only from the host's injected environment and secret mounts.
 os.environ["PYTHON_DOTENV_DISABLED"] = "true"
 
-from fastapi import FastAPI, Response  # noqa: E402
+from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
 from microsoft_teams.api import MessageActivity  # noqa: E402
 from microsoft_teams.apps import ActivityContext, App, FastAPIAdapter  # noqa: E402
 from microsoft_teams.common import ClientOptions  # noqa: E402
 
 from .activity import ActivityRejected, normalize_activity  # noqa: E402
 from .config import IngressSettings  # noqa: E402
+from .delivery_spool import (  # noqa: E402
+    DeliveryAdminConflict,
+    DeliveryIdentityConflict,
+    DeliveryPauseTimeout,
+    DeliverySpool,
+    DeliverySpoolError,
+    NavigatorDeliveryWorker,
+)
 from .logging_utils import install_sensitive_log_filters  # noqa: E402
 from .navigator import (  # noqa: E402
     NavigatorAdmissionUnavailable,
@@ -44,6 +54,8 @@ class TeamsIngressService:
     http_app: FastAPI
     navigator: NavigatorEventClient
     port: int
+    delivery_spool: DeliverySpool | None = None
+    delivery_worker: NavigatorDeliveryWorker | None = None
 
     async def start(self) -> None:
         """Run the SDK-managed FastAPI server on the configured port.
@@ -59,6 +71,8 @@ class TeamsIngressService:
         中文：监听器停止后关闭 Navigator client。
         """
 
+        if self.delivery_worker is not None:
+            await self.delivery_worker.close()
         await self.navigator.aclose()
 
 
@@ -78,7 +92,43 @@ async def build_ingress_service(
     """
 
     install_sensitive_log_filters()
-    api = FastAPI()
+    navigator_client = navigator or NavigatorEventClient(
+        base_url=settings.navigator_base_url,
+        key_id=settings.navigator_hmac_key_id,
+        hmac_key=settings.navigator_hmac_key,
+        timeout_seconds=settings.navigator_timeout_seconds,
+    )
+    delivery_spool = (
+        DeliverySpool(settings.delivery_state_dir)
+        if settings.delivery_state_dir is not None
+        else None
+    )
+    delivery_worker = (
+        NavigatorDeliveryWorker(
+            delivery_spool,
+            navigator_client.submit_body,
+            navigator_timeout_seconds=settings.navigator_timeout_seconds,
+        )
+        if delivery_spool is not None
+        else None
+    )
+
+    @asynccontextmanager
+    async def lifespan(_api: FastAPI):
+        """Start and drain the optional delivery worker with the app lifetime.
+
+        中文：随应用生命周期启动可选投递 worker，并在关闭时有界排空。
+        """
+
+        if delivery_worker is not None:
+            await delivery_worker.start()
+        try:
+            yield
+        finally:
+            if delivery_worker is not None:
+                await delivery_worker.close()
+
+    api = FastAPI(lifespan=lifespan)
     ready = False
 
     @api.get("/health/live")
@@ -102,12 +152,116 @@ async def build_ingress_service(
             return {"status": "not_ready"}
         return {"status": "ready"}
 
-    navigator_client = navigator or NavigatorEventClient(
-        base_url=settings.navigator_base_url,
-        key_id=settings.navigator_hmac_key_id,
-        hmac_key=settings.navigator_hmac_key,
-        timeout_seconds=settings.navigator_timeout_seconds,
-    )
+    if delivery_spool is not None and delivery_worker is not None:
+        admin_token = settings.delivery_admin_token
+        if admin_token is None:
+            raise ValueError("durable delivery requires its independent admin token")
+
+        def require_delivery_admin(request: Request) -> None:
+            """Compare the in-memory token without logging or persisting headers.
+
+            中文：在内存中常量时间比较 token，不记录或持久化请求 header。
+            """
+
+            authorization = request.headers.get("authorization", "")
+            scheme, separator, value = authorization.partition(" ")
+            try:
+                candidate = value.encode("ascii")
+            except UnicodeEncodeError:
+                candidate = b""
+            if (
+                scheme.casefold() != "bearer"
+                or not separator
+                or not hmac.compare_digest(candidate, admin_token)
+            ):
+                raise HTTPException(
+                    status_code=401,
+                    detail="delivery admin authentication required",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+
+        async def read_admin_cas(request: Request) -> tuple[str, int]:
+            """Read holder/revision fields without echoing request values.
+
+            中文：只读取 holder/revision，不回显请求字段。
+            """
+
+            try:
+                body = await request.json()
+            except (ValueError, UnicodeDecodeError):
+                raise HTTPException(400, "invalid delivery admin request") from None
+            if (
+                not isinstance(body, dict)
+                or set(body) != {"holder", "expected_revision"}
+                or not isinstance(body.get("holder"), str)
+                or type(body.get("expected_revision")) is not int
+            ):
+                raise HTTPException(400, "invalid delivery admin request")
+            return body["holder"], body["expected_revision"]
+
+        @api.get("/_internal/teams/delivery/status")
+        async def delivery_status(request: Request) -> dict[str, Any]:
+            """Return queue metadata only; never expose bodies or holders.
+
+            中文：只返回队列元数据，不暴露正文或 holder。
+            """
+
+            require_delivery_admin(request)
+            try:
+                return (await delivery_spool.status()).as_dict()
+            except DeliverySpoolError:
+                raise HTTPException(503, "delivery status is unavailable") from None
+
+        @api.post("/_internal/teams/delivery/pause")
+        async def pause_delivery(request: Request) -> dict[str, Any]:
+            """CAS-pause claims while continuing durable webhook admission.
+
+            中文：以 CAS 暂停后台领取；webhook 仍须持久入队后 ACK。
+            """
+
+            require_delivery_admin(request)
+            holder, revision = await read_admin_cas(request)
+            try:
+                return (
+                    await delivery_worker.pause_and_wait(
+                        holder=holder, expected_revision=revision
+                    )
+                ).as_dict()
+            except DeliveryAdminConflict:
+                raise HTTPException(
+                    409, "delivery pause revision or holder conflict"
+                ) from None
+            except DeliveryPauseTimeout:
+                raise HTTPException(503, "active delivery did not drain") from None
+            except DeliverySpoolError:
+                raise HTTPException(
+                    503, "delivery pause could not be persisted"
+                ) from None
+
+        @api.post("/_internal/teams/delivery/resume")
+        async def resume_delivery(request: Request) -> dict[str, Any]:
+            """CAS-resume only the pause owned by the matching holder.
+
+            中文：只允许匹配 holder 以 CAS 恢复后台领取。
+            """
+
+            require_delivery_admin(request)
+            holder, revision = await read_admin_cas(request)
+            try:
+                return (
+                    await delivery_worker.resume(
+                        holder=holder, expected_revision=revision
+                    )
+                ).as_dict()
+            except DeliveryAdminConflict:
+                raise HTTPException(
+                    409, "delivery pause revision or holder conflict"
+                ) from None
+            except DeliverySpoolError:
+                raise HTTPException(
+                    503, "delivery resume could not be persisted"
+                ) from None
+
     sdk_app = App(
         client_id=settings.bot_app_id,
         tenant_id=settings.tenant_id,
@@ -140,6 +294,21 @@ async def build_ingress_service(
             # echoes are terminally ignored; they must not create Navigator work.
             return
 
+        if delivery_spool is not None and delivery_worker is not None:
+            try:
+                await delivery_spool.enqueue(normalized.as_event())
+            except DeliveryIdentityConflict:
+                raise HTTPException(
+                    409, "Teams activity identity conflicts with queued body"
+                ) from None
+            except DeliverySpoolError:
+                # Disk-full and commit failures must remain visible to Teams retries.
+                raise HTTPException(
+                    503, "Teams event could not be durably queued"
+                ) from None
+            await delivery_worker.notify()
+            return
+
         result = await navigator_client.submit(normalized.as_event())
         if result.accepted:
             return
@@ -158,6 +327,8 @@ async def build_ingress_service(
         http_app=api,
         navigator=navigator_client,
         port=settings.port,
+        delivery_spool=delivery_spool,
+        delivery_worker=delivery_worker,
     )
 
 

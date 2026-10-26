@@ -117,10 +117,10 @@ async def test_authenticated_terminal_team_rejection_is_not_an_admission():
 
 
 @pytest.mark.asyncio
-async def test_hmac_or_timestamp_401_remains_retryable():
-    """A source-authentication 401 must not ACK an unpersisted event.
+async def test_source_authentication_401_is_permanent_for_durable_delivery():
+    """A source-authentication 401 is terminal until its private key is fixed.
 
-    中文：来源鉴权或 timestamp 401 不能确认未持久化事件。
+    中文：来源鉴权或 timestamp 401 在修复私有 key 前属于永久错误。
     """
 
     async def handler(_request: httpx.Request) -> httpx.Response:
@@ -140,15 +140,17 @@ async def test_hmac_or_timestamp_401_remains_retryable():
             hmac_key=HMAC_KEY,
             client=http_client,
         )
-        with pytest.raises(NavigatorAdmissionUnavailable, match="status=401"):
+        with pytest.raises(NavigatorAdmissionUnavailable, match="status=401") as error:
             await client.submit({"event_type": "inbound_message"})
+    assert error.value.retryable is False
+    assert error.value.status_code == 401
 
 
 @pytest.mark.asyncio
-async def test_unknown_or_malformed_four_xx_remains_retryable():
-    """A 4xx without an allowlisted terminal code can never become an ACK.
+async def test_unknown_or_malformed_four_xx_is_permanent_for_spool_retry_policy():
+    """An unallowlisted 4xx is never ACKed and is not retried forever.
 
-    中文：没有 allowlist 终态 code 的 4xx 不能成为 ACK。
+    中文：没有 allowlist 终态 code 的 4xx 不 ACK，也不无限重试。
     """
 
     replies = iter(
@@ -178,8 +180,34 @@ async def test_unknown_or_malformed_four_xx_remains_retryable():
         for status_code in (403, 422):
             with pytest.raises(
                 NavigatorAdmissionUnavailable, match=f"status={status_code}"
-            ):
+            ) as error:
                 await client.submit({"event_type": "inbound_message"})
+            assert error.value.retryable is False
+
+
+@pytest.mark.asyncio
+async def test_rate_limit_is_transient_and_exposes_only_bounded_retry_after():
+    """A 429 schedules a retry without persisting response headers.
+
+    中文：429 按临时错误重试，只读取有界 Retry-After 元数据。
+    """
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(429, headers={"Retry-After": "17"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+        client = NavigatorEventClient(
+            base_url="http://navigator:8080",
+            key_id="teams-v1",
+            hmac_key=HMAC_KEY,
+            client=http_client,
+        )
+        with pytest.raises(NavigatorAdmissionUnavailable) as error:
+            await client.submit({"event_type": "inbound_message"})
+
+    assert error.value.retryable is True
+    assert error.value.status_code == 429
+    assert error.value.retry_after_seconds == 17
 
 
 @pytest.mark.asyncio
