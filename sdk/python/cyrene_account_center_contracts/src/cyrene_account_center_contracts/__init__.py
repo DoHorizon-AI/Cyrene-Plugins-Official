@@ -2,6 +2,7 @@
 
 from .contracts import (
     AuthMaterial,
+    BeginHuggingFaceRenewalRequest,
     BeginLinkRequest,
     CompleteGitHubLinkRequest,
     ConfirmWeComLinkRequest,
@@ -9,6 +10,7 @@ from .contracts import (
     CreateProviderCredentialLeaseRequest,
     CredentialLease,
     GetAuthorizationRequest,
+    HuggingFaceRenewalSession,
     LinkedProviderProfileResponse,
     LinkGitHubAppInstallationRequest,
     LinkHuggingFaceProfileRequest,
@@ -16,6 +18,7 @@ from .contracts import (
     ListProviderProfilesRequest,
     ListProviderProfilesResponse,
     ObserveWeComChallengeRequest,
+    PollHuggingFaceRenewalRequest,
     ProviderCredentialLease,
     ProviderProfile,
     RedeemCredentialLeaseRequest,
@@ -36,6 +39,7 @@ from .contracts import (
 
 __all__ = [
     "AuthMaterial",
+    "BeginHuggingFaceRenewalRequest",
     "BeginLinkRequest",
     "CompleteGitHubLinkRequest",
     "ConfirmWeComLinkRequest",
@@ -43,6 +47,7 @@ __all__ = [
     "CreateProviderCredentialLeaseRequest",
     "CredentialLease",
     "GetAuthorizationRequest",
+    "HuggingFaceRenewalSession",
     "LinkGitHubAppInstallationRequest",
     "LinkHuggingFaceProfileRequest",
     "LinkedProviderProfileResponse",
@@ -50,6 +55,7 @@ __all__ = [
     "ListProviderProfilesRequest",
     "ListProviderProfilesResponse",
     "ObserveWeComChallengeRequest",
+    "PollHuggingFaceRenewalRequest",
     "ProviderCredentialLease",
     "ProviderProfile",
     "RedeemCredentialLeaseRequest",

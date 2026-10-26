@@ -2,16 +2,72 @@
 
 import hashlib
 import hmac
+import json
 from dataclasses import asdict
 
 import pytest
 from cyrene_account_center_contracts import (
+    BeginHuggingFaceRenewalRequest,
+    HuggingFaceRenewalSession,
+    PollHuggingFaceRenewalRequest,
     RedeemProviderCredentialLeaseRequest,
     canonical_json,
     payload_sha256,
     sign_context,
     verify_context,
 )
+
+
+def test_huggingface_renewal_dtos_round_trip_as_public_wire_json() -> None:
+    """Keep the new renewal DTO field names stable for Exchange serialization."""
+
+    values = (
+        (
+            BeginHuggingFaceRenewalRequest(
+                profile_ref="profile-1",
+                session_ref="session-1",
+            ),
+            {"profile_ref": "profile-1", "session_ref": "session-1"},
+        ),
+        (
+            PollHuggingFaceRenewalRequest(
+                profile_ref="profile-1",
+                session_ref="session-1",
+            ),
+            {"profile_ref": "profile-1", "session_ref": "session-1"},
+        ),
+        (
+            HuggingFaceRenewalSession(
+                profile_ref="profile-1",
+                session_ref="session-1",
+                state="waiting_user",
+                user_code="L94P-HPL8",
+                verification_uri="https://hf.co/oauth/device",
+                expires_at=1_800_000_000,
+                interval_seconds=5,
+                generation=7,
+                reason_code=None,
+            ),
+            {
+                "profile_ref": "profile-1",
+                "session_ref": "session-1",
+                "state": "waiting_user",
+                "user_code": "L94P-HPL8",
+                "verification_uri": "https://hf.co/oauth/device",
+                "expires_at": 1_800_000_000,
+                "interval_seconds": 5,
+                "generation": 7,
+                "reason_code": None,
+            },
+        ),
+    )
+
+    for dto, expected in values:
+        serialized = asdict(dto)
+        assert serialized == expected
+        decoded = json.loads(canonical_json(serialized))
+        assert decoded == expected
+        assert canonical_json(decoded) == canonical_json(expected)
 
 
 def test_provider_lease_request_contract_keeps_profile_scope() -> None:

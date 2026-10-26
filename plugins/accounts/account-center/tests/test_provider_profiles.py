@@ -24,6 +24,7 @@ from account_center.huggingface_auth import (
     HuggingFaceIdentityClient,
 )
 from account_center.huggingface_oauth import (
+    HuggingFaceDeviceCode,
     HuggingFaceOAuthClient,
     HuggingFaceOAuthError,
     HuggingFaceOAuthToken,
@@ -48,7 +49,12 @@ GITHUB_TYPED_TARGET_CASES = [
     (
         "github.issues.search",
         GITHUB_TARGET,
-        {**GITHUB_TARGET, "state": "OPEN", "limit": 20, "updated_since": "2026-10-01T00:00:00Z"},
+        {
+            **GITHUB_TARGET,
+            "state": "OPEN",
+            "limit": 20,
+            "updated_since": "2026-10-01T00:00:00Z",
+        },
     ),
     (
         "github.branch.get",
@@ -205,6 +211,7 @@ class FakeHuggingFace:
         "hf_token_other": "other-user",
         "oauth_access_initial": "derek-li",
         "oauth_access_refreshed": "derek-li",
+        "oauth_access_device_renewed": "derek-li",
         "oauth_access_wrong": "other-user",
     }
 
@@ -245,6 +252,59 @@ class FakeHuggingFaceOAuth:
             now + 7200,
             None,
         )
+
+
+class FakeHuggingFaceDeviceOAuth(FakeHuggingFaceOAuth):
+    """Drive owner-initiated HF device renewal without any external request."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.start_calls: list[tuple[str, tuple[str, ...]]] = []
+        self.poll_calls: list[tuple[str, str]] = []
+        self.start_error: HuggingFaceOAuthError | None = None
+        self.poll_error: HuggingFaceOAuthError | None = None
+        self.poll_started: threading.Event | None = None
+        self.poll_release: threading.Event | None = None
+        self.device_token = HuggingFaceOAuthToken(
+            "oauth_access_device_renewed",
+            "oauth_refresh_device_rotated",
+            13_600,
+            17_200,
+            ("openid", "profile", "read-repos"),
+        )
+
+    def begin_device_code(
+        self,
+        *,
+        client_id: str,
+        oauth_scopes: tuple[str, ...],
+    ) -> HuggingFaceDeviceCode:
+        self.start_calls.append((client_id, oauth_scopes))
+        if self.start_error is not None:
+            raise self.start_error
+        return HuggingFaceDeviceCode(
+            "private-device-code",
+            "ABCD-EFGH",
+            "https://hf.co/oauth/device",
+            600,
+            5,
+        )
+
+    def poll_device_code(
+        self,
+        *,
+        client_id: str,
+        device_code: str,
+        now: int,
+    ) -> HuggingFaceOAuthToken:
+        self.poll_calls.append((client_id, device_code))
+        if self.poll_started is not None:
+            self.poll_started.set()
+        if self.poll_release is not None and not self.poll_release.wait(timeout=2):
+            raise RuntimeError("test device poll was not released")
+        if self.poll_error is not None:
+            raise self.poll_error
+        return self.device_token
 
 
 class ProfileHarness:
@@ -820,6 +880,7 @@ def test_huggingface_link_rotation_is_host_secret_only_and_identity_pinned(
     assert listed["profiles"][0]["profile_ref"] == profile_ref
     assert "credential_secret_ref" not in listed["profiles"][0]
     assert "credential_blob" not in listed["profiles"][0]
+    assert listed["profiles"][0]["credential_revision"] == 0
 
     with pytest.raises(AccountCenterError, match="external_identity_mismatch"):
         harness.call(
@@ -907,6 +968,7 @@ def test_huggingface_device_oauth_refresh_persists_rotation_and_survives_restart
     listed = harness.call("list_provider_profiles", {})["profiles"][0]
     assert listed["oauth_scopes"] is None
     assert listed["auth_mode"] == "device_oauth"
+    initial_revision = listed["credential_revision"]
 
     _, redemption = _huggingface_oauth_lease(harness, profile_ref, scope)
     result = harness.call(
@@ -926,6 +988,10 @@ def test_huggingface_device_oauth_refresh_persists_rotation_and_survives_restart
     assert stored_refresh == "oauth_refresh_rotated"
     assert b"oauth_refresh_rotated" not in bytes(row["credential_refresh_blob"])
     assert row["credential_refresh_expires_at"] == 17_200
+    assert (
+        harness.call("list_provider_profiles", {})["profiles"][0]["credential_revision"]
+        > initial_revision
+    )
 
     harness.plugin = harness._new_plugin()
     _, resumed_redemption = _huggingface_oauth_lease(harness, profile_ref, scope)
@@ -1144,14 +1210,20 @@ def test_workspace_operator_profile_requires_fresh_one_use_exchange_grant(
             (grant["grant_ref"],),
         ).fetchone()
         assert consumed["anchor_subject"] == "maintainer-2"
-        assert db.execute(
-            "SELECT 1 FROM consumed_connector_grants WHERE grant_ref=?",
-            (grant["grant_ref"],),
-        ).fetchone() is not None
-        assert db.execute(
-            "SELECT 1 FROM provider_credential_leases WHERE lease_ref=?",
-            (lease["lease_ref"],),
-        ).fetchone() is not None
+        assert (
+            db.execute(
+                "SELECT 1 FROM consumed_connector_grants WHERE grant_ref=?",
+                (grant["grant_ref"],),
+            ).fetchone()
+            is not None
+        )
+        assert (
+            db.execute(
+                "SELECT 1 FROM provider_credential_leases WHERE lease_ref=?",
+                (lease["lease_ref"],),
+            ).fetchone()
+            is not None
+        )
     with pytest.raises(AccountCenterError, match="connector_grant_replayed"):
         harness.call("create_provider_credential_lease", authorized, actor=operator)
     result = harness.call(
@@ -1182,22 +1254,34 @@ def test_workspace_operator_profile_requires_fresh_one_use_exchange_grant(
         actor=operator,
     )
     with harness.plugin._store._connect() as db:
-        assert db.execute(
-            "SELECT 1 FROM consumed_connector_grants WHERE grant_ref=?",
-            (grant["grant_ref"],),
-        ).fetchone() is None
-        assert db.execute(
-            "SELECT 1 FROM provider_credential_leases WHERE lease_ref=?",
-            (lease["lease_ref"],),
-        ).fetchone() is None
-        assert db.execute(
-            "SELECT 1 FROM consumed_connector_grants WHERE grant_ref=?",
-            (fresh_grant["grant_ref"],),
-        ).fetchone() is not None
-        assert db.execute(
-            "SELECT 1 FROM provider_credential_leases WHERE lease_ref=?",
-            (fresh_lease["lease_ref"],),
-        ).fetchone() is not None
+        assert (
+            db.execute(
+                "SELECT 1 FROM consumed_connector_grants WHERE grant_ref=?",
+                (grant["grant_ref"],),
+            ).fetchone()
+            is None
+        )
+        assert (
+            db.execute(
+                "SELECT 1 FROM provider_credential_leases WHERE lease_ref=?",
+                (lease["lease_ref"],),
+            ).fetchone()
+            is None
+        )
+        assert (
+            db.execute(
+                "SELECT 1 FROM consumed_connector_grants WHERE grant_ref=?",
+                (fresh_grant["grant_ref"],),
+            ).fetchone()
+            is not None
+        )
+        assert (
+            db.execute(
+                "SELECT 1 FROM provider_credential_leases WHERE lease_ref=?",
+                (fresh_lease["lease_ref"],),
+            ).fetchone()
+            is not None
+        )
     with pytest.raises(AccountCenterError, match="connector_grant_required"):
         harness.call("create_provider_credential_lease", authorized, actor=operator)
 
@@ -1779,6 +1863,153 @@ def test_huggingface_oauth_invalid_grant_is_sanitized() -> None:
     assert "revoked" not in str(caught.value)
 
 
+def test_huggingface_device_oauth_uses_official_fixed_endpoints_and_poll_grant() -> (
+    None
+):
+    captured: list[dict[str, Any]] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes,
+    ) -> Any:
+        captured.append(
+            {
+                "method": method,
+                "host": host,
+                "path": path,
+                "headers": dict(headers),
+                "body": body.decode("ascii"),
+            }
+        )
+        response = (
+            {
+                "device_code": "device-secret-code",
+                "user_code": "ABCD-EFGH",
+                "verification_uri": "https://hf.co/oauth/device",
+                "expires_in": 600,
+                "interval": 5,
+            }
+            if path == "/oauth/device"
+            else {
+                "access_token": "hf_access_device",
+                "refresh_token": "hf_refresh_rotated",
+                "expires_in": 3600,
+                "refresh_expires_in": 7200,
+                "scope": "openid profile read-repos",
+            }
+        )
+        return type(
+            "Response",
+            (),
+            {"status": 200, "headers": {}, "body": json.dumps(response).encode()},
+        )()
+
+    client = HuggingFaceOAuthClient(transport=transport)
+    device = client.begin_device_code(
+        client_id="first-party-client",
+        oauth_scopes=("openid", "profile", "read-repos"),
+    )
+    token = client.poll_device_code(
+        client_id="first-party-client",
+        device_code=device.device_code,
+        now=10_000,
+    )
+
+    assert device.user_code == "ABCD-EFGH"
+    assert device.verification_uri == "https://hf.co/oauth/device"
+    assert token.access_token == "hf_access_device"
+    assert token.refresh_token == "hf_refresh_rotated"
+    assert [call["path"] for call in captured] == ["/oauth/device", "/oauth/token"]
+    assert all(call["method"] == "POST" for call in captured)
+    assert all(call["host"] == "huggingface.co" for call in captured)
+    assert "scope=openid+profile+read-repos" in captured[0]["body"]
+    assert (
+        "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"
+        in captured[1]["body"]
+    )
+    assert "device-secret-code" not in str(captured[0])
+
+
+def test_huggingface_device_oauth_pending_error_is_sanitized() -> None:
+    def transport(
+        _method: str,
+        _host: str,
+        _path: str,
+        _headers: Mapping[str, str],
+        _body: bytes,
+    ) -> Any:
+        return type(
+            "Response",
+            (),
+            {
+                "status": 400,
+                "headers": {},
+                "body": json.dumps(
+                    {
+                        "error": "authorization_pending",
+                        "error_description": "wait for user",
+                    }
+                ).encode(),
+            },
+        )()
+
+    client = HuggingFaceOAuthClient(transport=transport)
+    with pytest.raises(HuggingFaceOAuthError, match="authorization_pending") as caught:
+        client.poll_device_code(
+            client_id="first-party-client",
+            device_code="private-device-code",
+            now=10_000,
+        )
+    assert "private-device-code" not in str(caught.value)
+    assert "wait for user" not in str(caught.value)
+
+
+@pytest.mark.parametrize(
+    "device_facts",
+    [
+        {
+            "device_code": "private-device-code",
+            "user_code": "L94P-HPL8",
+            "verification_uri": "https://hf.co/oauth/device?next=https://evil.example",
+            "expires_in": 600,
+            "interval": 5,
+        },
+        {
+            "device_code": "private-device-code",
+            "user_code": "l94p-hpl8",
+            "verification_uri": "https://hf.co/oauth/device",
+            "expires_in": 600,
+            "interval": 5,
+        },
+    ],
+)
+def test_huggingface_device_oauth_rejects_noncanonical_user_action_metadata(
+    device_facts: dict[str, Any],
+) -> None:
+    def transport(
+        _method: str,
+        _host: str,
+        _path: str,
+        _headers: Mapping[str, str],
+        _body: bytes,
+    ) -> Any:
+        return type(
+            "Response",
+            (),
+            {"status": 200, "headers": {}, "body": json.dumps(device_facts).encode()},
+        )()
+
+    client = HuggingFaceOAuthClient(transport=transport)
+    with pytest.raises(HuggingFaceOAuthError, match="invalid_provider_response"):
+        client.begin_device_code(
+            client_id="first-party-client",
+            oauth_scopes=("openid", "profile", "read-repos"),
+        )
+
+
 def test_huggingface_oauth_seed_rejects_pending_or_unselected_material() -> None:
     seed = _oauth_seed(_huggingface_scope(), oauth_scopes=None)
     parsed = parse_device_oauth_seed(
@@ -1791,3 +2022,398 @@ def test_huggingface_oauth_seed_rejects_pending_or_unselected_material() -> None
         parse_device_oauth_seed(
             json.dumps(pending), expected_secret_ref="huggingface/connector-token"
         )
+
+
+def test_huggingface_device_renewal_is_owner_scoped_encrypted_and_rotates_revision(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000240"
+    session_ref = "00000000-0000-4000-8000-000000000241"
+    scope = _huggingface_scope("derek/renewal-model")
+    oauth = FakeHuggingFaceDeviceOAuth()
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    linked = harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    initial = harness.call("list_provider_profiles", {})["profiles"][0]
+    start_payload = {"profile_ref": profile_ref, "session_ref": session_ref}
+    started = harness.call("begin_huggingface_renewal", start_payload)
+    replayed_start = harness.call("begin_huggingface_renewal", start_payload)
+
+    assert started["state"] == "waiting_user"
+    assert started["user_code"] == "ABCD-EFGH"
+    assert started["verification_uri"] == "https://hf.co/oauth/device"
+    assert started["expires_at"] == harness.now + 600
+    assert started["generation"] == initial["credential_revision"]
+    assert replayed_start == started
+    assert oauth.start_calls == [
+        ("first-party-public-client-id", ("openid", "profile", "read-repos"))
+    ]
+    assert "private-device-code" not in json.dumps(started)
+    assert "oauth_refresh_initial" not in json.dumps(started)
+    with harness.plugin._store._connect() as db:
+        session = db.execute(
+            "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+            (session_ref,),
+        ).fetchone()
+    assert session is not None
+    assert b"private-device-code" not in bytes(session["device_code_blob"])
+
+    harness.plugin = harness._new_plugin()
+    other_actor = {**ACTOR, "subject": "another-owner"}
+    with pytest.raises(AccountCenterError, match="renewal_session_not_found"):
+        harness.call(
+            "poll_huggingface_renewal",
+            start_payload,
+            actor=other_actor,
+        )
+    harness.now += 5
+    completed = harness.call("poll_huggingface_renewal", start_payload)
+    replayed_poll = harness.call("poll_huggingface_renewal", start_payload)
+
+    assert completed["state"] == "succeeded"
+    assert completed["user_code"] is None
+    assert completed["verification_uri"] is None
+    assert completed["generation"] == initial["credential_revision"] + 1
+    assert replayed_poll == completed
+    assert oauth.poll_calls == [("first-party-public-client-id", "private-device-code")]
+    assert "oauth_access_device_renewed" not in json.dumps(completed)
+    profile = harness.plugin._store.get_provider_profile(profile_ref, Anchor(**ACTOR))
+    assert json.loads(profile["target_scope_json"]) == scope
+    assert profile["external_subject"] == linked["external_subject"] == "derek-li"
+    assert profile["credential_revision"] == initial["credential_revision"] + 1
+    assert profile["auth_status"] == "healthy"
+    assert harness.plugin._decrypt_provider_token(
+        profile_ref, bytes(profile["credential_blob"])
+    ) == ("oauth_access_device_renewed", 13_600)
+    assert (
+        harness.plugin._decrypt_provider_refresh_token(
+            profile_ref, bytes(profile["credential_refresh_blob"])
+        )
+        == "oauth_refresh_device_rotated"
+    )
+
+
+def test_huggingface_device_renewal_rejects_a_different_hub_subject(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000242"
+    session_ref = "00000000-0000-4000-8000-000000000243"
+    scope = _huggingface_scope("derek/renewal-subject-model")
+    oauth = FakeHuggingFaceDeviceOAuth()
+    oauth.device_token = HuggingFaceOAuthToken(
+        "oauth_access_wrong",
+        "oauth_refresh_wrong_subject",
+        13_600,
+        17_200,
+        ("openid", "profile", "read-repos"),
+    )
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    initial = harness.call("list_provider_profiles", {})["profiles"][0]
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    harness.call("begin_huggingface_renewal", request)
+    harness.now += 5
+    rejected = harness.call("poll_huggingface_renewal", request)
+
+    assert rejected["state"] == "failed"
+    assert rejected["reason_code"] == "external_identity_mismatch"
+    current = harness.plugin._store.get_provider_profile(profile_ref, Anchor(**ACTOR))
+    assert current["credential_revision"] == initial["credential_revision"]
+    assert harness.plugin._decrypt_provider_token(
+        profile_ref, bytes(current["credential_blob"])
+    ) == ("oauth_access_initial", 10_020)
+    assert (
+        harness.plugin._decrypt_provider_refresh_token(
+            profile_ref, bytes(current["credential_refresh_blob"])
+        )
+        == "oauth_refresh_initial"
+    )
+
+
+def test_huggingface_device_renewal_pending_and_slow_down_are_deferred(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000246"
+    session_ref = "00000000-0000-4000-8000-000000000247"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    scope = _huggingface_scope("derek/pending-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    harness.call("begin_huggingface_renewal", request)
+
+    oauth.poll_error = HuggingFaceOAuthError("authorization_pending")
+    harness.now += 5
+    pending = harness.call("poll_huggingface_renewal", request)
+    repeated_before_deadline = harness.call("poll_huggingface_renewal", request)
+
+    assert pending["state"] == "waiting_user"
+    assert pending["interval_seconds"] == 5
+    assert pending["reason_code"] is None
+    assert repeated_before_deadline == pending
+    assert len(oauth.poll_calls) == 1
+
+    oauth.poll_error = HuggingFaceOAuthError("slow_down")
+    harness.now += 5
+    slowed = harness.call("poll_huggingface_renewal", request)
+    repeated_before_next_deadline = harness.call("poll_huggingface_renewal", request)
+
+    assert slowed["state"] == "waiting_user"
+    assert slowed["interval_seconds"] == 10
+    assert slowed["reason_code"] == "slow_down"
+    assert repeated_before_next_deadline == slowed
+    assert len(oauth.poll_calls) == 2
+
+
+def test_huggingface_device_renewal_expires_without_an_upstream_poll(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000248"
+    session_ref = "00000000-0000-4000-8000-000000000249"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    scope = _huggingface_scope("derek/expired-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    started = harness.call("begin_huggingface_renewal", request)
+    harness.now = started["expires_at"]
+
+    expired = harness.call("poll_huggingface_renewal", request)
+
+    assert expired["state"] == "expired"
+    assert expired["reason_code"] == "device_code_expired"
+    assert expired["user_code"] is None
+    assert expired["verification_uri"] is None
+    assert oauth.poll_calls == []
+
+
+def test_huggingface_device_renewal_uncertain_outcomes_are_not_replayed(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000250"
+    start_session_ref = "00000000-0000-4000-8000-000000000251"
+    poll_session_ref = "00000000-0000-4000-8000-000000000252"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    scope = _huggingface_scope("derek/uncertain-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    start_request = {"profile_ref": profile_ref, "session_ref": start_session_ref}
+    oauth.start_error = HuggingFaceOAuthError("provider_timeout", uncertain=True)
+
+    unknown_start = harness.call("begin_huggingface_renewal", start_request)
+    replayed_start = harness.call("begin_huggingface_renewal", start_request)
+
+    assert unknown_start["state"] == "unknown"
+    assert replayed_start == unknown_start
+    assert len(oauth.start_calls) == 1
+
+    oauth.start_error = None
+    poll_request = {"profile_ref": profile_ref, "session_ref": poll_session_ref}
+    harness.call("begin_huggingface_renewal", poll_request)
+    oauth.poll_error = HuggingFaceOAuthError("provider_timeout", uncertain=True)
+    harness.now += 5
+    unknown_poll = harness.call("poll_huggingface_renewal", poll_request)
+    replayed_poll = harness.call("poll_huggingface_renewal", poll_request)
+
+    assert unknown_poll["state"] == "unknown"
+    assert unknown_poll["user_code"] is None
+    assert unknown_poll["verification_uri"] is None
+    assert replayed_poll == unknown_poll
+    assert len(oauth.poll_calls) == 1
+
+
+def test_huggingface_device_renewal_fences_concurrent_polls(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000253"
+    session_ref = "00000000-0000-4000-8000-000000000254"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    oauth.poll_started = threading.Event()
+    oauth.poll_release = threading.Event()
+    scope = _huggingface_scope("derek/concurrent-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    harness.call("begin_huggingface_renewal", request)
+    harness.now += 5
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        first_poll = executor.submit(harness.call, "poll_huggingface_renewal", request)
+        assert oauth.poll_started.wait(timeout=2)
+        concurrent_poll = harness.call("poll_huggingface_renewal", request)
+        assert concurrent_poll["state"] == "waiting_user"
+        assert len(oauth.poll_calls) == 1
+        oauth.poll_release.set()
+        completed = first_poll.result(timeout=2)
+
+    assert completed["state"] == "succeeded"
+    assert len(oauth.poll_calls) == 1
+
+
+def test_huggingface_workspace_operator_cannot_start_owner_renewal(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000255"
+    session_ref = "00000000-0000-4000-8000-000000000256"
+    scope = _huggingface_scope("derek/operator-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=FakeHuggingFaceDeviceOAuth(),
+        workspace_operator_profile_refs=[profile_ref],
+    )
+    linked = harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    assert linked["access_mode"] == "workspace_operator"
+    operator_actor = {**ACTOR, "subject": "workspace-maintainer"}
+
+    with pytest.raises(AccountCenterError, match="profile_not_found"):
+        harness.call(
+            "begin_huggingface_renewal",
+            {"profile_ref": profile_ref, "session_ref": session_ref},
+            actor=operator_actor,
+        )
+
+
+def test_huggingface_profile_unlink_cancels_device_session_and_clears_code(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000244"
+    session_ref = "00000000-0000-4000-8000-000000000245"
+    scope = _huggingface_scope("derek/unlink-renewal-model")
+    oauth = FakeHuggingFaceDeviceOAuth()
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    harness.call("begin_huggingface_renewal", request)
+    harness.call("unlink_provider_profile", {"profile_ref": profile_ref})
+    polled = harness.call("poll_huggingface_renewal", request)
+
+    assert polled["state"] == "cancelled"
+    assert polled["user_code"] is None
+    assert polled["verification_uri"] is None
+    assert oauth.poll_calls == []
+    with harness.plugin._store._connect() as db:
+        row = db.execute(
+            "SELECT status,device_code_blob,user_code FROM huggingface_device_renewal_sessions "
+            "WHERE session_ref=?",
+            (session_ref,),
+        ).fetchone()
+    assert row is not None
+    assert row["status"] == "cancelled"
+    assert row["device_code_blob"] is None
+    assert row["user_code"] is None

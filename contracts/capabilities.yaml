@@ -10,6 +10,7 @@ capabilities:
       paths:
         - plugins/accounts/account-center/contracts/v1/schema.json
     contract_methods:
+      - begin_huggingface_renewal
       - begin_link
       - complete_github_link
       - confirm_wecom_link
@@ -21,6 +22,7 @@ capabilities:
       - list_links
       - list_provider_profiles
       - observe_wecom_challenge
+      - poll_huggingface_renewal
       - redeem_credential_lease
       - redeem_provider_credential_lease
       - register_host_identity_profile
@@ -35,6 +37,7 @@ capabilities:
         language: python
         publication: published
         methods:
+          - begin_huggingface_renewal
           - begin_link
           - complete_github_link
           - confirm_wecom_link
@@ -46,6 +49,7 @@ capabilities:
           - list_links
           - list_provider_profiles
           - observe_wecom_challenge
+          - poll_huggingface_renewal
           - redeem_credential_lease
           - redeem_provider_credential_lease
           - register_host_identity_profile
