@@ -12,6 +12,15 @@ then bind a project, zones, and instance-name prefixes. Runpod profiles use a
 host-injected API key and REST API v2, with explicit Pod IDs, name prefixes,
 GPU types, data centers, and resource limits.
 
+Each profile in `CYRENE_CAPABILITY_CONFIGURATION_JSON.profiles[]` accepts an
+optional host-only `read_only` boolean (omitted means `false`). A read-only
+profile permits only provider health, resource list/get,
+and operation status/log reads. Mutations, cancellation, and the native vendor
+CLI are rejected by the executor before it writes a replay receipt or contacts
+the vendor. When every profile in a binding is read-only, `list_tools` hides the
+mutating tools as well; mixed bindings retain a union catalog while the
+per-profile execution gate remains authoritative.
+
 `cloud_provider_health` reports the bound profile's authentication state,
 authorization state, scope references, check time, and credential expiry when
 the provider supplies one. Azure Managed Identity and GCP Workload Identity
@@ -111,6 +120,12 @@ stdout/stderr 不会送入模型或 Teams；结果只报告有界执行元数据
 `command_state=COMMAND_COMPLETED` 只描述本地进程退出；写命令的 `remote_state=UNKNOWN` 会持续到原生状态回读。
 安全解析的 GCP 和 Runpod JSON operation/resource 引用可通过 typed 状态工具对账。最终权限仍由云 IAM 和 Runpod
 API key 权限控制。
+
+`CYRENE_CAPABILITY_CONFIGURATION_JSON.profiles[]` 中的每个 profile 可配置宿主 `read_only` 布尔值
+（省略时为 `false`）。只读 profile 只允许 provider
+健康检查、资源列表/详情与操作状态/日志读取。写操作、取消和供应商 CLI 会在 executor 写入重放回执或访问供应商
+前拒绝。当 binding 中所有 profile 都是只读时，`list_tools` 也会隐藏写工具；混合 binding 保留联合目录，最终权限
+仍由逐 profile 的执行端门禁强制。
 
 `cloud_provider_health` 会返回绑定 profile 的认证状态、授权状态、范围引用、检查时间，以及供应商
 提供的凭据过期时间。Azure Managed Identity 和 GCP Workload Identity Federation token 由各自 SDK

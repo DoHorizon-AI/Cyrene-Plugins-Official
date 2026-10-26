@@ -14,6 +14,12 @@ transfers are limited to 1 MiB, and an upload is reported confirmed only after
 the Hub tree readback contains the exact target path. An uncertain upload is
 never retried automatically.
 
+The `CYRENE_CAPABILITY_CONFIGURATION_JSON` activation root accepts an optional
+`read_only` boolean (omitted means `false`). When enabled, every configured repository grant must be read-only;
+the provider hides upload and native CLI tools from its catalog and rejects
+direct signed calls before redeeming an Account Center lease. This binding-wide
+server gate complements the per-repository permission checks.
+
 | Tool | Operation | Scope |
 | --- | --- | --- |
 | `huggingface.models.list` | Search model metadata | Public results, bounded to 100 |
@@ -44,6 +50,11 @@ Account Center 一次性租约；Exchange 不会收到 HF token。
 引用；token 值保留在 host secret store，并由 Account Center 加密保存。私有或 gated
 资源的授权失败以结构化错误返回。文件传输限制为 1 MiB；上传只有在 Hub tree 回读确认
 目标路径存在后才报告成功。结果不确定的上传不会自动重试。
+
+`CYRENE_CAPABILITY_CONFIGURATION_JSON` activation 根对象可配置 `read_only` 布尔值（省略时为 `false`）。启用后
+所有配置仓库权限都必须只读；provider
+会从目录隐藏上传与原生 CLI 工具，并在兑换 Account Center 租约前拒绝直接签名调用。该 binding 级服务端门禁会与
+每仓库权限校验同时生效。
 
 建议阅读顺序：先看 `settings.py` 的配置与 repo scope 校验，再看 `account_center.py`
 和 `trust.py` 的身份与租约边界，最后看 `huggingface_api.py` 和 `plugin.py` 的固定

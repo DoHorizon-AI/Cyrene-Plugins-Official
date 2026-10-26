@@ -2308,15 +2308,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/README.md",
-      "sha256": "7f4e32128f37d71c6ce9e4c430f739a1b35c8e546a61a76e856cd0c461e103fe",
-      "size_bytes": 9206
+      "sha256": "9727cdc4124329e3f58d5f8f939432bba1355448b0c49865782947af4baa6d2e",
+      "size_bytes": 10296
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/configuration.schema.json",
-      "sha256": "ff542442456f6e1831336b7a081c314838fb5924bbd8d22815786de150c61485",
-      "size_bytes": 9382
+      "sha256": "41d0ccabe81255129129747f25705fda5d671dd116bd649f9fe6a5aa9f97ae43",
+      "size_bytes": 9442
     },
     {
       "kind": "file",
@@ -2406,8 +2406,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/plugin.py",
-      "sha256": "7bcc09025166189e1bc9c7950eb845c1e6eccf73e98a89f8f1cd74dc16c9a417",
-      "size_bytes": 11463
+      "sha256": "71aceedc0f334338655ac720f40a05a8721b3ed8e9268ed64c4e0d7ff6bc06f0",
+      "size_bytes": 11816
     },
     {
       "kind": "file",
@@ -2420,22 +2420,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/providers.py",
-      "sha256": "b71d8405f7f247fb9f0d5717410a00f752ea02b7abf76335a858056cb20335b9",
-      "size_bytes": 146155
+      "sha256": "c56f04862bb87600e9006ea261318ad70355ae29bf629ff8c020c386a63d6ee8",
+      "size_bytes": 146298
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/settings.py",
-      "sha256": "41224adad8612de67fb9d53e3e009c864da5311c18a27f45f9d895d00e6a30ab",
-      "size_bytes": 25616
+      "sha256": "b228c6a9d06d829cdfdcd8b66654c6793f32194cc20846d49797ee03f44c59e7",
+      "size_bytes": 25869
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/tool_catalog.py",
-      "sha256": "fa3f2c88998567a27890157a912e24fa692bb02e4bd087f59aee6456500f7f4e",
-      "size_bytes": 8906
+      "sha256": "98546fb7af78f8075f414f5e4e7a7f9a85f417baf953f6617eece142e504a70e",
+      "size_bytes": 9247
     },
     {
       "kind": "file",
@@ -2462,8 +2462,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "789d3025cc7d161e108445a28dc5ef242e0cfe757db8dbdc7c977f5e7a104930",
-      "size_bytes": 88754
+      "sha256": "c414c654a0c0e231a1092f765ee82e78aadd41cf539b643e238229b6eb5d44ba",
+      "size_bytes": 95898
     },
     {
       "kind": "file",
@@ -2749,15 +2749,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/README.md",
-      "sha256": "b01db940b769749607786b28f7ac60ce5fda3930581fd2bfe13baa81f3ae19f1",
-      "size_bytes": 2810
+      "sha256": "6ed1a95ac6e78febc50f901f0651b520c308cb96305d93267c3b2776803aebc7",
+      "size_bytes": 3586
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/configuration.schema.json",
-      "sha256": "c2b5822af30f33095434276628d1cb400397925fde4746fa7730ffdfd83cee0a",
-      "size_bytes": 4186
+      "sha256": "c5628f2adecb94a5f455f8b04583ac2d85abda8cc5aeee9de63893d13b9ff687",
+      "size_bytes": 4596
     },
     {
       "kind": "file",
@@ -2833,15 +2833,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/plugin.py",
-      "sha256": "6b900a93bc5e1fa9ccac80db01d647e0f4e6981484880a83969013830629c64c",
-      "size_bytes": 26184
+      "sha256": "7e982f2bd102e5d8afab208dbeb32ffc9ff1c23b84089cd92f566ffd7c6d8c35",
+      "size_bytes": 26756
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/settings.py",
-      "sha256": "566eb3c902d58960692e72e9733a8fad1d426ba7d54a6374d101e692eaacc813",
-      "size_bytes": 11529
+      "sha256": "1228d7d6c978661ca320c9536abba7a28ed9f891b4f868568748956911dd37fd",
+      "size_bytes": 12383
     },
     {
       "kind": "file",
@@ -2868,15 +2868,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_provider.py",
-      "sha256": "4d11420aa12458709e8c2f0f8191cbe508088accefd90317b4672a2648e2bedd",
-      "size_bytes": 22015
+      "sha256": "c1978d50a4dae66029ef3ec2cbb2401a167ec254b0c9905051d9fe5ae9740630",
+      "size_bytes": 23925
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_settings.py",
-      "sha256": "a8ec8765d3c84be0dd85a75382661beddf7fd1bba27136c47974f023bb39d85d",
-      "size_bytes": 3556
+      "sha256": "799c1987e3da1b36769a9017aa106531d6845bee224ed005e438c7ea28a6e817",
+      "size_bytes": 5210
     },
     {
       "kind": "file",
