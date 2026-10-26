@@ -168,7 +168,7 @@ class NavigatorEventClient:
             else "UNKNOWN"
         )
         if (
-            400 <= response.status_code < 500
+            response.status_code == 403
             and body.get("terminal") is True
             and body.get("sourceAuthenticated") is True
             and safe_code in TERMINAL_BUSINESS_REJECTIONS

@@ -129,9 +129,9 @@ async def test_source_authentication_401_is_retried_with_bounded_backoff():
         return httpx.Response(
             401,
             json={
-                "code": "CONNECTOR_SOURCE_UNAUTHENTICATED",
-                "terminal": False,
-                "sourceAuthenticated": False,
+                "code": "TEAMS_TEAM_NOT_ALLOWED",
+                "terminal": True,
+                "sourceAuthenticated": True,
             },
         )
 

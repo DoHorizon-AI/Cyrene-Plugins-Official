@@ -1783,8 +1783,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/navigator.py",
-      "sha256": "b02354244c81fb193f3d85517c4108706f7ae7d6d4f3099a662b6f2dc3f9a6e9",
-      "size_bytes": 9188
+      "sha256": "947840e48ff9b4c247761bf1dc246aab714a5f723551644cccac1fa214bb3956",
+      "size_bytes": 9182
     },
     {
       "kind": "file",
@@ -1860,8 +1860,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_navigator.py",
-      "sha256": "3d3ecf706a06f89ac5781cfbf34d38c915916ab961ed643f29b7c4a3a9b51069",
-      "size_bytes": 12010
+      "sha256": "a6697418a996425dc3ae945d5c864ca2c7e718e74f7bd63aa6ff4ca1c2b885c1",
+      "size_bytes": 11998
     },
     {
       "kind": "file",
