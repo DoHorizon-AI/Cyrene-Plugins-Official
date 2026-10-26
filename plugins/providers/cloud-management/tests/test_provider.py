@@ -188,6 +188,328 @@ def _pod_response(
     }
 
 
+def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Azure and GCP health checks expose only short-lived token expiry metadata."""
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    azure_expiry = "2026-10-26T22:00:00Z"
+    gcp_expiry = "2026-10-26T22:05:00Z"
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", azure_expiry))
+    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", gcp_expiry))
+
+    azure = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id="request-azure-health",
+    )
+    gcp = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id="request-gcp-health",
+    )
+
+    expected_fields = {
+        "profile_ref",
+        "provider",
+        "identity_ref",
+        "authentication_state",
+        "authorization_state",
+        "scope_refs",
+        "checked_at",
+        "expires_at",
+        "reason_code",
+    }
+    assert set(azure) == expected_fields
+    assert set(gcp) == expected_fields
+    assert azure["authentication_state"] == "VALID"
+    assert azure["authorization_state"] == "VALID"
+    assert azure["expires_at"] == azure_expiry
+    assert gcp["authentication_state"] == "VALID"
+    assert gcp["authorization_state"] == "VALID"
+    assert gcp["expires_at"] == gcp_expiry
+    executor.close()
+
+
+def test_cloud_provider_health_runpod_key_has_unknown_expiry(
+    tmp_path: Any,
+) -> None:
+    """A working static Runpod key is valid now but has no asserted expiry date."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"pods": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id="request-runpod-health",
+    )
+
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "VALID"
+    assert health["expires_at"] is None
+    assert health["reason_code"] is None
+    executor.close()
+
+
+def test_cloud_provider_health_missing_runpod_key_requests_reauthorization(
+    tmp_path: Any,
+) -> None:
+    """A missing host key is actionable and distinct from an unknown network result."""
+
+    settings = ProviderSettings.from_environment(
+        {
+            "CYRENE_CAPABILITY_BINDING_ID": "binding-cloud-test",
+            "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(_configuration(tmp_path)),
+            "EXCHANGE_KEY": _EXCHANGE_KEY.hex(),
+            "STATE_DIR": str(tmp_path),
+            "RUNPOD_API_KEY": "",
+        }
+    )
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(200, json={"pods": []})
+            )
+        ),
+    )
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id="request-runpod-health-missing",
+    )
+
+    assert health["authentication_state"] == "MISSING"
+    assert health["authorization_state"] == "REAUTHORIZATION_REQUIRED"
+    assert health["expires_at"] is None
+    assert health["reason_code"] == "CREDENTIAL_MISSING"
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_authentication", "expected_authorization", "reason_code"),
+    [
+        (401, "INVALID", "REAUTHORIZATION_REQUIRED", "AUTHENTICATION_FAILED"),
+        (403, "VALID", "PERMISSION_DENIED", "SCOPE_DENIED"),
+        (302, "UNKNOWN", "UNKNOWN", "PROVIDER_REDIRECT_REJECTED"),
+        (503, "UNKNOWN", "UNKNOWN", "PROVIDER_ERROR"),
+    ],
+)
+def test_cloud_provider_health_distinguishes_auth_scope_and_upstream_failures(
+    tmp_path: Any,
+    status_code: int,
+    expected_authentication: str,
+    expected_authorization: str,
+    reason_code: str,
+) -> None:
+    """401, 403, and provider failure keep distinct safe health outcomes."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(status_code, json={"detail": "private body"})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id=f"request-runpod-health-{status_code}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == reason_code
+    assert "private body" not in json.dumps(health)
+    executor.close()
+
+
+def test_cloud_provider_health_network_failure_is_unknown_not_invalid(
+    tmp_path: Any,
+) -> None:
+    """A network failure cannot be reported as an invalid Runpod API key."""
+
+    settings = _settings(tmp_path)
+
+    def fail(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("private network detail")
+
+    client = httpx.Client(transport=httpx.MockTransport(fail))
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id="request-runpod-health-network",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == "PROVIDER_UNAVAILABLE"
+    assert "private network detail" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("failure_type", "expected_authentication", "expected_authorization", "expected_reason"),
+    [
+        ("transport", "UNKNOWN", "UNKNOWN", "PROVIDER_UNAVAILABLE"),
+        ("auth", "INVALID", "REAUTHORIZATION_REQUIRED", "AUTHENTICATION_FAILED"),
+    ],
+)
+def test_azure_managed_identity_health_does_not_misreport_token_transport_errors(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_type: str,
+    expected_authentication: str,
+    expected_authorization: str,
+    expected_reason: str,
+) -> None:
+    """Managed identity token transport and authentication failures remain distinct."""
+
+    from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    error: Exception = (
+        ServiceRequestError("private transport detail")
+        if failure_type == "transport"
+        else ClientAuthenticationError("private identity detail")
+    )
+
+    class _Credential:
+        def get_token(self, _scope: str) -> Any:
+            raise error
+
+    monkeypatch.setitem(executor._credentials, "azure/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id=f"request-azure-token-{failure_type}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == expected_reason
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("retryable", "expected_authentication", "expected_authorization", "expected_reason"),
+    [
+        (True, "UNKNOWN", "UNKNOWN", "PROVIDER_UNAVAILABLE"),
+        (False, "INVALID", "REAUTHORIZATION_REQUIRED", "AUTHENTICATION_FAILED"),
+    ],
+)
+def test_gcp_wif_health_treats_retryable_refresh_errors_as_unknown(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    retryable: bool,
+    expected_authentication: str,
+    expected_authorization: str,
+    expected_reason: str,
+) -> None:
+    """WIF refresh retries are not mistaken for an invalid long-lived identity."""
+
+    from google.auth.exceptions import RefreshError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise RefreshError("private refresh detail", retryable=retryable)
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id=f"request-gcp-refresh-{retryable}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == expected_reason
+    assert "private refresh detail" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("profile_ref", "target", "response"),
+    [
+        ("azure/test", {"resource_group": "rg-test"}, {"error": {"code": "Denied"}}),
+        ("gcp/test", {"zone": "us-central1-a"}, {"error": {"code": "denied"}}),
+        ("runpod/test", {"scope_ref": "pods"}, {"error": {"status": 403}}),
+    ],
+)
+def test_cloud_resource_list_does_not_turn_error_envelopes_into_empty_lists(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_ref: str,
+    target: dict[str, str],
+    response: dict[str, Any],
+) -> None:
+    """HTTP success with an error or malformed envelope never becomes resources=[]."""
+
+    settings = (
+        _multi_provider_settings(tmp_path)
+        if profile_ref != "runpod/test"
+        else _settings(tmp_path)
+    )
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", None))
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resources_list",
+            {"profile_ref": profile_ref, "target": target},
+            request_id=f"request-list-envelope-{profile_ref}",
+        )
+    executor.close()
+
+
+def test_runpod_readback_does_not_treat_error_envelope_as_missing_pod(tmp_path: Any) -> None:
+    """A malformed Pod list cannot falsely confirm that a new resource is absent."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, json={"error": {"code": "Unavailable"}})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor._find_runpod_by_name(  # noqa: SLF001
+            settings.profile("runpod/test"), "cyrene-test-unit"
+        )
+    executor.close()
+
+
 def test_runpod_create_is_scope_bounded_and_replay_safe(tmp_path: Any) -> None:
     """One signed create calls Runpod once and caches the exact typed result."""
 
