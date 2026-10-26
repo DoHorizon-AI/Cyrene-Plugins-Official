@@ -273,7 +273,7 @@ class CloudManagementExecutor:
     ) -> dict[str, Any]:
         """Dispatch one catalogued tool, replay-guarding every mutation and CLI call."""
 
-        from .tool_catalog import TOOL_BY_ID
+        from .tool_catalog import READ_ONLY_TOOL_IDS, TOOL_BY_ID
 
         if tool_id not in TOOL_BY_ID:
             raise ProviderFailure("TOOL_NOT_FOUND")
@@ -284,6 +284,8 @@ class CloudManagementExecutor:
             profile = self._settings.profile(profile_ref)
         except ProfileNotFoundError as error:
             raise ProviderFailure("PROFILE_NOT_FOUND") from error
+        if profile.read_only and tool_id not in READ_ONLY_TOOL_IDS:
+            raise ProviderFailure("READ_ONLY_PROFILE")
         if tool_id in _WRITE_TOOLS:
             argument_digest = payload_sha256(dict(arguments))
             write_receipt: Mapping[str, Any] | None = None

@@ -28,6 +28,8 @@ from cloud_management_provider.tool_catalog import (
     CALL_TOOL_METHOD,
     CALL_TOOL_RESPONSE_TYPE_URL,
     CAPABILITY_ID,
+    LIST_TOOLS_METHOD,
+    READ_ONLY_TOOL_IDS,
     TOOL_BY_ID,
 )
 
@@ -46,7 +48,9 @@ class _PartialThenTimeoutStream(httpx.SyncByteStream):
         pass
 
 
-def _configuration(tmp_path: Any, *, cli_enabled: bool = False) -> dict[str, Any]:
+def _configuration(
+    tmp_path: Any, *, cli_enabled: bool = False, read_only: bool = False
+) -> dict[str, Any]:
     """Build one host-only Runpod profile with explicit resource limits."""
 
     profile = {
@@ -74,6 +78,8 @@ def _configuration(tmp_path: Any, *, cli_enabled: bool = False) -> dict[str, Any
             "executable": "/usr/bin/runpodctl",
             "timeout_seconds": 5,
         }
+    if read_only:
+        profile["read_only"] = True
     return {
         "trusted_callers": [
             {
@@ -94,13 +100,15 @@ def _configuration(tmp_path: Any, *, cli_enabled: bool = False) -> dict[str, Any
     }
 
 
-def _settings(tmp_path: Any, *, cli_enabled: bool = False) -> ProviderSettings:
+def _settings(
+    tmp_path: Any, *, cli_enabled: bool = False, read_only: bool = False
+) -> ProviderSettings:
     """Create validated test settings from temporary host secret values."""
 
     environment = {
         "CYRENE_CAPABILITY_BINDING_ID": "binding-cloud-test",
         "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(
-            _configuration(tmp_path, cli_enabled=cli_enabled)
+            _configuration(tmp_path, cli_enabled=cli_enabled, read_only=read_only)
         ),
         "EXCHANGE_KEY": _EXCHANGE_KEY.hex(),
         "STATE_DIR": str(tmp_path),
@@ -258,6 +266,29 @@ def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
     assert gcp["authorization_state"] == "VALID"
     assert gcp["expires_at"] == "2026-10-26T22:05:00Z"
     executor.close()
+
+
+def test_cloud_profile_read_only_defaults_false_and_parses_true(tmp_path: Any) -> None:
+    """The host profile flag is optional for compatibility and parsed as a boolean."""
+
+    assert _settings(tmp_path / "default").profile("runpod/test").read_only is False
+    assert _settings(tmp_path / "readonly", read_only=True).profile("runpod/test").read_only is True
+    schema = json.loads(
+        (Path(__file__).parents[1] / "configuration.schema.json").read_text(encoding="utf-8")
+    )
+    Draft202012Validator(schema).validate(_configuration(tmp_path, read_only=True))
+
+    invalid_config = _configuration(tmp_path, read_only=True)
+    invalid_config["profiles"][0]["read_only"] = "true"
+    invalid_environment = {
+        "CYRENE_CAPABILITY_BINDING_ID": "binding-cloud-test",
+        "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(invalid_config),
+        "EXCHANGE_KEY": _EXCHANGE_KEY.hex(),
+        "STATE_DIR": str(tmp_path / "invalid"),
+        "RUNPOD_API_KEY": _API_KEY,
+    }
+    with pytest.raises(ConfigurationError, match="profile read_only must be boolean"):
+        ProviderSettings.from_environment(invalid_environment)
 
 
 def test_cloud_provider_health_runpod_key_has_unknown_expiry(
@@ -2391,6 +2422,176 @@ def _invoke(
     decoded = wire.CallToolResponse()
     decoded.ParseFromString(response.value)
     return decoded
+
+
+def test_read_only_profile_filters_catalog_and_server_denies_direct_mutations(
+    tmp_path: Any,
+) -> None:
+    """The provider enforces the host profile mode even for signed direct tool calls."""
+
+    settings = _settings(tmp_path, cli_enabled=True, read_only=True)
+    assert settings.profile("runpod/test").read_only is True
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={"pods": [], "pagination": {"nextCursor": None, "hasNextPage": False}},
+        )
+
+    class _ProcessRunner:
+        calls = 0
+
+        def run(self, *_args: Any, **_kwargs: Any) -> ProcessResult:
+            self.calls += 1
+            raise AssertionError("read-only rejection must happen before CLI execution")
+
+    process = _ProcessRunner()
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        process_runner=process,
+    )
+    plugin = CloudManagementProvider(settings=settings, executor=executor)
+    catalog_request = wire.ListToolsRequest(binding_id=settings.binding_id)
+    accepted, catalog_payload = plugin.on_invoke(
+        CAPABILITY_ID,
+        LIST_TOOLS_METHOD,
+        catalog_request.SerializeToString(),
+    )
+    assert accepted is True
+    catalog = wire.ListToolsResponse.FromString(catalog_payload.value).catalog
+    assert {tool.provider_tool_id for tool in catalog.tools} == READ_ONLY_TOOL_IDS
+
+    cases = [
+        (
+            "cloud_resource_create",
+            {
+                "profile_ref": "runpod/test",
+                "target": {"pod_name": "cyrene-test-unit"},
+                "parameters": {
+                    "image": "example/image:1",
+                    "gpu": {"id": "NVIDIA GeForce RTX 4090", "count": 1},
+                    "disk": 20,
+                    "dataCenterIds": ["US-KS-2"],
+                },
+            },
+        ),
+        (
+            "cloud_operation_cancel",
+            {"profile_ref": "runpod/test", "operation_ref": "fixture-operation-ref"},
+        ),
+        (
+            "cloud_vendor_cli",
+            {"profile_ref": "runpod/test", "argv": ["pod", "list"]},
+        ),
+    ]
+    for index, (tool_id, arguments) in enumerate(cases):
+        request_id = f"request-readonly-{index}"
+        now = datetime.now(UTC)
+        context = sign_context(
+            method=tool_id,
+            operation_id=str(TOOL_BY_ID[tool_id]["operation_id"]),
+            payload=arguments,
+            caller_workload="exchange",
+            audience="cloud-management",
+            issuer="https://directory.example",
+            subject="user-1",
+            organization_id="org-fixture",
+            workspace_id="workspace-fixture",
+            binding_id=settings.binding_id,
+            request_id=request_id,
+            key=_EXCHANGE_KEY,
+            issued_at=now,
+            expires_at=now + timedelta(seconds=60),
+        )
+
+        response = _invoke(
+            plugin,
+            settings.binding_id,
+            arguments,
+            context.as_dict(),
+            tool_id=tool_id,
+        )
+
+        assert response.outcome.is_error is True
+        assert json.loads(response.outcome.content[0].json.json)["error"]["code"] == (
+            "READ_ONLY_PROFILE"
+        )
+        assert executor._ledger.get(request_id) is None  # noqa: SLF001
+
+    list_arguments = {"profile_ref": "runpod/test", "target": {"scope_ref": "pods"}}
+    now = datetime.now(UTC)
+    list_context = sign_context(
+        method="cloud_resources_list",
+        operation_id="cloud.resources.list",
+        payload=list_arguments,
+        caller_workload="exchange",
+        audience="cloud-management",
+        issuer="https://directory.example",
+        subject="user-1",
+        organization_id="org-fixture",
+        workspace_id="workspace-fixture",
+        binding_id=settings.binding_id,
+        request_id="request-readonly-list",
+        key=_EXCHANGE_KEY,
+        issued_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+    read_response = _invoke(
+        plugin,
+        settings.binding_id,
+        list_arguments,
+        list_context.as_dict(),
+        tool_id="cloud_resources_list",
+    )
+
+    assert read_response.outcome.is_error is False
+    assert [request.method for request in requests] == ["GET"]
+    assert process.calls == 0
+
+    attempted_override = {
+        "profile_ref": "runpod/test",
+        "target": {"pod_name": "cyrene-test-unit"},
+        "parameters": {
+            "image": "example/image:1",
+            "gpu": {"id": "NVIDIA GeForce RTX 4090", "count": 1},
+            "disk": 20,
+            "dataCenterIds": ["US-KS-2"],
+        },
+        "read_only": False,
+    }
+    now = datetime.now(UTC)
+    override_context = sign_context(
+        method="cloud_resource_create",
+        operation_id="cloud.resource.create",
+        payload=attempted_override,
+        caller_workload="exchange",
+        audience="cloud-management",
+        issuer="https://directory.example",
+        subject="user-1",
+        organization_id="org-fixture",
+        workspace_id="workspace-fixture",
+        binding_id=settings.binding_id,
+        request_id="request-readonly-override",
+        key=_EXCHANGE_KEY,
+        issued_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+    override_response = _invoke(
+        plugin,
+        settings.binding_id,
+        attempted_override,
+        override_context.as_dict(),
+        tool_id="cloud_resource_create",
+    )
+    assert override_response.outcome.is_error is True
+    assert json.loads(override_response.outcome.content[0].json.json)["error"]["code"] == (
+        "INVALID_ARGUMENTS"
+    )
+    assert len(requests) == 1
+    plugin.close()
 
 
 def test_operation_ref_is_bound_to_exchange_key(tmp_path: Any) -> None:

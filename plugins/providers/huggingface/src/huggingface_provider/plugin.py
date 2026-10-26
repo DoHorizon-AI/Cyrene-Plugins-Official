@@ -164,6 +164,15 @@ _LIST_OPERATION_TYPE = {
     "huggingface.datasets.list": "dataset",
     "huggingface.spaces.list": "space",
 }
+_READ_ONLY_TOOL_IDS = frozenset(
+    {
+        "huggingface.models.list",
+        "huggingface.datasets.list",
+        "huggingface.spaces.list",
+        "huggingface.repo.get",
+        "huggingface.file.download",
+    }
+)
 _OPERATION_ID_BY_TOOL = {
     "hf_vendor_cli": "huggingface.vendor.cli.execute",
 }
@@ -248,6 +257,8 @@ class HuggingFaceProvider:
         response = wire.ListToolsResponse()
         response.catalog.catalog_version = PLUGIN_VERSION
         for definition in CANONICAL_TOOLS:
+            if settings.read_only and definition["provider_tool_id"] not in _READ_ONLY_TOOL_IDS:
+                continue
             descriptor = response.catalog.tools.add()
             descriptor.binding_id = settings.binding_id
             descriptor.provider_tool_id = str(definition["provider_tool_id"])
@@ -292,7 +303,6 @@ class HuggingFaceProvider:
             not isinstance(arguments, Mapping)
             or not _uuid_text(profile_ref)
             or not _uuid_text(lease_ref)
-            or not _valid_arguments(tool_id, arguments, settings)
         ):
             return False, "INVALID_ARGUMENTS: tool arguments do not match the schema"
         try:
@@ -305,6 +315,10 @@ class HuggingFaceProvider:
             operation_id = _OPERATION_ID_BY_TOOL.get(tool_id, tool_id)
             if envelope["trusted_context"].get("operation_id") != operation_id:
                 raise TrustedContextError("trusted operation does not match the selected tool")
+            if settings.read_only and tool_id not in _READ_ONLY_TOOL_IDS:
+                return True, _tool_error("READ_ONLY_PROFILE")
+            if not _valid_arguments(tool_id, arguments, settings):
+                return False, "INVALID_ARGUMENTS: tool arguments do not match the schema"
             target = _target(tool_id, arguments)
             lease_payload = {
                 "lease_ref": lease_ref,

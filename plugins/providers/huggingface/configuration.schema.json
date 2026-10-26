@@ -54,6 +54,7 @@
         "additionalProperties": false
       }
     },
+    "read_only": {"type": "boolean", "default": false},
     "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 60, "default": 15},
     "max_artifact_bytes": {"type": "integer", "minimum": 1, "maximum": 1048576, "default": 1048576},
     "hostSecretRefs": {
@@ -71,6 +72,20 @@
     }
   },
   "allOf": [
+    {
+      "if": {"properties": {"read_only": {"const": true}}, "required": ["read_only"]},
+      "then": {
+        "properties": {
+          "repositories": {
+            "items": {
+              "properties": {
+                "permissions": {"not": {"contains": {"const": "write"}}}
+              }
+            }
+          }
+        }
+      }
+    },
     {
       "if": {"properties": {"account_center": {"properties": {"transport": {"const": "mtls"}}, "required": ["transport"]}}, "required": ["account_center"]},
       "then": {"properties": {"hostSecretRefs": {"required": ["huggingface/account-center-root-certificate", "huggingface/account-center-client-certificate", "huggingface/account-center-client-key"]}}}
