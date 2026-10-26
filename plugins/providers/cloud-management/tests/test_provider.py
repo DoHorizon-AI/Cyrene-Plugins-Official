@@ -641,6 +641,37 @@ def test_runpod_v2_list_validates_and_preserves_pagination(tmp_path: Any) -> Non
 
 
 @pytest.mark.parametrize(
+    "pagination",
+    [
+        {"hasNextPage": True},
+        {"nextCursor": None, "hasNextPage": True},
+        {"nextCursor": "", "hasNextPage": True},
+    ],
+)
+def test_runpod_v2_list_rejects_unfollowable_next_page(
+    tmp_path: Any,
+    pagination: dict[str, Any],
+) -> None:
+    """Runpod cannot claim another page without a usable continuation cursor."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, json={"pods": [], "pagination": pagination})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resources_list",
+            {"profile_ref": "runpod/test", "target": {"scope_ref": "pods"}},
+            request_id="request-runpod-list-invalid-pagination",
+        )
+    executor.close()
+
+
+@pytest.mark.parametrize(
     ("profile_ref", "target", "response"),
     [
         ("azure/test", {"resource_group": "rg-test"}, {"value": [{}]}),

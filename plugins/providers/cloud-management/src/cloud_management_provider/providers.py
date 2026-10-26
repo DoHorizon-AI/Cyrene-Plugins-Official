@@ -3340,13 +3340,12 @@ def _runpod_list_response(
         raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
     next_cursor = pagination.get("nextCursor")
     has_next_page = pagination.get("hasNextPage")
+    valid_cursor = isinstance(next_cursor, str) and 1 <= len(next_cursor) <= 4096
     if (
-        next_cursor is not None
-        and (
-            not isinstance(next_cursor, str)
-            or not 1 <= len(next_cursor) <= 4096
-        )
-    ) or not isinstance(has_next_page, bool):
+        (next_cursor is not None and not valid_cursor)
+        or not isinstance(has_next_page, bool)
+        or (has_next_page and not valid_cursor)
+    ):
         raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
     return pods, next_cursor, has_next_page
 
