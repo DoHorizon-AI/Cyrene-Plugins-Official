@@ -12,6 +12,16 @@ then bind a project, zones, and instance-name prefixes. Runpod profiles use a
 host-injected API key and REST API v2, with explicit Pod IDs, name prefixes,
 GPU types, data centers, and resource limits.
 
+`cloud_provider_health` reports the bound profile's authentication state,
+authorization state, scope references, check time, and credential expiry when
+the provider supplies one. Azure Managed Identity and GCP Workload Identity
+Federation tokens are refreshed by their SDKs and report the resulting
+short-lived token expiry. Runpod uses a static API key; the v2 API does not
+provide a key-expiry timestamp, so `expires_at: null` means expiry is unknown,
+not that the key is guaranteed to remain valid. A provider 401 is reported as
+authentication failure, 403 as scope denial, and network/upstream failures as
+unknown health. Response bodies and credential material are never included.
+
 Every tool request selects a host-bound `profile_ref`; typed API calls also
 carry a provider-specific resource `target`. The CLI call is granted the whole
 host profile scope and signs the complete vendor `argv[]`, without claiming an
@@ -101,6 +111,12 @@ stdout/stderr 不会送入模型或 Teams；结果只报告有界执行元数据
 `command_state=COMMAND_COMPLETED` 只描述本地进程退出；写命令的 `remote_state=UNKNOWN` 会持续到原生状态回读。
 安全解析的 GCP 和 Runpod JSON operation/resource 引用可通过 typed 状态工具对账。最终权限仍由云 IAM 和 Runpod
 API key 权限控制。
+
+`cloud_provider_health` 会返回绑定 profile 的认证状态、授权状态、范围引用、检查时间，以及供应商
+提供的凭据过期时间。Azure Managed Identity 和 GCP Workload Identity Federation token 由各自 SDK
+刷新，并报告最新短期 token 的到期时间。Runpod 使用静态 API key；v2 API 不提供 key 过期时间字段，
+因此 `expires_at: null` 表示过期时间未知，不表示 key 保证长期有效。供应商 401 会报告认证失败，403
+报告范围授权不足，网络或上游故障报告为状态未知。响应正文和凭据不会进入结果。
 
 SQLite 回执账本默认上限为 8,192 条、128 MiB。只有已知终态回执在 90 天后才可清理，该期限长于
 30 天的 operation reference 有效期。Pending、unknown 和未验证写入 tombstone 永不清理；受保护回执达到上限时，

@@ -2308,8 +2308,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/README.md",
-      "sha256": "c9d5a2ee9757c7f75f0877aad0abcd7fc090acfb00c17c4ecbee9e61bff7a3e4",
-      "size_bytes": 7908
+      "sha256": "7f4e32128f37d71c6ce9e4c430f739a1b35c8e546a61a76e856cd0c461e103fe",
+      "size_bytes": 9206
     },
     {
       "kind": "file",
@@ -2420,8 +2420,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/providers.py",
-      "sha256": "dddec13ddc7f1bcbf6fcb7cd02398bf6c4dc426c62d4e265ce391933a1aee2ec",
-      "size_bytes": 136215
+      "sha256": "b71d8405f7f247fb9f0d5717410a00f752ea02b7abf76335a858056cb20335b9",
+      "size_bytes": 146155
     },
     {
       "kind": "file",
@@ -2462,15 +2462,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "f124066640ad2494889b3cdb6a3ea0b8f4e29671e43180a185a9f44860999b72",
-      "size_bytes": 67211
+      "sha256": "789d3025cc7d161e108445a28dc5ef242e0cfe757db8dbdc7c977f5e7a104930",
+      "size_bytes": 88754
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-resources/README.md",
-      "sha256": "9dd8f8cec37b22d53324c150c58885c6d3180d8220e027f8b16bfe6fcb64eec2",
-      "size_bytes": 7331
+      "sha256": "213746262baa36b690d4ed4e1ddc0454336798d1cdf1f1cbf6f8d1360bd723cb",
+      "size_bytes": 8026
     },
     {
       "kind": "file",
@@ -2553,8 +2553,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-resources/src/cloud_resources_provider/plugin.py",
-      "sha256": "0ab09729c8c416b77ebe686ade1be1964c0ae722c4c42ef766a1c6065873347a",
-      "size_bytes": 18901
+      "sha256": "13652ba8a093e83d4c41a6e56a9bba47174d5447cfad56fec90f5b487844d35f",
+      "size_bytes": 18863
     },
     {
       "kind": "file",
@@ -2588,8 +2588,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-resources/tests/test_hf_auth_health.py",
-      "sha256": "30cfa2f4d7198edb805a53bac19d73da11d2626a13168e78f4ad78d9f3e88e59",
-      "size_bytes": 7112
+      "sha256": "c27376d4145d4f9bd4d997f4ff31c337578b86e8682e380122adec425123f2e5",
+      "size_bytes": 7990
     },
     {
       "kind": "file",
