@@ -2214,6 +2214,11 @@ class CloudManagementExecutor:
         except CredentialUnavailableError as error:
             raise ProviderFailure("CREDENTIAL_PROVIDER_UNAVAILABLE", retryable=True) from error
         except ClientAuthenticationError as error:
+            status_code = _exception_status_code(error)
+            if status_code == 403:
+                raise ProviderFailure("SCOPE_DENIED") from error
+            if status_code in {408, 429} or (status_code is not None and status_code >= 500):
+                raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
             raise ProviderFailure("AUTHENTICATION_FAILED") from error
         except Exception as error:
             raise ProviderFailure("PROVIDER_ERROR") from error
@@ -2248,6 +2253,8 @@ class CloudManagementExecutor:
             if isinstance(error, RefreshError):
                 if error.retryable:
                     raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
+                if _google_error_indicates_permission_denied(error):
+                    raise ProviderFailure("SCOPE_DENIED") from error
                 raise ProviderFailure("AUTHENTICATION_FAILED") from error
             if isinstance(error, OSError):
                 raise ProviderFailure("CREDENTIAL_PROVIDER_UNAVAILABLE") from error
@@ -3373,6 +3380,49 @@ def _exception_caused_by(error: BaseException, exception_type: type[BaseExceptio
         visited.add(id(current))
         current = current.__cause__ or current.__context__
     return False
+
+
+def _exception_status_code(error: BaseException) -> int | None:
+    """Read only a numeric HTTP status from a wrapped SDK exception."""
+
+    visited: set[int] = set()
+    current: BaseException | None = error
+    while current is not None and id(current) not in visited:
+        status_code = getattr(current, "status_code", None)
+        if isinstance(status_code, int) and not isinstance(status_code, bool):
+            return status_code
+        response = getattr(current, "response", None)
+        status_code = getattr(response, "status_code", None)
+        if isinstance(status_code, int) and not isinstance(status_code, bool):
+            return status_code
+        visited.add(id(current))
+        current = current.__cause__ or current.__context__
+    return None
+
+
+def _google_error_indicates_permission_denied(error: BaseException) -> bool:
+    """Recognize safe structured IAM denial fields without inspecting error text."""
+
+    def is_denial(value: object, depth: int = 0) -> bool:
+        if depth > 3 or not isinstance(value, Mapping):
+            return False
+        for key in ("code", "status", "error"):
+            item = value.get(key)
+            if isinstance(item, int) and not isinstance(item, bool) and item == 403:
+                return True
+            if isinstance(item, str) and item.upper() in {
+                "403",
+                "ACCESS_DENIED",
+                "FORBIDDEN",
+                "INSUFFICIENT_PERMISSIONS",
+                "PERMISSION_DENIED",
+            }:
+                return True
+            if is_denial(item, depth + 1):
+                return True
+        return False
+
+    return any(is_denial(argument) for argument in error.args)
 
 
 def _now() -> str:

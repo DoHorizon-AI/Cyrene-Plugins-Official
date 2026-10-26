@@ -383,6 +383,7 @@ def test_cloud_provider_health_network_failure_is_unknown_not_invalid(
     [
         ("transport", "UNKNOWN", "UNKNOWN", "PROVIDER_UNAVAILABLE"),
         ("auth", "INVALID", "REAUTHORIZATION_REQUIRED", "AUTHENTICATION_FAILED"),
+        ("permission", "VALID", "PERMISSION_DENIED", "SCOPE_DENIED"),
     ],
 )
 def test_azure_managed_identity_health_does_not_misreport_token_transport_errors(
@@ -402,11 +403,15 @@ def test_azure_managed_identity_health_does_not_misreport_token_transport_errors
         transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={}))
     )
     executor = CloudManagementExecutor(settings, http_client=client)
-    error: Exception = (
-        ServiceRequestError("private transport detail")
-        if failure_type == "transport"
-        else ClientAuthenticationError("private identity detail")
-    )
+    if failure_type == "transport":
+        error: Exception = ServiceRequestError("private transport detail")
+    elif failure_type == "permission":
+        error = ClientAuthenticationError(
+            "private identity detail",
+            response=SimpleNamespace(status_code=403, reason="Forbidden", headers={}),
+        )
+    else:
+        error = ClientAuthenticationError("private identity detail")
 
     class _Credential:
         def get_token(self, _scope: str) -> Any:
@@ -468,6 +473,44 @@ def test_gcp_wif_health_treats_retryable_refresh_errors_as_unknown(
     assert health["authorization_state"] == expected_authorization
     assert health["reason_code"] == expected_reason
     assert "private refresh detail" not in json.dumps(health)
+    executor.close()
+
+
+def test_gcp_wif_health_reports_structured_iam_denial_as_permission_denied(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A structured WIF/IAM 403 is not mislabeled as an invalid source identity."""
+
+    from google.auth.exceptions import RefreshError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise RefreshError(
+                "private denial detail",
+                {"error": {"code": 403, "status": "PERMISSION_DENIED", "message": "private"}},
+            )
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id="request-gcp-refresh-permission-denied",
+    )
+
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "PERMISSION_DENIED"
+    assert health["reason_code"] == "SCOPE_DENIED"
+    assert "private denial detail" not in json.dumps(health)
+    assert '"message": "private"' not in json.dumps(health)
     executor.close()
 
 
