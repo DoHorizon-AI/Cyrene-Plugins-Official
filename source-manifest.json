@@ -1034,8 +1034,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "2331e42721e535b5a6f526ee83919269276ddffe38fdc3fd2bf0854954718967",
-      "size_bytes": 77817
+      "sha256": "f4509a4c47e89c2600b36a7918702fb06d4fc1c19918acd7f93c1659d885dbe9",
+      "size_bytes": 86181
     },
     {
       "kind": "file",
@@ -6452,8 +6452,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/tests/test_signing.py",
-      "sha256": "44b25fe29a42c2af53b3b70f2c66b6a579762b00edc39c2b3fff3009038eb618",
-      "size_bytes": 8080
+      "sha256": "30e8824b69db1f890c521951245244e9a390fae67776d68330a6d066201fcb8f",
+      "size_bytes": 9962
     },
     {
       "kind": "file",

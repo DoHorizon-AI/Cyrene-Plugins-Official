@@ -261,7 +261,10 @@ class FakeHuggingFaceDeviceOAuth(FakeHuggingFaceOAuth):
         super().__init__()
         self.start_calls: list[tuple[str, tuple[str, ...]]] = []
         self.poll_calls: list[tuple[str, str]] = []
+        self.start_error: HuggingFaceOAuthError | None = None
         self.poll_error: HuggingFaceOAuthError | None = None
+        self.poll_started: threading.Event | None = None
+        self.poll_release: threading.Event | None = None
         self.device_token = HuggingFaceOAuthToken(
             "oauth_access_device_renewed",
             "oauth_refresh_device_rotated",
@@ -277,6 +280,8 @@ class FakeHuggingFaceDeviceOAuth(FakeHuggingFaceOAuth):
         oauth_scopes: tuple[str, ...],
     ) -> HuggingFaceDeviceCode:
         self.start_calls.append((client_id, oauth_scopes))
+        if self.start_error is not None:
+            raise self.start_error
         return HuggingFaceDeviceCode(
             "private-device-code",
             "ABCD-EFGH",
@@ -293,6 +298,10 @@ class FakeHuggingFaceDeviceOAuth(FakeHuggingFaceOAuth):
         now: int,
     ) -> HuggingFaceOAuthToken:
         self.poll_calls.append((client_id, device_code))
+        if self.poll_started is not None:
+            self.poll_started.set()
+        if self.poll_release is not None and not self.poll_release.wait(timeout=2):
+            raise RuntimeError("test device poll was not released")
         if self.poll_error is not None:
             raise self.poll_error
         return self.device_token
@@ -2148,6 +2157,221 @@ def test_huggingface_device_renewal_rejects_a_different_hub_subject(
         )
         == "oauth_refresh_initial"
     )
+
+
+def test_huggingface_device_renewal_pending_and_slow_down_are_deferred(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000246"
+    session_ref = "00000000-0000-4000-8000-000000000247"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    scope = _huggingface_scope("derek/pending-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    harness.call("begin_huggingface_renewal", request)
+
+    oauth.poll_error = HuggingFaceOAuthError("authorization_pending")
+    harness.now += 5
+    pending = harness.call("poll_huggingface_renewal", request)
+    repeated_before_deadline = harness.call("poll_huggingface_renewal", request)
+
+    assert pending["state"] == "waiting_user"
+    assert pending["interval_seconds"] == 5
+    assert pending["reason_code"] is None
+    assert repeated_before_deadline == pending
+    assert len(oauth.poll_calls) == 1
+
+    oauth.poll_error = HuggingFaceOAuthError("slow_down")
+    harness.now += 5
+    slowed = harness.call("poll_huggingface_renewal", request)
+    repeated_before_next_deadline = harness.call("poll_huggingface_renewal", request)
+
+    assert slowed["state"] == "waiting_user"
+    assert slowed["interval_seconds"] == 10
+    assert slowed["reason_code"] == "slow_down"
+    assert repeated_before_next_deadline == slowed
+    assert len(oauth.poll_calls) == 2
+
+
+def test_huggingface_device_renewal_expires_without_an_upstream_poll(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000248"
+    session_ref = "00000000-0000-4000-8000-000000000249"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    scope = _huggingface_scope("derek/expired-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    started = harness.call("begin_huggingface_renewal", request)
+    harness.now = started["expires_at"]
+
+    expired = harness.call("poll_huggingface_renewal", request)
+
+    assert expired["state"] == "expired"
+    assert expired["reason_code"] == "device_code_expired"
+    assert expired["user_code"] is None
+    assert expired["verification_uri"] is None
+    assert oauth.poll_calls == []
+
+
+def test_huggingface_device_renewal_uncertain_outcomes_are_not_replayed(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000250"
+    start_session_ref = "00000000-0000-4000-8000-000000000251"
+    poll_session_ref = "00000000-0000-4000-8000-000000000252"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    scope = _huggingface_scope("derek/uncertain-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    start_request = {"profile_ref": profile_ref, "session_ref": start_session_ref}
+    oauth.start_error = HuggingFaceOAuthError("provider_timeout", uncertain=True)
+
+    unknown_start = harness.call("begin_huggingface_renewal", start_request)
+    replayed_start = harness.call("begin_huggingface_renewal", start_request)
+
+    assert unknown_start["state"] == "unknown"
+    assert replayed_start == unknown_start
+    assert len(oauth.start_calls) == 1
+
+    oauth.start_error = None
+    poll_request = {"profile_ref": profile_ref, "session_ref": poll_session_ref}
+    harness.call("begin_huggingface_renewal", poll_request)
+    oauth.poll_error = HuggingFaceOAuthError("provider_timeout", uncertain=True)
+    harness.now += 5
+    unknown_poll = harness.call("poll_huggingface_renewal", poll_request)
+    replayed_poll = harness.call("poll_huggingface_renewal", poll_request)
+
+    assert unknown_poll["state"] == "unknown"
+    assert unknown_poll["user_code"] is None
+    assert unknown_poll["verification_uri"] is None
+    assert replayed_poll == unknown_poll
+    assert len(oauth.poll_calls) == 1
+
+
+def test_huggingface_device_renewal_fences_concurrent_polls(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000253"
+    session_ref = "00000000-0000-4000-8000-000000000254"
+    oauth = FakeHuggingFaceDeviceOAuth()
+    oauth.poll_started = threading.Event()
+    oauth.poll_release = threading.Event()
+    scope = _huggingface_scope("derek/concurrent-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=oauth,
+    )
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    request = {"profile_ref": profile_ref, "session_ref": session_ref}
+    harness.call("begin_huggingface_renewal", request)
+    harness.now += 5
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        first_poll = executor.submit(harness.call, "poll_huggingface_renewal", request)
+        assert oauth.poll_started.wait(timeout=2)
+        concurrent_poll = harness.call("poll_huggingface_renewal", request)
+        assert concurrent_poll["state"] == "waiting_user"
+        assert len(oauth.poll_calls) == 1
+        oauth.poll_release.set()
+        completed = first_poll.result(timeout=2)
+
+    assert completed["state"] == "succeeded"
+    assert len(oauth.poll_calls) == 1
+
+
+def test_huggingface_workspace_operator_cannot_start_owner_renewal(
+    tmp_path: Path,
+) -> None:
+    profile_ref = "00000000-0000-4000-8000-000000000255"
+    session_ref = "00000000-0000-4000-8000-000000000256"
+    scope = _huggingface_scope("derek/operator-renewal-model")
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        oauth_seed=_oauth_seed(
+            scope,
+            oauth_scopes=["openid", "profile", "read-repos"],
+        ),
+        oauth_client=FakeHuggingFaceDeviceOAuth(),
+        workspace_operator_profile_refs=[profile_ref],
+    )
+    linked = harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": profile_ref,
+            "credential_secret_ref": "huggingface/connector-token",
+            "auth_mode": "device_oauth",
+            "scopes": scope,
+        },
+    )
+    assert linked["access_mode"] == "workspace_operator"
+    operator_actor = {**ACTOR, "subject": "workspace-maintainer"}
+
+    with pytest.raises(AccountCenterError, match="profile_not_found"):
+        harness.call(
+            "begin_huggingface_renewal",
+            {"profile_ref": profile_ref, "session_ref": session_ref},
+            actor=operator_actor,
+        )
 
 
 def test_huggingface_profile_unlink_cancels_device_session_and_clears_code(
