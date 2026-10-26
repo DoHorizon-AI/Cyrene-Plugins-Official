@@ -1414,6 +1414,8 @@ def test_pull_request_merge_projection_omits_unknown_source_fields() -> None:
         {"merged": "true"},
         {"merged_at": "not-a-timestamp"},
         {"state": "open", "merged": True},
+        {"state": "open", "merged_at": "2026-10-26T12:30:00Z"},
+        {"merged": True, "merged_at": None},
         {"merged": False, "merged_at": "2026-10-26T12:30:00Z"},
     ],
 )

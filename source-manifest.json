@@ -2742,8 +2742,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/tests/test_provider.py",
-      "sha256": "e16b5cb3cfba28ce08e095010863c891862078d998b34ee3e1011802a473a860",
-      "size_bytes": 91799
+      "sha256": "d118bb2d9ed1ad70c5cd627eef154527ff5ba9e46279bfa5d89f0725f5189a22",
+      "size_bytes": 91908
     },
     {
       "kind": "file",
