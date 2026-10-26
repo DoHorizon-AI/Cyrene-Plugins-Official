@@ -24,7 +24,12 @@ from github_issues_provider.account_center import (
     AccountCenterDirectLeaseClient,
     AccountCenterUnavailable,
 )
-from github_issues_provider.github_api import GitHubApi, GitHubApiFailure, HttpResponse
+from github_issues_provider.github_api import (
+    GitHubApi,
+    GitHubApiFailure,
+    HttpResponse,
+    _pull_request_projection,
+)
 from github_issues_provider.plugin import (
     CALL_TOOL_RESPONSE_TYPE_URL,
     WEBHOOK_REQUEST_TYPE_URL,
@@ -1299,9 +1304,18 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert api.list_repositories("token")["repositories"][0]["repository_id"] == "12345"
     assert api.get_repository(repository, "token")["default_branch"] == "main"
     assert api.list_branches(repository, "token")["branches"][0]["name"] == "main"
-    assert api.list_pull_requests(repository, "OPEN", "token")["pull_requests"][0]["number"] == 4
+    listed_pull_request = api.list_pull_requests(repository, "OPEN", "token")[
+        "pull_requests"
+    ][0]
+    assert listed_pull_request["number"] == 4
+    assert listed_pull_request["merge_status"] == "OPEN"
+    assert "merged" not in listed_pull_request
+    assert "merged_at" not in listed_pull_request
+    assert "merge_commit_sha" not in listed_pull_request
     pull_request = api.get_pull_request(repository, 4, "token")
     assert pull_request["pull_request"]["head_sha"] == "deadbeef1234567"
+    assert pull_request["pull_request"]["merge_status"] == "OPEN"
+    assert "merged" not in pull_request["pull_request"]
     workflow_runs = api.list_workflow_runs(repository, "token", branch="main")
     assert workflow_runs["workflow_runs"][0]["status"] == "COMPLETED"
     assert workflow_runs["complete"] is True
@@ -1314,6 +1328,100 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert all(
         path.startswith(("/repos/owner/project", "/installation/repositories")) for path in observed
     )
+
+
+def _pull_request_projection_input(
+    *, state: str = "closed", **overrides: Any
+) -> dict[str, Any]:
+    """Build the minimum valid upstream PR shape for projection tests.
+
+    中文：生成 PR projection 测试所需的最小有效上游响应。
+    """
+
+    value: dict[str, Any] = {
+        "number": 17,
+        "state": state,
+        "title": "Merge-state projection",
+        "body": "Evidence",
+        "head": {"sha": "a" * 40, "ref": "feature"},
+        "base": {"sha": "b" * 40, "ref": "develop"},
+    }
+    value.update(overrides)
+    return value
+
+
+def test_pull_request_merge_projection_distinguishes_closed_states_and_unknown() -> None:
+    closed_unmerged = _pull_request_projection(
+        _pull_request_projection_input(merged=False, merged_at=None)
+    )
+    merged = _pull_request_projection(
+        _pull_request_projection_input(
+            merged=True,
+            merged_at="2026-10-26T12:30:00Z",
+            merge_commit_sha="C" * 40,
+        )
+    )
+    merged_at_only = _pull_request_projection(
+        _pull_request_projection_input(merged_at="2026-10-26T12:30:00Z")
+    )
+    unknown_with_test_merge_sha = _pull_request_projection(
+        _pull_request_projection_input(merge_commit_sha="D" * 40)
+    )
+
+    assert closed_unmerged["state"] == "CLOSED"
+    assert closed_unmerged["merged"] is False
+    assert closed_unmerged["merge_status"] == "CLOSED_UNMERGED"
+    assert "merged_at" not in closed_unmerged
+
+    assert merged["merged"] is True
+    assert merged["merge_status"] == "MERGED"
+    assert merged["merged_at"] == "2026-10-26T12:30:00Z"
+    assert merged["merge_commit_sha"] == "c" * 40
+
+    assert "merged" not in merged_at_only
+    assert merged_at_only["merge_status"] == "MERGED"
+    assert merged_at_only["merged_at"] == "2026-10-26T12:30:00Z"
+
+    assert "merged" not in unknown_with_test_merge_sha
+    assert "merged_at" not in unknown_with_test_merge_sha
+    assert unknown_with_test_merge_sha["merge_status"] == "UNKNOWN"
+    assert unknown_with_test_merge_sha["merge_commit_sha"] == "d" * 40
+
+
+def test_pull_request_merge_projection_omits_unknown_source_fields() -> None:
+    projected = _pull_request_projection(
+        _pull_request_projection_input(state="closed")
+    )
+    closed_at_null = _pull_request_projection(
+        _pull_request_projection_input(state="closed", merged_at=None)
+    )
+
+    assert projected["merge_status"] == "UNKNOWN"
+    assert "merged" not in projected
+    assert "merged_at" not in projected
+    assert "merge_commit_sha" not in projected
+
+    assert closed_at_null["merge_status"] == "CLOSED_UNMERGED"
+    assert "merged" not in closed_at_null
+    assert "merged_at" not in closed_at_null
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"merge_commit_sha": "a" * 39},
+        {"merge_commit_sha": "g" * 40},
+        {"merged": "true"},
+        {"merged_at": "not-a-timestamp"},
+        {"state": "open", "merged": True},
+        {"merged": False, "merged_at": "2026-10-26T12:30:00Z"},
+    ],
+)
+def test_pull_request_merge_projection_rejects_malformed_or_conflicting_facts(
+    overrides: dict[str, Any],
+) -> None:
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        _pull_request_projection(_pull_request_projection_input(**overrides))
 
 
 def test_workflow_run_list_reports_truncated_first_page() -> None:

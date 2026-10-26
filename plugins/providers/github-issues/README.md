@@ -39,6 +39,16 @@ request, and return a best-effort excerpt with common credential patterns
 redacted, bounded to 200 lines and 20,000 bytes. This filter cannot identify
 every possible secret format.
 
+Pull-request projections keep GitHub's `state` and add `merge_status` with
+`OPEN`, `CLOSED_UNMERGED`, `MERGED`, or `UNKNOWN`. `merged`, `merged_at`, and
+`merge_commit_sha` are included only when GitHub provides valid non-null values;
+missing or null fields are omitted rather than replaced with guessed false/null
+values. A closed response without enough merge facts is `UNKNOWN`. A merge SHA
+must contain exactly 40 hexadecimal characters. GitHub notes that
+`merge_commit_sha` may be a test merge commit before the PR is merged, so this
+field never establishes merge status by itself. See the [GitHub pull request
+REST API](https://docs.github.com/en/rest/pulls/pulls).
+
 Writes require the dedicated assistant task namespace and exact SHA preconditions
 where the GitHub API supports them. Branch deletion checks the expected SHA
 and current default branch immediately before deletion, but GitHub exposes no
@@ -98,6 +108,13 @@ Actions run 和 job 列表也会返回 `total_count`、`complete` 与 `truncated
 首批结果与完整集合。
 失败 job 重跑还需要按仓库配置的 `source_workflow_ids` 正向 allowlist；缺失或空列表时一律拒绝。
 请求会绑定 `expected_workflow_id` 和任务分支，provider 在重跑前重新读取并核对上游 run。
+
+PR projection 保留 GitHub 的 `state`，并增加 `merge_status`：`OPEN`、`CLOSED_UNMERGED`、
+`MERGED` 或 `UNKNOWN`。只有 GitHub 提供有效非 null 值时才输出 `merged`、`merged_at` 和
+`merge_commit_sha`；字段缺失或为 null 时省略，不猜测 `false` 或补 null。closed 响应缺少
+足够合并事实时为 `UNKNOWN`。merge SHA 必须恰好是 40 位十六进制。GitHub 说明 PR 合并前
+`merge_commit_sha` 可能指向测试 merge commit，因此不能单独据此判断是否已合并。详见
+[GitHub Pull Request REST API](https://docs.github.com/en/rest/pulls/pulls)。
 
 写入要求使用专属 assistant 任务分支，并在 API 支持时绑定精确 SHA。删除分支前会重新读取并
 核对 expected SHA 和当前默认分支，但 GitHub 没有原子化的条件删除 API；宿主必须对同一仓库和

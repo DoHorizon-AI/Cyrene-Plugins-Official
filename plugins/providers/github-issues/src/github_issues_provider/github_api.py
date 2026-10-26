@@ -1427,7 +1427,23 @@ def _pull_request_projection(value: Mapping[str, Any]) -> dict[str, Any]:
         or not isinstance(base_ref, str)
     ):
         raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
-    return {
+    merged = value.get("merged")
+    merged_at_present = "merged_at" in value
+    merged_at = value.get("merged_at")
+    merge_commit_sha = value.get("merge_commit_sha")
+    if merged is not None and not isinstance(merged, bool):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    if merged_at is not None and (
+        not isinstance(merged_at, str) or not _valid_updated_since(merged_at)
+    ):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    if merge_commit_sha is not None and (
+        not isinstance(merge_commit_sha, str)
+        or re.fullmatch(r"[0-9a-fA-F]{40}", merge_commit_sha) is None
+    ):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+
+    projection: dict[str, Any] = {
         "number": number,
         "state": state.upper(),
         "title": title[:500],
@@ -1438,7 +1454,57 @@ def _pull_request_projection(value: Mapping[str, Any]) -> dict[str, Any]:
         "base_sha": base_sha[:64] if isinstance(base_sha, str) else None,
         "html_url": value.get("html_url") if isinstance(value.get("html_url"), str) else None,
         "draft": value.get("draft") if isinstance(value.get("draft"), bool) else False,
+        "merge_status": _pull_request_merge_status(
+            state=state,
+            merged=merged,
+            merged_at=merged_at,
+            merged_at_present=merged_at_present,
+        ),
     }
+    # Do not invent false/null facts when a list or detail response omits a field.
+    if isinstance(merged, bool):
+        projection["merged"] = merged
+    if isinstance(merged_at, str):
+        projection["merged_at"] = merged_at
+    if isinstance(merge_commit_sha, str):
+        projection["merge_commit_sha"] = merge_commit_sha.lower()
+    return projection
+
+
+def _pull_request_merge_status(
+    *,
+    state: str,
+    merged: bool | None,
+    merged_at: str | None,
+    merged_at_present: bool,
+) -> str:
+    """Summarize merge facts without treating a test SHA as proof of merging.
+
+    GitHub can return a test merge commit before a pull request is merged. Prefer
+    the explicit ``merged`` boolean; use an actual ``merged_at`` value only when
+    that boolean is absent. A closed response with neither fact remains unknown.
+
+    中文：汇总合并状态时不把测试 merge SHA 当成已合并证明。优先使用上游 boolean；
+    缺少该值时才使用 merged_at。closed 响应两者都缺失时保留 UNKNOWN。
+    """
+
+    if state == "open":
+        if merged is True or merged_at is not None:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        return "OPEN"
+    if merged is True:
+        if merged_at_present and merged_at is None:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        return "MERGED"
+    if merged is False:
+        if merged_at is not None:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        return "CLOSED_UNMERGED"
+    if merged_at is not None:
+        return "MERGED"
+    if merged_at_present:
+        return "CLOSED_UNMERGED"
+    return "UNKNOWN"
 
 
 def _workflow_run_projection(value: Mapping[str, Any]) -> dict[str, Any]:
