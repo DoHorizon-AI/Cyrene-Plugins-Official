@@ -9,6 +9,7 @@ import json
 import sqlite3
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -198,10 +199,26 @@ def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
         transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
     )
     executor = CloudManagementExecutor(settings, http_client=client)
-    azure_expiry = "2026-10-26T22:00:00Z"
-    gcp_expiry = "2026-10-26T22:05:00Z"
-    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", azure_expiry))
-    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", gcp_expiry))
+    azure_expiry_epoch = datetime(2026, 10, 26, 22, 0, tzinfo=UTC).timestamp()
+    gcp_expiry = datetime(2026, 10, 26, 22, 5, tzinfo=UTC)
+
+    class _AzureCredential:
+        def get_token(self, scope: str) -> SimpleNamespace:
+            assert scope == "https://management.azure.com/.default"
+            return SimpleNamespace(token="fixture-azure-token", expires_on=azure_expiry_epoch)
+
+    class _GcpCredential:
+        valid = False
+        token: str | None = None
+        expiry: datetime | None = None
+
+        def refresh(self, _request: Any) -> None:
+            self.valid = True
+            self.token = "fixture-gcp-token"
+            self.expiry = gcp_expiry
+
+    monkeypatch.setitem(executor._credentials, "azure/test", _AzureCredential())  # noqa: SLF001
+    monkeypatch.setitem(executor._credentials, "gcp/test", _GcpCredential())  # noqa: SLF001
 
     azure = executor.call(
         "cloud_provider_health",
@@ -229,10 +246,10 @@ def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
     assert set(gcp) == expected_fields
     assert azure["authentication_state"] == "VALID"
     assert azure["authorization_state"] == "VALID"
-    assert azure["expires_at"] == azure_expiry
+    assert azure["expires_at"] == "2026-10-26T22:00:00Z"
     assert gcp["authentication_state"] == "VALID"
     assert gcp["authorization_state"] == "VALID"
-    assert gcp["expires_at"] == gcp_expiry
+    assert gcp["expires_at"] == "2026-10-26T22:05:00Z"
     executor.close()
 
 

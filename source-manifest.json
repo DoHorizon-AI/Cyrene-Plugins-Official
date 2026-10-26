@@ -2462,8 +2462,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "cdde17c47feb83d85df334a8ef0bdfb7bdcc2e9e83d6e7b6f6fbd2826ea6cb45",
-      "size_bytes": 78611
+      "sha256": "118b7eb532dd6ec068b1dc96a0d54889b4636c8dcdb4604beaa66b948fa04c7b",
+      "size_bytes": 79266
     },
     {
       "kind": "file",
