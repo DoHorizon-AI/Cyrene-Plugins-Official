@@ -180,8 +180,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "cdc9088dbf88849d5ddcd1bfdc69922427ac861b565f1b1769c6c9eea08819dc",
-      "size_bytes": 26470
+      "sha256": "45a7f122a109a2ae4df8a215660caea9def653678b3f346f220f73f922943c04",
+      "size_bytes": 26612
     },
     {
       "kind": "file",
