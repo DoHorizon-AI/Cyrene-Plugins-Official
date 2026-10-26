@@ -33,9 +33,9 @@ from .navigator import (
 MAX_EVENT_BYTES = 256 * 1024
 DEFAULT_MAX_ROWS = 10_000
 DEFAULT_MAX_BYTES = 64 * 1024 * 1024
-MAX_ATTEMPTS = 12
+MAX_RECORDED_ATTEMPTS = (1 << 31) - 1
 DELIVERED_RETENTION_SECONDS = 24 * 60 * 60
-TERMINAL_RETENTION_SECONDS = 7 * 24 * 60 * 60
+REJECTED_RETENTION_SECONDS = 7 * 24 * 60 * 60
 MAX_RETRY_DELAY_SECONDS = 5 * 60
 POLL_INTERVAL_SECONDS = 0.25
 log = logging.getLogger("teams_connector.delivery_spool")
@@ -126,6 +126,7 @@ class DeliveryStatus:
     rejected_count: int
     dead_count: int
     pending_bytes: int
+    retained_body_bytes: int
     oldest_pending_at: float | None
     last_delivered_at: float | None
 
@@ -191,9 +192,10 @@ class DeliverySpool:
                 "normalized Teams event exceeds the spool item limit"
             )
         delivery_id = stable_delivery_id(event)
+        thread_key = stable_thread_key(event)
         body_sha256 = hashlib.sha256(raw_body).hexdigest()
         return await self._run_sync(
-            self._enqueue_sync, delivery_id, raw_body, body_sha256
+            self._enqueue_sync, delivery_id, thread_key, raw_body, body_sha256
         )
 
     async def claim_next(self, *, lease_seconds: float) -> DeliveryClaim | None:
@@ -229,9 +231,13 @@ class DeliverySpool:
     async def mark_dead(
         self, claim: DeliveryClaim, *, status_code: int | None, code: str | None
     ) -> bool:
-        """Record permanent failure metadata and erase the private message body.
+        """Retain a permanent failure body until explicit owner recovery.
 
-        中文：保存永久失败元数据，并清除私有消息正文。
+        Dead rows remain private, block later events in their thread, and count
+        toward storage limits until the paused owner explicitly requeues them.
+
+        中文：永久失败正文保留在私有 DB 并阻塞同 thread 后续事件，直到暂停状态下由 owner
+        显式重排；正文同时计入有界存储。
         """
 
         return await self._run_sync(
@@ -246,9 +252,9 @@ class DeliverySpool:
         status_code: int | None,
         code: str | None,
     ) -> bool:
-        """Return a transient failure to the queue or dead-letter exhausted work.
+        """Return a transient failure to the queue with a bounded retry interval.
 
-        中文：临时错误回到队列等待重试；超过次数上限后转为终态 dead。
+        中文：临时错误保留在队列中重试，退避间隔有上限。
         """
 
         return await self._run_sync(
@@ -291,6 +297,22 @@ class DeliverySpool:
 
         validate_admin_cas(holder, expected_revision)
         return await self._run_sync(self._resume_sync, holder, expected_revision)
+
+    async def retry_dead(
+        self, *, holder: str, expected_revision: int
+    ) -> tuple[int, DeliveryStatus]:
+        """Requeue retained permanent failures under the current drained pause.
+
+        No body or delivery identifier is returned. The operator must pause and
+        drain, fix the upstream condition, then explicitly request recovery.
+
+        中文：仅在当前 pause 已排空时重排保留的永久失败；不返回正文或 delivery ID。
+        运维方
+        先暂停并排空、修复上游条件，再显式触发恢复。
+        """
+
+        validate_admin_cas(holder, expected_revision)
+        return await self._run_sync(self._retry_dead_sync, holder, expected_revision)
 
     async def status(self) -> DeliveryStatus:
         """Return counts and timestamps, never a row body or holder token.
@@ -393,7 +415,9 @@ class DeliverySpool:
                         value TEXT NOT NULL
                     );
                     CREATE TABLE IF NOT EXISTS deliveries (
-                        delivery_id TEXT PRIMARY KEY,
+                        sequence INTEGER PRIMARY KEY AUTOINCREMENT,
+                        delivery_id TEXT NOT NULL UNIQUE,
+                        thread_key TEXT NOT NULL,
                         body_sha256 TEXT NOT NULL CHECK(length(body_sha256) = 64),
                         body BLOB,
                         state TEXT NOT NULL CHECK(state IN
@@ -413,14 +437,16 @@ class DeliverySpool:
                                AND lease_expires_at IS NULL)),
                         CHECK(
                             (state IN ('queued', 'leased') AND body IS NOT NULL)
-                            OR (state IN ('delivered', 'rejected', 'dead')
-                                AND body IS NULL)
+                            OR (state IN ('delivered', 'rejected') AND body IS NULL)
+                            OR (state = 'dead' AND body IS NOT NULL)
                         )
                     );
                     CREATE INDEX IF NOT EXISTS deliveries_due
                         ON deliveries(
-                            state, next_attempt_at, lease_expires_at, received_at
+                            state, next_attempt_at, lease_expires_at, sequence
                         );
+                    CREATE INDEX IF NOT EXISTS deliveries_thread_order
+                        ON deliveries(thread_key, sequence, state);
                     CREATE INDEX IF NOT EXISTS deliveries_retention
                         ON deliveries(state, finished_at);
                     INSERT OR IGNORE INTO delivery_meta(key, value) VALUES
@@ -439,7 +465,7 @@ class DeliverySpool:
             ) from None
 
     def _enqueue_sync(
-        self, delivery_id: str, body: bytes, body_sha256: str
+        self, delivery_id: str, thread_key: str, body: bytes, body_sha256: str
     ) -> EnqueueResult:
         now = self._clock()
         with self._connect() as connection:
@@ -469,9 +495,17 @@ class DeliverySpool:
 
             connection.execute(
                 """INSERT INTO deliveries
-                   (delivery_id, body_sha256, body, state, received_at, next_attempt_at)
-                   VALUES (?, ?, ?, 'queued', ?, ?)""",
-                (delivery_id, body_sha256, sqlite3.Binary(body), now, now),
+                   (delivery_id, thread_key, body_sha256, body, state,
+                    received_at, next_attempt_at)
+                   VALUES (?, ?, ?, ?, 'queued', ?, ?)""",
+                (
+                    delivery_id,
+                    thread_key,
+                    body_sha256,
+                    sqlite3.Binary(body),
+                    now,
+                    now,
+                ),
             )
             # The explicit FULL-synchronous commit is the ACK boundary.
             connection.commit()
@@ -486,10 +520,18 @@ class DeliverySpool:
                 return None
             row = connection.execute(
                 """SELECT delivery_id, body, body_sha256, attempts, lease_epoch
-                   FROM deliveries
-                   WHERE (state = 'queued' AND next_attempt_at <= ?)
-                      OR (state = 'leased' AND lease_expires_at <= ?)
-                   ORDER BY received_at, delivery_id
+                   FROM deliveries AS candidate
+                   WHERE ((candidate.state = 'queued'
+                           AND candidate.next_attempt_at <= ?)
+                       OR (candidate.state = 'leased'
+                           AND candidate.lease_expires_at <= ?))
+                     AND NOT EXISTS (
+                         SELECT 1 FROM deliveries AS prior
+                         WHERE prior.thread_key = candidate.thread_key
+                           AND prior.sequence < candidate.sequence
+                           AND prior.state IN ('queued', 'leased', 'dead')
+                     )
+                   ORDER BY candidate.sequence
                    LIMIT 1""",
                 (now, now),
             ).fetchone()
@@ -498,7 +540,7 @@ class DeliverySpool:
                 return None
             lease_id = secrets.token_hex(24)
             lease_epoch = int(row["lease_epoch"]) + 1
-            attempt = int(row["attempts"]) + 1
+            attempt = min(int(row["attempts"]) + 1, MAX_RECORDED_ATTEMPTS)
             changed = connection.execute(
                 """UPDATE deliveries
                    SET state = 'leased', attempts = ?, lease_id = ?, lease_epoch = ?,
@@ -545,12 +587,15 @@ class DeliverySpool:
             connection.execute("BEGIN IMMEDIATE")
             changed = connection.execute(
                 """UPDATE deliveries
-                   SET state = ?, body = NULL, lease_id = NULL, lease_expires_at = NULL,
+                   SET state = ?,
+                       body = CASE WHEN ? THEN NULL ELSE body END,
+                       lease_id = NULL, lease_expires_at = NULL,
                        last_http_status = ?, last_error_code = ?, finished_at = ?
                    WHERE delivery_id = ? AND state = 'leased' AND lease_id = ?
                      AND lease_epoch = ?""",
                 (
                     state,
+                    1 if state in {"delivered", "rejected"} else 0,
                     status_code,
                     error_code,
                     now,
@@ -570,24 +615,19 @@ class DeliverySpool:
         error_code: str | None,
     ) -> bool:
         now = self._clock()
-        exhausted = claim.attempt >= MAX_ATTEMPTS
-        state = "dead" if exhausted else "queued"
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             changed = connection.execute(
                 """UPDATE deliveries
-                   SET state = ?, body = CASE WHEN ? THEN NULL ELSE body END,
-                       next_attempt_at = ?, lease_id = NULL, lease_expires_at = NULL,
-                       last_http_status = ?, last_error_code = ?, finished_at = ?
+                   SET state = 'queued', next_attempt_at = ?, lease_id = NULL,
+                       lease_expires_at = NULL, last_http_status = ?,
+                       last_error_code = ?, finished_at = NULL
                    WHERE delivery_id = ? AND state = 'leased' AND lease_id = ?
                      AND lease_epoch = ?""",
                 (
-                    state,
-                    1 if exhausted else 0,
-                    now + delay_seconds if not exhausted else now,
+                    now + delay_seconds,
                     status_code,
-                    "RETRY_EXHAUSTED" if exhausted else error_code,
-                    now if exhausted else None,
+                    error_code,
                     claim.delivery_id,
                     claim.lease_id,
                     claim.lease_epoch,
@@ -653,6 +693,42 @@ class DeliverySpool:
             connection.commit()
         return self._status_sync()
 
+    def _retry_dead_sync(
+        self, holder: str, expected_revision: int
+    ) -> tuple[int, DeliveryStatus]:
+        now = self._clock()
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            if (
+                self._meta(connection, "paused") != "1"
+                or self._meta(connection, "pause_holder") != holder
+                or int(self._meta(connection, "revision")) != expected_revision
+            ):
+                raise DeliveryAdminConflict(
+                    "dead delivery recovery requires the current paused holder"
+                )
+            active = int(
+                connection.execute(
+                    "SELECT COUNT(*) FROM deliveries "
+                    "WHERE state = 'leased' AND lease_expires_at > ?",
+                    (now,),
+                ).fetchone()[0]
+            )
+            if active:
+                raise DeliveryAdminConflict(
+                    "dead delivery recovery requires zero active deliveries"
+                )
+            changed = connection.execute(
+                """UPDATE deliveries
+                   SET state = 'queued', attempts = 0, next_attempt_at = ?,
+                       last_http_status = NULL, last_error_code = NULL,
+                       finished_at = NULL
+                   WHERE state = 'dead'""",
+                (now,),
+            ).rowcount
+            connection.commit()
+        return changed, self._status_sync()
+
     def _status_sync(self) -> DeliveryStatus:
         with self._connect() as connection:
             connection.execute("BEGIN")
@@ -680,6 +756,7 @@ class DeliverySpool:
                  SUM(CASE WHEN state = 'dead' THEN 1 ELSE 0 END) AS dead_count,
                  COALESCE(SUM(CASE WHEN state IN ('queued', 'leased')
                                    THEN length(body) ELSE 0 END), 0) AS pending_bytes,
+                 COALESCE(SUM(length(body)), 0) AS retained_body_bytes,
                  MIN(CASE WHEN state IN ('queued', 'leased') THEN received_at END)
                      AS oldest_pending_at,
                  MAX(CASE WHEN state = 'delivered' THEN finished_at END)
@@ -698,6 +775,7 @@ class DeliverySpool:
             rejected_count=int(counts["rejected_count"] or 0),
             dead_count=int(counts["dead_count"] or 0),
             pending_bytes=int(counts["pending_bytes"] or 0),
+            retained_body_bytes=int(counts["retained_body_bytes"] or 0),
             oldest_pending_at=counts["oldest_pending_at"],
             last_delivered_at=counts["last_delivered_at"],
         )
@@ -718,9 +796,8 @@ class DeliverySpool:
             (now - DELIVERED_RETENTION_SECONDS,),
         )
         connection.execute(
-            "DELETE FROM deliveries WHERE state IN ('rejected', 'dead') "
-            "AND finished_at <= ?",
-            (now - TERMINAL_RETENTION_SECONDS,),
+            "DELETE FROM deliveries WHERE state = 'rejected' AND finished_at <= ?",
+            (now - REJECTED_RETENTION_SECONDS,),
         )
 
     @staticmethod
@@ -761,6 +838,7 @@ class NavigatorDeliveryWorker:
         self._spool = spool
         self._submit_body = submit_body
         self._poll_interval_seconds = poll_interval_seconds
+        self._navigator_timeout_seconds = navigator_timeout_seconds
         self._lease_seconds = max(15.0, navigator_timeout_seconds * 2.0 + 1.0)
         self._shutdown_grace_seconds = navigator_timeout_seconds + 2.0
         self._stopping = asyncio.Event()
@@ -826,7 +904,15 @@ class NavigatorDeliveryWorker:
         await self.notify()
         deadline = time.monotonic() + self._lease_seconds + self._shutdown_grace_seconds
         while True:
-            await self._idle.wait()
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise DeliveryPauseTimeout("Teams Navigator delivery did not drain")
+            try:
+                await asyncio.wait_for(self._idle.wait(), timeout=remaining)
+            except TimeoutError:
+                raise DeliveryPauseTimeout(
+                    "Teams Navigator delivery did not drain"
+                ) from None
             status = await self._spool.status()
             if status.active_delivery_count == 0:
                 return status
@@ -887,7 +973,8 @@ class NavigatorDeliveryWorker:
 
     async def _forward(self, claim: DeliveryClaim) -> None:
         try:
-            result = await self._submit_body(claim.body)
+            async with asyncio.timeout(self._navigator_timeout_seconds):
+                result = await self._submit_body(claim.body)
         except NavigatorAdmissionUnavailable as exc:
             if exc.retryable:
                 await self._spool.mark_retry(
@@ -906,6 +993,14 @@ class NavigatorDeliveryWorker:
         except asyncio.CancelledError:
             # The lease stays durable; a replacement process retries it after expiry.
             raise
+        except TimeoutError:
+            await self._spool.mark_retry(
+                claim,
+                delay_seconds=retry_delay_seconds(claim.attempt, None),
+                status_code=None,
+                code="NAVIGATOR_TOTAL_TIMEOUT",
+            )
+            return
         except Exception:
             # Unknown client/runtime faults are bounded retries, never a success ACK.
             await self._spool.mark_retry(
@@ -933,19 +1028,17 @@ class NavigatorDeliveryWorker:
 
 
 def stable_delivery_id(event: dict[str, Any]) -> str:
-    """Hash the verified tenant/team/channel/conversation/activity identity.
+    """Hash the verified tenant/team/channel/bot/activity identity.
 
     The event body remains the exact canonical Navigator body; this separate
     key lets the spool reject a conflicting body for the same Teams activity.
 
-    中文：对经过验证的租户/团队/频道/会话/activity 身份生成哈希。该 key 与规范
+    中文：对经过验证的租户/团队/频道/bot/activity 身份生成哈希。该 key 与规范
     Navigator body 分开保存，以便拒绝同一 Teams activity 对应不同正文。
     """
 
     trust = event.get("trust")
-    payload = event.get("payload")
-    conversation = payload.get("conversation") if isinstance(payload, dict) else None
-    if not isinstance(trust, dict) or not isinstance(conversation, dict):
+    if not isinstance(trust, dict):
         raise DeliverySpoolError("normalized Teams event identity is incomplete")
     identity = [
         trust.get("provider"),
@@ -953,7 +1046,6 @@ def stable_delivery_id(event: dict[str, Any]) -> str:
         trust.get("team_id"),
         trust.get("channel_id"),
         trust.get("bot_app_id"),
-        conversation.get("conversation_id"),
         trust.get("message_id"),
     ]
     if any(not isinstance(part, str) or not part for part in identity):
@@ -964,13 +1056,58 @@ def stable_delivery_id(event: dict[str, Any]) -> str:
     return hashlib.sha256(b"cyrene-teams-delivery-v1\0" + encoded).hexdigest()
 
 
+def stable_thread_key(event: dict[str, Any]) -> str:
+    """Hash the verified Teams scope and root after removing per-message suffixes.
+
+    Channel conversation IDs may append ``;messageid=<root>`` to replies. Strip
+    that segment, then combine the stable scope and root so a retry/backoff at
+    the start of a thread blocks later replies without blocking other threads.
+
+    中文：对已验证 Teams 范围和根消息生成 thread key。reply 的 conversation ID 可能
+    附带 `;messageid=<root>`；先去掉该逐消息后缀，再用稳定范围和 root 分组，避免
+    同 thread 后续消息越过重试，同时不阻塞其他 thread。
+    """
+
+    trust = event.get("trust")
+    payload = event.get("payload")
+    conversation = payload.get("conversation") if isinstance(payload, dict) else None
+    if not isinstance(trust, dict) or not isinstance(conversation, dict):
+        raise DeliverySpoolError("normalized Teams thread identity is incomplete")
+    conversation_id = conversation.get("conversation_id")
+    root_thread_id = trust.get("root_thread_id")
+    scope = [
+        trust.get("provider"),
+        trust.get("tenant_id"),
+        trust.get("team_id"),
+        trust.get("channel_id"),
+        trust.get("bot_app_id"),
+        root_thread_id,
+    ]
+    if (
+        not isinstance(conversation_id, str)
+        or not conversation_id
+        or any(not isinstance(part, str) or not part for part in scope)
+    ):
+        raise DeliverySpoolError("normalized Teams thread identity is incomplete")
+    conversation_scope = ";".join(
+        segment
+        for segment in conversation_id.split(";")
+        if segment.partition("=")[0].casefold() != "messageid"
+    )
+    identity = [*scope[:-1], conversation_scope, root_thread_id]
+    encoded = json.dumps(identity, ensure_ascii=False, separators=(",", ":")).encode(
+        "utf-8"
+    )
+    return hashlib.sha256(b"cyrene-teams-thread-v1\0" + encoded).hexdigest()
+
+
 def retry_delay_seconds(attempt: int, retry_after_seconds: float | None) -> float:
     """Apply bounded exponential retry delay and respect numeric Retry-After.
 
     中文：应用有界指数退避，并遵守数值型 Retry-After。
     """
 
-    backoff = min(2 ** max(0, attempt - 1), MAX_RETRY_DELAY_SECONDS)
+    backoff = min(2 ** min(max(0, attempt - 1), 9), MAX_RETRY_DELAY_SECONDS)
     if retry_after_seconds is None:
         return float(backoff)
     return min(

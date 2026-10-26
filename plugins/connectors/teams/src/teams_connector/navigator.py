@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -129,12 +130,19 @@ class NavigatorEventClient:
         }
         url = urljoin(self._base_url + "/", EVENT_ROUTE.lstrip("/"))
         try:
-            response = await self._client.post(
-                url,
-                content=raw_body,
-                headers=headers,
-                timeout=self._timeout_seconds,
-            )
+            async with asyncio.timeout(self._timeout_seconds):
+                response = await self._client.post(
+                    url,
+                    content=raw_body,
+                    headers=headers,
+                    timeout=self._timeout_seconds,
+                )
+        except TimeoutError:
+            # HTTPX read timeouts are per idle interval; enforce a lease-safe total.
+            raise NavigatorAdmissionUnavailable(
+                "Navigator event admission exceeded its total deadline",
+                retryable=True,
+            ) from None
         except httpx.HTTPError:
             # Do not propagate HTTPX's exception text; it may include an internal URL.
             raise NavigatorAdmissionUnavailable(
@@ -172,8 +180,14 @@ class NavigatorEventClient:
                 terminal_rejection=True,
                 code=safe_code,
             )
+        source_auth_retry = response.status_code == 401 or (
+            response.status_code == 403 and body.get("sourceAuthenticated") is not True
+        )
         retryable = (
-            response.status_code in {408, 425, 429} or response.status_code >= 500
+            source_auth_retry
+            or 300 <= response.status_code < 400
+            or response.status_code in {408, 425, 429}
+            or response.status_code >= 500
         )
         retry_after_seconds = _retry_after_seconds(response.headers.get("Retry-After"))
         raise NavigatorAdmissionUnavailable(

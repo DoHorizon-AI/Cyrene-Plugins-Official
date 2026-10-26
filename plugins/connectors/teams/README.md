@@ -33,13 +33,17 @@ background worker sends the saved bytes to Navigator; every retry keeps the
 same body and refreshes only the timestamp and HMAC headers. Navigator's
 existing connector-event idempotency prevents another Task after an ambiguous
 timeout. The spool does not execute provider, model, Plugin, or Task logic.
+Within one verified Teams thread, a persisted monotonic enqueue sequence keeps
+later replies behind earlier unconfirmed events; independent threads may progress.
 
-Transient network/timeouts, HTTP 408/425/429, and 5xx responses retry with
-bounded exponential backoff. Other 4xx responses become permanent dead-letter
-metadata; only Navigator's authenticated, allowlisted tenant/team refusal is
-counted as a terminal business rejection. The spool stores bodies only in the
-private SQLite state directory, removes bodies when delivery becomes terminal,
-and reports metadata counts without message text or credentials. The canonical
+Transient network/timeouts, HTTP 408/425/429, 5xx, and source-authentication
+401/403 responses retry with an exponential delay capped at five minutes. These
+retries do not exhaust into message deletion; the SQLite row/byte limits bound
+storage, and a full queue makes new callbacks return non-2xx. Other 4xx responses
+become unresolved dead letters whose bodies remain until an owner explicitly
+requeues them or intentionally retires the spool. Only Navigator's authenticated,
+allowlisted tenant/team refusal is counted as a terminal business rejection.
+Delivered and terminally rejected bodies are erased. The canonical
 body includes normalized message text and verified actor/thread identity and is
 stored only in the owner-only SQLite directory. Raw SDK activities and Bot
 Framework or Navigator Authorization headers are never stored.
@@ -52,10 +56,16 @@ Framework or Navigator Authorization headers are never stored.
 `synchronous=FULL` 提交后再向 Teams ACK。单一后台 worker 向 Navigator 投递保存的字节；每次
 重试正文不变，只刷新 timestamp 与 HMAC headers。Navigator 已有的 connector event 幂等
 确保网络超时不重复创建 Task。spool 不执行 provider、model、Plugin 或 Task 逻辑。
+同一已验证 Teams thread 使用持久单调入队序号；较早事件未确认时，后续 reply 不会越过，
+其他 thread 仍可继续投递。
 
-网络/timeout、HTTP 408/425/429 与 5xx 使用有界指数退避。其他 4xx 转为永久 dead-letter
-元数据；只有 Navigator 已认证且在 allowlist 中的租户/团队拒绝计为业务终态拒绝。正文只存放
-在私有 SQLite state 目录，事件进入终态时清除正文；status 只返回计数等元数据，不返回消息或凭据。
+网络/timeout、HTTP 408/425/429、5xx 以及 source-authentication 401/403 使用指数退避，
+最长间隔五分钟。不会因为重试次数耗尽而删除消息；SQLite 行数/字节上限负责限制存储，队列满时
+新 callback 返回非 2xx。其他 4xx 转为未解决 dead-letter，正文保留到 owner 显式恢复或有意退役
+spool；只有 Navigator 已认证且在 allowlist 中的租户/团队拒绝计为业务终态拒绝。已投递及业务
+终态拒绝会清除正文。规范
+body 包含归一化消息和已验证 actor/thread identity，只写入 owner-only SQLite 目录。原始 SDK
+activity 以及 Bot Framework 或 Navigator Authorization headers 都不会保存。
 
 持久模式仅保存规范事件中的消息文本、已验证 actor/thread identity 与必要路由字段，并且
 只写入 owner-only SQLite 目录。原始 SDK activity 以及 Bot Framework 或 Navigator
@@ -119,11 +129,15 @@ SQLite uses `delivery-spool.sqlite3` inside it. Mount an independent printable
 the ingress UID with mode `0400` or `0600`. The admin token is separate from the
 Navigator HMAC key. Partial configuration fails startup instead of silently
 falling back to direct mode. The default bounds are 10,000 rows, 64 MiB of stored
-bodies, 256 KiB per event, 12 delivery attempts, five-minute maximum retry
-delay, 24-hour delivered-row retention, and seven-day terminal-row retention.
+bodies, 256 KiB per event, a five-minute maximum transient retry interval,
+24-hour delivered-row retention, and seven-day rejected-row retention. Transient
+retries continue until Navigator confirms admission; permanent dead letters stay
+recoverable until an owner explicitly requeues them. The row/byte cap causes new
+webhooks to receive non-2xx if the backlog fills.
 
 The internal admin routes are `GET /_internal/teams/delivery/status`,
-`POST /_internal/teams/delivery/pause`, and
+`POST /_internal/teams/delivery/pause`,
+`POST /_internal/teams/delivery/retry-dead`, and
 `POST /_internal/teams/delivery/resume`. They require
 `Authorization: Bearer <mounted admin token>` and must remain outside public
 proxy routes. Pause/resume JSON is `{"holder":"<operation-id>",
@@ -131,9 +145,11 @@ proxy routes. Pause/resume JSON is `{"holder":"<operation-id>",
 accepting authenticated webhooks after their SQLite commit; it waits for active
 forwards to finish and returns metadata with `active_delivery_count: 0`. The
 first pause increments `revision`; repeats by the same holder are idempotent.
-Resume must match both the current holder and revision. A stale or different
-holder receives HTTP 409. Status does not return the holder, event body, HMAC
-material, bearer token, or request headers.
+Resume and dead-letter recovery must match both the current holder and revision;
+dead-letter recovery also requires zero active deliveries. A stale or different
+holder receives HTTP 409. `retry-dead` requeues retained bodies without returning
+them. Status reports `pending_bytes` and `retained_body_bytes` but does not return
+the holder, delivery IDs, event body, HMAC material, bearer token, or headers.
 
 The SDK-verified `activity.serviceUrl` is copied only to the private
 `trust.service_url` routing envelope. Navigator carries it in the private
@@ -159,17 +175,24 @@ require an ingress restart or code change.
 `delivery-spool.sqlite3`。将独立、可打印的 32-256 字节 admin token 挂载到
 `/run/secrets/teams-delivery-admin-token`，由 ingress UID 以 `0400` 或 `0600` 读取。
 它与 Navigator HMAC key 分开保存。只配置其中一项会导致启动失败，不会静默退回 direct
-模式。默认上限为 10,000 行、64 MiB 正文、单事件 256 KiB、12 次投递、最多 5 分钟退避、
-已投递记录保留 24 小时、终态记录保留 7 天。
+模式。默认上限为 10,000 行、64 MiB 正文、单事件 256 KiB、最多 5 分钟退避间隔、
+已投递记录保留 24 小时、业务终态拒绝记录保留 7 天。未解决 dead-letter 正文保留在有界
+spool，直到 owner 显式恢复。
+
+临时错误会持续重试直至 Navigator 确认；达到行数或字节上限后，新 webhook 收到非 2xx，
+等待 Teams 重投，不会对已 ACK 的队列消息静默删正文。
 
 内部 admin 路由为 `GET /_internal/teams/delivery/status`、
-`POST /_internal/teams/delivery/pause` 和 `POST /_internal/teams/delivery/resume`。它们
+`POST /_internal/teams/delivery/pause`、`POST /_internal/teams/delivery/retry-dead` 和
+`POST /_internal/teams/delivery/resume`。它们
 要求 `Authorization: Bearer <挂载的 admin token>`，不得加入公网代理路由。pause/resume
 JSON 为 `{"holder":"<operation-id>","expected_revision":0}`。pause 成功后禁止新 claim，
 但仍接收经过认证的 webhook 并在 SQLite commit 后 ACK；所有当前转发结束后才返回，且
 `active_delivery_count` 为 0。首次 pause 增加 `revision`，同一 holder 重放幂等。resume
-必须同时匹配当前 holder 和 revision；旧 revision 或其他 holder 返回 HTTP 409。status 不会
-返回 holder、事件正文、HMAC 材料、bearer token 或请求 headers。
+必须同时匹配当前 holder 和 revision；dead-letter 恢复还要求 active count 为 0。旧 revision
+或其他 holder 返回 HTTP 409。`retry-dead` 只重排保存的 event，不返回正文。status 返回
+`pending_bytes` 与 `retained_body_bytes`，但不返回 holder、delivery ID、正文、HMAC 材料、
+bearer token 或请求 headers。
 
 SDK 验证过的 `activity.serviceUrl` 只写入 HMAC 保护的私有 `trust.service_url` 路由
 envelope。Navigator 将其保存在私有 `conversation.serviceUrl` delivery route；Exchange

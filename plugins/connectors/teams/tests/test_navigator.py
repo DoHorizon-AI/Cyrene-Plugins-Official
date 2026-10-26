@@ -10,9 +10,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
+import time
 
 import httpx
 import pytest
@@ -117,10 +119,10 @@ async def test_authenticated_terminal_team_rejection_is_not_an_admission():
 
 
 @pytest.mark.asyncio
-async def test_source_authentication_401_is_permanent_for_durable_delivery():
-    """A source-authentication 401 is terminal until its private key is fixed.
+async def test_source_authentication_401_is_retried_with_bounded_backoff():
+    """A source-authentication 401 may be transient during key rotation.
 
-    中文：来源鉴权或 timestamp 401 在修复私有 key 前属于永久错误。
+    中文：key rotation 或 timestamp 修复期间，来源鉴权 401 保留并重试。
     """
 
     async def handler(_request: httpx.Request) -> httpx.Response:
@@ -142,8 +144,106 @@ async def test_source_authentication_401_is_permanent_for_durable_delivery():
         )
         with pytest.raises(NavigatorAdmissionUnavailable, match="status=401") as error:
             await client.submit({"event_type": "inbound_message"})
-    assert error.value.retryable is False
+    assert error.value.retryable is True
     assert error.value.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_unauthenticated_source_403_is_retryable_but_authenticated_403_is_not():
+    """Retry source authentication failures but keep business 403 permanent.
+
+    中文：未通过 source auth 的 403 可重试；已认证但未 allowlist 的拒绝为终态。
+    """
+
+    replies = iter(
+        [
+            httpx.Response(
+                403,
+                json={
+                    "code": "CONNECTOR_SOURCE_KEY_UNKNOWN",
+                    "terminal": False,
+                    "sourceAuthenticated": False,
+                },
+            ),
+            httpx.Response(
+                403,
+                json={
+                    "code": "WORK_CONNECTOR_FORBIDDEN",
+                    "terminal": False,
+                    "sourceAuthenticated": True,
+                },
+            ),
+        ]
+    )
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return next(replies)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as http_client:
+        client = NavigatorEventClient(
+            base_url="http://navigator:8080",
+            key_id="teams-v1",
+            hmac_key=HMAC_KEY,
+            client=http_client,
+        )
+        with pytest.raises(NavigatorAdmissionUnavailable) as source_error:
+            await client.submit({"event_type": "inbound_message"})
+        with pytest.raises(NavigatorAdmissionUnavailable) as business_error:
+            await client.submit({"event_type": "inbound_message"})
+
+    assert source_error.value.retryable is True
+    assert business_error.value.retryable is False
+
+
+@pytest.mark.asyncio
+async def test_redirect_is_retryable_until_navigator_admission_is_confirmed():
+    """A transient ingress redirect cannot erase an ACKed queued body.
+
+    中文：短暂 redirect 不得删除已经 ACK 并排队的消息。
+    """
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(307, headers={"Location": "http://navigator/next"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        navigator = NavigatorEventClient(
+            base_url="http://navigator:8080",
+            key_id="teams-v1",
+            hmac_key=HMAC_KEY,
+            client=client,
+        )
+        with pytest.raises(NavigatorAdmissionUnavailable) as error:
+            await navigator.submit({"event_type": "inbound_message"})
+
+    assert error.value.status_code == 307
+    assert error.value.retryable is True
+
+
+@pytest.mark.asyncio
+async def test_submit_body_enforces_total_deadline_even_for_slow_trickle_response():
+    """The lease-safe total timeout does not rely on HTTPX inactivity timers.
+
+    中文：总时限不能只依赖 HTTPX 的逐段网络空闲 timeout。
+    """
+
+    async def slow_handler(_request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(1)
+        return httpx.Response(202)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(slow_handler)) as client:
+        navigator = NavigatorEventClient(
+            base_url="http://navigator:8080",
+            key_id="teams-v1",
+            hmac_key=HMAC_KEY,
+            timeout_seconds=0.05,
+            client=client,
+        )
+        started = time.monotonic()
+        with pytest.raises(NavigatorAdmissionUnavailable) as error:
+            await navigator.submit_body(b'{"event_type":"inbound_message"}')
+
+    assert error.value.retryable is True
+    assert time.monotonic() - started < 0.5
 
 
 @pytest.mark.asyncio

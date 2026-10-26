@@ -262,6 +262,30 @@ async def build_ingress_service(
                     503, "delivery resume could not be persisted"
                 ) from None
 
+        @api.post("/_internal/teams/delivery/retry-dead")
+        async def retry_dead_delivery(request: Request) -> dict[str, Any]:
+            """CAS-requeue dead letters only while the matching pause is drained.
+
+            中文：仅在匹配的 pause 已排空时，以 CAS 恢复 dead-letter。
+            """
+
+            require_delivery_admin(request)
+            holder, revision = await read_admin_cas(request)
+            try:
+                retried_count, status = await delivery_spool.retry_dead(
+                    holder=holder, expected_revision=revision
+                )
+                await delivery_worker.notify()
+                return {"retried_count": retried_count, **status.as_dict()}
+            except DeliveryAdminConflict:
+                raise HTTPException(
+                    409, "dead delivery recovery requires the current paused holder"
+                ) from None
+            except DeliverySpoolError:
+                raise HTTPException(
+                    503, "dead delivery recovery could not be persisted"
+                ) from None
+
     sdk_app = App(
         client_id=settings.bot_app_id,
         tenant_id=settings.tenant_id,

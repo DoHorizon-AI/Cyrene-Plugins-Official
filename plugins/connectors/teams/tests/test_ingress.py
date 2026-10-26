@@ -297,6 +297,51 @@ async def test_sdk_rejects_activity_service_url_not_bound_to_signed_claim(monkey
 
 
 @pytest.mark.asyncio
+async def test_durable_mode_rejects_unverified_activity_before_sqlite_enqueue(
+    monkeypatch, tmp_path
+):
+    """An SDK auth rejection cannot create a durable queue row or receive success.
+
+    中文：SDK 鉴权拒绝时不能写入 SQLite，也不能返回成功 ACK。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+
+    class UnusedNavigator:
+        async def submit_body(self, _body: bytes):
+            raise AssertionError("unauthenticated activity must not be forwarded")
+
+        async def aclose(self):
+            return None
+
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=b"0123456789abcdef0123456789abcdef",
+        ),
+        navigator=UnusedNavigator(),
+    )
+    mismatched_token = _service_token(
+        private_key,
+        service_url="https://smba.trafficmanager.net/teams/",
+    )
+    try:
+        with TestClient(service.http_app) as client:
+            response = client.post(
+                "/api/messages",
+                json=_activity(activity_id="1749000000009"),
+                headers={"Authorization": f"Bearer {mismatched_token}"},
+            )
+        assert response.status_code == 401
+        with sqlite3.connect(service.delivery_spool.database_path) as connection:
+            count = connection.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0]
+        assert count == 0
+    finally:
+        await service.close()
+
+
+@pytest.mark.asyncio
 async def test_durable_ack_waits_for_sqlite_commit_not_navigator_forward(
     monkeypatch, tmp_path
 ):
@@ -413,6 +458,135 @@ async def test_spool_capacity_failure_returns_non_success_to_teams(
 
 
 @pytest.mark.asyncio
+async def test_sqlite_commit_failure_cannot_acknowledge_teams(monkeypatch, tmp_path):
+    """A failed durable commit rolls back and returns non-2xx to Teams.
+
+    中文：SQLite commit 失败时事务回滚，Teams 收到非 2xx。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+
+    class UnusedNavigator:
+        async def submit_body(self, _body: bytes):
+            raise AssertionError("uncommitted event must not be forwarded")
+
+        async def aclose(self):
+            return None
+
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=b"0123456789abcdef0123456789abcdef",
+        ),
+        navigator=UnusedNavigator(),
+    )
+    original_connect = service.delivery_spool._connect
+
+    class CommitFailureConnection(sqlite3.Connection):
+        def commit(self):
+            raise sqlite3.OperationalError("injected commit failure")
+
+    def failing_connect():
+        connection = sqlite3.connect(
+            service.delivery_spool.database_path,
+            timeout=5.0,
+            isolation_level=None,
+            factory=CommitFailureConnection,
+        )
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout=5000")
+        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA foreign_keys=ON")
+        return connection
+
+    try:
+        monkeypatch.setattr(service.delivery_spool, "_connect", failing_connect)
+        with TestClient(service.http_app) as client:
+            response = client.post(
+                "/api/messages",
+                json=_activity(activity_id="1749000000008"),
+                headers={"Authorization": f"Bearer {_service_token(private_key)}"},
+            )
+            monkeypatch.setattr(service.delivery_spool, "_connect", original_connect)
+            assert not 200 <= response.status_code < 300
+            with sqlite3.connect(service.delivery_spool.database_path) as connection:
+                count = connection.execute(
+                    "SELECT COUNT(*) FROM deliveries"
+                ).fetchone()[0]
+            assert count == 0
+    finally:
+        monkeypatch.setattr(service.delivery_spool, "_connect", original_connect)
+        await service.close()
+
+
+@pytest.mark.asyncio
+async def test_sqlite_writer_lock_failure_cannot_acknowledge_teams(
+    monkeypatch, tmp_path
+):
+    """A held SQLite write lock makes the authenticated callback return non-2xx.
+
+    中文：SQLite writer lock 未释放时，经过认证的 callback 返回非 2xx。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+
+    class UnusedNavigator:
+        async def submit_body(self, _body: bytes):
+            raise AssertionError("locked database must not forward")
+
+        async def aclose(self):
+            return None
+
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=b"0123456789abcdef0123456789abcdef",
+        ),
+        navigator=UnusedNavigator(),
+    )
+    database_path = service.delivery_spool.database_path
+    lock_connection = sqlite3.connect(database_path, timeout=0.1, isolation_level=None)
+    lock_connection.execute("BEGIN IMMEDIATE")
+
+    def short_busy_connect():
+        connection = sqlite3.connect(
+            database_path,
+            timeout=0.02,
+            isolation_level=None,
+        )
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA busy_timeout=20")
+        connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA foreign_keys=ON")
+        return connection
+
+    original_connect = service.delivery_spool._connect
+    try:
+        monkeypatch.setattr(service.delivery_spool, "_connect", short_busy_connect)
+        with TestClient(service.http_app) as client:
+            response = client.post(
+                "/api/messages",
+                json=_activity(activity_id="1749000000010"),
+                headers={"Authorization": f"Bearer {_service_token(private_key)}"},
+            )
+            assert not 200 <= response.status_code < 300
+            lock_connection.rollback()
+            monkeypatch.setattr(service.delivery_spool, "_connect", original_connect)
+            with sqlite3.connect(database_path) as connection:
+                count = connection.execute(
+                    "SELECT COUNT(*) FROM deliveries"
+                ).fetchone()[0]
+            assert count == 0
+    finally:
+        lock_connection.rollback()
+        lock_connection.close()
+        monkeypatch.setattr(service.delivery_spool, "_connect", original_connect)
+        await service.close()
+
+
+@pytest.mark.asyncio
 async def test_duplicate_activity_is_idempotent_and_conflicting_body_is_rejected(
     monkeypatch, tmp_path
 ):
@@ -487,6 +661,7 @@ async def test_durable_admin_routes_are_private_and_use_holder_revision_cas(tmp_
             assert status.status_code == 200
             assert status.json()["paused"] is False
             assert status.json()["revision"] == 0
+            assert status.json()["retained_body_bytes"] == 0
             assert "holder" not in status.json()
             assert "body" not in status.json()
 
@@ -532,5 +707,118 @@ async def test_durable_admin_routes_are_private_and_use_holder_revision_cas(tmp_
             )
             assert repeated_resume.status_code == 200
             assert repeated_resume.json()["revision"] == 2
+            assert any(
+                route.path.endswith("/retry-dead") for route in service.http_app.routes
+            )
+    finally:
+        await service.close()
+
+
+@pytest.mark.asyncio
+async def test_retry_dead_admin_route_requires_paused_holder_and_requeues_same_body(
+    tmp_path,
+):
+    """Recover permanent failures only under the current drained pause holder.
+
+    中文：只有当前暂停 holder 可在 active=0 时恢复 dead-letter，正文保持原样。
+    """
+
+    token_value = b"0123456789abcdef0123456789abcdef"
+    navigator = AdmissionNavigator()
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=token_value,
+        ),
+        navigator=navigator,
+    )
+    event = {
+        "event_type": "inbound_message",
+        "payload": {
+            "message_id": "1749000000007",
+            "conversation": {
+                "vendor": "msteams",
+                "account_id": BOT_APP_ID,
+                "conversation_id": CONVERSATION_ID,
+                "kind": "channel",
+            },
+            "sender_id": ACTOR_ID,
+            "content": [{"text": {"text": "recover this private dead letter"}}],
+        },
+        "trust": {
+            "version": 1,
+            "provider": "teams",
+            "tenant_id": TENANT_ID,
+            "actor_aad_object_id": ACTOR_ID,
+            "team_id": TEAM_ID,
+            "channel_id": CHANNEL_ID,
+            "root_thread_id": "1749000000007",
+            "message_id": "1749000000007",
+            "bot_app_id": BOT_APP_ID,
+            "service_url": SERVICE_URL,
+        },
+    }
+    expected_body = json.dumps(
+        event, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    await service.delivery_spool.enqueue(event)
+    claim = await service.delivery_spool.claim_next(lease_seconds=5)
+    assert claim is not None
+    await service.delivery_spool.mark_dead(claim, status_code=422, code="INVALID_EVENT")
+    headers = {"Authorization": f"Bearer {token_value.decode('ascii')}"}
+    cas = {"holder": "manual-recovery-1", "expected_revision": 0}
+    try:
+        with TestClient(service.http_app) as client:
+            unpaused = client.post(
+                "/_internal/teams/delivery/retry-dead", headers=headers, json=cas
+            )
+            assert unpaused.status_code == 409
+
+            paused = client.post(
+                "/_internal/teams/delivery/pause", headers=headers, json=cas
+            )
+            assert paused.status_code == 200
+            assert paused.json()["active_delivery_count"] == 0
+            assert paused.json()["dead_count"] == 1
+            assert paused.json()["retained_body_bytes"] == len(expected_body)
+
+            retry = client.post(
+                "/_internal/teams/delivery/retry-dead",
+                headers=headers,
+                json={"holder": "manual-recovery-1", "expected_revision": 1},
+            )
+            assert retry.status_code == 200
+            assert retry.json()["retried_count"] == 1
+            assert retry.json()["dead_count"] == 0
+            assert retry.json()["queued_count"] == 1
+
+            replay = client.post(
+                "/_internal/teams/delivery/retry-dead",
+                headers=headers,
+                json={"holder": "manual-recovery-1", "expected_revision": 1},
+            )
+            assert replay.status_code == 200
+            assert replay.json()["retried_count"] == 0
+
+            resumed = client.post(
+                "/_internal/teams/delivery/resume",
+                headers=headers,
+                json={"holder": "manual-recovery-1", "expected_revision": 1},
+            )
+            assert resumed.status_code == 200
+            deadline = time.monotonic() + 2
+            while not navigator.events and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert navigator.events == [event]
+            while (
+                await service.delivery_spool.status()
+            ).delivered_count == 0 and time.monotonic() < deadline:
+                await asyncio.sleep(0.01)
+            assert (await service.delivery_spool.status()).delivered_count == 1
+            with sqlite3.connect(service.delivery_spool.database_path) as connection:
+                row = connection.execute(
+                    "SELECT body, state FROM deliveries"
+                ).fetchone()
+            assert row == (None, "delivered")
     finally:
         await service.close()

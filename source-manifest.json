@@ -1650,8 +1650,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/README.md",
-      "sha256": "2ca95a507eda716eaae458e9e50493bbebb1e31bb145d4d2a8e167bf446662be",
-      "size_bytes": 13531
+      "sha256": "ad8b93bcb5c8962842fd858b1aea44a6626abaa80d9a51db5373a75c4dcd97bb",
+      "size_bytes": 15297
     },
     {
       "kind": "file",
@@ -1762,15 +1762,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/delivery_spool.py",
-      "sha256": "7f5c435ba77157a40cbcb340902855791633881ac52ad5573f9c845eeb2f6039",
-      "size_bytes": 39627
+      "sha256": "beb0716c92a80a0186b7527cf6a3f9898b87d0cc7c7d4e14104f78b30c1b89f0",
+      "size_bytes": 45630
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/ingress.py",
-      "sha256": "82d68a5eb3790192a2efe13dbdfda668b7301238d64ae5e326829d981636bb9c",
-      "size_bytes": 13330
+      "sha256": "38bdae93dc99ba07516f790d9f56b068fd40a467c6c158c9076d51566a6fcf64",
+      "size_bytes": 14419
     },
     {
       "kind": "file",
@@ -1783,8 +1783,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/navigator.py",
-      "sha256": "00280b4cbf0d128bb61d451d3da5c8e2f34b8b0b250d6b69a9335338c9c87995",
-      "size_bytes": 8541
+      "sha256": "b02354244c81fb193f3d85517c4108706f7ae7d6d4f3099a662b6f2dc3f9a6e9",
+      "size_bytes": 9188
     },
     {
       "kind": "file",
@@ -1839,15 +1839,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_delivery_spool.py",
-      "sha256": "30760f2e950cb95844f2d5ea0c46f0fc3cbe5e26744eac09ff17059b94e6b6f6",
-      "size_bytes": 19468
+      "sha256": "2778c6faaf282845fd39a426482f11bb78137d58a3fbbfc44fc46ce6bdbdf3da",
+      "size_bytes": 28994
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_ingress.py",
-      "sha256": "40f85c86cbb9ba6f1e0d83c3a65865256be6cac06da6d9f56c76f509bdcaac61",
-      "size_bytes": 19548
+      "sha256": "1801119816f3f2d3752ec219fa7ca00ef6f81d88292939f26bd91106d5e65430",
+      "size_bytes": 30587
     },
     {
       "kind": "file",
@@ -1860,8 +1860,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_navigator.py",
-      "sha256": "b479631470da5460c45be6f42bb33966d1da741ebcbfb59fe76580d73ad948ea",
-      "size_bytes": 8491
+      "sha256": "3d3ecf706a06f89ac5781cfbf34d38c915916ab961ed643f29b7c4a3a9b51069",
+      "size_bytes": 12010
     },
     {
       "kind": "file",

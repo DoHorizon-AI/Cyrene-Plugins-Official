@@ -22,10 +22,11 @@ import pytest
 
 from teams_connector.delivery_spool import (
     DELIVERED_RETENTION_SECONDS,
-    MAX_ATTEMPTS,
-    TERMINAL_RETENTION_SECONDS,
+    MAX_RETRY_DELAY_SECONDS,
+    REJECTED_RETENTION_SECONDS,
     DeliveryAdminConflict,
     DeliveryIdentityConflict,
+    DeliveryPauseTimeout,
     DeliverySpool,
     DeliverySpoolFull,
     DeliverySpoolUnavailable,
@@ -43,7 +44,13 @@ from teams_connector.navigator import (
 HMAC_KEY = b"teams-test-key-material-with-32-bytes-minimum"
 
 
-def _event(*, message_id: str = "activity-100", text: str = "你好，Cyrene") -> dict:
+def _event(
+    *,
+    message_id: str = "activity-100",
+    text: str = "你好，Cyrene",
+    root_thread_id: str = "100",
+    conversation_id: str = "19:channel;messageid=100",
+) -> dict:
     """Build one normalized event with stable Teams identity fields.
 
     中文：构造一个带稳定 Teams 身份字段的规范 event。
@@ -55,7 +62,7 @@ def _event(*, message_id: str = "activity-100", text: str = "你好，Cyrene") -
             "message_id": message_id,
             "conversation": {
                 "vendor": "msteams",
-                "conversation_id": "19:channel;messageid=100",
+                "conversation_id": conversation_id,
             },
             "content": [{"text": {"text": text}}],
         },
@@ -66,6 +73,7 @@ def _event(*, message_id: str = "activity-100", text: str = "你好，Cyrene") -
             "channel_id": "channel-1",
             "bot_app_id": "bot-1",
             "message_id": message_id,
+            "root_thread_id": root_thread_id,
         },
     }
 
@@ -187,6 +195,62 @@ async def test_shared_sqlite_claim_has_one_winner_and_fences_expired_worker(tmp_
 
 
 @pytest.mark.asyncio
+async def test_thread_head_of_line_blocks_followup_but_other_threads_progress(tmp_path):
+    """A retried root stays ahead of its replies without blocking other threads.
+
+    中文：根消息退避时同 thread reply 不越过，其他 thread 仍可继续投递。
+    """
+
+    now = [5000.0]
+    spool = DeliverySpool(tmp_path / "state", clock=lambda: now[0])
+    root = _event(
+        message_id="root-100",
+        root_thread_id="root-100",
+        conversation_id="19:channel",
+    )
+    reply = _event(
+        message_id="reply-message",
+        root_thread_id="root-100",
+        conversation_id="19:channel;messageid=root-100",
+        text="继续刚才的讨论",
+    )
+    other = _event(
+        message_id="other-message",
+        root_thread_id="root-200",
+        conversation_id="19:channel",
+        text="另一个线程",
+    )
+
+    await spool.enqueue(root)
+    root_claim = await spool.claim_next(lease_seconds=5)
+    assert root_claim is not None
+    await spool.mark_retry(
+        root_claim,
+        delay_seconds=60,
+        status_code=503,
+        code="NAVIGATOR_UNAVAILABLE",
+    )
+    await spool.enqueue(reply)
+    await spool.enqueue(other)
+
+    unrelated_claim = await spool.claim_next(lease_seconds=5)
+    assert unrelated_claim is not None
+    assert unrelated_claim.delivery_id == stable_delivery_id(other)
+    await spool.mark_delivered(unrelated_claim)
+    assert await spool.claim_next(lease_seconds=5) is None
+
+    now[0] += 61
+    retried_root = await spool.claim_next(lease_seconds=5)
+    assert retried_root is not None
+    assert retried_root.delivery_id == stable_delivery_id(root)
+    await spool.mark_delivered(retried_root)
+    followup = await spool.claim_next(lease_seconds=5)
+    assert followup is not None
+    assert followup.delivery_id == stable_delivery_id(reply)
+    await spool.mark_delivered(followup)
+
+
+@pytest.mark.asyncio
 async def test_new_spool_instance_recovers_queued_body_after_restart(tmp_path):
     """A fresh process object can claim the same committed queued row.
 
@@ -209,36 +273,38 @@ async def test_new_spool_instance_recovers_queued_body_after_restart(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_retry_limit_dead_letters_and_erases_body(tmp_path):
-    """Stop after the fixed attempt budget and retain only failure metadata.
+async def test_long_transient_outage_keeps_retrying_the_same_private_body(tmp_path):
+    """Keep ambiguous/transient work queued after many capped-backoff retries.
 
-    中文：达到固定重试次数后转 dead，并只保留失败元数据。
+    中文：多轮临时错误后仍保留原正文和队列状态，退避间隔有上限。
     """
 
     now = [3000.0]
     spool = DeliverySpool(tmp_path / "state", clock=lambda: now[0])
     await spool.enqueue(_event(message_id="bounded-retry"))
 
-    for attempt in range(1, MAX_ATTEMPTS + 1):
+    expected_body = canonical_event_body(_event(message_id="bounded-retry"))
+    for attempt in range(1, 21):
         claim = await spool.claim_next(lease_seconds=1)
         assert claim is not None
         assert claim.attempt == attempt
+        assert claim.body == expected_body
         await spool.mark_retry(
             claim,
-            delay_seconds=0,
+            delay_seconds=MAX_RETRY_DELAY_SECONDS,
             status_code=503,
             code="NAVIGATOR_UNAVAILABLE",
         )
-        now[0] += 1
+        now[0] += MAX_RETRY_DELAY_SECONDS + 1
 
     status = await spool.status()
     with sqlite3.connect(spool.database_path) as connection:
         row = connection.execute(
-            "SELECT state, body, last_error_code FROM deliveries"
+            "SELECT state, body, last_error_code, attempts FROM deliveries"
         ).fetchone()
-    assert status.dead_count == 1
-    assert status.queued_count == 0
-    assert row == ("dead", None, "RETRY_EXHAUSTED")
+    assert status.dead_count == 0
+    assert status.queued_count == 1
+    assert row == ("queued", expected_body, "NAVIGATOR_UNAVAILABLE", 20)
 
 
 @pytest.mark.asyncio
@@ -268,18 +334,140 @@ async def test_terminal_retention_purges_old_rows_on_next_admission(tmp_path):
 
     terminal_claim = await spool.claim_next(lease_seconds=1)
     assert terminal_claim is not None
-    await spool.mark_dead(
+    await spool.mark_rejected(
         terminal_claim,
         status_code=422,
-        code="INVALID_EVENT",
+        code="TEAMS_TEAM_NOT_ALLOWED",
     )
-    now[0] += TERMINAL_RETENTION_SECONDS + 1
+    now[0] += REJECTED_RETENTION_SECONDS + 1
     await spool.enqueue(_event(message_id="after-terminal-retention"))
     with sqlite3.connect(spool.database_path) as connection:
         states = connection.execute(
             "SELECT state FROM deliveries ORDER BY received_at"
         ).fetchall()
     assert states == [("queued",)]
+
+
+@pytest.mark.asyncio
+async def test_dead_letter_is_retained_and_requeued_only_by_paused_cas(tmp_path):
+    """Keep permanent failures/body as HOL blockers until explicit owner recovery.
+
+    中文：永久失败保留正文并阻塞同 thread；只能由已暂停 holder 显式重排恢复。
+    """
+
+    now = [8000.0]
+    spool = DeliverySpool(tmp_path / "state", clock=lambda: now[0])
+    root = _event(
+        message_id="dead-root",
+        root_thread_id="dead-thread",
+        conversation_id="19:channel",
+    )
+    reply = _event(
+        message_id="dead-reply",
+        root_thread_id="dead-thread",
+        conversation_id="19:channel;messageid=dead-thread",
+        text="reply waits for root recovery",
+    )
+    expected_body = canonical_event_body(root)
+    await spool.enqueue(root)
+    root_claim = await spool.claim_next(lease_seconds=1)
+    assert root_claim is not None
+    await spool.mark_dead(
+        root_claim,
+        status_code=400,
+        code="INVALID_EVENT",
+    )
+    await spool.enqueue(reply)
+    assert await spool.claim_next(lease_seconds=1) is None
+    await spool.enqueue(
+        _event(
+            message_id="dead-other-thread",
+            root_thread_id="other-thread",
+            text="independent thread",
+        )
+    )
+    # Dead bodies stay private and retained rather than expiring into a lost reply.
+    now[0] += 365 * 24 * 60 * 60
+    with sqlite3.connect(spool.database_path) as connection:
+        dead_row = connection.execute(
+            "SELECT body, state FROM deliveries WHERE delivery_id = ?",
+            (stable_delivery_id(root),),
+        ).fetchone()
+    assert dead_row == (expected_body, "dead")
+    status = await spool.status()
+    other = _event(
+        message_id="dead-other-thread",
+        root_thread_id="other-thread",
+        text="independent thread",
+    )
+    assert status.pending_bytes == len(canonical_event_body(reply)) + len(
+        canonical_event_body(other)
+    )
+    assert status.retained_body_bytes == len(expected_body) + len(
+        canonical_event_body(reply)
+    ) + len(canonical_event_body(other))
+
+    active_other_thread = await spool.claim_next(lease_seconds=3600)
+    assert active_other_thread is not None
+    assert active_other_thread.delivery_id == stable_delivery_id(other)
+
+    with pytest.raises(DeliveryAdminConflict):
+        await spool.retry_dead(holder="recover-1", expected_revision=0)
+    paused = await spool.pause(holder="recover-1", expected_revision=0)
+    assert paused.revision == 1
+    with pytest.raises(DeliveryAdminConflict):
+        await spool.retry_dead(holder="recover-1", expected_revision=1)
+    await spool.mark_delivered(active_other_thread)
+    with pytest.raises(DeliveryAdminConflict):
+        await spool.retry_dead(holder="wrong-holder", expected_revision=1)
+    with pytest.raises(DeliveryAdminConflict):
+        await spool.retry_dead(holder="recover-1", expected_revision=0)
+
+    retried_count, status = await spool.retry_dead(
+        holder="recover-1", expected_revision=1
+    )
+    assert retried_count == 1
+    assert status.dead_count == 0
+    assert status.queued_count == 2
+    assert await spool.retry_dead(holder="recover-1", expected_revision=1) == (
+        0,
+        status,
+    )
+    assert await spool.claim_next(lease_seconds=1) is None
+
+    await spool.resume(holder="recover-1", expected_revision=1)
+    recovered_root = await spool.claim_next(lease_seconds=1)
+    assert recovered_root is not None
+    assert recovered_root.body == expected_body
+    assert recovered_root.delivery_id == stable_delivery_id(root)
+    await spool.mark_delivered(recovered_root)
+    recovered_reply = await spool.claim_next(lease_seconds=1)
+    assert recovered_reply is not None
+    assert recovered_reply.delivery_id == stable_delivery_id(reply)
+    await spool.mark_delivered(recovered_reply)
+
+
+@pytest.mark.asyncio
+async def test_dead_letter_body_counts_toward_capacity_and_status(tmp_path):
+    """A retained dead body consumes bounded storage and blocks new ACKs.
+
+    中文：保留的 dead body 计入容量；空间耗尽时新 webhook 不能 ACK。
+    """
+
+    event = _event(message_id="dead-capacity")
+    body = canonical_event_body(event)
+    spool = DeliverySpool(tmp_path / "state", max_rows=4, max_bytes=len(body))
+    await spool.enqueue(event)
+    claim = await spool.claim_next(lease_seconds=5)
+    assert claim is not None
+    await spool.mark_dead(claim, status_code=400, code="INVALID_EVENT")
+
+    status = await spool.status()
+    assert status.dead_count == 1
+    assert status.pending_bytes == 0
+    assert status.retained_body_bytes == len(body)
+    with pytest.raises(DeliverySpoolFull):
+        await spool.enqueue(_event(message_id="cannot-ack"))
 
 
 @pytest.mark.asyncio
@@ -335,6 +523,42 @@ async def test_timeout_after_navigator_commit_replays_same_body_idempotently(tmp
     status = await spool.status()
     assert status.delivered_count == 1
     assert status.queued_count == 0
+
+
+@pytest.mark.asyncio
+async def test_worker_enforces_total_forward_deadline_before_lease_expiry(tmp_path):
+    """Cancel a slow trickle-style fake forward before a shared lease expires.
+
+    中文：即使 fake forward 持续慢速响应，也在 lease 过期前取消并安全重排。
+    """
+
+    spool = DeliverySpool(tmp_path / "state")
+    cancelled = asyncio.Event()
+
+    async def slow_forward(_body: bytes) -> AdmissionResult:
+        try:
+            await asyncio.sleep(1)
+        finally:
+            cancelled.set()
+        return AdmissionResult(True, False, 202)
+
+    worker = NavigatorDeliveryWorker(
+        spool,
+        slow_forward,
+        navigator_timeout_seconds=0.05,
+        poll_interval_seconds=0.01,
+    )
+    assert worker._lease_seconds > worker._navigator_timeout_seconds
+    await spool.enqueue(_event(message_id="slow-trickle"))
+    await worker.start()
+    await worker.notify()
+    await asyncio.wait_for(cancelled.wait(), timeout=1)
+    await _wait_until(lambda: _is_retry_waiting(spool))
+
+    status = await spool.status()
+    assert status.leased_count == 0
+    assert status.queued_count == 1
+    await worker.close()
 
 
 async def _is_retry_waiting(spool: DeliverySpool) -> bool:
@@ -526,7 +750,7 @@ async def test_worker_close_waits_for_current_forward_within_grace(tmp_path):
     worker = NavigatorDeliveryWorker(
         spool,
         blocked_forward,
-        navigator_timeout_seconds=0.1,
+        navigator_timeout_seconds=1,
         poll_interval_seconds=0.01,
     )
     await worker.start()
@@ -539,6 +763,47 @@ async def test_worker_close_waits_for_current_forward_within_grace(tmp_path):
     release.set()
     await asyncio.wait_for(close_task, timeout=2)
     assert (await spool.status()).delivered_count == 1
+
+
+@pytest.mark.asyncio
+async def test_pause_deadline_is_bounded_and_keeps_persisted_pause(tmp_path):
+    """A stuck local forward cannot hang pause beyond its drain deadline.
+
+    中文：本地 forward 卡住时 pause 在期限后返回，并保留已持久化的暂停。
+    """
+
+    spool = DeliverySpool(tmp_path / "state")
+    started = asyncio.Event()
+    release = asyncio.Event()
+
+    async def blocked_forward(_body: bytes) -> AdmissionResult:
+        started.set()
+        await release.wait()
+        return AdmissionResult(True, False, 202)
+
+    await spool.enqueue(_event(message_id="pause-timeout"))
+    worker = NavigatorDeliveryWorker(
+        spool,
+        blocked_forward,
+        navigator_timeout_seconds=10,
+        poll_interval_seconds=0.01,
+    )
+    worker._lease_seconds = 0.05
+    worker._shutdown_grace_seconds = 0.05
+    await worker.start()
+    await worker.notify()
+    await asyncio.wait_for(started.wait(), timeout=2)
+
+    with pytest.raises(DeliveryPauseTimeout):
+        await worker.pause_and_wait(holder="rollout-timeout", expected_revision=0)
+    paused_status = await spool.status()
+    assert paused_status.paused is True
+    assert paused_status.revision == 1
+    assert release.is_set() is False
+
+    release.set()
+    await _wait_until(lambda: _is_delivered(spool))
+    await worker.close()
 
 
 def test_retry_delay_is_bounded_and_respects_retry_after():
