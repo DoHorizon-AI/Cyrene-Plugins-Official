@@ -36,6 +36,7 @@ from .github import (
 from .github_app import GitHubAppClient, GitHubAppError
 from .huggingface_auth import HuggingFaceAuthError, HuggingFaceIdentityClient
 from .huggingface_oauth import (
+    ALLOWED_OAUTH_SCOPES,
     HuggingFaceOAuthClient,
     HuggingFaceOAuthError,
     parse_device_oauth_seed,
@@ -67,6 +68,8 @@ METHODS = (
     "link_github_app_installation",
     "link_huggingface_profile",
     "rotate_huggingface_profile",
+    "begin_huggingface_renewal",
+    "poll_huggingface_renewal",
     "register_host_identity_profile",
     "list_provider_profiles",
     "unlink_provider_profile",
@@ -123,6 +126,8 @@ EXCHANGE_ONLY_METHODS = {
     "link_github_app_installation",
     "link_huggingface_profile",
     "rotate_huggingface_profile",
+    "begin_huggingface_renewal",
+    "poll_huggingface_renewal",
     "register_host_identity_profile",
     "list_provider_profiles",
     "unlink_provider_profile",
@@ -194,6 +199,8 @@ def _action_type_name(action: str, suffix: str) -> str:
         "link_github_app_installation": "LinkGitHubAppInstallation",
         "link_huggingface_profile": "LinkHuggingFaceProfile",
         "rotate_huggingface_profile": "RotateHuggingFaceProfile",
+        "begin_huggingface_renewal": "BeginHuggingFaceRenewal",
+        "poll_huggingface_renewal": "PollHuggingFaceRenewal",
         "register_host_identity_profile": "RegisterHostIdentityProfile",
         "list_provider_profiles": "ListProviderProfiles",
         "unlink_provider_profile": "UnlinkProviderProfile",
@@ -539,6 +546,10 @@ class AccountCenterPlugin:
             return self._link_huggingface_profile(request, anchor)
         if method == "rotate_huggingface_profile":
             return self._rotate_huggingface_profile(request, anchor)
+        if method == "begin_huggingface_renewal":
+            return self._begin_huggingface_renewal(request, anchor)
+        if method == "poll_huggingface_renewal":
+            return self._poll_huggingface_renewal(request, anchor)
         if method == "register_host_identity_profile":
             return self._register_host_identity_profile(request, anchor)
         if method == "list_provider_profiles":
@@ -1071,6 +1082,273 @@ class AccountCenterPlugin:
             "external_subject": external_subject,
             "expires_at": credential_expires_at,
         }
+
+    def _begin_huggingface_renewal(
+        self, request: Mapping[str, Any], anchor: Anchor
+    ) -> dict[str, Any]:
+        """Start one owner-scoped HF device login without returning its private code."""
+
+        _require_fields(request, {"profile_ref", "session_ref"})
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        session_ref = _opaque_profile_ref(request["session_ref"])
+        profile = self._store.get_provider_profile(profile_ref, anchor)
+        if (
+            profile["provider"] != "huggingface"
+            or profile["auth_mode"] != "device_oauth"
+            or not profile["oauth_client_id"]
+            or not profile["oauth_scopes_json"]
+        ):
+            raise AccountCenterError("profile_provider_mismatch")
+        if profile["refresh_claim_id"] is not None:
+            raise AccountCenterError("credential_refresh_in_progress")
+        oauth_scopes = _stored_huggingface_oauth_scopes(profile["oauth_scopes_json"])
+        now = int(self._now())
+        session, created = self._store.begin_huggingface_device_renewal(
+            profile_ref=profile_ref,
+            session_ref=session_ref,
+            anchor=anchor,
+            now=now,
+        )
+        if not created:
+            return _huggingface_renewal_response(session)
+        if session["profile_revision"] != profile["credential_revision"]:
+            session = self._store.fail_huggingface_device_renewal_start(
+                session_ref,
+                anchor,
+                state="failed",
+                reason_code="profile_changed_before_device_start",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(session)
+        try:
+            device = self._huggingface_oauth.begin_device_code(
+                client_id=str(profile["oauth_client_id"]),
+                oauth_scopes=oauth_scopes,
+            )
+        except HuggingFaceOAuthError as error:
+            session = self._store.fail_huggingface_device_renewal_start(
+                session_ref,
+                anchor,
+                state="unknown" if error.uncertain else "failed",
+                reason_code=error.code,
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(session)
+        encrypted_device_code = encrypt(
+            self._encryption_key,
+            device.device_code.encode("utf-8"),
+            f"huggingface-device-renewal:{session_ref}".encode(),
+        )
+        started_at = int(self._now())
+        session = self._store.complete_huggingface_device_renewal_start(
+            session_ref,
+            anchor,
+            encrypted_device_code=encrypted_device_code,
+            user_code=device.user_code,
+            verification_uri=device.verification_uri,
+            expires_at=started_at + device.expires_in,
+            interval_seconds=device.interval_seconds,
+            now=started_at,
+        )
+        return _huggingface_renewal_response(session)
+
+    def _poll_huggingface_renewal(
+        self, request: Mapping[str, Any], anchor: Anchor
+    ) -> dict[str, Any]:
+        """Poll one fenced HF device session and atomically replace its owned profile."""
+
+        _require_fields(request, {"profile_ref", "session_ref"})
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        session_ref = _opaque_profile_ref(request["session_ref"])
+        session = self._store.get_huggingface_device_renewal(session_ref, anchor)
+        if session["profile_ref"] != profile_ref:
+            raise AccountCenterError("renewal_session_not_found")
+        now = int(self._now())
+        session, claim_id = self._store.claim_huggingface_device_renewal_poll(
+            session_ref,
+            anchor,
+            now=now,
+        )
+        if claim_id is None:
+            return _huggingface_renewal_response(session)
+        profile = self._store.get_provider_profile(profile_ref, anchor)
+        if (
+            profile["provider"] != "huggingface"
+            or profile["auth_mode"] != "device_oauth"
+            or profile["credential_revision"] != session["profile_revision"]
+            or profile["refresh_claim_id"] is not None
+            or not isinstance(profile["oauth_client_id"], str)
+            or not profile["oauth_client_id"]
+        ):
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="profile_changed_during_renewal",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        device_blob = session.get("device_code_blob")
+        if not isinstance(device_blob, bytes):
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="unknown",
+                reason_code="device_code_unavailable",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        try:
+            device_code = decrypt(
+                self._encryption_key,
+                device_blob,
+                f"huggingface-device-renewal:{session_ref}".encode(),
+            ).decode("utf-8")
+            token = self._huggingface_oauth.poll_device_code(
+                client_id=profile["oauth_client_id"],
+                device_code=device_code,
+                now=now,
+            )
+        except UnicodeDecodeError:
+            token_error = HuggingFaceOAuthError(
+                "device_code_unavailable", uncertain=True
+            )
+        except HuggingFaceOAuthError as error:
+            token_error = error
+        else:
+            token_error = None
+        if token_error is not None:
+            return self._record_huggingface_device_poll_error(
+                session_ref,
+                anchor,
+                claim_id,
+                session,
+                token_error,
+            )
+        if token.refresh_token is None:
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="refresh_token_missing",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        old_scopes = _stored_huggingface_oauth_scopes(profile["oauth_scopes_json"])
+        if token.oauth_scopes is not None and set(token.oauth_scopes) != set(
+            old_scopes
+        ):
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="authorization_scope_mismatch",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        try:
+            external_subject = self._huggingface.whoami(token.access_token)
+        except HuggingFaceAuthError:
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="provider_authentication_failed",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        if (
+            not profile["external_subject"]
+            or external_subject != profile["external_subject"]
+        ):
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="external_identity_mismatch",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        scopes_json = profile["oauth_scopes_json"]
+        completed_at = int(self._now())
+        completed = self._store.complete_huggingface_device_renewal(
+            session_ref,
+            anchor,
+            claim_id,
+            credential_blob=self._encrypt_provider_token(
+                profile_ref,
+                token.access_token,
+                token.access_token_expires_at,
+            ),
+            credential_refresh_blob=self._encrypt_provider_refresh_token(
+                profile_ref,
+                token.refresh_token,
+            ),
+            credential_expires_at=token.access_token_expires_at,
+            credential_refresh_expires_at=token.refresh_token_expires_at,
+            oauth_scopes_json=scopes_json,
+            external_subject=external_subject,
+            now=completed_at,
+        )
+        return _huggingface_renewal_response(completed)
+
+    def _record_huggingface_device_poll_error(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        session: Mapping[str, Any],
+        error: HuggingFaceOAuthError,
+    ) -> dict[str, Any]:
+        """Persist pending, throttled, final, and uncertain poll outcomes safely."""
+
+        now = int(self._now())
+        current_interval = session.get("interval_seconds")
+        interval = (
+            current_interval
+            if isinstance(current_interval, int)
+            and not isinstance(current_interval, bool)
+            else 5
+        )
+        if error.code == "authorization_pending":
+            updated = self._store.defer_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                interval_seconds=interval,
+                reason_code=None,
+                now=now,
+            )
+            return _huggingface_renewal_response(updated)
+        if error.code in {"slow_down", "provider_rate_limited"}:
+            updated = self._store.defer_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                interval_seconds=min(300, interval + 5),
+                reason_code=error.code,
+                now=now,
+            )
+            return _huggingface_renewal_response(updated)
+        state = {
+            "expired_token": "expired",
+            "access_denied": "cancelled",
+        }.get(error.code, "unknown" if error.uncertain else "failed")
+        updated = self._store.fail_huggingface_device_renewal_poll(
+            session_ref,
+            anchor,
+            claim_id,
+            state=state,
+            reason_code=error.code,
+            now=now,
+        )
+        return _huggingface_renewal_response(updated)
 
     def _huggingface_oauth_seed(
         self, secret_ref: str, scopes: Mapping[str, Any]
@@ -2510,8 +2788,7 @@ def _github_path_locator(value: Any) -> bool:
         or not 1 <= len(value) <= 512
         or re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", value) is None
         or any(
-            part in {"", ".", ".."} or part.startswith(".")
-            for part in value.split("/")
+            part in {"", ".", ".."} or part.startswith(".") for part in value.split("/")
         )
     )
 
@@ -2925,6 +3202,71 @@ def _environment_config() -> dict[str, Any]:
 
 class Plugin(AccountCenterPlugin):
     """Manifest-compatible short entrypoint alias."""
+
+
+def _stored_huggingface_oauth_scopes(value: Any) -> tuple[str, ...]:
+    """Load an exact persisted OAuth scope set without adding privileges."""
+
+    try:
+        scopes = json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        raise AccountCenterError("profile_unavailable") from None
+    if (
+        not isinstance(scopes, list)
+        or not scopes
+        or any(
+            not isinstance(scope, str) or scope not in ALLOWED_OAUTH_SCOPES
+            for scope in scopes
+        )
+        or len(scopes) != len(set(scopes))
+    ):
+        raise AccountCenterError("profile_unavailable")
+    return tuple(sorted(scopes))
+
+
+def _huggingface_renewal_response(session: Mapping[str, Any]) -> dict[str, Any]:
+    """Project only user-action metadata from a private device renewal row."""
+
+    state = session.get("status")
+    if state not in {
+        "starting",
+        "waiting_user",
+        "succeeded",
+        "failed",
+        "expired",
+        "cancelled",
+        "unknown",
+    }:
+        raise AccountCenterError("renewal_session_unavailable")
+    profile_revision = session.get("profile_revision")
+    if isinstance(profile_revision, bool) or not isinstance(profile_revision, int):
+        raise AccountCenterError("renewal_session_unavailable")
+    active = state == "waiting_user"
+    user_code = session.get("user_code") if active else None
+    verification_uri = session.get("verification_uri") if active else None
+    if active and (
+        not isinstance(user_code, str)
+        or re.fullmatch(r"[A-Z0-9]{4}-[A-Z0-9]{4}", user_code) is None
+        or verification_uri
+        not in {
+            "https://hf.co/oauth/device",
+            "https://huggingface.co/oauth/device",
+        }
+    ):
+        raise AccountCenterError("renewal_session_unavailable")
+    expires_at = session.get("expires_at") if active else None
+    interval = session.get("interval_seconds") if active else None
+    return {
+        "profile_ref": session.get("profile_ref"),
+        "session_ref": session.get("session_ref"),
+        "state": state,
+        "user_code": user_code,
+        "verification_uri": verification_uri,
+        "expires_at": expires_at if isinstance(expires_at, int) else None,
+        "interval_seconds": interval if isinstance(interval, int) else None,
+        "generation": profile_revision + (1 if state == "succeeded" else 0),
+        "reason_code": session.get("reason_code"),
+    }
 
 
 def _read_private_secret_file(path: str) -> str:

@@ -16,7 +16,7 @@ from typing import Any
 
 from .models import AccountCenterError, Anchor
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 
@@ -372,6 +372,25 @@ class AccountStore:
                     "ON consumed_connector_grants(expires_at)"
                 )
                 db.execute("PRAGMA user_version = 7")
+            if current < 8:
+                db.execute(
+                    "CREATE TABLE IF NOT EXISTS huggingface_device_renewal_sessions ("
+                    "session_ref TEXT PRIMARY KEY,profile_ref TEXT NOT NULL "
+                    "REFERENCES provider_profiles(profile_ref),anchor_issuer TEXT NOT NULL,"
+                    "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
+                    "status TEXT NOT NULL CHECK(status IN "
+                    "('starting','waiting_user','succeeded','failed','expired','cancelled','unknown')),"
+                    "device_code_blob BLOB,user_code TEXT,verification_uri TEXT,expires_at INTEGER,"
+                    "interval_seconds INTEGER,next_poll_at INTEGER,profile_revision INTEGER NOT NULL,"
+                    "poll_claim_id TEXT,poll_claim_owner TEXT,poll_claimed_at INTEGER,"
+                    "reason_code TEXT,created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)"
+                )
+                db.execute(
+                    "CREATE INDEX IF NOT EXISTS huggingface_device_renewal_owner "
+                    "ON huggingface_device_renewal_sessions(anchor_issuer,anchor_subject,"
+                    "organization_id,workspace_id,status,expires_at)"
+                )
+                db.execute("PRAGMA user_version = 8")
 
     def _recover_interrupted_operations(self) -> None:
         """Mark token rotations, callbacks, and revocations interrupted by restart."""
@@ -412,6 +431,23 @@ class AccountStore:
                 "UPDATE link_sessions SET status='failed',failure_revocation_status='unknown', "
                 "code_verifier_blob=NULL WHERE provider='github' AND status='processing' "
                 "AND pending_credential_blob IS NULL"
+            )
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET status='unknown',"
+                "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,"
+                "poll_claim_id=NULL,poll_claim_owner=NULL,"
+                "poll_claimed_at=NULL,reason_code='device_flow_interrupted',updated_at=? "
+                "WHERE status='starting' AND created_at<=?",
+                (int(time.time()), int(time.time()) - 60),
+            )
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET status='unknown',"
+                "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,"
+                "poll_claim_id=NULL,poll_claim_owner=NULL,"
+                "poll_claimed_at=NULL,reason_code='device_poll_outcome_unknown',updated_at=? "
+                "WHERE status='waiting_user' AND poll_claim_id IS NOT NULL "
+                "AND poll_claimed_at<=? AND poll_claim_owner!=?",
+                (int(time.time()), int(time.time()) - 45, self._instance_id),
             )
 
     def _protect_files(self) -> None:
@@ -1267,6 +1303,452 @@ class AccountStore:
             ).fetchall()
         return list(rows)
 
+    def begin_huggingface_device_renewal(
+        self,
+        *,
+        profile_ref: str,
+        session_ref: str,
+        anchor: Anchor,
+        now: int,
+    ) -> tuple[dict[str, Any], bool]:
+        """Persist one owner-bound start intent before calling HF's device endpoint."""
+
+        with self.transaction() as db:
+            existing = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if existing is not None:
+                if existing["profile_ref"] != profile_ref or not self._owns(
+                    existing, anchor
+                ):
+                    raise AccountCenterError("renewal_session_not_found")
+                if (
+                    existing["status"] == "starting"
+                    and int(existing["created_at"]) <= now - 60
+                ):
+                    db.execute(
+                        "UPDATE huggingface_device_renewal_sessions SET status='unknown',"
+                        "reason_code='device_start_outcome_unknown',updated_at=? "
+                        "WHERE session_ref=? AND status='starting'",
+                        (now, session_ref),
+                    )
+                    existing = db.execute(
+                        "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                        (session_ref,),
+                    ).fetchone()
+                return dict(existing), False
+
+            profile = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if profile is None or not self._owns_provider_profile(profile, anchor):
+                raise AccountCenterError("profile_not_found")
+            if (
+                profile["provider"] != "huggingface"
+                or profile["auth_mode"] != "device_oauth"
+                or not profile["oauth_client_id"]
+                or not profile["oauth_scopes_json"]
+            ):
+                raise AccountCenterError("profile_provider_mismatch")
+            db.execute(
+                "INSERT INTO huggingface_device_renewal_sessions "
+                "(session_ref,profile_ref,anchor_issuer,anchor_subject,organization_id,"
+                "workspace_id,status,profile_revision,created_at,updated_at) "
+                "VALUES(?,?,?,?,?,?,'starting',?,?,?)",
+                (
+                    session_ref,
+                    profile_ref,
+                    anchor.issuer,
+                    anchor.subject,
+                    anchor.organization_id,
+                    anchor.workspace_id,
+                    profile["credential_revision"],
+                    now,
+                    now,
+                ),
+            )
+            row = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if row is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(row), True
+
+    def complete_huggingface_device_renewal_start(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        *,
+        encrypted_device_code: bytes,
+        user_code: str,
+        verification_uri: str,
+        expires_at: int,
+        interval_seconds: int,
+        now: int,
+    ) -> dict[str, Any]:
+        """Persist encrypted device code and the user-visible short-lived code."""
+
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if row is None or not self._owns(row, anchor):
+                raise AccountCenterError("renewal_session_not_found")
+            if row["status"] != "starting":
+                return dict(row)
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET status='waiting_user',"
+                "device_code_blob=?,user_code=?,verification_uri=?,expires_at=?,"
+                "interval_seconds=?,next_poll_at=?,updated_at=? WHERE session_ref=? "
+                "AND status='starting'",
+                (
+                    encrypted_device_code,
+                    user_code,
+                    verification_uri,
+                    expires_at,
+                    interval_seconds,
+                    now + interval_seconds,
+                    now,
+                    session_ref,
+                ),
+            )
+            updated = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if updated is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(updated)
+
+    def fail_huggingface_device_renewal_start(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        *,
+        state: str,
+        reason_code: str,
+        now: int,
+    ) -> dict[str, Any]:
+        """Record a sanitized start failure without replaying device creation."""
+
+        if (
+            state not in {"failed", "unknown"}
+            or not reason_code
+            or len(reason_code) > 100
+        ):
+            raise AccountCenterError("invalid_request")
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if row is None or not self._owns(row, anchor):
+                raise AccountCenterError("renewal_session_not_found")
+            if row["status"] == "starting":
+                db.execute(
+                    "UPDATE huggingface_device_renewal_sessions SET status=?,reason_code=?,"
+                    "device_code_blob=NULL,updated_at=? WHERE session_ref=? AND status='starting'",
+                    (state, reason_code, now, session_ref),
+                )
+            updated = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if updated is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(updated)
+
+    def get_huggingface_device_renewal(
+        self, session_ref: str, anchor: Anchor
+    ) -> dict[str, Any]:
+        """Read one device renewal without returning a decrypted device code."""
+
+        with self._connect() as db:
+            row = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+        if row is None or not self._owns(row, anchor):
+            raise AccountCenterError("renewal_session_not_found")
+        return dict(row)
+
+    def claim_huggingface_device_renewal_poll(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        *,
+        now: int,
+        stale_seconds: int = 45,
+    ) -> tuple[dict[str, Any], str | None]:
+        """Claim one due device-code poll or return its current safe state."""
+
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if row is None or not self._owns(row, anchor):
+                raise AccountCenterError("renewal_session_not_found")
+            if row["status"] == "starting":
+                if int(row["created_at"]) <= now - 60:
+                    db.execute(
+                        "UPDATE huggingface_device_renewal_sessions SET status='unknown',"
+                        "reason_code='device_start_outcome_unknown',updated_at=? "
+                        "WHERE session_ref=? AND status='starting'",
+                        (now, session_ref),
+                    )
+                    row = db.execute(
+                        "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                        (session_ref,),
+                    ).fetchone()
+                return dict(row), None
+            if row["status"] != "waiting_user":
+                return dict(row), None
+            expires_at = row["expires_at"]
+            if isinstance(expires_at, int) and expires_at <= now:
+                db.execute(
+                    "UPDATE huggingface_device_renewal_sessions SET status='expired',"
+                    "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,"
+                    "reason_code='device_code_expired',updated_at=? "
+                    "WHERE session_ref=? AND status='waiting_user'",
+                    (now, session_ref),
+                )
+                row = db.execute(
+                    "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                    (session_ref,),
+                ).fetchone()
+                return dict(row), None
+            if isinstance(row["next_poll_at"], int) and row["next_poll_at"] > now:
+                return dict(row), None
+            if row["poll_claim_id"] is not None:
+                claimed_at = row["poll_claimed_at"]
+                if isinstance(claimed_at, int) and now - claimed_at <= stale_seconds:
+                    return dict(row), None
+                db.execute(
+                    "UPDATE huggingface_device_renewal_sessions SET status='unknown',"
+                    "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,"
+                    "poll_claim_id=NULL,poll_claim_owner=NULL,"
+                    "poll_claimed_at=NULL,reason_code='device_poll_outcome_unknown',updated_at=? "
+                    "WHERE session_ref=? AND status='waiting_user'",
+                    (now, session_ref),
+                )
+                row = db.execute(
+                    "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                    (session_ref,),
+                ).fetchone()
+                return dict(row), None
+            claim_id = str(uuid.uuid4())
+            changed = db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET poll_claim_id=?,"
+                "poll_claim_owner=?,poll_claimed_at=?,updated_at=? WHERE session_ref=? "
+                "AND status='waiting_user' AND poll_claim_id IS NULL",
+                (claim_id, self._instance_id, now, now, session_ref),
+            ).rowcount
+            if changed != 1:
+                current = db.execute(
+                    "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                    (session_ref,),
+                ).fetchone()
+                if current is None:
+                    raise AccountCenterError("renewal_session_not_found")
+                return dict(current), None
+            claimed = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if claimed is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(claimed), claim_id
+
+    def defer_huggingface_device_renewal_poll(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        *,
+        interval_seconds: int,
+        reason_code: str | None,
+        now: int,
+    ) -> dict[str, Any]:
+        """Persist pending/slow_down and release the one-poll claim."""
+
+        if not 1 <= interval_seconds <= 300:
+            raise AccountCenterError("invalid_request")
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if (
+                row is None
+                or not self._owns(row, anchor)
+                or row["status"] != "waiting_user"
+                or row["poll_claim_id"] != claim_id
+                or row["poll_claim_owner"] != self._instance_id
+            ):
+                raise AccountCenterError("renewal_poll_claim_lost")
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET interval_seconds=?,"
+                "next_poll_at=?,poll_claim_id=NULL,poll_claim_owner=NULL,poll_claimed_at=NULL,"
+                "reason_code=?,updated_at=? WHERE session_ref=? AND poll_claim_id=?",
+                (
+                    interval_seconds,
+                    now + interval_seconds,
+                    reason_code,
+                    now,
+                    session_ref,
+                    claim_id,
+                ),
+            )
+            updated = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if updated is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(updated)
+
+    def fail_huggingface_device_renewal_poll(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        *,
+        state: str,
+        reason_code: str,
+        now: int,
+    ) -> dict[str, Any]:
+        """Finalize a denied/expired/ambiguous poll and destroy device-code material."""
+
+        if state not in {"failed", "expired", "cancelled", "unknown"}:
+            raise AccountCenterError("invalid_request")
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if (
+                row is None
+                or not self._owns(row, anchor)
+                or row["status"] != "waiting_user"
+                or row["poll_claim_id"] != claim_id
+                or row["poll_claim_owner"] != self._instance_id
+            ):
+                raise AccountCenterError("renewal_poll_claim_lost")
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET status=?,device_code_blob=NULL,"
+                "user_code=NULL,verification_uri=NULL,poll_claim_id=NULL,poll_claim_owner=NULL,"
+                "poll_claimed_at=NULL,reason_code=?,"
+                "updated_at=? WHERE session_ref=? AND poll_claim_id=?",
+                (state, reason_code[:100], now, session_ref, claim_id),
+            )
+            updated = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if updated is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(updated)
+
+    def complete_huggingface_device_renewal(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        *,
+        credential_blob: bytes,
+        credential_refresh_blob: bytes,
+        credential_expires_at: int,
+        credential_refresh_expires_at: int | None,
+        oauth_scopes_json: str | None,
+        external_subject: str,
+        now: int,
+    ) -> dict[str, Any]:
+        """Atomically replace OAuth material and complete the owner-scoped session."""
+
+        with self.transaction() as db:
+            session = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if (
+                session is None
+                or not self._owns(session, anchor)
+                or session["status"] != "waiting_user"
+                or session["poll_claim_id"] != claim_id
+                or session["poll_claim_owner"] != self._instance_id
+            ):
+                raise AccountCenterError("renewal_poll_claim_lost")
+            profile = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (session["profile_ref"],),
+            ).fetchone()
+            if profile is None or not self._owns_provider_profile(profile, anchor):
+                raise AccountCenterError("profile_not_found")
+            if (
+                profile["provider"] != "huggingface"
+                or profile["auth_mode"] != "device_oauth"
+                or profile["credential_revision"] != session["profile_revision"]
+                or profile["refresh_claim_id"] is not None
+                or profile["external_subject"] != external_subject
+            ):
+                db.execute(
+                    "UPDATE huggingface_device_renewal_sessions SET status='failed',"
+                    "device_code_blob=NULL,poll_claim_id=NULL,poll_claim_owner=NULL,"
+                    "poll_claimed_at=NULL,reason_code='profile_changed_during_renewal',"
+                    "updated_at=? WHERE session_ref=? AND poll_claim_id=?",
+                    (now, session_ref, claim_id),
+                )
+                updated = db.execute(
+                    "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                    (session_ref,),
+                ).fetchone()
+                if updated is None:
+                    raise AccountCenterError("storage_unavailable")
+                return dict(updated)
+            updated_profile = db.execute(
+                "UPDATE provider_profiles SET credential_blob=?,credential_refresh_blob=?,"
+                "credential_expires_at=?,credential_refresh_expires_at=?,oauth_scopes_json=?,"
+                "auth_status='healthy',refresh_claim_id=NULL,refresh_claim_owner=NULL,"
+                "refresh_claimed_at=NULL,credential_revision=credential_revision+1,updated_at=? "
+                "WHERE profile_ref=? AND credential_revision=? AND refresh_claim_id IS NULL",
+                (
+                    credential_blob,
+                    credential_refresh_blob,
+                    credential_expires_at,
+                    credential_refresh_expires_at,
+                    oauth_scopes_json,
+                    now,
+                    session["profile_ref"],
+                    session["profile_revision"],
+                ),
+            )
+            if updated_profile.rowcount != 1:
+                raise AccountCenterError("credential_refresh_claim_lost")
+            db.execute(
+                "DELETE FROM provider_credential_leases WHERE profile_ref=?",
+                (session["profile_ref"],),
+            )
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET status='succeeded',"
+                "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,"
+                "poll_claim_id=NULL,poll_claim_owner=NULL,"
+                "poll_claimed_at=NULL,reason_code=NULL,updated_at=? WHERE session_ref=? "
+                "AND poll_claim_id=?",
+                (now, session_ref, claim_id),
+            )
+            updated = db.execute(
+                "SELECT * FROM huggingface_device_renewal_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if updated is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(updated)
+
     def get_provider_profile(
         self,
         profile_ref: str,
@@ -1380,6 +1862,14 @@ class AccountStore:
                     now,
                     profile_ref,
                 ),
+            )
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET status='failed',"
+                "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,poll_claim_id=NULL,"
+                "poll_claim_owner=NULL,poll_claimed_at=NULL,"
+                "reason_code='profile_credentials_replaced',updated_at=? "
+                "WHERE profile_ref=? AND status IN ('starting','waiting_user')",
+                (now, profile_ref),
             )
             db.execute(
                 "DELETE FROM provider_credential_leases WHERE profile_ref=?",
@@ -1645,6 +2135,13 @@ class AccountStore:
             db.execute(
                 "DELETE FROM provider_credential_leases WHERE profile_ref=?",
                 (profile_ref,),
+            )
+            db.execute(
+                "UPDATE huggingface_device_renewal_sessions SET status='cancelled',"
+                "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,poll_claim_id=NULL,"
+                "poll_claim_owner=NULL,poll_claimed_at=NULL,reason_code='profile_unlinked',"
+                "updated_at=? WHERE profile_ref=? AND status IN ('starting','waiting_user')",
+                (now, profile_ref),
             )
 
     def create_provider_lease(

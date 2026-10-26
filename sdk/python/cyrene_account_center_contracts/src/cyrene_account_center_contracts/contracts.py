@@ -277,6 +277,37 @@ class RotateHuggingFaceProfileRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class BeginHuggingFaceRenewalRequest:
+    """Create one durable HF device-code renewal session for an owned profile."""
+
+    profile_ref: str
+    session_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class PollHuggingFaceRenewalRequest:
+    """Poll one durable HF device-code session without returning credential material."""
+
+    profile_ref: str
+    session_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class HuggingFaceRenewalSession:
+    """Owner-safe device authorization state; device and bearer codes are omitted."""
+
+    profile_ref: str
+    session_ref: str
+    state: str
+    user_code: str | None
+    verification_uri: str | None
+    expires_at: int | None
+    interval_seconds: int | None
+    generation: int
+    reason_code: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class RegisterHostIdentityProfileRequest:
     """Register non-secret Azure, GCP, or RunPod host identity metadata."""
 
