@@ -195,9 +195,16 @@ def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
     """Azure and GCP health checks expose only short-lived token expiry metadata."""
 
     settings = _multi_provider_settings(tmp_path)
-    client = httpx.Client(
-        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
-    )
+
+    def health_response(request: httpx.Request) -> httpx.Response:
+        if "/subscriptions/" in request.url.path:
+            return httpx.Response(
+                200,
+                json={"subscriptionId": "11111111-2222-3333-4444-555555555555"},
+            )
+        return httpx.Response(200, json={"items": []})
+
+    client = httpx.Client(transport=httpx.MockTransport(health_response))
     executor = CloudManagementExecutor(settings, http_client=client)
     azure_expiry_epoch = datetime(2026, 10, 26, 22, 0, tzinfo=UTC).timestamp()
     gcp_expiry = datetime(2026, 10, 26, 22, 5, tzinfo=UTC)
@@ -260,7 +267,12 @@ def test_cloud_provider_health_runpod_key_has_unknown_expiry(
 
     settings = _settings(tmp_path)
     client = httpx.Client(
-        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"pods": []}))
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={"pods": [], "pagination": {"nextCursor": None, "hasNextPage": False}},
+            )
+        )
     )
     executor = CloudManagementExecutor(settings, http_client=client)
 
@@ -295,7 +307,10 @@ def test_cloud_provider_health_missing_runpod_key_requests_reauthorization(
         settings,
         http_client=httpx.Client(
             transport=httpx.MockTransport(
-                lambda _request: httpx.Response(200, json={"pods": []})
+                lambda _request: httpx.Response(
+                    200,
+                    json={"pods": [], "pagination": {"nextCursor": None, "hasNextPage": False}},
+                )
             )
         ),
     )
@@ -375,6 +390,49 @@ def test_cloud_provider_health_network_failure_is_unknown_not_invalid(
     assert health["authorization_state"] == "UNKNOWN"
     assert health["reason_code"] == "PROVIDER_UNAVAILABLE"
     assert "private network detail" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("profile_ref", "response"),
+    [
+        ("azure/test", {"error": {"code": "Denied"}}),
+        ("gcp/test", {"items": [{}]}),
+        (
+            "runpod/test",
+            {"pods": [{}], "pagination": {"nextCursor": None, "hasNextPage": False}},
+        ),
+    ],
+)
+def test_cloud_provider_health_does_not_accept_malformed_success_bodies(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_ref: str,
+    response: dict[str, Any],
+) -> None:
+    """A 2xx with an invalid provider shape remains UNKNOWN, never VALID."""
+
+    settings = (
+        _multi_provider_settings(tmp_path)
+        if profile_ref != "runpod/test"
+        else _settings(tmp_path)
+    )
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", None))
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": profile_ref},
+        request_id=f"request-health-malformed-{profile_ref}",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == "INVALID_PROVIDER_RESPONSE"
     executor.close()
 
 
@@ -552,6 +610,106 @@ def test_cloud_resource_list_does_not_turn_error_envelopes_into_empty_lists(
     executor.close()
 
 
+def test_runpod_v2_list_validates_and_preserves_pagination(tmp_path: Any) -> None:
+    """A valid v2 Pod page returns scoped records and its opaque next cursor."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={
+                    "pods": [_pod_response("pod-123", "cyrene-test-worker")],
+                    "pagination": {"nextCursor": "page-next", "hasNextPage": True},
+                },
+            )
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    listed = executor.call(
+        "cloud_resources_list",
+        {"profile_ref": "runpod/test", "target": {"scope_ref": "pods"}},
+        request_id="request-runpod-list-valid",
+    )
+
+    assert listed["resources"][0]["id"] == "pod-123"
+    assert listed["resources"][0]["status"] == "RUNNING"
+    assert listed["next_cursor"] == "page-next"
+    assert listed["has_next_page"] is True
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("profile_ref", "target", "response"),
+    [
+        ("azure/test", {"resource_group": "rg-test"}, {"value": [{}]}),
+        ("gcp/test", {"zone": "us-central1-a"}, {"items": [{}]}),
+        (
+            "runpod/test",
+            {"scope_ref": "pods"},
+            {"pods": [{}], "pagination": {"nextCursor": None, "hasNextPage": False}},
+        ),
+    ],
+)
+def test_cloud_resource_list_rejects_incomplete_provider_items(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_ref: str,
+    target: dict[str, str],
+    response: dict[str, Any],
+) -> None:
+    """Incomplete success records cannot vanish during scope filtering."""
+
+    settings = (
+        _multi_provider_settings(tmp_path)
+        if profile_ref != "runpod/test"
+        else _settings(tmp_path)
+    )
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", None))
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resources_list",
+            {"profile_ref": profile_ref, "target": target},
+            request_id=f"request-list-item-{profile_ref}",
+        )
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"id": "pod-123", "error": {"code": "Unavailable"}},
+        {"id": "pod-123", "name": "cyrene-test-unit"},
+    ],
+)
+def test_runpod_get_requires_a_complete_pod_record(
+    tmp_path: Any,
+    response: dict[str, Any],
+) -> None:
+    """A matching ID alone cannot convert a malformed v2 read into a resource."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resource_get",
+            {"profile_ref": "runpod/test", "target": {"pod_id": "pod-123"}},
+            request_id="request-runpod-malformed-get",
+        )
+    executor.close()
+
+
 def test_runpod_readback_does_not_treat_error_envelope_as_missing_pod(tmp_path: Any) -> None:
     """A malformed Pod list cannot falsely confirm that a new resource is absent."""
 
@@ -615,6 +773,49 @@ def test_runpod_create_is_scope_bounded_and_replay_safe(tmp_path: Any) -> None:
     operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
     assert operation["provider"] == "runpod"
     assert operation["profile_ref"] == "runpod/test"
+    executor.close()
+
+
+def test_runpod_create_malformed_201_stays_unknown_and_replay_safe(tmp_path: Any) -> None:
+    """A malformed create response cannot become success or trigger a duplicate POST."""
+
+    settings = _settings(tmp_path)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            201,
+            json={"id": "new-pod-1", "name": "cyrene-test-unit"},
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    executor = CloudManagementExecutor(settings, http_client=client)
+    arguments = {
+        "profile_ref": "runpod/test",
+        "target": {"pod_name": "cyrene-test-unit"},
+        "parameters": {
+            "image": "example/image:1",
+            "gpu": {"id": "NVIDIA GeForce RTX 4090", "count": 1},
+            "disk": 20,
+            "dataCenterIds": ["US-KS-2"],
+        },
+    }
+
+    result = executor.call(
+        "cloud_resource_create", arguments, request_id="request-create-malformed"
+    )
+    replay = executor.call(
+        "cloud_resource_create", arguments, request_id="request-create-malformed"
+    )
+
+    assert len(requests) == 1
+    assert result == replay
+    assert result["state"] == "UNKNOWN_RESULT"
+    assert result["actual_state"] == "UNKNOWN"
+    assert result["readiness"] == "UNKNOWN"
+    assert result["reason_code"] == "INVALID_PROVIDER_RESPONSE"
+    assert result["operation_ref"]
     executor.close()
 
 
