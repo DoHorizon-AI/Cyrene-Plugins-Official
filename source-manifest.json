@@ -7103,15 +7103,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "3f89cb3e98baa3f9062f8109751185f9ee2767caa68a08fa7483d9387e120f14",
-      "size_bytes": 20274
+      "sha256": "71212954c2747760c54aa9e6f245569f15510070597852d1567ea8f0a728625c",
+      "size_bytes": 20828
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "0a53693cde3b1e93084ad55e0eac9b29eb5febfcf3b749a76c79491c0ed6d547",
-      "size_bytes": 28379
+      "sha256": "b5ab6a9579707bc9ecf972255d3276b22dc3936c0f59d3f5c8f34347e72c3d8c",
+      "size_bytes": 28575
     },
     {
       "kind": "file",
