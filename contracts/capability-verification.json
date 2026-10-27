@@ -577,6 +577,36 @@
           "notes": "Hub/CDN and CLI use local fixtures; no Hugging Face account, OAuth login, token, repository, upload, or external call was used."
         }
       ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.microsoft-graph",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-27",
+          "environment": "Linux / Python 3.12 / local provider dispatch and synthetic Account Center/OAuth/vendor transports",
+          "command": "uv run --project plugins/providers/microsoft-graph --extra test pytest -q plugins/providers/microsoft-graph/tests",
+          "result": "31 passed",
+          "notes": "Fixed tools, actor/target/digest binding, bounded reads and typed failures verified locally. No live tenant OAuth, selected source resource access, Teams delivery or VM deployment acceptance is included."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.azure-devops-observation",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-27",
+          "environment": "Linux / Python 3.12 / local provider dispatch and synthetic Account Center/OAuth/vendor transports",
+          "command": "uv run --project plugins/providers/azure-devops-observation --extra test pytest -q plugins/providers/azure-devops-observation/tests",
+          "result": "20 passed",
+          "notes": "Fixed tools, actor/target/digest binding, bounded reads and typed failures verified locally. No live tenant OAuth, selected source resource access, Teams delivery or VM deployment acceptance is included."
+        }
+      ]
     }
   ]
 }

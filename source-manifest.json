@@ -180,15 +180,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "45a7f122a109a2ae4df8a215660caea9def653678b3f346f220f73f922943c04",
-      "size_bytes": 26612
+      "sha256": "810133d5f4e38d9b15ca0d6493dfca1249a8a161a15f398ccaa3dc1dff016e79",
+      "size_bytes": 27974
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "739113bedeef22cf2d572d5a32b11ed1d62702c83a1bb46cc31888b4f8fc9a10",
-      "size_bytes": 37867
+      "sha256": "61fc4e64139e90669a76287eabbc109b6517f6da46fccd1d514798466c82d530",
+      "size_bytes": 39524
     },
     {
       "kind": "file",
