@@ -8,7 +8,7 @@ This directory implements the fixed Hub provider runtime.
 | `settings.py` | Host-resolved Account Center connection, service keys, and repo allowlists. |
 | `trust.py` | Exchange actor context verification and Account Center lease signing. |
 | `account_center.py` | Private DirectPluginRuntime client for one-use profile credential leases. |
-| `huggingface_api.py` | Fixed Hub API transport, metadata projections, and bounded file transfers. |
+| `huggingface_api.py` | Fixed Hub API transport, optional repository file counts, metadata projections, and bounded transfers. |
 | `vendor_cli.py` | Reject credential, endpoint, proxy, and local-file CLI operations. |
 | `_generated/` | Canonical `tool.provider.v1` protobuf binding. |
 
@@ -25,7 +25,7 @@ lease boundaries. Read `huggingface_api.py` before changing upstream paths.
 | `settings.py` | 宿主解析的 Account Center 连接、服务密钥与 repo allowlist。 |
 | `trust.py` | Exchange actor 上下文验证及 Account Center 租约签名。 |
 | `account_center.py` | 兑换一次性 profile 凭据租约的私有 DirectPluginRuntime 客户端。 |
-| `huggingface_api.py` | 固定 Hub API 传输、metadata 投影和限额文件传输。 |
+| `huggingface_api.py` | 固定 Hub API 传输、可选仓库文件数、metadata 投影和限额文件传输。 |
 | `vendor_cli.py` | 拒绝凭据、定制端点、代理和本地文件 CLI 操作。 |
 | `_generated/` | 规范的 `tool.provider.v1` protobuf 绑定。 |
 

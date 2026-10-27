@@ -97,7 +97,11 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
     {
         "provider_tool_id": "huggingface.repo.get",
         "display_name": "Get Hugging Face Repository",
-        "description": "Read metadata for one configured model, dataset, or Space.",
+        "description": (
+            "Read metadata for one configured model, dataset, or Space. When the Hub returns "
+            "a siblings file list, the result includes its file_count; an unavailable count "
+            "is unknown, not zero."
+        ),
         "input_schema": {
             "type": "object",
             "properties": dict(_REPO_PROPERTIES),
