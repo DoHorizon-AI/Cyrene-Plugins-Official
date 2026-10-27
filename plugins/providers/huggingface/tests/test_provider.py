@@ -174,7 +174,7 @@ class FakeHubApi:
 
     def get_repository(self, *args: Any) -> dict[str, Any]:
         self.calls.append(("repo", args, {}))
-        return {"repo_id": args[1], "private": True, "gated": False}
+        return {"repo_id": args[1], "private": True, "gated": False, "file_count": 10}
 
     def download_file(self, *args: Any) -> dict[str, Any]:
         self.calls.append(("download", args, {}))
@@ -333,6 +333,25 @@ def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
     assert account_context["method"] == "redeem_provider_credential_lease"
     assert account_context["binding_id"] == settings.account_center_binding_id
     assert api.calls[0][1][1] == "hf_private_test_token"
+
+
+def test_repo_get_forwards_file_count_from_hub_projection() -> None:
+    """Expose the Hub projection through the signed provider tool response."""
+    settings = make_settings()
+    account_center = FakeAccountCenter()
+    api = FakeHubApi()
+    provider = HuggingFaceProvider(settings=settings, account_center=account_center, hub_api=api)
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "huggingface.repo.get",
+        {"repo_type": "model", "repo_id": "owner/model"},
+    )
+
+    assert is_error is False
+    assert result["file_count"] == 10
+    assert api.calls == [("repo", ("model", "owner/model", "hf_private_test_token"), {})]
 
 
 def test_read_only_binding_hides_and_rejects_upload_and_native_cli() -> None:

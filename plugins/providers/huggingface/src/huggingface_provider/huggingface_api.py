@@ -13,7 +13,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote, urlencode, urlsplit, urlunsplit
+from urllib.parse import quote, urlencode, urljoin, urlsplit, urlunsplit
 
 from .settings import ProviderSettings
 
@@ -90,14 +90,14 @@ class HuggingFaceApi:
         returned_id = value.get("id") or value.get("modelId")
         if returned_id != repo_id:
             raise HuggingFaceApiFailure("RESOURCE_IDENTITY_MISMATCH")
-        return _repository_projection(value, repo_id=repo_id)
+        return _repository_projection(value, repo_id=repo_id, include_file_count=True)
 
     def download_file(
         self,
         repo_id: str,
         revision: str,
         path: str,
-        token: str,
+        token: str | None,
     ) -> dict[str, Any]:
         """Download one bounded file without forwarding bearer auth to CDN hosts."""
 
@@ -159,9 +159,7 @@ class HuggingFaceApi:
             **receipt,
         }
 
-    def _file_exists(
-        self, route: str, repo_id: str, revision: str, path: str, token: str
-    ) -> bool:
+    def _file_exists(self, route: str, repo_id: str, revision: str, path: str, token: str) -> bool:
         """Read a bounded parent tree and confirm the uploaded path exactly."""
 
         parent, _, filename = path.rpartition("/")
@@ -169,9 +167,7 @@ class HuggingFaceApi:
         if parent:
             base += f"/{_path(parent)}"
         try:
-            response = self._request(
-                "GET", base + "?recursive=false&expand=false&limit=100", token
-            )
+            response = self._request("GET", base + "?recursive=false&expand=false&limit=100", token)
             entries = _json_array(response)
         except HuggingFaceApiFailure as error:
             if error.code == "RESOURCE_NOT_FOUND":
@@ -185,9 +181,12 @@ class HuggingFaceApi:
                 return True
         return False
 
-    def _request_file(self, path: str, token: str) -> HttpResponse:
-        """Fetch a Hub resolve URL and safely follow signed storage redirects."""
+    def _request_file(self, path: str, token: str | None) -> HttpResponse:
+        """Fetch a Hub resolve URL, retaining auth only on exact Hub-origin hops."""
 
+        current_url = urlunsplit(("https", HUGGINGFACE_HOST, path, "", ""))
+        current_host = HUGGINGFACE_HOST
+        current_token = token
         response = self._request_raw("GET", HUGGINGFACE_HOST, path, token, None)
         if 200 <= response.status < 300:
             return _bounded(response, self._settings.max_artifact_bytes)
@@ -198,19 +197,36 @@ class HuggingFaceApi:
             location = _header(response.headers, "location")
             if not location:
                 raise HuggingFaceApiFailure("INVALID_PROVIDER_RESPONSE")
-            parsed = urlsplit(location)
+            if location.strip() != location or any(ord(character) < 32 for character in location):
+                raise HuggingFaceApiFailure("INVALID_PROVIDER_RESPONSE")
+            try:
+                resolved_url = urljoin(current_url, location)
+                parsed = urlsplit(resolved_url)
+                port = parsed.port
+            except ValueError:
+                raise HuggingFaceApiFailure("UNTRUSTED_DOWNLOAD_REDIRECT") from None
             host = parsed.hostname or ""
             if (
                 parsed.scheme != "https"
                 or parsed.username is not None
                 or parsed.password is not None
-                or parsed.port not in (None, 443)
+                or port not in (None, 443)
                 or not _trusted_download_host(host)
             ):
                 raise HuggingFaceApiFailure("UNTRUSTED_DOWNLOAD_REDIRECT")
             target = urlunsplit(("", "", parsed.path or "/", parsed.query, ""))
-            # Signed CDN URLs authorize themselves. Never forward the Hub bearer token.
-            response = self._request_raw("GET", host, target, None, None)
+            # Drop auth permanently after a cross-origin hop; CDN URLs authorize themselves.
+            redirect_token = (
+                current_token
+                if current_host == HUGGINGFACE_HOST and host == HUGGINGFACE_HOST
+                else None
+            )
+            response = self._request_raw("GET", host, target, redirect_token, None)
+            current_host = host
+            current_token = redirect_token
+            current_url = urlunsplit(
+                (parsed.scheme, parsed.netloc, parsed.path or "/", parsed.query, "")
+            )
             redirects += 1
         self._raise_for_status(response, write=False)
         return _bounded(response, self._settings.max_artifact_bytes)
@@ -387,13 +403,20 @@ def _json_array(response: HttpResponse) -> list[dict[str, Any]]:
     return value
 
 
-def _repository_projection(value: Mapping[str, Any], *, repo_id: str) -> dict[str, Any]:
-    """Return a stable Hub repository metadata projection."""
+def _repository_projection(
+    value: Mapping[str, Any], *, repo_id: str, include_file_count: bool = False
+) -> dict[str, Any]:
+    """Return stable repository metadata and an optional Hub-reported sibling count.
+
+    Missing or malformed `siblings` metadata stays unknown (`None`) for `repo.get`;
+    it is never reported as an empty repository. Search results keep their existing shape.
+    中文：仅在 repo.get 响应中投影文件数；Hub 未提供 siblings 时返回未知，不伪报为 0。
+    """
 
     returned_id = value.get("id") or value.get("modelId")
     if returned_id != repo_id:
         raise HuggingFaceApiFailure("RESOURCE_IDENTITY_MISMATCH")
-    return {
+    result = {
         "repo_id": repo_id,
         "private": value.get("private") if isinstance(value.get("private"), bool) else False,
         "gated": value.get("gated") if isinstance(value.get("gated"), (bool, str)) else False,
@@ -408,6 +431,10 @@ def _repository_projection(value: Mapping[str, Any], *, repo_id: str) -> dict[st
             value.get("pipeline_tag") if isinstance(value.get("pipeline_tag"), str) else None
         ),
     }
+    if include_file_count:
+        siblings = value.get("siblings")
+        result["file_count"] = len(siblings) if isinstance(siblings, list) else None
+    return result
 
 
 def _string_list(value: Any) -> list[str]:
