@@ -2420,8 +2420,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/providers.py",
-      "sha256": "d6ffc916ee7501df3934f63036f6bcc8e60236fe3a4bc35b14dabd3c7d822c0e",
-      "size_bytes": 146934
+      "sha256": "c350a3dd9c335a4e3495e284c8b1857f78648654ad8bf3238239cf656ba6f336",
+      "size_bytes": 148307
     },
     {
       "kind": "file",
@@ -2462,8 +2462,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "7a57e6e87c6ac17a5b108d53e911139cf4861eaf024e65ba37a70779ba84e3d0",
-      "size_bytes": 100570
+      "sha256": "ef125c6700feaac9ffb92c94cd4f53d25148ae4f7614f4483c6ec196ee80b1ef",
+      "size_bytes": 106012
     },
     {
       "kind": "file",

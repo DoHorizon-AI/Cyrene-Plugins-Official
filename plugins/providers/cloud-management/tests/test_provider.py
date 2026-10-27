@@ -692,6 +692,174 @@ def test_gcp_wif_health_treats_retryable_refresh_errors_as_unknown(
     executor.close()
 
 
+@pytest.mark.parametrize(
+    (
+        "response_body",
+        "exception_message",
+        "expected_authentication",
+        "expected_authorization",
+        "expected_reason",
+    ),
+    [
+        (
+            '{"error":"invalid_target","error_description":"private detail"}',
+            "private OAuth message",
+            "INVALID",
+            "REAUTHORIZATION_REQUIRED",
+            "AUTHENTICATION_FAILED",
+        ),
+        (
+            '{"error":"temporarily_unavailable","error_description":"private detail"}',
+            "private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_UNAVAILABLE",
+        ),
+        (
+            '{"error":"server_error","error_description":"private detail"}',
+            "private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_UNAVAILABLE",
+        ),
+        (
+            "not-json",
+            "invalid_target private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_ERROR",
+        ),
+        (
+            '{"error":"unrecognized_code","error_description":"private detail"}',
+            "private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_ERROR",
+        ),
+    ],
+)
+def test_gcp_wif_health_classifies_only_known_structured_oauth_errors(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    response_body: str,
+    exception_message: str,
+    expected_authentication: str,
+    expected_authorization: str,
+    expected_reason: str,
+) -> None:
+    """Classify only bounded OAuth machine codes, never free-form provider text."""
+
+    from google.auth.exceptions import OAuthError
+
+    settings = _multi_provider_settings(tmp_path)
+    requests: list[httpx.Request] = []
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda request: requests.append(request) or httpx.Response(200, json={"items": []})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise OAuthError(exception_message, response_body)
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id=f"request-gcp-oauth-{expected_reason}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == expected_reason
+    assert requests == []
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("response_body", "expected_reason"),
+    [
+        (None, "PROVIDER_ERROR"),
+        ("x" * 8193, "PROVIDER_ERROR"),
+    ],
+)
+def test_gcp_wif_health_rejects_absent_or_oversized_oauth_response_bodies(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    response_body: str | None,
+    expected_reason: str,
+) -> None:
+    """Malformed or oversized OAuth bodies never become credential evidence."""
+
+    from google.auth.exceptions import OAuthError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            if response_body is None:
+                raise OAuthError("invalid_target appeared only in this message")
+            raise OAuthError("private OAuth message", response_body)
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id=f"request-gcp-oauth-bad-body-{expected_reason}-{response_body is None}",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == expected_reason
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
+def test_gcp_wif_health_preserves_transport_error_classification(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Google token transport failures remain retryable and distinct from OAuth rejection."""
+
+    from google.auth.exceptions import TransportError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise TransportError("private transport detail")
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id="request-gcp-oauth-transport",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == "PROVIDER_UNAVAILABLE"
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
 def test_gcp_wif_health_reports_structured_iam_denial_as_permission_denied(
     tmp_path: Any,
     monkeypatch: pytest.MonkeyPatch,

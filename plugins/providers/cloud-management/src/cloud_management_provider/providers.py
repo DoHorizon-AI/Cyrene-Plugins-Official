@@ -2265,7 +2265,7 @@ class CloudManagementExecutor:
 
         path = self._gcp_credential_path(profile)
         try:
-            from google.auth.exceptions import RefreshError, TransportError
+            from google.auth.exceptions import OAuthError, RefreshError, TransportError
         except Exception as error:
             raise ProviderFailure("PROVIDER_ERROR") from error
         try:
@@ -2290,6 +2290,13 @@ class CloudManagementExecutor:
                 if _google_error_indicates_permission_denied(error):
                     raise ProviderFailure("SCOPE_DENIED") from error
                 raise ProviderFailure("AUTHENTICATION_FAILED") from error
+            if isinstance(error, OAuthError):
+                oauth_error_code = _google_oauth_machine_error_code(error)
+                if oauth_error_code == "invalid_target":
+                    raise ProviderFailure("AUTHENTICATION_FAILED") from error
+                if oauth_error_code in {"server_error", "temporarily_unavailable"}:
+                    raise ProviderFailure("PROVIDER_UNAVAILABLE", retryable=True) from error
+                raise ProviderFailure("PROVIDER_ERROR") from error
             if isinstance(error, OSError):
                 raise ProviderFailure("CREDENTIAL_PROVIDER_UNAVAILABLE") from error
             raise ProviderFailure("PROVIDER_ERROR") from error
@@ -3538,6 +3545,33 @@ def _google_error_indicates_permission_denied(error: BaseException) -> bool:
         return False
 
     return any(is_denial(argument) for argument in error.args)
+
+
+def _google_oauth_machine_error_code(error: BaseException) -> str | None:
+    """Read a bounded OAuth error code from the SDK's structured response body."""
+
+    if len(error.args) < 2:
+        return None
+    response_body = error.args[1]
+    if not isinstance(response_body, str) or len(response_body) > 8192:
+        return None
+    try:
+        if len(response_body.encode("utf-8")) > 8192:
+            return None
+    except UnicodeEncodeError:
+        return None
+    try:
+        payload = json.loads(response_body)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(payload, Mapping):
+        return None
+    code = payload.get("error")
+    if isinstance(code, Mapping):
+        code = code.get("code")
+    if not isinstance(code, str) or not re.fullmatch(r"[a-z][a-z0-9_]{0,63}", code):
+        return None
+    return code
 
 
 def _now() -> str:
