@@ -35,6 +35,8 @@ LOCK_ISOLATED_STARTUP_PACKAGES = frozenset(
         "cyrene.providers.cloud-resources",
         "cyrene.providers.github-issues",
         "cyrene.providers.huggingface",
+        "cyrene.providers.microsoft-graph",
+        "cyrene.providers.azure-devops-observation",
     }
 )
 
@@ -104,6 +106,39 @@ def _create_wheelhouse_source(repository: Path, spec, destination: Path) -> Path
     return destination
 
 
+def _read_hashed_runtime_lock(path: Path) -> dict[str, str]:
+    """Parse a uv-generated pin/hash lock and reject incomplete requirement blocks."""
+
+    pins: dict[str, str] = {}
+    current_name: str | None = None
+    current_hashes = 0
+    for source_line in path.read_text(encoding="utf-8").splitlines():
+        line = source_line.strip().removesuffix("\\").strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("--hash="):
+            digest = line.removeprefix("--hash=sha256:")
+            if current_name is None or len(digest) != 64 or any(
+                character not in "0123456789abcdef" for character in digest
+            ):
+                raise AssertionError(f"invalid or misplaced package hash in {path}: {line}")
+            current_hashes += 1
+            continue
+        if current_name is not None and current_hashes == 0:
+            raise AssertionError(f"package pin has no hashes in {path}: {current_name}")
+        match = release.LOCK_PIN.fullmatch(line)
+        if match is None:
+            raise AssertionError(f"package lock line is not exactly pinned in {path}: {line}")
+        current_name = release.canonicalize_name(match.group(1))
+        if current_name in pins:
+            raise AssertionError(f"package lock repeats a distribution in {path}: {current_name}")
+        pins[current_name] = match.group(2)
+        current_hashes = 0
+    if current_name is None or current_hashes == 0:
+        raise AssertionError(f"package lock ends without a complete hashed pin: {path}")
+    return pins
+
+
 class OfficialPluginPackageTests(unittest.TestCase):
     """Exercise official packages and the existing training template."""
 
@@ -169,6 +204,114 @@ class OfficialPluginPackageTests(unittest.TestCase):
             Requirement(project["optional-dependencies"]["test"][0])
             .specifier.contains(teams_cryptography)
         )
+
+    def test_office_provider_packages_have_explicit_sdk_and_license_mappings(self) -> None:
+        """Register both Office observation providers with exact source-owned inputs."""
+
+        expected = {
+            "cyrene.providers.microsoft-graph": (
+                "cyrene-providers-microsoft-graph",
+                "plugins/providers/microsoft-graph",
+                "tooling/release/requirements/microsoft-graph.in",
+                {"grpcio", "protobuf", "rfc8785"},
+            ),
+            "cyrene.providers.azure-devops-observation": (
+                "cyrene-providers-azure-devops-observation",
+                "plugins/providers/azure-devops-observation",
+                "tooling/release/requirements/azure-devops-observation.in",
+                {"grpcio", "httpx", "protobuf", "rfc8785"},
+            ),
+        }
+        for package_id, (component_id, source_dir, requirements_input, external) in expected.items():
+            with self.subTest(package_id=package_id):
+                spec = release.PACKAGE_SPECS[package_id]
+                self.assertEqual(spec.component_id, component_id)
+                self.assertEqual(spec.source_dir, source_dir)
+                self.assertEqual(spec.requirements_input, requirements_input)
+                self.assertEqual(spec.vendored_sdks, (release.RUNTIME_SDK, release.ACCOUNT_CENTER_SDK))
+                self.assertTrue(spec.require_spdx_license)
+
+                manifest, _ = release._read_package_spec(self.repository, spec)
+                self.assertEqual(manifest["licenseExpression"], "Apache-2.0")
+                source_files, _ = release._source_files(self.repository, spec)
+                requirements = source_files[spec.requirements_input].decode("utf-8")
+                names = {
+                    release.canonicalize_name(Requirement(line.strip()).name)
+                    for line in requirements.splitlines()
+                    if line.strip() and not line.lstrip().startswith("#")
+                }
+                self.assertEqual(names, external)
+                self.assertIn("cyrene-plugin-runtime==0.2.2", requirements)
+                self.assertIn("cyrene-account-center-contracts==0.1.1", requirements)
+                release._verify_lock_inputs(spec, source_files)
+
+    def test_office_docker_locks_hash_every_exact_package_lock_pin(self) -> None:
+        """Keep the Docker install lock fully hashed and aligned to package releases."""
+
+        for package_id in selection.OFFICE_PILOT_PACKAGE_IDS:
+            with self.subTest(package_id=package_id):
+                spec = release.PACKAGE_SPECS[package_id]
+                package_lock = (self.repository / spec.source_dir / "requirements.lock").read_bytes()
+                package_pins = {
+                    release.canonicalize_name(match.group(1)): match.group(2)
+                    for line in release._lock_lines(package_lock, spec.source_dir)
+                    if (match := release.LOCK_PIN.fullmatch(line)) is not None
+                }
+                docker_lock = self.repository / spec.source_dir / "docker-requirements.lock"
+                self.assertEqual(_read_hashed_runtime_lock(docker_lock), package_pins)
+
+    def test_office_provider_packages_build_and_start_from_locked_wheelhouses(self) -> None:
+        """Build both source packages and list fixed tools from isolated ZIP runtimes."""
+
+        for index, package_id in enumerate(selection.OFFICE_PILOT_PACKAGE_IDS):
+            with self.subTest(package_id=package_id):
+                spec = release.PACKAGE_SPECS[package_id]
+                output_dir = self.temp_root / f"office-provider-release-{index}"
+                outputs = release.build_release_artifacts(
+                    root=self.repository,
+                    output_dir=output_dir,
+                    package_id=package_id,
+                    source_sha=self.source_sha,
+                    source_ref="refs/heads/develop",
+                    channel="preview",
+                    run_id="12345",
+                    run_attempt=1,
+                    preparer_wheel=self.wheel,
+                )
+                release.verify_release_artifacts(
+                    root=self.repository,
+                    output_dir=output_dir,
+                    package_id=package_id,
+                    source_sha=self.source_sha,
+                    source_ref="refs/heads/develop",
+                    channel="preview",
+                    run_id="12345",
+                    run_attempt=1,
+                )
+
+                payload = self.temp_root / f"office-provider-payload-{index}"
+                payload.mkdir()
+                with zipfile.ZipFile(outputs["package"]) as archive:
+                    archive.extractall(payload)
+                manifest = json.loads(
+                    (self.repository / spec.source_dir / "plugin.manifest.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                python_executable = self._lock_bound_startup_python(
+                    package_id=package_id,
+                    package_name=package_id,
+                    payload=payload,
+                )
+                self._assert_clean_start(
+                    name=package_id,
+                    payload=payload,
+                    entrypoint=manifest["runtime"]["entrypoint"],
+                    capability=manifest["capabilities"][0],
+                    environment_overrides=self._package_activation_environment(package_id),
+                    python_executable=python_executable,
+                    package_id=package_id,
+                )
 
     def test_package_release_selection_preserves_push_scope_and_limits_dispatch(
         self,
@@ -1437,6 +1580,64 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 "TEST_PACKAGE_GH_WEBHOOK_SECRET": "synthetic-github-webhook-secret-value",
                 "TEST_PACKAGE_GH_PROVIDER_KEY": (b"\x33" * 32).hex(),
             }
+
+        if package_id == "cyrene.providers.microsoft-graph":
+            configuration = {
+                "exchange_caller_id": "exchange-service",
+                "exchange_verification_key_ref": "microsoft-graph/exchange-verification-key",
+                "account_center": {
+                    "binding_id": "account-center-package-test",
+                    "connection_ref": "grpc://127.0.0.1:1",
+                    "transport": "local",
+                    "caller_id": "microsoft-graph-provider",
+                    "signing_key_ref": "microsoft-graph/account-center-provider-signing-key",
+                },
+                "hostSecretRefs": {
+                    "microsoft-graph/exchange-verification-key": "TEST_PACKAGE_GRAPH_EXCHANGE_KEY",
+                    "microsoft-graph/account-center-provider-signing-key": "TEST_PACKAGE_GRAPH_ACCOUNT_CENTER_KEY",
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "microsoft-graph-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_GRAPH_EXCHANGE_KEY": (b"\x61" * 32).hex(),
+                "TEST_PACKAGE_GRAPH_ACCOUNT_CENTER_KEY": (b"\x62" * 32).hex(),
+            }
+
+        if package_id == "cyrene.providers.azure-devops-observation":
+            configuration = {
+                "exchange_caller_id": "exchange-service",
+                "exchange_verification_key_ref": "azure-devops-observation/exchange-verification-key",
+                "organization": "package-test",
+                "tenant_id": "00000000-0000-4000-8000-000000000011",
+                "account_center": {
+                    "binding_id": "account-center-package-test",
+                    "connection_ref": "grpc://127.0.0.1:1",
+                    "transport": "local",
+                    "caller_id": "azure-devops-observation-provider",
+                    "signing_key_ref": "azure-devops-observation/account-center-provider-signing-key",
+                },
+                "authorized_sources": [
+                    {
+                        "source_id": "pipeline-source",
+                        "kind": "pipeline_runs",
+                        "project_id": "00000000-0000-4000-8000-000000000012",
+                        "project_name": "Package Test Project",
+                        "profile_ref": "00000000-0000-4000-8000-000000000013",
+                        "pipeline_id": 7,
+                    }
+                ],
+                "hostSecretRefs": {
+                    "azure-devops-observation/exchange-verification-key": "TEST_PACKAGE_ADO_EXCHANGE_KEY",
+                    "azure-devops-observation/account-center-provider-signing-key": "TEST_PACKAGE_ADO_ACCOUNT_CENTER_KEY",
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "azure-devops-observation-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_ADO_EXCHANGE_KEY": (b"\x63" * 32).hex(),
+                "TEST_PACKAGE_ADO_ACCOUNT_CENTER_KEY": (b"\x64" * 32).hex(),
+            }
         return {}
 
     def _lock_bound_startup_python(
@@ -1448,9 +1649,9 @@ class OfficialPluginPackageTests(unittest.TestCase):
     ) -> Path | None:
         """Create a runtime from an isolated exact wheelhouse where pins differ.
 
-        Account Center, GitHub, WeCom, Cloud, Teams, and Hugging Face have
-        component-specific locks. These checks install each ZIP's exact
-        wheelhouse instead of merging provider dependency pins.
+        Account Center, Graph, Azure DevOps, GitHub, WeCom, Cloud, Teams, and
+        Hugging Face have component-specific locks. These checks install each
+        ZIP's exact wheelhouse instead of merging provider dependency pins.
         中文：为有独立依赖锁的 package 安装各自 ZIP 中的精确 wheelhouse。
         """
 
@@ -1466,8 +1667,14 @@ class OfficialPluginPackageTests(unittest.TestCase):
         virtual_environment = self.temp_root / (
             "clean-start-runtime-" + package_name.replace(" ", "-")
         )
+        uv = shutil.which("uv")
+        venv_command = (
+            [uv, "venv", "--seed", "--python", sys.executable, str(virtual_environment)]
+            if uv is not None
+            else [sys.executable, "-m", "venv", str(virtual_environment)]
+        )
         subprocess.run(
-            [sys.executable, "-m", "venv", str(virtual_environment)],
+            venv_command,
             check=True,
             capture_output=True,
             text=True,
@@ -1535,6 +1742,10 @@ class OfficialPluginPackageTests(unittest.TestCase):
             "SMTP_PASSWORD",
             "TEST_PACKAGE_EMAIL_CONTEXT_KEY",
             "TEST_PACKAGE_CLOUD_CONTEXT_KEY",
+            "TEST_PACKAGE_GRAPH_EXCHANGE_KEY",
+            "TEST_PACKAGE_GRAPH_ACCOUNT_CENTER_KEY",
+            "TEST_PACKAGE_ADO_EXCHANGE_KEY",
+            "TEST_PACKAGE_ADO_ACCOUNT_CENTER_KEY",
         ):
             environment.pop(variable, None)
         environment.update(environment_overrides or {})
@@ -1598,6 +1809,17 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     connection_ref=ready["connection_ref"],
                     environment=environment,
                     python_executable=python_executable,
+                )
+            elif package_id in {
+                "cyrene.providers.microsoft-graph",
+                "cyrene.providers.azure-devops-observation",
+            }:
+                self._assert_office_provider_tool_catalog(
+                    name=name,
+                    payload=payload,
+                    connection_ref=ready["connection_ref"],
+                    python_executable=python_executable,
+                    package_id=package_id,
                 )
         finally:
             selector.close()
@@ -1755,6 +1977,99 @@ print(json.dumps({
             catalog["tool_ids"],
             ["cloud_resources_query", "cloud_authorization_health"],
         )
+
+    def _assert_office_provider_tool_catalog(
+        self,
+        *,
+        name: str,
+        payload: Path,
+        connection_ref: str,
+        python_executable: Path | None,
+        package_id: str,
+    ) -> None:
+        """List each Office provider's fixed tools from its packaged runtime."""
+
+        if package_id == "cyrene.providers.microsoft-graph":
+            module_name = "microsoft_graph_provider"
+            binding_id = "microsoft-graph-package-test"
+            expected_tool_ids = [
+                "microsoft_graph.planner.plan.get",
+                "microsoft_graph.planner.tasks.list",
+                "microsoft_graph.planner.task.get",
+                "microsoft_graph.planner.task.create",
+                "microsoft_graph.planner.task.update",
+                "microsoft_graph.sharepoint.site.get",
+                "microsoft_graph.sharepoint.list.get",
+                "microsoft_graph.sharepoint.list.items.delta",
+            ]
+        elif package_id == "cyrene.providers.azure-devops-observation":
+            module_name = "azure_devops_observation_provider"
+            binding_id = "azure-devops-observation-package-test"
+            expected_tool_ids = [
+                "azure_devops.observations.poll",
+                "azure_devops.pipelines.list",
+                "azure_devops.pipeline_runs.list",
+                "azure_devops.pipeline_run.get",
+                "azure_devops.deployments.list",
+                "azure_devops.release_environment.get",
+            ]
+        else:
+            self.fail(f"unsupported Office provider package ID: {package_id}")
+
+        script = """
+import importlib
+import json
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from cyrene_plugin_runtime.client import DirectPayload, DirectPluginClient
+
+wire = importlib.import_module(sys.argv[3] + "._generated.tool_provider_pb2")
+request = wire.ListToolsRequest(binding_id=sys.argv[4])
+with DirectPluginClient.for_local_connection_ref(sys.argv[2]) as client:
+    response_payload = client.invoke(
+        capability="tool.provider.v1",
+        interface_version="1",
+        method="list_tools",
+        request=DirectPayload(
+            type_url="type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest",
+            value=request.SerializeToString(),
+        ),
+        deadline_seconds=10,
+        request_id="office-package-list-tools",
+    )
+response = wire.ListToolsResponse.FromString(response_payload.value)
+print(json.dumps({
+    "type_url": response_payload.type_url,
+    "tool_ids": [tool.provider_tool_id for tool in response.catalog.tools],
+}))
+"""
+        result = subprocess.run(
+            [
+                str(python_executable or sys.executable),
+                "-I",
+                "-c",
+                script,
+                str(payload / "src"),
+                connection_ref,
+                module_name,
+                binding_id,
+            ],
+            cwd=self.temp_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+        self.assertEqual(
+            result.returncode, 0, f"{name} tool catalog failed: {result.stderr}"
+        )
+        catalog = json.loads(result.stdout)
+        self.assertEqual(
+            catalog["type_url"],
+            "type.cyrene.io/cyrene.tool.provider.v1.ListToolsResponse",
+        )
+        self.assertEqual(catalog["tool_ids"], expected_tool_ids)
 
 
 if __name__ == "__main__":

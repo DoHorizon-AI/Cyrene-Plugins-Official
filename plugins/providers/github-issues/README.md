@@ -26,9 +26,11 @@ fixed search query.
 CI status returns context and check-run counts with `complete`/`truncated`;
 responses over the first 100 items are explicitly incomplete and cannot be
 treated as a green result.
-Actions run and job lists also return `total_count`, `complete`, and
-`truncated`; consumers can distinguish the bounded first page from the full
-set.
+Actions run lists request a fixed first page of at most 30 runs to stay within
+the provider transport's 1 MB response limit. The tool does not expose a page
+selector, so it returns this page only and reports `total_count`, `complete`,
+and `truncated` when more runs exist. Job lists retain their bounded `limit`
+input.
 Failed-job reruns require a repository-scoped `source_workflow_ids` allowlist;
 an absent or empty entry denies every rerun. The request binds the expected
 `expected_workflow_id` and task branch, and the provider rereads the run before
@@ -104,8 +106,9 @@ GitHub 短时重定向到文档所列的 `productionresultssa*.blob.core.windows
 此过滤无法识别所有可能的密钥格式。
 CI 状态附带 status context/check-run 计数与 `complete`/`truncated`；超过首批 100 条时会
 明确标为不完整，不能当作 CI 全绿结果。
-Actions run 和 job 列表也会返回 `total_count`、`complete` 与 `truncated`，调用方可以区分有界
-首批结果与完整集合。
+Actions run 列表每次固定请求首批最多 30 条，以适配 provider transport 的 1 MB 响应上限。工具不
+接受页码参数，因此只返回这一页；结果通过 `total_count`、`complete` 和 `truncated` 说明是否还有
+更多 run。job 列表仍使用有界 `limit` 输入。
 失败 job 重跑还需要按仓库配置的 `source_workflow_ids` 正向 allowlist；缺失或空列表时一律拒绝。
 请求会绑定 `expected_workflow_id` 和任务分支，provider 在重跑前重新读取并核对上游 run。
 

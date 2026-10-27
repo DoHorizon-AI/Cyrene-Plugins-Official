@@ -1197,7 +1197,7 @@ def test_schema_v1_migration_preserves_legacy_data_and_fails_closed_on_wecom_tup
     store = AccountStore(db_path)
 
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 8
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
     links = store.list_accounts(ACTOR_ANCHOR(), ACTOR["workspace_id"])
     assert links[0]["source_authority"] == "wecom:tenant:9/bot/main"
     assert links[0]["status"] == "reauthorization_required"
@@ -1245,7 +1245,7 @@ def test_fresh_schema_ddl_rolls_back_as_one_transaction(
 
     store = AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 8
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
 
 
 def test_direct_runtime_rejects_duplicate_json_keys_and_wrong_type_url(

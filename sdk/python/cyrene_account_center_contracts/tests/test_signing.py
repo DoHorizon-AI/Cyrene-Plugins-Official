@@ -7,8 +7,17 @@ from dataclasses import asdict
 
 import pytest
 from cyrene_account_center_contracts import (
+    AzureDevOpsOperation,
+    BeginAzureDevOpsLinkRequest,
     BeginHuggingFaceRenewalRequest,
+    BeginMicrosoftGraphLinkRequest,
+    BeginMicrosoftGraphScopeUpgradeRequest,
+    CompleteAzureDevOpsLinkRequest,
+    CompleteMicrosoftGraphLinkRequest,
+    CompleteMicrosoftGraphScopeUpgradeRequest,
     HuggingFaceRenewalSession,
+    MicrosoftGraphOperation,
+    MicrosoftGraphPermissionUpgrade,
     PollHuggingFaceRenewalRequest,
     RedeemProviderCredentialLeaseRequest,
     canonical_json,
@@ -86,6 +95,17 @@ def test_provider_lease_request_contract_keeps_profile_scope() -> None:
         "target": {"repository_id": "123", "repository": "owner/repo"},
         "arguments_sha256": "a" * 64,
     }
+
+
+def test_graph_scope_upgrade_completion_dto_contains_only_callback_fields() -> None:
+    request = CompleteMicrosoftGraphScopeUpgradeRequest(
+        state="synthetic-state",
+        code="synthetic-code",
+    )
+
+    serialized = asdict(request)
+    assert serialized == {"state": "synthetic-state", "code": "synthetic-code"}
+    assert json.loads(canonical_json(serialized)) == serialized
 
 
 def test_rfc8785_canonical_vector_matches_javascript_key_and_number_order() -> None:
@@ -255,6 +275,67 @@ def test_provider_profile_lease_signature_binds_target_and_argument_digest() -> 
             keys={"exchange": key},
             now=150,
         )
+
+
+def test_provider_oauth_dtos_keep_scopes_and_credentials_out_of_requests() -> None:
+    """Keep Entra link requests limited to selected targets and callback values."""
+
+    graph = BeginMicrosoftGraphLinkRequest(
+        profile_ref="00000000-0000-4000-8000-000000000401",
+        planner_plan_ids=["plan_opaque-1"],
+        idempotency_key="graph-link-1",
+    )
+    graph_upgrade = BeginMicrosoftGraphScopeUpgradeRequest(
+        profile_ref=graph.profile_ref,
+        permission=MicrosoftGraphPermissionUpgrade.PLANNER_TASKS_WRITE,
+        idempotency_key="graph-upgrade-1",
+    )
+    ado = BeginAzureDevOpsLinkRequest(
+        profile_ref="00000000-0000-4000-8000-000000000402",
+        tenant_id="11111111-2222-4333-8444-555555555555",
+        organization="cyrene-devops",
+        project_id="12345678-1234-4234-8234-123456789abc",
+        source_id="pipeline-source-1",
+        source_kind="pipeline_runs",
+        pipeline_id=42,
+        idempotency_key="ado-link-1",
+    )
+    callbacks = (
+        CompleteMicrosoftGraphLinkRequest(state="random-state", code="one-time-code"),
+        CompleteAzureDevOpsLinkRequest(state="random-state", code="one-time-code"),
+    )
+
+    assert set(asdict(graph)) == {
+        "profile_ref",
+        "planner_plan_ids",
+        "idempotency_key",
+    }
+    assert set(asdict(graph_upgrade)) == {
+        "profile_ref",
+        "permission",
+        "idempotency_key",
+        "site_id",
+        "list_ids",
+    }
+    assert set(asdict(ado)) == {
+        "profile_ref",
+        "tenant_id",
+        "organization",
+        "project_id",
+        "source_id",
+        "source_kind",
+        "idempotency_key",
+        "pipeline_id",
+        "definition_id",
+        "definition_environment_id",
+    }
+    assert all(set(asdict(callback)) == {"state", "code"} for callback in callbacks)
+    assert MicrosoftGraphOperation.PLANNER_TASK_CREATE == (
+        "microsoft_graph.planner.task.create"
+    )
+    assert AzureDevOpsOperation.RELEASE_ENVIRONMENT_GET == (
+        "azure_devops.release_environment.get"
+    )
 
 
 def test_sdk_signer_and_verifier_reject_empty_trusted_claims() -> None:

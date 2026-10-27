@@ -87,8 +87,12 @@ async def test_event_is_signed_over_exact_raw_body_and_accepts_duplicate_receipt
 
 
 @pytest.mark.asyncio
-async def test_authenticated_terminal_team_rejection_is_not_an_admission():
-    """Accept only an authenticated, code-allowlisted business rejection.
+@pytest.mark.parametrize(
+    "code",
+    ["TEAMS_TEAM_NOT_ALLOWED", "WORK_TEAMS_PRIVATE_INSTALLATION_FORBIDDEN"],
+)
+async def test_authenticated_terminal_scope_rejection_is_not_an_admission(code):
+    """Accept only authenticated, code-allowlisted scope rejections.
 
     中文：只接受已认证且 code 在 allowlist 中的业务终态拒绝。
     """
@@ -97,7 +101,7 @@ async def test_authenticated_terminal_team_rejection_is_not_an_admission():
         return httpx.Response(
             403,
             json={
-                "code": "TEAMS_TEAM_NOT_ALLOWED",
+                "code": code,
                 "terminal": True,
                 "sourceAuthenticated": True,
             },
@@ -114,7 +118,7 @@ async def test_authenticated_terminal_team_rejection_is_not_an_admission():
 
     assert result.accepted is False
     assert result.terminal_rejection is True
-    assert result.code == "TEAMS_TEAM_NOT_ALLOWED"
+    assert result.code == code
     assert result.status_code == 403
 
 

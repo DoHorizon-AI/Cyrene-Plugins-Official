@@ -2,9 +2,9 @@
 ┌─────────────────────────────────────────────────────────────────────┐
 │  📄 activity.py                                                      │
 │  Module: teams_connector.activity                                   │
-│  Role: Normalize verified Teams channel messages.                    │
+│  Role: Normalize verified Teams messages and personal installs.      │
 │                                                                      │
-│  模块职责：归一化经过验证的 Teams 频道消息                              │
+│  模块职责：归一化经过验证的 Teams 消息与个人安装事件                   │
 └─────────────────────────────────────────────────────────────────────┘
 """
 
@@ -35,13 +35,14 @@ class ActivityRejected(ValueError):
 
 @dataclass(frozen=True)
 class NormalizedTeamsActivity:
-    """Canonical message payload and host-only identity envelope.
+    """Normalized Teams payload and host-only identity envelope.
 
-    中文：规范消息载荷与仅供主机使用的身份信任 envelope。
+    中文：规范化 Teams payload 与仅供主机使用的身份信任 envelope。
     """
 
     payload: dict[str, Any]
     trust: dict[str, Any]
+    event_type: str = "inbound_message"
 
     def as_event(self) -> dict[str, Any]:
         """Return the Navigator connector-event request body.
@@ -50,7 +51,7 @@ class NormalizedTeamsActivity:
         """
 
         return {
-            "event_type": "inbound_message",
+            "event_type": self.event_type,
             "payload": self.payload,
             "trust": self.trust,
         }
@@ -62,14 +63,15 @@ def normalize_activity(
     bot_app_id: str,
     tenant_id: str,
     allowed_team_ids: frozenset[str],
+    personal_chat_enabled: bool = False,
 ) -> NormalizedTeamsActivity:
-    """Normalize one authenticated message activity and enforce its binding scope.
+    """Normalize one authenticated message within channel or personal scope.
 
     The caller must pass an activity only after the Microsoft Teams SDK has
     validated its Bot Framework authorization header.
 
-    中文：归一化一个已认证的消息 activity 并校验 binding 范围。调用者必须先使用微软
-    Teams SDK 验证 Bot Framework authorization header。
+    中文：归一化一个已认证的消息 activity 并校验 channel/personal binding 范围。
+    调用者必须先使用微软 Teams SDK 验证 Bot Framework authorization header。
     """
 
     if not isinstance(activity, Mapping):
@@ -95,6 +97,15 @@ def normalize_activity(
     channel = _mapping(_get(channel_data, "channel"))
     tenant = _mapping(_get(channel_data, "tenant"))
     conversation = _mapping(_get(activity, "conversation"))
+    conversation_type = (
+        _optional_text(_get(conversation, "conversationType", "conversation_type"))
+        or ""
+    ).casefold()
+    is_personal = conversation_type == "personal"
+    if conversation_type and not is_personal and conversation_type != "channel":
+        raise ActivityRejected("unsupported_conversation_scope")
+    if is_personal and not personal_chat_enabled:
+        raise ActivityRejected("personal_chat_disabled")
 
     raw_tenant = _optional_text(_get(tenant, "id"), limit=512) or _optional_text(
         _get(conversation, "tenantId", "tenant_id"), limit=512
@@ -107,14 +118,17 @@ def normalize_activity(
 
     if observed_tenant is None or observed_tenant != tenant_id.lower():
         raise ActivityRejected("tenant_not_allowed")
-    if (
+    if conversation_id is None or message_id is None:
+        raise ActivityRejected("missing_conversation_identity")
+    if is_personal:
+        if observed_team is not None or channel_id is not None:
+            raise ActivityRejected("invalid_personal_scope")
+    elif (
         observed_team is None
         or channel_id is None
         or observed_team not in allowed_team_ids
     ):
         raise ActivityRejected("team_or_channel_not_allowed")
-    if conversation_id is None or message_id is None:
-        raise ActivityRejected("missing_conversation_identity")
 
     raw_service_url = _get(activity, "serviceUrl", "service_url")
     if not isinstance(raw_service_url, str) or not raw_service_url:
@@ -127,24 +141,29 @@ def normalize_activity(
     except ServiceUrlError as exc:
         raise ActivityRejected("service_url_not_allowed") from exc
 
-    direct_parent = _optional_thread_id(_get(activity, "replyToId", "reply_to_id"))
-    conversation_root = _conversation_root_thread_id(conversation_id)
-    if (
-        conversation_root is not None
-        and direct_parent is not None
-        and direct_parent != conversation_root
-    ):
-        raise ActivityRejected("invalid_thread_identity")
-    root_thread_id = (
-        conversation_root or direct_parent or _validated_thread_id(message_id)
-    )
+    root_thread_id: str | None = None
+    if not is_personal:
+        direct_parent = _optional_thread_id(_get(activity, "replyToId", "reply_to_id"))
+        conversation_root = _conversation_root_thread_id(conversation_id)
+        if (
+            conversation_root is not None
+            and direct_parent is not None
+            and direct_parent != conversation_root
+        ):
+            raise ActivityRejected("invalid_thread_identity")
+        root_thread_id = (
+            conversation_root or direct_parent or _validated_thread_id(message_id)
+        )
 
     content, omitted_attachments = _content_parts(activity, bot_app_id)
-    facts = [
-        {"name": "tenant_id", "value": observed_tenant},
-        {"name": "team_id", "value": observed_team},
-        {"name": "channel_id", "value": channel_id},
-    ]
+    facts = [{"name": "tenant_id", "value": observed_tenant}]
+    if not is_personal:
+        facts.extend(
+            [
+                {"name": "team_id", "value": observed_team},
+                {"name": "channel_id", "value": channel_id},
+            ]
+        )
     if omitted_attachments:
         facts.append({"name": "attachments_omitted", "value": str(omitted_attachments)})
     if len(content) > 128:
@@ -156,13 +175,13 @@ def normalize_activity(
             "vendor": "msteams",
             "account_id": bot_app_id,
             "conversation_id": conversation_id,
-            "kind": "channel",
+            "kind": "private" if is_personal else "channel",
         },
         "sender_id": actor_aad_id,
         "content": content,
         "vendor_extension": {"vendor": "msteams", "facts": facts},
     }
-    if root_thread_id != message_id:
+    if root_thread_id is not None and root_thread_id != message_id:
         payload["reply"] = {"message_id": root_thread_id}
 
     trust = {
@@ -170,14 +189,114 @@ def normalize_activity(
         "provider": "teams",
         "tenant_id": observed_tenant,
         "actor_aad_object_id": actor_aad_id,
-        "team_id": observed_team,
-        "channel_id": channel_id,
-        "root_thread_id": root_thread_id,
         "message_id": message_id,
         "bot_app_id": bot_app_id,
         "service_url": service_url,
     }
+    if is_personal:
+        trust.update(
+            {
+                "conversation_kind": "private",
+                "conversation_id": conversation_id,
+            }
+        )
+    else:
+        trust.update(
+            {
+                "team_id": observed_team,
+                "channel_id": channel_id,
+                "root_thread_id": root_thread_id,
+            }
+        )
     return NormalizedTeamsActivity(payload=payload, trust=trust)
+
+
+def normalize_personal_installation(
+    activity: Mapping[str, Any],
+    *,
+    action: str,
+    bot_app_id: str,
+    tenant_id: str,
+    personal_chat_enabled: bool = False,
+) -> NormalizedTeamsActivity:
+    """Normalize an authenticated one-person bot install or removal event.
+
+    Only private host trust metadata carries the route and actor identity. The
+    Work API owns authorization, persistence, and revocation for that binding.
+
+    中文：归一化经过鉴权的个人 bot 安装或移除事件。只有私有 host trust metadata 包含
+    路由与 actor 身份；Work API 负责该 binding 的授权、持久化与撤销。
+    """
+
+    if not personal_chat_enabled:
+        raise ActivityRejected("personal_chat_disabled")
+    if not isinstance(activity, Mapping):
+        raise ActivityRejected("invalid_activity")
+    if _string(_get(activity, "type")) != "installationUpdate":
+        raise ActivityRejected("unsupported_activity")
+    observed_action = _string(_get(activity, "action")).casefold()
+    if action not in {"add", "remove"} or observed_action != action:
+        raise ActivityRejected("invalid_installation_action")
+
+    sender = _mapping(_get(activity, "from", "from_"))
+    actor_aad_id = _canonical_uuid(
+        _optional_text(_get(sender, "aadObjectId", "aad_object_id"), limit=512)
+    )
+    if actor_aad_id is None:
+        raise ActivityRejected("missing_stable_actor_id")
+
+    channel_data = _mapping(_get(activity, "channelData", "channel_data"))
+    tenant = _mapping(_get(channel_data, "tenant"))
+    conversation = _mapping(_get(activity, "conversation"))
+    observed_tenant = _canonical_uuid(
+        _optional_text(_get(tenant, "id"), limit=512)
+        or _optional_text(_get(conversation, "tenantId", "tenant_id"), limit=512)
+    )
+    conversation_type = (
+        _optional_text(_get(conversation, "conversationType", "conversation_type"))
+        or ""
+    ).casefold()
+    if observed_tenant != tenant_id.lower():
+        raise ActivityRejected("tenant_not_allowed")
+    if conversation_type != "personal":
+        raise ActivityRejected("personal_installation_required")
+    if (
+        _mapping(_get(channel_data, "team")).get("id") is not None
+        or _mapping(_get(channel_data, "channel")).get("id") is not None
+    ):
+        raise ActivityRejected("invalid_personal_scope")
+
+    conversation_id = _optional_text(_get(conversation, "id"), limit=512)
+    activity_id = _optional_text(_get(activity, "id"), limit=512)
+    if conversation_id is None or activity_id is None:
+        raise ActivityRejected("missing_installation_identity")
+    raw_service_url = _get(activity, "serviceUrl", "service_url")
+    if not isinstance(raw_service_url, str) or not raw_service_url:
+        raise ActivityRejected("missing_service_url")
+    try:
+        service_url = validate_bot_service_url(
+            raw_service_url,
+            tenant_id=observed_tenant,
+        )
+    except ServiceUrlError as exc:
+        raise ActivityRejected("service_url_not_allowed") from exc
+
+    return NormalizedTeamsActivity(
+        payload={"action": action},
+        trust={
+            "version": 1,
+            "provider": "teams",
+            "conversation_kind": "private",
+            "installation_action": action,
+            "tenant_id": observed_tenant,
+            "actor_aad_object_id": actor_aad_id,
+            "bot_app_id": bot_app_id,
+            "conversation_id": conversation_id,
+            "activity_id": activity_id,
+            "service_url": service_url,
+        },
+        event_type="personal_installation",
+    )
 
 
 def _content_parts(

@@ -5,6 +5,7 @@
   "allowed_team_ids": [
     "<APPROVED_TEAMS_TEAM_ID>"
   ],
+  "personal_chat_enabled": false,
   "client_secret_env_ref": "TEAMS_BOT_APP_SECRET",
   "timeout_seconds": 10
 }

@@ -24,6 +24,8 @@ GITHUB_API_VERSION = "2022-11-28"
 MAX_RESPONSE_BYTES = 1_000_000
 MAX_ACTIONS_LOG_BYTES = 2_000_000
 MAX_ACTIONS_LOG_EXCERPT_BYTES = 20_000
+# Keep run summaries within the fixed-host transport's 1 MB response bound | 控制列表响应大小。
+MAX_ACTION_WORKFLOW_RUNS = 30
 _ACTIONS_LOG_HOST = re.compile(r"productionresultssa[0-9]{1,3}\.blob\.core\.windows\.net\Z")
 TASK_BRANCH_PREFIX = "cyrene/assistant/"
 
@@ -599,7 +601,7 @@ class GitHubApi:
         """Read bounded Actions runs for an optional fixed branch or commit."""
 
         self._verify_configured_repository(repository, token)
-        query: dict[str, str | int] = {"per_page": 100}
+        query: dict[str, str | int] = {"per_page": MAX_ACTION_WORKFLOW_RUNS}
         if branch is not None:
             query["branch"] = branch
         if commit_sha is not None:
@@ -610,7 +612,7 @@ class GitHubApi:
         total_count = value.get("total_count")
         if (
             not isinstance(runs, list)
-            or len(runs) > 100
+            or len(runs) > MAX_ACTION_WORKFLOW_RUNS
             or isinstance(total_count, bool)
             or not isinstance(total_count, int)
             or total_count < len(runs)

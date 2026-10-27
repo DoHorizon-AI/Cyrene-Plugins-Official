@@ -33,6 +33,7 @@ from teams_connector.delivery_spool import (
     NavigatorDeliveryWorker,
     retry_delay_seconds,
     stable_delivery_id,
+    stable_thread_key,
 )
 from teams_connector.navigator import (
     AdmissionResult,
@@ -74,6 +75,28 @@ def _event(
             "bot_app_id": "bot-1",
             "message_id": message_id,
             "root_thread_id": root_thread_id,
+        },
+    }
+
+
+def _personal_install_event(action: str, *, activity_id: str) -> dict:
+    """Build one synthetic personal installation lifecycle event.
+
+    中文：构造一条伪造的个人安装生命周期 event。
+    """
+
+    return {
+        "event_type": "personal_installation",
+        "payload": {"action": action},
+        "trust": {
+            "provider": "teams",
+            "conversation_kind": "private",
+            "installation_action": action,
+            "tenant_id": "tenant-1",
+            "bot_app_id": "bot-1",
+            "actor_aad_object_id": "33333333-3333-4333-8333-333333333333",
+            "conversation_id": "a:personal-install-conversation",
+            "activity_id": activity_id,
         },
     }
 
@@ -124,6 +147,54 @@ async def test_enqueue_commits_exact_body_and_rejects_identity_body_conflict(tmp
     assert status.queued_count == 1
     assert status.pending_bytes == len(expected_body)
     assert "你好，Cyrene" not in json.dumps(status.as_dict(), ensure_ascii=False)
+
+
+@pytest.mark.asyncio
+async def test_personal_install_add_duplicate_and_remove_keep_one_ordered_route(
+    tmp_path,
+):
+    """Deduplicate install retries and keep revocation behind registration.
+
+    中文：个人安装重试保持幂等，撤销事件与注册事件按同一 route 排序。
+    """
+
+    spool = DeliverySpool(tmp_path / "state")
+    added = _personal_install_event("add", activity_id="install-add-1")
+    removed = _personal_install_event("remove", activity_id="install-remove-1")
+    removed["trust"]["conversation_id"] = "a:updated-personal-install-conversation"
+
+    first_add = await spool.enqueue(added)
+    repeated_add = await spool.enqueue(added)
+    remove = await spool.enqueue(removed)
+
+    assert first_add.duplicate is False
+    assert repeated_add.duplicate is True
+    assert repeated_add.delivery_id == first_add.delivery_id
+    assert remove.duplicate is False
+    assert remove.delivery_id != first_add.delivery_id
+    assert stable_thread_key(added) == stable_thread_key(removed)
+
+
+@pytest.mark.asyncio
+async def test_two_actors_share_channel_queue_thread_but_keep_distinct_activity_keys(
+    tmp_path,
+):
+    """Serialize a shared channel route without collapsing actor event identity.
+
+    中文：共享频道路由按同一 thread 排队，但不同 actor 的 event identity 保持独立。
+    """
+
+    first = _event(message_id="actor-one-message", text="actor one")
+    second = _event(message_id="actor-two-message", text="actor two")
+    second["trust"]["actor_aad_object_id"] = "44444444-4444-4444-8444-444444444444"
+    second["payload"]["content"][0]["text"]["text"] = "actor two"
+
+    assert stable_thread_key(first) == stable_thread_key(second)
+    assert stable_delivery_id(first) != stable_delivery_id(second)
+    spool = DeliverySpool(tmp_path / "state")
+    one = await spool.enqueue(first)
+    two = await spool.enqueue(second)
+    assert one.delivery_id != two.delivery_id
 
 
 @pytest.mark.asyncio

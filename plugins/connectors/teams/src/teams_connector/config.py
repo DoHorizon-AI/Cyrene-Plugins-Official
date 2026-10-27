@@ -41,6 +41,7 @@ class IngressSettings:
     navigator_base_url: str
     navigator_hmac_key_id: str
     navigator_hmac_key: bytes
+    personal_chat_enabled: bool = False
     port: int = 3978
     navigator_timeout_seconds: float = 5.0
     delivery_state_dir: Path | None = None
@@ -59,6 +60,10 @@ class IngressSettings:
         tenant_id = _required_uuid(os.environ.get("TEAMS_TENANT_ID"), "TEAMS_TENANT_ID")
         allowed_team_ids = _parse_identifiers(
             os.environ.get("TEAMS_ALLOWED_TEAM_IDS", ""), "TEAMS_ALLOWED_TEAM_IDS"
+        )
+        personal_chat_enabled = _parse_bool(
+            os.environ.get("TEAMS_PERSONAL_CHAT_ENABLED", "false"),
+            "TEAMS_PERSONAL_CHAT_ENABLED",
         )
         base_url = _required_text(
             os.environ.get("NAVIGATOR_INTERNAL_BASE_URL"),
@@ -132,6 +137,7 @@ class IngressSettings:
             navigator_base_url=base_url.rstrip("/"),
             navigator_hmac_key_id=hmac_key_id,
             navigator_hmac_key=hmac_key,
+            personal_chat_enabled=personal_chat_enabled,
             port=port,
             navigator_timeout_seconds=timeout,
             delivery_state_dir=delivery_state_dir,
@@ -246,6 +252,20 @@ def _parse_identifiers(value: str, name: str) -> frozenset[str]:
     if len(identifiers) != len(values) or any(len(item) > 512 for item in identifiers):
         raise ConfigurationError(f"{name} contains duplicate or oversized identifiers")
     return identifiers
+
+
+def _parse_bool(value: str, name: str) -> bool:
+    """Parse one explicit boolean flag without truthy-value guessing.
+
+    中文：严格解析显式布尔值，不猜测其他 truthy 字符串。
+    """
+
+    normalized = value.strip().casefold()
+    if normalized == "true":
+        return True
+    if normalized == "false":
+        return False
+    raise ConfigurationError(f"{name} must be true or false")
 
 
 def _validate_internal_origin(value: str) -> None:

@@ -22,11 +22,19 @@ from typing import Any
 os.environ["PYTHON_DOTENV_DISABLED"] = "true"
 
 from fastapi import FastAPI, HTTPException, Request, Response  # noqa: E402
-from microsoft_teams.api import MessageActivity  # noqa: E402
+from microsoft_teams.api import (  # noqa: E402
+    InstalledActivity,
+    MessageActivity,
+    UninstalledActivity,
+)
 from microsoft_teams.apps import ActivityContext, App, FastAPIAdapter  # noqa: E402
 from microsoft_teams.common import ClientOptions  # noqa: E402
 
-from .activity import ActivityRejected, normalize_activity  # noqa: E402
+from .activity import (  # noqa: E402
+    ActivityRejected,
+    normalize_activity,
+    normalize_personal_installation,
+)
 from .config import IngressSettings  # noqa: E402
 from .delivery_spool import (  # noqa: E402
     DeliveryAdminConflict,
@@ -151,6 +159,37 @@ async def build_ingress_service(
             response.status_code = 503
             return {"status": "not_ready"}
         return {"status": "ready"}
+
+    async def forward_event(event: dict[str, Any]) -> None:
+        """Admit one SDK-authenticated event through the configured delivery path.
+
+        中文：通过已配置投递路径接纳一条 SDK 鉴权后的 event。
+        """
+
+        if delivery_spool is not None and delivery_worker is not None:
+            try:
+                await delivery_spool.enqueue(event)
+            except DeliveryIdentityConflict:
+                raise HTTPException(
+                    409, "Teams activity identity conflicts with queued body"
+                ) from None
+            except DeliverySpoolError:
+                # Disk-full and commit failures must remain visible to Teams retries.
+                raise HTTPException(
+                    503, "Teams event could not be durably queued"
+                ) from None
+            await delivery_worker.notify()
+            return
+
+        result = await navigator_client.submit(event)
+        if result.accepted:
+            return
+        if result.terminal_rejection:
+            # Only an authenticated, code-allowlisted host decision is terminal.
+            return
+        raise NavigatorAdmissionUnavailable(
+            "Navigator did not confirm durable Teams event admission"
+        )
 
     if delivery_spool is not None and delivery_worker is not None:
         admin_token = settings.delivery_admin_token
@@ -297,9 +336,9 @@ async def build_ingress_service(
 
     @sdk_app.on_message
     async def handle_message(ctx: ActivityContext[MessageActivity]) -> None:
-        """Forward one authenticated channel activity and await durable admission.
+        """Forward one authenticated channel or personal activity.
 
-        中文：转发一个经过鉴权的频道 activity，并等待 Navigator 持久接纳。
+        中文：转发一个经过鉴权的频道或个人 activity，并等待 Navigator 持久接纳。
         """
 
         activity_model = ctx.activity
@@ -312,37 +351,64 @@ async def build_ingress_service(
                 bot_app_id=settings.bot_app_id,
                 tenant_id=settings.tenant_id,
                 allowed_team_ids=settings.allowed_team_ids,
+                personal_chat_enabled=settings.personal_chat_enabled,
             )
         except ActivityRejected:
-            # Authenticated messages outside the configured tenant/team or bot
-            # echoes are terminally ignored; they must not create Navigator work.
+            # Authenticated messages outside the configured tenant/scope or bot
+            # echoes are ignored; they must not create Navigator work.
             return
 
-        if delivery_spool is not None and delivery_worker is not None:
+        await forward_event(normalized.as_event())
+
+    if settings.personal_chat_enabled:
+
+        @sdk_app.on_install_add
+        async def handle_install_add(
+            ctx: ActivityContext[InstalledActivity],
+        ) -> None:
+            """Register only an SDK-verified personal installation.
+
+            中文：只注册经过 SDK 验证的个人 scope 安装。
+            """
+
+            activity_data: Any = ctx.activity.model_dump(
+                mode="json", by_alias=True, exclude_none=True
+            )
             try:
-                await delivery_spool.enqueue(normalized.as_event())
-            except DeliveryIdentityConflict:
-                raise HTTPException(
-                    409, "Teams activity identity conflicts with queued body"
-                ) from None
-            except DeliverySpoolError:
-                # Disk-full and commit failures must remain visible to Teams retries.
-                raise HTTPException(
-                    503, "Teams event could not be durably queued"
-                ) from None
-            await delivery_worker.notify()
-            return
+                normalized = normalize_personal_installation(
+                    activity_data,
+                    action="add",
+                    bot_app_id=settings.bot_app_id,
+                    tenant_id=settings.tenant_id,
+                    personal_chat_enabled=True,
+                )
+            except ActivityRejected:
+                return
+            await forward_event(normalized.as_event())
 
-        result = await navigator_client.submit(normalized.as_event())
-        if result.accepted:
-            return
-        if result.terminal_rejection:
-            # Only a code-allowlisted business decision after verified HMAC is
-            # terminal; transport authentication failures remain retryable.
-            return
-        raise NavigatorAdmissionUnavailable(
-            "Navigator did not confirm durable Teams event admission"
-        )
+        @sdk_app.on_install_remove
+        async def handle_install_remove(
+            ctx: ActivityContext[UninstalledActivity],
+        ) -> None:
+            """Revoke only an SDK-verified personal installation.
+
+            中文：只撤销经过 SDK 验证的个人 scope 安装。
+            """
+
+            activity_data: Any = ctx.activity.model_dump(
+                mode="json", by_alias=True, exclude_none=True
+            )
+            try:
+                normalized = normalize_personal_installation(
+                    activity_data,
+                    action="remove",
+                    bot_app_id=settings.bot_app_id,
+                    tenant_id=settings.tenant_id,
+                    personal_chat_enabled=True,
+                )
+            except ActivityRejected:
+                return
+            await forward_event(normalized.as_event())
 
     await sdk_app.initialize()
     ready = True

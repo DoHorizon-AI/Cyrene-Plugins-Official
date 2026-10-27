@@ -111,6 +111,8 @@ jobs:
             -e plugins/evaluation/llm-judge \
             -e plugins/accounts/account-center \
             -e plugins/providers/github-issues \
+            -e plugins/providers/microsoft-graph \
+            -e plugins/providers/azure-devops-observation \
             -e plugins/providers/cloud-resources \
             -e plugins/providers/cloud-management \
             -e plugins/providers/huggingface \
@@ -165,6 +167,8 @@ jobs:
             plugins/connectors/email-notification \
             plugins/accounts/account-center \
             plugins/providers/github-issues \
+            plugins/providers/microsoft-graph \
+            plugins/providers/azure-devops-observation \
             plugins/providers/cloud-resources \
             plugins/providers/cloud-management \
             plugins/providers/huggingface \
@@ -199,6 +203,8 @@ jobs:
             sdk/python/cyrene_account_center_contracts/tests \
             plugins/accounts/account-center/tests \
             plugins/providers/github-issues/tests \
+            plugins/providers/microsoft-graph/tests \
+            plugins/providers/azure-devops-observation/tests \
             contracts/tck/tool-provider-v1 \
             contracts/tck/execution-engine-v1 \
             contracts/tck/training-llama-factory-v1 \

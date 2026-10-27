@@ -14,7 +14,11 @@ import json
 
 import pytest
 
-from teams_connector.activity import ActivityRejected, normalize_activity
+from teams_connector.activity import (
+    ActivityRejected,
+    normalize_activity,
+    normalize_personal_installation,
+)
 
 BOT_APP_ID = "11111111-1111-4111-8111-111111111111"
 TENANT_ID = "22222222-2222-4222-8222-222222222222"
@@ -103,6 +107,200 @@ def test_initial_mention_creates_stable_channel_envelope():
     }
     assert event.payload["content"][0]["mention"]["target_id"] == BOT_APP_ID
     assert event.payload["content"][1] == {"text": {"text": "inspect this"}}
+
+
+def test_two_actors_in_one_channel_thread_keep_distinct_authenticated_identity():
+    """Keep actor identity separate when the shared route and thread are equal.
+
+    中文：共享频道路由与根线程相同时，仍保留各自的已验证 actor 身份。
+    """
+
+    second_actor = "44444444-4444-4444-8444-444444444444"
+    first = _normalize(_activity())
+    second = _normalize(
+        _activity(
+            **{
+                "from": {"id": "29:another-actor", "aadObjectId": second_actor},
+                "id": "1749000000001",
+                "replyToId": "1749000000000",
+                "text": "another participant",
+                "entities": [],
+            }
+        )
+    )
+
+    assert first.trust["root_thread_id"] == second.trust["root_thread_id"]
+    assert first.payload["conversation"] == second.payload["conversation"]
+    assert first.trust["actor_aad_object_id"] == ACTOR_ID
+    assert second.trust["actor_aad_object_id"] == second_actor
+    assert first.payload["sender_id"] != second.payload["sender_id"]
+
+
+def _personal_activity(
+    *, actor_aad_id=ACTOR_ID, activity_id="personal-message-1", **overrides
+):
+    """Return one fabricated authenticated one-person bot activity.
+
+    中文：返回一条伪造的个人 bot activity。
+    """
+
+    value = {
+        "type": "message",
+        "id": activity_id,
+        "from": {"id": "29:actor", "aadObjectId": actor_aad_id},
+        "recipient": {"id": "28:cyrene-bot", "type": "bot"},
+        "conversation": {
+            "id": "a:personal-conversation-opaque",
+            "tenantId": TENANT_ID,
+            "conversationType": "personal",
+        },
+        "serviceUrl": SERVICE_URL,
+        "channelData": {"tenant": {"id": TENANT_ID}},
+        "text": "private question",
+        "entities": [],
+        "attachments": [],
+    }
+    value.update(overrides)
+    return value
+
+
+def test_personal_message_is_opt_in_and_keeps_private_route_in_trust():
+    """Keep direct messages disabled by default and isolate enabled private scope.
+
+    中文：个人消息默认关闭；启用后按 private scope 归一化并保留私有路由。
+    """
+
+    with pytest.raises(ActivityRejected, match="personal_chat_disabled"):
+        _normalize(_personal_activity())
+
+    event = normalize_activity(
+        _personal_activity(),
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        allowed_team_ids=frozenset({TEAM_ID}),
+        personal_chat_enabled=True,
+    )
+
+    assert event.payload["conversation"] == {
+        "vendor": "msteams",
+        "account_id": BOT_APP_ID,
+        "conversation_id": "a:personal-conversation-opaque",
+        "kind": "private",
+    }
+    assert event.payload["sender_id"] == ACTOR_ID
+    assert event.payload["content"] == [{"text": {"text": "private question"}}]
+    assert event.trust["conversation_kind"] == "private"
+    assert event.trust["conversation_id"] == "a:personal-conversation-opaque"
+    assert event.trust["actor_aad_object_id"] == ACTOR_ID
+    assert "team_id" not in event.trust
+    assert "channel_id" not in event.trust
+    assert "root_thread_id" not in event.trust
+
+
+@pytest.mark.parametrize(
+    ("overrides", "reason"),
+    [
+        (
+            {"conversation": {"id": "personal", "tenantId": TENANT_ID}},
+            "team_or_channel_not_allowed",
+        ),
+        ({"from": {"id": "29:actor"}}, "missing_stable_actor_id"),
+        (
+            {
+                "channelData": {
+                    "tenant": {"id": TENANT_ID},
+                    "team": {"id": TEAM_ID},
+                    "channel": {"id": CHANNEL_ID},
+                }
+            },
+            "invalid_personal_scope",
+        ),
+    ],
+)
+def test_personal_message_rejects_missing_actor_or_mixed_scope(overrides, reason):
+    """Fail closed when a personal activity lacks stable scope or actor facts.
+
+    中文：个人 activity 缺少稳定 scope 或 actor 身份时 fail closed。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        normalize_activity(
+            _personal_activity(**overrides),
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            allowed_team_ids=frozenset({TEAM_ID}),
+            personal_chat_enabled=True,
+        )
+    assert error.value.reason == reason
+
+
+def _personal_installation(
+    action, *, conversation_type="personal", actor_aad_id=ACTOR_ID
+):
+    """Return a fabricated personal install lifecycle activity.
+
+    中文：返回伪造的个人安装生命周期 activity。
+    """
+
+    return {
+        "type": "installationUpdate",
+        "action": action,
+        "id": f"installation-{action}-1",
+        "from": {"id": "29:actor", "aadObjectId": actor_aad_id},
+        "conversation": {
+            "id": "a:personal-install-conversation",
+            "tenantId": TENANT_ID,
+            "conversationType": conversation_type,
+        },
+        "serviceUrl": SERVICE_URL,
+        "channelData": {"tenant": {"id": TENANT_ID}},
+    }
+
+
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_personal_installation_add_and_remove_are_host_only_trust_events(action):
+    """Carry lifecycle action to Work without placing actor or route in payload.
+
+    中文：将安装生命周期传给 Work；actor 与路由只进入 host trust。
+    """
+
+    event = normalize_personal_installation(
+        _personal_installation(action),
+        action=action,
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        personal_chat_enabled=True,
+    ).as_event()
+
+    assert event["event_type"] == "personal_installation"
+    assert event["payload"] == {"action": action}
+    assert event["trust"]["installation_action"] == action
+    assert event["trust"]["actor_aad_object_id"] == ACTOR_ID
+    assert event["trust"]["conversation_id"] == "a:personal-install-conversation"
+    assert event["trust"]["service_url"] == SERVICE_URL
+
+
+def test_personal_installation_rejects_disabled_or_nonpersonal_install():
+    """Never create an installation binding outside enabled personal scope.
+
+    中文：个人 scope 未启用或安装发生在其他 scope 时不得创建 binding。
+    """
+
+    with pytest.raises(ActivityRejected, match="personal_chat_disabled"):
+        normalize_personal_installation(
+            _personal_installation("add"),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+        )
+    with pytest.raises(ActivityRejected, match="personal_installation_required"):
+        normalize_personal_installation(
+            _personal_installation("add", conversation_type="channel"),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
 
 
 def test_reply_without_mention_keeps_root_thread_and_direct_parent():
