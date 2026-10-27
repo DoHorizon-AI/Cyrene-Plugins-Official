@@ -38,7 +38,6 @@ from .settings import (
 
 AZURE_HOST = "management.azure.com"
 AZURE_RESOURCE_API_VERSION = "2021-04-01"
-AZURE_SUBSCRIPTION_API_VERSION = "2022-12-01"
 AZURE_ACTIVITY_API_VERSION = "2015-04-01"
 GCP_HOST = "compute.googleapis.com"
 GCP_BASE = "https://compute.googleapis.com/compute/v1"
@@ -436,21 +435,29 @@ class CloudManagementExecutor:
             if profile.provider == "azure":
                 token, expires_at = self._azure_token(profile)
                 sub = quote(str(profile.scope["subscription_id"]), safe="-")
-                result = self._request(
-                    "GET",
-                    f"https://{AZURE_HOST}/subscriptions/{sub}",
-                    token=token,
-                    params={"api-version": AZURE_SUBSCRIPTION_API_VERSION},
-                )
-                subscription_id = result.body.get("subscriptionId") if isinstance(
-                    result.body, Mapping
-                ) else None
-                if (
-                    not isinstance(subscription_id, str)
-                    or subscription_id.casefold()
-                    != str(profile.scope["subscription_id"]).casefold()
-                ):
-                    raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
+                subscription_id = str(profile.scope["subscription_id"])
+                for resource_group in profile.scope["resource_groups"]:
+                    group_path = quote(str(resource_group), safe="")
+                    result = self._request(
+                        "GET",
+                        f"https://{AZURE_HOST}/subscriptions/{sub}/resourceGroups/{group_path}",
+                        token=token,
+                        params={"api-version": AZURE_RESOURCE_API_VERSION},
+                    )
+                    body = result.body
+                    expected_id_prefix = f"/subscriptions/{subscription_id}/resourceGroups/"
+                    expected_id = f"{expected_id_prefix}{resource_group}"
+                    resource_id = body.get("id") if isinstance(body, Mapping) else None
+                    name = body.get("name") if isinstance(body, Mapping) else None
+                    if (
+                        not isinstance(body, Mapping)
+                        or "error" in body
+                        or not isinstance(resource_id, str)
+                        or resource_id.casefold() != expected_id.casefold()
+                        or not isinstance(name, str)
+                        or name.casefold() != str(resource_group).casefold()
+                    ):
+                        raise ProviderFailure("INVALID_PROVIDER_RESPONSE")
             elif profile.provider == "gcp":
                 token, expires_at = self._gcp_token(profile)
                 project = quote(str(profile.scope["project_id"]), safe="-")

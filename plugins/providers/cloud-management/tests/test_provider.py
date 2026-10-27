@@ -118,7 +118,11 @@ def _settings(
 
 
 def _multi_provider_settings(
-    tmp_path: Any, *, azure_resource_api_versions: dict[str, str] | None = None
+    tmp_path: Any,
+    *,
+    azure_resource_api_versions: dict[str, str] | None = None,
+    azure_resource_groups: list[str] | None = None,
+    azure_subscription_id: str | None = None,
 ) -> ProviderSettings:
     """Create Azure, GCP WIF, and Runpod profiles without contacting providers."""
 
@@ -132,8 +136,14 @@ def _multi_provider_settings(
             "provider": "azure",
             "identity_ref": "managed-identities/azure/test",
             "scope": {
-                "subscription_id": "11111111-2222-3333-4444-555555555555",
-                "resource_groups": ["rg-test"],
+                "subscription_id": (
+                    "11111111-2222-3333-4444-555555555555"
+                    if azure_subscription_id is None
+                    else azure_subscription_id
+                ),
+                "resource_groups": (
+                    ["rg-test"] if azure_resource_groups is None else azure_resource_groups
+                ),
                 "resource_api_versions": azure_api_versions,
             },
             "auth": {"mode": "managed_identity"},
@@ -203,12 +213,19 @@ def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
     """Azure and GCP health checks expose only short-lived token expiry metadata."""
 
     settings = _multi_provider_settings(tmp_path)
+    subscription_path = "/subscriptions/11111111-2222-3333-4444-555555555555"
 
     def health_response(request: httpx.Request) -> httpx.Response:
-        if "/subscriptions/" in request.url.path:
+        if request.url.host == provider_impl.AZURE_HOST:
+            assert request.method == "GET"
+            assert request.url.path == f"{subscription_path}/resourceGroups/rg-test"
+            assert request.url.params["api-version"] == provider_impl.AZURE_RESOURCE_API_VERSION
             return httpx.Response(
                 200,
-                json={"subscriptionId": "11111111-2222-3333-4444-555555555555"},
+                json={
+                    "id": f"{subscription_path}/resourceGroups/RG-TEST",
+                    "name": "RG-TEST",
+                },
             )
         return httpx.Response(200, json={"items": []})
 
@@ -265,6 +282,94 @@ def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
     assert gcp["authentication_state"] == "VALID"
     assert gcp["authorization_state"] == "VALID"
     assert gcp["expires_at"] == "2026-10-26T22:05:00Z"
+    executor.close()
+
+
+def test_azure_health_checks_every_bound_resource_group_without_subscription_get(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Azure health proves every configured group and never probes subscription scope."""
+
+    subscription_id = "a1111111-b222-c333-d444-e55555555555"
+    resource_groups = ["Rg-One", "Rg-Two"]
+    settings = _multi_provider_settings(
+        tmp_path,
+        azure_resource_groups=resource_groups,
+        azure_subscription_id=subscription_id,
+    )
+    requests: list[httpx.Request] = []
+
+    def health_response(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        expected_prefix = f"/subscriptions/{subscription_id}/resourceGroups/"
+        assert request.method == "GET"
+        assert request.url.host == provider_impl.AZURE_HOST
+        assert request.url.path.startswith(expected_prefix)
+        group = request.url.path.removeprefix(expected_prefix)
+        assert group in resource_groups
+        assert request.url.params["api-version"] == provider_impl.AZURE_RESOURCE_API_VERSION
+        return httpx.Response(
+            200,
+            json={
+                "id": f"/subscriptions/{subscription_id}/resourceGroups/{group.lower()}".upper(),
+                "name": group.lower(),
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(health_response))
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(
+        executor,
+        "_azure_token",
+        lambda _profile: ("fixture-azure-token", "2026-10-26T22:00:00Z"),
+    )
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id="request-azure-health-rgs",
+    )
+
+    assert [request.url.path for request in requests] == [
+        f"/subscriptions/{subscription_id}/resourceGroups/Rg-One",
+        f"/subscriptions/{subscription_id}/resourceGroups/Rg-Two",
+    ]
+    assert all("/resourceGroups/" in request.url.path for request in requests)
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "VALID"
+    assert health["scope_refs"] == [
+        f"azure:{subscription_id}/Rg-One",
+        f"azure:{subscription_id}/Rg-Two",
+    ]
+    executor.close()
+
+
+def test_azure_health_reports_resource_group_403_as_permission_denied(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A denial at the bound resource-group scope stays a permission failure."""
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(403, json={"detail": "private body"})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id="request-azure-health-rg-denied",
+    )
+
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "PERMISSION_DENIED"
+    assert health["reason_code"] == "SCOPE_DENIED"
+    assert "private body" not in json.dumps(health)
     executor.close()
 
 
@@ -428,6 +533,28 @@ def test_cloud_provider_health_network_failure_is_unknown_not_invalid(
     ("profile_ref", "response"),
     [
         ("azure/test", {"error": {"code": "Denied"}}),
+        ("azure/test", {}),
+        (
+            "azure/test",
+            {
+                "id": "/subscriptions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/resourceGroups/rg-test",
+                "name": "rg-test",
+            },
+        ),
+        (
+            "azure/test",
+            {
+                "id": "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-other",
+                "name": "rg-test",
+            },
+        ),
+        (
+            "azure/test",
+            {
+                "id": "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-test",
+                "name": "rg-other",
+            },
+        ),
         ("gcp/test", {"items": [{}]}),
         (
             "runpod/test",
