@@ -2833,8 +2833,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/plugin.py",
-      "sha256": "356111ab83c97120479fc2030d7f42014e1f3b08b7a969bc862a64ac33a12180",
-      "size_bytes": 26932
+      "sha256": "7e982f2bd102e5d8afab208dbeb32ffc9ff1c23b84089cd92f566ffd7c6d8c35",
+      "size_bytes": 26756
     },
     {
       "kind": "file",
@@ -2875,8 +2875,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_provider.py",
-      "sha256": "6afb769f0bb0bc63b5b4b9293f20baa02da72f6cdcfd70a1ad2d6754055c0791",
-      "size_bytes": 24613
+      "sha256": "59b72079e6b867091427d6236be7e20b747839de364831bf6fa36965d05dfeaa",
+      "size_bytes": 24856
     },
     {
       "kind": "file",

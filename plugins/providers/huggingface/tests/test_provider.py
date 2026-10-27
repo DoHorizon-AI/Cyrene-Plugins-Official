@@ -316,6 +316,12 @@ def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
         "huggingface.file.upload",
         "hf_vendor_cli",
     ]
+    repository_tool = next(
+        item for item in catalog.tools if item.provider_tool_id == "huggingface.repo.get"
+    )
+    assert (
+        repository_tool.description == "Read metadata for one configured model, dataset, or Space."
+    )
 
     arguments = {"search": "bert", "limit": 5}
     is_error, response = invoke_tool(provider, settings, "huggingface.models.list", arguments)
