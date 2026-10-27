@@ -13,6 +13,8 @@ on:
       - "plugins/training/llama-factory/**"
       - "plugins/accounts/account-center/**"
       - "plugins/providers/github-issues/**"
+      - "plugins/providers/microsoft-graph/**"
+      - "plugins/providers/azure-devops-observation/**"
       - "plugins/providers/cloud-resources/**"
       - "plugins/providers/cloud-management/**"
       - "plugins/providers/huggingface/**"
@@ -43,6 +45,8 @@ on:
       - "plugins/training/llama-factory/**"
       - "plugins/accounts/account-center/**"
       - "plugins/providers/github-issues/**"
+      - "plugins/providers/microsoft-graph/**"
+      - "plugins/providers/azure-devops-observation/**"
       - "plugins/providers/cloud-resources/**"
       - "plugins/providers/cloud-management/**"
       - "plugins/providers/huggingface/**"
@@ -73,6 +77,7 @@ on:
           - integration-v1
           - authorization-cloud-v1
           - teams-cloud-v1
+          - office-pilot
           - cyrene.tools.dataset-preparation
           - cyrene.tools.document-parsing
           - cyrene.tools.dataset-generation
@@ -82,10 +87,12 @@ on:
           - cyrene.providers.github-issues
           - cyrene.connectors.wecom
           - cyrene.providers.cloud-resources
+          - cyrene.connectors.email-notification
           - cyrene.connectors.teams
           - cyrene.providers.cloud-management
           - cyrene.providers.huggingface
-          - cyrene.connectors.email-notification
+          - cyrene.providers.microsoft-graph
+          - cyrene.providers.azure-devops-observation
 
 permissions:
   contents: read
@@ -177,6 +184,8 @@ jobs:
               "cyrene.providers.huggingface",
               "cyrene.accounts.account-center",
               "cyrene.providers.github-issues",
+              "cyrene.providers.microsoft-graph",
+              "cyrene.providers.azure-devops-observation",
               "cyrene.connectors.email-notification",
           }
           root = Path.cwd()

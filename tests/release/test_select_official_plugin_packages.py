@@ -6,6 +6,9 @@
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
+
+import yaml
 
 from tooling.release import official_plugin_package as package_release
 from tooling.release import select_official_plugin_packages as selection
@@ -35,8 +38,8 @@ class OfficialPackageSelectionTests(unittest.TestCase):
         package_ids = [row["package_id"] for row in matrix["include"]]
 
         self.assertEqual(package_ids, list(selection.ALL_PACKAGE_IDS))
-        self.assertEqual(len(package_ids), 13)
-        self.assertEqual(len(set(package_ids)), 13)
+        self.assertEqual(len(package_ids), 15)
+        self.assertEqual(len(set(package_ids)), 15)
         self.assertEqual(publish_mode, "none")
 
     def test_release_allowlist_and_package_producers_have_the_same_identities(self) -> None:
@@ -46,6 +49,22 @@ class OfficialPackageSelectionTests(unittest.TestCase):
             set(selection.ALL_PACKAGE_IDS), set(package_release.PACKAGE_SPECS)
         )
         self.assertEqual(set(selection.PACKAGE_NAMES), set(package_release.PACKAGE_SPECS))
+
+    def test_workflow_choices_match_selector_and_keep_legacy5_as_default(self) -> None:
+        """Keep the manual workflow interface aligned with its fixed selector."""
+
+        root = Path(__file__).resolve().parents[2]
+        workflow = yaml.load(
+            (root / ".github/workflows/data-tools-package-release.yml").read_text(
+                encoding="utf-8"
+            ),
+            Loader=yaml.BaseLoader,
+        )
+        package_set = workflow["on"]["workflow_dispatch"]["inputs"]["package_set"]
+
+        self.assertEqual(package_set["default"], "legacy5")
+        self.assertEqual(package_set["options"], list(selection.PACKAGE_SET_CHOICES))
+        self.assertEqual(len(package_set["options"]), len(set(package_set["options"])))
 
     def test_authorization_cloud_named_set_is_immutable_and_exact(self) -> None:
         """Only cloud resources, email notification, and WeCom join this set."""
@@ -103,6 +122,35 @@ class OfficialPackageSelectionTests(unittest.TestCase):
             ],
         )
         self.assertEqual(publish_mode, "immutable")
+
+    def test_office_pilot_is_an_exact_immutable_package_set(self) -> None:
+        """The office pilot contains only the Graph and Azure DevOps providers."""
+
+        matrix, publish_mode = selection.select_package_release(
+            "workflow_dispatch", "office-pilot"
+        )
+
+        self.assertEqual(
+            [row["package_id"] for row in matrix["include"]],
+            [
+                "cyrene.providers.microsoft-graph",
+                "cyrene.providers.azure-devops-observation",
+            ],
+        )
+        self.assertEqual(publish_mode, "immutable")
+
+    def test_office_pilot_packages_are_single_package_immutable_dispatches(self) -> None:
+        """Each office provider can be selected without widening the pilot set."""
+
+        for package_id in selection.OFFICE_PILOT_PACKAGE_IDS:
+            with self.subTest(package_id=package_id):
+                matrix, publish_mode = selection.select_package_release(
+                    "workflow_dispatch", package_id
+                )
+                self.assertEqual(
+                    [row["package_id"] for row in matrix["include"]], [package_id]
+                )
+                self.assertEqual(publish_mode, "immutable")
 
     def test_teams_cloud_packages_are_single_package_immutable_dispatches(self) -> None:
         """Each new package identity can be selected without broadening the set."""

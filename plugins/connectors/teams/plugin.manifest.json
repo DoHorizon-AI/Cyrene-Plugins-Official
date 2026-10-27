@@ -3,7 +3,7 @@
   "id": "cyrene.connectors.teams",
   "name": "Cyrene Microsoft Teams Connector",
   "version": "0.1.0",
-  "description": "Microsoft Teams channel transport for message.connector.v1 with verified Bot Framework ingress and bounded channel reply delivery.",
+  "description": "Microsoft Teams channel and opt-in personal transport for message.connector.v1 with verified Bot Framework ingress and bounded delivery.",
   "licenseExpression": "Apache-2.0",
   "kind": "capability-plugin",
   "capabilities": [

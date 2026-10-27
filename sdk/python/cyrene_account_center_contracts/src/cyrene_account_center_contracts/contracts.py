@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import time
 from dataclasses import asdict, dataclass
+from enum import StrEnum
 from typing import Any
 
 import rfc8785
@@ -222,6 +223,7 @@ class ProviderCredentialLease:
     target: dict[str, Any]
     arguments_sha256: str
     expires_at: int
+    profile_scope_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -336,6 +338,106 @@ class UnlinkProviderProfileRequest:
 
     profile_ref: str
     idempotency_key: str
+
+
+class MicrosoftGraphOperation(StrEnum):
+    """Closed Microsoft Graph operation names accepted by Account Center."""
+
+    PLANNER_PLAN_GET = "microsoft_graph.planner.plan.get"
+    PLANNER_TASKS_LIST = "microsoft_graph.planner.tasks.list"
+    PLANNER_TASK_GET = "microsoft_graph.planner.task.get"
+    PLANNER_TASK_CREATE = "microsoft_graph.planner.task.create"
+    PLANNER_TASK_UPDATE = "microsoft_graph.planner.task.update"
+    SHAREPOINT_SITE_GET = "microsoft_graph.sharepoint.site.get"
+    SHAREPOINT_LIST_GET = "microsoft_graph.sharepoint.list.get"
+    SHAREPOINT_LIST_ITEMS_DELTA = "microsoft_graph.sharepoint.list.items.delta"
+
+
+class MicrosoftGraphPermissionUpgrade(StrEnum):
+    """Explicit user-approved Graph permission upgrades; never raw scopes."""
+
+    PLANNER_TASKS_WRITE = "planner_tasks_write"
+    SHAREPOINT_SELECTED = "sharepoint_selected"
+
+
+class AzureDevOpsOperation(StrEnum):
+    """Closed read-only Azure DevOps operations accepted by Account Center."""
+
+    OBSERVATIONS_POLL = "azure_devops.observations.poll"
+    PIPELINES_LIST = "azure_devops.pipelines.list"
+    PIPELINE_RUNS_LIST = "azure_devops.pipeline_runs.list"
+    PIPELINE_RUN_GET = "azure_devops.pipeline_run.get"
+    DEPLOYMENTS_LIST = "azure_devops.deployments.list"
+    RELEASE_ENVIRONMENT_GET = "azure_devops.release_environment.get"
+
+
+@dataclass(frozen=True, slots=True)
+class BeginMicrosoftGraphLinkRequest:
+    """Start fixed least-privilege Graph consent for selected Planner plans."""
+
+    profile_ref: str
+    planner_plan_ids: list[str]
+    idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class BeginMicrosoftGraphScopeUpgradeRequest:
+    """Start one explicitly selected permission upgrade without caller scopes."""
+
+    profile_ref: str
+    permission: MicrosoftGraphPermissionUpgrade
+    idempotency_key: str
+    site_id: str | None = None
+    list_ids: list[str] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteMicrosoftGraphLinkRequest:
+    """Complete one PKCE callback using state and code only."""
+
+    state: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteMicrosoftGraphScopeUpgradeRequest:
+    """Complete one consent upgrade using only callback state and code."""
+
+    state: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True)
+class BeginAzureDevOpsLinkRequest:
+    """Start Entra consent for one host-selected Azure DevOps source."""
+
+    profile_ref: str
+    tenant_id: str
+    organization: str
+    project_id: str
+    source_id: str
+    source_kind: str
+    idempotency_key: str
+    pipeline_id: int | None = None
+    definition_id: int | None = None
+    definition_environment_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteAzureDevOpsLinkRequest:
+    """Complete one Entra PKCE callback using state and code only."""
+
+    state: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True)
+class MicrosoftGraphOAuthSession:
+    """Browser redirect metadata; never contains an OAuth credential."""
+
+    link_session_ref: str
+    authorization_url: str
+    expires_at: int
 
 
 def sign_context(

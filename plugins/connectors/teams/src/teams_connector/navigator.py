@@ -24,7 +24,11 @@ import httpx
 
 EVENT_ROUTE = "/internal/v1/connectors/teams/events"
 TERMINAL_BUSINESS_REJECTIONS = frozenset(
-    {"TEAMS_TENANT_NOT_ALLOWED", "TEAMS_TEAM_NOT_ALLOWED"}
+    {
+        "TEAMS_TENANT_NOT_ALLOWED",
+        "TEAMS_TEAM_NOT_ALLOWED",
+        "WORK_TEAMS_PRIVATE_INSTALLATION_FORBIDDEN",
+    }
 )
 
 

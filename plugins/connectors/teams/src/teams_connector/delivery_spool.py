@@ -1028,26 +1028,48 @@ class NavigatorDeliveryWorker:
 
 
 def stable_delivery_id(event: dict[str, Any]) -> str:
-    """Hash the verified tenant/team/channel/bot/activity identity.
+    """Hash the verified Teams activity or personal-install identity.
 
     The event body remains the exact canonical Navigator body; this separate
     key lets the spool reject a conflicting body for the same Teams activity.
 
-    中文：对经过验证的租户/团队/频道/bot/activity 身份生成哈希。该 key 与规范
-    Navigator body 分开保存，以便拒绝同一 Teams activity 对应不同正文。
+    中文：对经过验证的 Teams activity 或个人安装身份生成哈希。该 key 与规范
+    Navigator body 分开保存，以便拒绝同一 event 身份对应不同正文。
     """
 
     trust = event.get("trust")
     if not isinstance(trust, dict):
         raise DeliverySpoolError("normalized Teams event identity is incomplete")
-    identity = [
-        trust.get("provider"),
-        trust.get("tenant_id"),
-        trust.get("team_id"),
-        trust.get("channel_id"),
-        trust.get("bot_app_id"),
-        trust.get("message_id"),
-    ]
+    event_type = event.get("event_type")
+    conversation_kind = trust.get("conversation_kind")
+    if event_type == "personal_installation":
+        identity = [
+            trust.get("provider"),
+            trust.get("tenant_id"),
+            trust.get("bot_app_id"),
+            trust.get("actor_aad_object_id"),
+            trust.get("conversation_id"),
+            trust.get("installation_action"),
+            trust.get("activity_id"),
+        ]
+    elif conversation_kind == "private":
+        identity = [
+            trust.get("provider"),
+            trust.get("tenant_id"),
+            trust.get("bot_app_id"),
+            trust.get("actor_aad_object_id"),
+            trust.get("conversation_id"),
+            trust.get("message_id"),
+        ]
+    else:
+        identity = [
+            trust.get("provider"),
+            trust.get("tenant_id"),
+            trust.get("team_id"),
+            trust.get("channel_id"),
+            trust.get("bot_app_id"),
+            trust.get("message_id"),
+        ]
     if any(not isinstance(part, str) or not part for part in identity):
         raise DeliverySpoolError("normalized Teams event identity is incomplete")
     encoded = json.dumps(identity, ensure_ascii=False, separators=(",", ":")).encode(
@@ -1071,7 +1093,41 @@ def stable_thread_key(event: dict[str, Any]) -> str:
     trust = event.get("trust")
     payload = event.get("payload")
     conversation = payload.get("conversation") if isinstance(payload, dict) else None
-    if not isinstance(trust, dict) or not isinstance(conversation, dict):
+    if not isinstance(trust, dict):
+        raise DeliverySpoolError("normalized Teams thread identity is incomplete")
+
+    event_type = event.get("event_type")
+    if event_type == "personal_installation":
+        scope = [
+            trust.get("provider"),
+            trust.get("tenant_id"),
+            trust.get("bot_app_id"),
+            trust.get("actor_aad_object_id"),
+        ]
+        if any(not isinstance(part, str) or not part for part in scope):
+            raise DeliverySpoolError("normalized Teams thread identity is incomplete")
+        encoded = json.dumps(scope, ensure_ascii=False, separators=(",", ":")).encode(
+            "utf-8"
+        )
+        return hashlib.sha256(b"cyrene-teams-install-thread-v1\0" + encoded).hexdigest()
+
+    if trust.get("conversation_kind") == "private":
+        conversation_id = trust.get("conversation_id")
+        scope = [
+            trust.get("provider"),
+            trust.get("tenant_id"),
+            trust.get("bot_app_id"),
+            trust.get("actor_aad_object_id"),
+            conversation_id,
+        ]
+        if any(not isinstance(part, str) or not part for part in scope):
+            raise DeliverySpoolError("normalized Teams thread identity is incomplete")
+        encoded = json.dumps(scope, ensure_ascii=False, separators=(",", ":")).encode(
+            "utf-8"
+        )
+        return hashlib.sha256(b"cyrene-teams-private-thread-v1\0" + encoded).hexdigest()
+
+    if not isinstance(conversation, dict):
         raise DeliverySpoolError("normalized Teams thread identity is incomplete")
     conversation_id = conversation.get("conversation_id")
     root_thread_id = trust.get("root_thread_id")

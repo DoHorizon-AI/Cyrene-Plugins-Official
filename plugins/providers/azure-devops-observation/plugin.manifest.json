@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.providers.azure-devops-observation",
+  "name": "Azure DevOps Observation Provider",
+  "version": "0.1.0",
+  "licenseExpression": "Apache-2.0",
+  "description": "Read-only, project-scoped Azure DevOps pipeline run and classic release deployment status using Account Center leases.",
+  "kind": "capability-plugin",
+  "capabilities": ["tool.provider.v1"],
+  "supportedServices": ["Cyrene-Exchange"],
+  "methods": [
+    {"capability": "tool.provider.v1", "name": "list_tools", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "tool.provider.v1", "name": "call_tool", "interfaceVersion": "1", "executionMode": "service"}
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "azure_devops_observation_provider.plugin:AzureDevOpsObservationProvider",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": ["-B", "src/cyrene_plugin_runtime/bootstrap.py", "--entrypoint", "azure_devops_observation_provider.plugin:AzureDevOpsObservationProvider"]
+    }
+  },
+  "compatibility": {"platformVersion": ">=0.1.0", "requiresPython": ">=3.11"},
+  "configuration": {"schemaRef": "configuration.schema.json"},
+  "secrets": {
+    "requiredSecretRefs": [
+      "azure-devops-observation/exchange-verification-key",
+      "azure-devops-observation/account-center-provider-signing-key"
+    ],
+    "optionalSecretRefs": [
+      "azure-devops-observation/account-center-root-certificate",
+      "azure-devops-observation/account-center-client-certificate",
+      "azure-devops-observation/account-center-client-key"
+    ]
+  },
+  "state": {"isStateful": false, "storageCategory": "stateless", "retentionPolicyOnUninstall": "retain"}
+}

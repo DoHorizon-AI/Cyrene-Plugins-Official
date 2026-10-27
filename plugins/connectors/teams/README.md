@@ -1,10 +1,11 @@
 # Cyrene Microsoft Teams Connector / Cyrene Microsoft Teams 连接器
 
-The Teams connector provides a verified channel-message ingress and the
-`message.connector.v1/send_message` transport used by Exchange. It does not
-select users, decide authorization, create Navigator tasks, or call an LLM.
+The Teams connector provides verified channel-message ingress, opt-in
+one-person bot conversations, and the `message.connector.v1/send_message`
+transport used by Exchange. It does not select users, decide authorization,
+create Navigator tasks, or call an LLM.
 
-Teams 消息连接器负责验证频道消息入口，并提供 Exchange 调用的
+Teams 消息连接器负责验证频道消息入口、可选的一对一 bot 会话，并提供 Exchange 调用的
 `message.connector.v1/send_message` 传输能力。它不选择用户、不判定授权、不创建
 Navigator 任务，也不调用 LLM。
 
@@ -17,14 +18,17 @@ Navigator 任务，也不调用 LLM。
 | `src/teams_connector/delivery_spool.py` | Persist verified event bodies and run one leased Navigator delivery worker. |
 | `src/teams_connector/ingress.py` | Run the official Microsoft Teams SDK callback sidecar and health routes. |
 | `src/teams_connector/connector.py` | Implement the canonical message capability over the official Teams SDK. |
-| `teams-app-manifest.template.json` | Declare a team-scoped bot with channel-message RSC consent. |
+| `teams-app-manifest.template.json` | Declare personal and team bot scopes with channel-message RSC consent. |
 
 ## Runtime boundary / 运行边界
 
 The ingress sidecar uses Microsoft's current Python Teams SDK for Bot Framework
 JWT signature, issuer, audience, and expiry validation. It allows only the
-configured tenant and Teams, forwards the stable AAD object ID and original
-activity ID, and never persists Bot Framework authorization headers. With
+configured tenant and Teams for channel messages. Personal messages and
+personal installation events are accepted only when
+`TEAMS_PERSONAL_CHAT_ENABLED` is explicitly true and the signed activity
+reports a one-person conversation. It forwards the stable AAD object ID and
+original activity ID, and never persists Bot Framework authorization headers. With
 `TEAMS_NAVIGATOR_DELIVERY_STATE_DIR` unset it retains the existing direct mode:
 the callback waits for Navigator admission. When durable mode is enabled, the
 callback writes the exact canonical Navigator body and stable activity identity
@@ -42,11 +46,23 @@ retries do not exhaust into message deletion; the SQLite row/byte limits bound
 storage, and a full queue makes new callbacks return non-2xx. Other 4xx responses
 become unresolved dead letters whose bodies remain until an owner explicitly
 requeues them or intentionally retires the spool. Only Navigator's authenticated,
-allowlisted tenant/team refusal is counted as a terminal business rejection.
+code-allowlisted tenant/team or owner-private binding refusal is counted as a
+terminal business rejection.
 Delivered and terminally rejected bodies are erased. The canonical
 body includes normalized message text and verified actor/thread identity and is
 stored only in the owner-only SQLite directory. Raw SDK activities and Bot
 Framework or Navigator Authorization headers are never stored.
+
+Personal installation events carry actor, tenant, bot, conversation, activity,
+and validated service URL only in the HMAC-protected `trust` envelope. The Work
+host authorizes the actor against its live owner projection and owns the active
+route record and revocation. Channel thread identity stays shared; Navigator
+must keep each actor's native session separate within that thread. Shared
+channels receive approved shared metadata only. A private source query from a
+shared channel fails until an approved personal binding exists. The model and
+workflow notice contain no personal conversation ID or recipient ID; V3
+notifications select `owner_private`, and the host resolves the route from the
+verified owner task.
 
 入口侧车使用微软当前 Python Teams SDK 校验 Bot Framework JWT 签名、issuer、audience
 和有效期。它只接收配置的租户与 Teams，传递稳定 AAD object ID 与原始 activity ID，且
@@ -62,7 +78,8 @@ Framework or Navigator Authorization headers are never stored.
 网络/timeout、HTTP 408/425/429、5xx 以及 source-authentication 401/403 使用指数退避，
 最长间隔五分钟。不会因为重试次数耗尽而删除消息；SQLite 行数/字节上限负责限制存储，队列满时
 新 callback 返回非 2xx。其他 4xx 转为未解决 dead-letter，正文保留到 owner 显式恢复或有意退役
-spool；只有 Navigator 已认证且在 allowlist 中的租户/团队拒绝计为业务终态拒绝。已投递及业务
+spool；只有 Navigator 已认证且 code 在 allowlist 中的租户/团队或 owner-private binding 拒绝
+计为业务终态拒绝。已投递及业务
 终态拒绝会清除正文。规范
 body 包含归一化消息和已验证 actor/thread identity，只写入 owner-only SQLite 目录。原始 SDK
 activity 以及 Bot Framework 或 Navigator Authorization headers 都不会保存。
@@ -71,24 +88,30 @@ activity 以及 Bot Framework 或 Navigator Authorization headers 都不会保�
 只写入 owner-only SQLite 目录。原始 SDK activity 以及 Bot Framework 或 Navigator
 Authorization headers 都不会保存。
 
-The app manifest uses Microsoft's [v1.28 schema](https://developer.microsoft.com/json-schemas/teams/v1.28/MicrosoftTeams.schema.json),
-installs only in the `team` scope, and requests only `ChannelMessage.Read.Group`.
-That resource-specific permission covers messages in the team where the app is
-installed and consented. The runtime team allowlist further restricts accepted
-activities. Navigator and Directory remain authoritative for the user's
-connector role; the connector does not hard-code a person's identity. File
-support stays disabled because this release omits attachment URLs and sends
-text-only replies.
+The app manifest uses Microsoft's [v1.28 schema](https://developer.microsoft.com/json-schemas/teams/v1.28/MicrosoftTeams.schema.json)
+and declares `personal` and `team` bot scopes. It requests only
+`ChannelMessage.Read.Group`; that resource-specific permission covers messages
+in the team where the app is installed and consented. Personal one-to-one bot
+activities do not add a Graph or chat RSC permission. The runtime team allowlist
+further restricts channel activities. Navigator and Directory remain
+authoritative for the user's connector role; the connector does not hard-code a
+person's identity. Personal scope stays disabled in activation config by
+default. Updating the installed app package and obtaining each intended user's
+installation/consent remain external acceptance steps. No new pilot user is
+enabled by this source change. File support stays disabled because this release
+omits attachment URLs and sends text-only replies.
 
 Team-scoped v1.28 app packages set `supportsChannelFeatures` to `tier1` because
 the Teams app catalog rejects team-scoped packages that omit this declaration.
 It does not add a Graph permission or an RSC permission.
 
 App manifest 使用微软的 [v1.28 schema](https://developer.microsoft.com/json-schemas/teams/v1.28/MicrosoftTeams.schema.json)，
-只安装到 `team` scope，并只申请 `ChannelMessage.Read.Group`。该资源特定权限仅覆盖
-安装并同意应用的 Team 中的消息。运行时 team allowlist 会进一步限制接收范围。用户连接器
-角色仍由 Navigator 与 Directory 权威判定；连接器不硬编码个人身份。当前版本不支持文件，
-因为会省略附件 URL，且只发送文本回复。
+声明 `personal` 与 `team` bot scope，并且只申请 `ChannelMessage.Read.Group`。该资源特定
+权限仅覆盖安装并同意应用的 Team 中的消息。个人一对一 bot activity 不增加 Graph 或 chat RSC
+权限。运行时 team allowlist 会进一步限制频道 activity。用户连接器角色仍由 Navigator 与
+Directory 权威判定；连接器不硬编码个人身份。activation 配置默认关闭 personal scope。更新已安装
+应用包并取得每位目标用户的安装/同意仍属于外部验收。本源码变更不会启用新的 pilot 用户。当前
+版本不支持文件，因为会省略附件 URL，且只发送文本回复。
 
 `team` scope 的 v1.28 应用包将 `supportsChannelFeatures` 设为 `tier1`，因为 Teams 应用
 目录会拒绝缺少此声明的 team-scoped package。该声明不会增加 Graph 或 RSC 权限。
@@ -115,11 +138,17 @@ secret 存入主机 secret store，配置中只保存引用名。不要把 clien
 JWT、activity 中的 service URL 或签名附件 URL 放入配置或日志。
 
 Ingress environment names are `TEAMS_BOT_APP_ID`, `TEAMS_TENANT_ID`,
-`TEAMS_ALLOWED_TEAM_IDS`, `NAVIGATOR_INTERNAL_BASE_URL`, and
+`TEAMS_ALLOWED_TEAM_IDS`, `TEAMS_PERSONAL_CHAT_ENABLED`,
+`NAVIGATOR_INTERNAL_BASE_URL`, and
 `TEAMS_NAVIGATOR_HMAC_KEY_FILE`. The HMAC key is read from the mounted file into
 process memory; the key value is never placed in an environment variable or
 event body. `TEAMS_NAVIGATOR_KEY_ID` defaults to `teams-v1`, the callback port
 defaults to `3978`, and the host admission timeout defaults to five seconds.
+`TEAMS_PERSONAL_CHAT_ENABLED` accepts only `true` or `false` and defaults to
+`false`. The package activation setting `personal_chat_enabled` uses the same
+default. Enabling either side alone is insufficient: ingress and outbound
+transport must both be explicitly configured, and the Work host must have an
+active owner-private installation binding.
 
 Durable mode is enabled only when both `TEAMS_NAVIGATOR_DELIVERY_STATE_DIR` and
 `TEAMS_DELIVERY_ADMIN_TOKEN_FILE` are set. Mount a writable owner-only persistent
@@ -160,14 +189,19 @@ It is never placed in the public message payload, model prompt, or logs.
 
 Navigator owns the dynamic maintainer projection in the read-only file named by
 `TEAMS_TASK_ACTOR_SUBJECTS_FILE`. It contains `{schemaVersion:1,workspaceId,issuer,subjects}`
-and is re-read for each admission and reply. Teams ingress does not keep a
-second actor allowlist, so adding or removing a Directory maintainer does not
-require an ingress restart or code change.
+and is re-read for each admission and reply. Work reads the same projection
+when registering, revoking, or resolving an owner-private installation.
+Teams ingress does not keep a second actor allowlist, so adding or removing a
+Directory maintainer does not require an ingress restart or code change.
 
 入站环境变量为 `TEAMS_BOT_APP_ID`、`TEAMS_TENANT_ID`、`TEAMS_ALLOWED_TEAM_IDS`、
-`NAVIGATOR_INTERNAL_BASE_URL` 和 `TEAMS_NAVIGATOR_HMAC_KEY_FILE`。HMAC key 从挂载文件
+`TEAMS_PERSONAL_CHAT_ENABLED`、`NAVIGATOR_INTERNAL_BASE_URL` 和
+`TEAMS_NAVIGATOR_HMAC_KEY_FILE`。HMAC key 从挂载文件
 读入进程内存；key 值不会进入环境变量或 event body。`TEAMS_NAVIGATOR_KEY_ID` 默认
 `teams-v1`，回调端口默认 `3978`，主机接纳超时默认五秒。
+`TEAMS_PERSONAL_CHAT_ENABLED` 只接受 `true` 或 `false`，默认 `false`。package activation
+设置 `personal_chat_enabled` 也默认 `false`。仅启用其中一侧仍不能收发个人消息：入站与出站
+transport 都必须显式配置，且 Work host 必须存在有效的 owner-private installation binding。
 
 持久模式仅在同时设置 `TEAMS_NAVIGATOR_DELIVERY_STATE_DIR` 与
 `TEAMS_DELIVERY_ADMIN_TOKEN_FILE` 时启用。将可写、owner-only 持久目录挂载到
@@ -200,15 +234,27 @@ envelope。Navigator 将其保存在私有 `conversation.serviceUrl` delivery ro
 再次验证该值并保留区域路径和末尾斜线。该 URL 不进入公开消息载荷、模型 prompt 或日志。
 
 Navigator 拥有由 `TEAMS_TASK_ACTOR_SUBJECTS_FILE` 指定的只读动态维护者投影文件，格式为
-`{schemaVersion:1,workspaceId,issuer,subjects}`，并在每次接纳和回复前重新读取。Teams
-入站不维护第二份 actor allowlist，因此新增或撤销 Directory 维护者无需重启侧车或改代码。
+`{schemaVersion:1,workspaceId,issuer,subjects}`，并在每次接纳和回复前重新读取。Work 在注册、撤销
+或解析 owner-private installation 时读取相同投影。Teams 入站不维护第二份 actor allowlist，因此
+新增或撤销 Directory 维护者无需重启侧车或改代码。
 
 The Teams app package manifest uses `<BOT_APP_CLIENT_ID>` for both
 `webApplicationInfo.id` and `bots[0].botId`; it does not contain a tenant ID.
 The tenant ID is configured only in the private activation settings.
 
+The private send transport accepts only `ConversationKind.PRIVATE`, a host
+resolved `target_kind=owner_private`, the verified actor UUID, and the SDK
+validated service URL. It calls the SDK's direct conversation send path and
+rejects channel reply references. The model-facing notification contract does
+not carry a conversation ID or recipient identifier.
+
 Teams 应用 manifest 的 `webApplicationInfo.id` 与 `bots[0].botId` 都使用
 `<BOT_APP_CLIENT_ID>`；manifest 不包含 tenant ID。tenant ID 只写入私有 activation 设置。
+
+个人消息 transport 只接受 `ConversationKind.PRIVATE`、宿主解析的
+`target_kind=owner_private`、已验证 actor UUID 与 SDK 校验过的 service URL。它调用 SDK 的
+conversation send 路径，并拒绝频道 reply reference。模型可见的 notification contract 不包含
+conversation ID 或 recipient 标识。
 
 ## Local validation / 本地验证
 

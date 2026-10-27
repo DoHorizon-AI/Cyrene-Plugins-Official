@@ -55,10 +55,27 @@ def test_secret_is_loaded_from_file_reference_and_team_scope_is_explicit(
 
     assert settings.navigator_hmac_key == b"private-test-key-material-at-least-32-bytes"
     assert settings.allowed_team_ids == frozenset({TEAM_ID})
+    assert settings.personal_chat_enabled is False
     assert settings.port == 3978
     assert not hasattr(settings, "allowed_actor_aad_object_ids")
     assert settings.delivery_state_dir is None
     assert settings.delivery_admin_token is None
+
+
+def test_personal_chat_flag_requires_explicit_boolean_value(monkeypatch, tmp_path):
+    """Keep private chat disabled unless the host opts in explicitly.
+
+    中文：只有主机显式 opt-in 才启用个人聊天。
+    """
+
+    secret_path = tmp_path / "navigator-hmac"
+    secret_path.write_bytes(b"private-test-key-material-at-least-32-bytes")
+    _environment(monkeypatch, secret_path, TEAMS_PERSONAL_CHAT_ENABLED="true")
+    assert IngressSettings.from_environment().personal_chat_enabled is True
+
+    _environment(monkeypatch, secret_path, TEAMS_PERSONAL_CHAT_ENABLED="enabled")
+    with pytest.raises(ConfigurationError, match="must be true or false"):
+        IngressSettings.from_environment()
 
 
 def test_optional_durable_delivery_requires_private_independent_admin_token(

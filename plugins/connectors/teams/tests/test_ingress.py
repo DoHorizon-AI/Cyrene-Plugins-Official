@@ -87,7 +87,9 @@ class AdmissionNavigator:
         self.closed = True
 
 
-def _settings(*, delivery_state_dir=None, delivery_admin_token=None):
+def _settings(
+    *, delivery_state_dir=None, delivery_admin_token=None, personal_chat_enabled=False
+):
     """Return private sidecar settings for one approved test team.
 
     中文：返回单个允许测试团队的私有侧车配置。
@@ -100,6 +102,7 @@ def _settings(*, delivery_state_dir=None, delivery_admin_token=None):
         navigator_base_url="http://navigator",
         navigator_hmac_key_id="teams-v1",
         navigator_hmac_key=b"fabricated-navigator-key-material-of-32-bytes",
+        personal_chat_enabled=personal_chat_enabled,
         navigator_timeout_seconds=1,
         delivery_state_dir=delivery_state_dir,
         delivery_admin_token=delivery_admin_token,
@@ -126,6 +129,54 @@ def _activity(*, actor_aad_id=ACTOR_ID, activity_id="1749000000000"):
             "channel": {"id": CHANNEL_ID},
         },
         "text": "@Cyrene inspect",
+        "entities": [],
+        "attachments": [],
+    }
+
+
+def _personal_install_activity(action, *, activity_id):
+    """Return one fabricated install lifecycle event from personal scope.
+
+    中文：返回一条伪造的 personal scope 安装生命周期 event。
+    """
+
+    return {
+        "type": "installationUpdate",
+        "action": action,
+        "id": activity_id,
+        "channelId": "msteams",
+        "serviceUrl": SERVICE_URL,
+        "from": {"id": "29:actor", "aadObjectId": ACTOR_ID, "name": "Actor"},
+        "recipient": {"id": "28:cyrene-bot", "type": "bot"},
+        "conversation": {
+            "id": "a:personal-install-conversation",
+            "tenantId": TENANT_ID,
+            "conversationType": "personal",
+        },
+        "channelData": {"tenant": {"id": TENANT_ID}},
+    }
+
+
+def _personal_message_activity(*, activity_id="personal-message-1"):
+    """Return one fabricated one-person Teams bot message.
+
+    中文：返回一条伪造的一对一 Teams bot 消息。
+    """
+
+    return {
+        "type": "message",
+        "id": activity_id,
+        "channelId": "msteams",
+        "serviceUrl": SERVICE_URL,
+        "from": {"id": "29:actor", "aadObjectId": ACTOR_ID, "name": "Actor"},
+        "recipient": {"id": "28:cyrene-bot", "type": "bot"},
+        "conversation": {
+            "id": "a:personal-conversation",
+            "tenantId": TENANT_ID,
+            "conversationType": "personal",
+        },
+        "channelData": {"tenant": {"id": TENANT_ID}},
+        "text": "private request",
         "entities": [],
         "attachments": [],
     }
@@ -265,6 +316,115 @@ async def test_sidecar_does_not_static_filter_future_directory_maintainers(monke
         ACTOR_ID,
         new_actor,
     ]
+
+
+@pytest.mark.asyncio
+async def test_personal_install_and_removal_require_sdk_auth_and_forward_binding_events(
+    monkeypatch,
+):
+    """Forward personal route registration and revocation only after SDK auth.
+
+    中文：只有 SDK 鉴权成功后才转发个人路由注册与撤销。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+    navigator = AdmissionNavigator()
+    service = await build_ingress_service(
+        _settings(personal_chat_enabled=True), navigator=navigator
+    )
+    token = _service_token(private_key)
+    try:
+        with TestClient(service.http_app) as client:
+            headers = {"Authorization": f"Bearer {token}"}
+            added = client.post(
+                "/api/messages",
+                json=_personal_install_activity("add", activity_id="install-add-1"),
+                headers=headers,
+            )
+            removed = client.post(
+                "/api/messages",
+                json=_personal_install_activity(
+                    "remove", activity_id="install-remove-1"
+                ),
+                headers=headers,
+            )
+            rejected = client.post(
+                "/api/messages",
+                json=_personal_install_activity("add", activity_id="install-add-2"),
+                headers={
+                    "Authorization": _service_token(
+                        private_key,
+                        service_url="https://smba.trafficmanager.net/teams/",
+                    )
+                },
+            )
+    finally:
+        await service.close()
+
+    assert added.status_code == 200
+    assert removed.status_code == 200
+    assert rejected.status_code == 401
+    assert [event["trust"]["installation_action"] for event in navigator.events] == [
+        "add",
+        "remove",
+    ]
+    assert all(
+        event["event_type"] == "personal_installation" for event in navigator.events
+    )
+    assert all(
+        event["trust"]["actor_aad_object_id"] == ACTOR_ID for event in navigator.events
+    )
+
+
+@pytest.mark.asyncio
+async def test_personal_messages_stay_disabled_until_explicit_host_opt_in(monkeypatch):
+    """Drop personal messages by default and preserve identity after opt-in.
+
+    中文：默认忽略个人消息；显式 opt-in 后保留已验证身份。
+    """
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+    token = _service_token(private_key)
+    activity = _personal_message_activity()
+
+    disabled_navigator = AdmissionNavigator()
+    disabled_service = await build_ingress_service(
+        _settings(), navigator=disabled_navigator
+    )
+    try:
+        with TestClient(disabled_service.http_app) as client:
+            disabled = client.post(
+                "/api/messages",
+                json=activity,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    finally:
+        await disabled_service.close()
+
+    enabled_navigator = AdmissionNavigator()
+    enabled_service = await build_ingress_service(
+        _settings(personal_chat_enabled=True), navigator=enabled_navigator
+    )
+    try:
+        with TestClient(enabled_service.http_app) as client:
+            enabled = client.post(
+                "/api/messages",
+                json=activity,
+                headers={"Authorization": f"Bearer {token}"},
+            )
+    finally:
+        await enabled_service.close()
+
+    assert disabled.status_code == 200
+    assert disabled_navigator.events == []
+    assert enabled.status_code == 200
+    assert len(enabled_navigator.events) == 1
+    event = enabled_navigator.events[0]
+    assert event["payload"]["conversation"]["kind"] == "private"
+    assert event["trust"]["actor_aad_object_id"] == ACTOR_ID
+    assert event["trust"]["conversation_kind"] == "private"
 
 
 @pytest.mark.asyncio

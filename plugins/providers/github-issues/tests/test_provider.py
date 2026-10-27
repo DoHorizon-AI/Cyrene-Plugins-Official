@@ -25,6 +25,8 @@ from github_issues_provider.account_center import (
     AccountCenterUnavailable,
 )
 from github_issues_provider.github_api import (
+    MAX_ACTION_WORKFLOW_RUNS,
+    MAX_RESPONSE_BYTES,
     GitHubApi,
     GitHubApiFailure,
     HttpResponse,
@@ -389,6 +391,12 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
     schemas = [json.loads(tool.input_schema_json) for tool in catalog.tools]
     assert all(schema["additionalProperties"] is False for schema in schemas)
     assert schemas[2]["properties"]["state"]["enum"] == ["OPEN", "CLOSED"]
+    workflow_runs_tool = next(
+        tool for tool in catalog.tools if tool.provider_tool_id == "github.actions.runs.list"
+    )
+    workflow_runs_schema = json.loads(workflow_runs_tool.input_schema_json)
+    assert "page" not in workflow_runs_schema["properties"]
+    assert "per_page" not in workflow_runs_schema["properties"]
     rerun_tool = next(
         tool for tool in catalog.tools if tool.provider_tool_id == "github.actions.rerun_failed"
     )
@@ -1280,7 +1288,7 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
                 {},
                 b'{"number":4,"state":"open","title":"Review","head":{"sha":"deadbeef1234567","ref":"cyrene/assistant/task","repo":{"id":12345,"full_name":"owner/project"}},"base":{"sha":"feedface1234567","ref":"main","repo":{"id":12345,"full_name":"owner/project"}},"repository":{"id":12345,"full_name":"owner/project"}}',
             )
-        if path.endswith("/actions/runs?per_page=100&branch=main"):
+        if path.endswith(f"/actions/runs?per_page={MAX_ACTION_WORKFLOW_RUNS}&branch=main"):
             return HttpResponse(
                 200,
                 {},
@@ -1429,6 +1437,9 @@ def test_pull_request_merge_projection_rejects_malformed_or_conflicting_facts(
 def test_workflow_run_list_reports_truncated_first_page() -> None:
     settings = make_settings()
     repository = settings.repositories[0]
+    observed: list[str] = []
+    run = json.loads(_workflow_run_response())
+    workflow_runs = [{**run, "id": run_id} for run_id in range(1, MAX_ACTION_WORKFLOW_RUNS + 1)]
 
     def transport(
         method: str,
@@ -1439,14 +1450,15 @@ def test_workflow_run_list_reports_truncated_first_page() -> None:
     ) -> HttpResponse:
         if path == "/repos/owner/project":
             return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
-        if path == "/repos/owner/project/actions/runs?per_page=100":
+        observed.append(path)
+        if path == f"/repos/owner/project/actions/runs?per_page={MAX_ACTION_WORKFLOW_RUNS}":
             return HttpResponse(
                 200,
                 {},
                 json.dumps(
                     {
-                        "total_count": 101,
-                        "workflow_runs": [json.loads(_workflow_run_response())],
+                        "total_count": MAX_ACTION_WORKFLOW_RUNS + 1,
+                        "workflow_runs": workflow_runs,
                     }
                 ).encode(),
             )
@@ -1456,9 +1468,111 @@ def test_workflow_run_list_reports_truncated_first_page() -> None:
         repository, "token"
     )
 
-    assert result["total_count"] == 101
+    assert len(result["workflow_runs"]) == MAX_ACTION_WORKFLOW_RUNS
+    assert result["total_count"] == MAX_ACTION_WORKFLOW_RUNS + 1
     assert result["complete"] is False
     assert result["truncated"] is True
+    assert len(observed) == 1
+
+
+@pytest.mark.parametrize(
+    "invalid_shape",
+    ["provider-exceeds-requested-page", "total-count-below-page-length"],
+    ids=["provider-exceeds-requested-page", "total-count-below-page-length"],
+)
+def test_workflow_run_list_rejects_invalid_page_counts(invalid_shape: str) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    run = json.loads(_workflow_run_response())
+    page_overflow = invalid_shape == "provider-exceeds-requested-page"
+    count = MAX_ACTION_WORKFLOW_RUNS + 1 if page_overflow else MAX_ACTION_WORKFLOW_RUNS
+    total_count = MAX_ACTION_WORKFLOW_RUNS + 1 if page_overflow else MAX_ACTION_WORKFLOW_RUNS - 1
+    response = {
+        "total_count": total_count,
+        "workflow_runs": [{**run, "id": run_id} for run_id in range(1, count + 1)],
+    }
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        assert path == f"/repos/owner/project/actions/runs?per_page={MAX_ACTION_WORKFLOW_RUNS}"
+        return HttpResponse(200, {}, json.dumps(response).encode())
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_workflow_runs(repository, "token")
+
+
+@pytest.mark.parametrize("page_argument", [{"page": 2}, {"per_page": 30}])
+def test_actions_run_tool_rejects_unexposed_pagination_arguments(
+    page_argument: dict[str, int],
+) -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    arguments = {"repository_id": "12345", "repository": "owner/project", **page_argument}
+    lease_ref = "12345678-1234-1234-1234-123456789abc"
+    request = wire.CallToolRequest(
+        binding_id=settings.binding_id,
+        provider_tool_id="github.actions.runs.list",
+        arguments_json=json.dumps(
+            {
+                "payload": arguments,
+                "lease_ref": lease_ref,
+                "trusted_context": signed_context(
+                    settings, arguments, lease_ref, "github.actions.runs.list"
+                ),
+            },
+            separators=(",", ":"),
+        ),
+    )
+
+    ok, result = provider.on_invoke("tool.provider.v1", "call_tool", request.SerializeToString())
+
+    assert ok is False
+    assert result == "INVALID_ARGUMENTS: tool arguments do not match the schema"
+    assert account.calls == []
+    assert api.calls == []
+
+
+def test_oversized_actions_run_response_is_reported_as_typed_tool_error() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        assert path == f"/repos/owner/project/actions/runs?per_page={MAX_ACTION_WORKFLOW_RUNS}"
+        return HttpResponse(200, {}, b"x" * (MAX_RESPONSE_BYTES + 1))
+
+    provider = GitHubIssuesProvider(
+        settings=settings,
+        account_center=FakeAccountCenter(),
+        github_api=GitHubApi(settings, transport=transport),
+    )
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "github.actions.runs.list",
+        {"repository_id": repository.repository_id, "repository": repository.slug},
+        profile_ref="00000000-0000-4000-8000-000000000001",
+    )
+
+    assert is_error is True
+    assert result == {"error": {"code": "INVALID_PROVIDER_RESPONSE", "retryable": False}}
 
 
 def test_ci_status_reports_incomplete_check_run_pages_instead_of_implying_green() -> None:

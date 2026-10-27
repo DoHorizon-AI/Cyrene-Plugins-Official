@@ -61,6 +61,7 @@ class TeamsBindingConfig:
     tenant_id: str
     allowed_team_ids: frozenset[str]
     client_secret_env_ref: str
+    personal_chat_enabled: bool
     service_url: str | None
     timeout_seconds: float
 
@@ -105,6 +106,11 @@ class TeamsBindingConfig:
             raise TeamsConnectorError(
                 "INVALID_REQUEST", "client_secret_env_ref is invalid"
             )
+        personal_chat_enabled = value.get("personal_chat_enabled", False)
+        if type(personal_chat_enabled) is not bool:
+            raise TeamsConnectorError(
+                "INVALID_REQUEST", "personal_chat_enabled must be boolean"
+            )
         service_url = value.get("service_url")
         if service_url is not None:
             try:
@@ -133,6 +139,7 @@ class TeamsBindingConfig:
             tenant_id=tenant_id,
             allowed_team_ids=team_ids,
             client_secret_env_ref=secret_ref,
+            personal_chat_enabled=personal_chat_enabled,
             service_url=service_url,
             timeout_seconds=timeout,
         )
@@ -154,10 +161,11 @@ class TeamsConnector:
 
     The Exchange host invokes this connector only after verifying a fresh
     `ConnectorOperationGrantV1`. This class still enforces the fixed app,
-    tenant, and installed-Team binding before sending to Teams.
+    tenant, and installed conversation binding before sending to Teams.
 
     中文：绑定范围内的 `message.connector.v1` Teams 传输。Exchange host 验证新鲜的
-    `ConnectorOperationGrantV1` 后才调用；本类仍会校验固定 app、tenant 和 Team。
+    `ConnectorOperationGrantV1` 后才调用；本类仍会校验固定 app、tenant 和 conversation
+    binding。
     """
 
     def __init__(
@@ -175,9 +183,9 @@ class TeamsConnector:
     def send_message(
         self, request: message_contract.SendMessageRequest
     ) -> message_contract.DeliveryResult:
-        """Send text to the exact authorized Teams channel thread.
+        """Send text to an authorized Teams channel thread or private target.
 
-        中文：向精确授权的 Teams 频道线程发送文本。
+        中文：向已授权的 Teams 频道线程或宿主解析的个人目标发送文本。
         """
 
         conversation = _conversation_for_send(request, self.config)
@@ -186,14 +194,23 @@ class TeamsConnector:
             try:
                 runner = self._require_runner()
                 app = self._require_sdk_app(runner)
-                sent = runner.run(
-                    app.reply(
-                        conversation["conversation_id"],
-                        conversation["root_thread_id"],
-                        text,
-                        service_url=conversation["service_url"],
+                if conversation["kind"] == "private":
+                    sent = runner.run(
+                        app.send(
+                            conversation["conversation_id"],
+                            text,
+                            service_url=conversation["service_url"],
+                        )
                     )
-                )
+                else:
+                    sent = runner.run(
+                        app.reply(
+                            conversation["conversation_id"],
+                            conversation["root_thread_id"],
+                            text,
+                            service_url=conversation["service_url"],
+                        )
+                    )
             except TeamsConnectorError:
                 raise
             except httpx.HTTPStatusError as exc:
@@ -383,9 +400,9 @@ def _conversation_for_send(
     request: message_contract.SendMessageRequest,
     config: TeamsBindingConfig,
 ) -> dict[str, str]:
-    """Validate provider, app, channel scope, and thread identity.
+    """Validate provider, app, channel scope, or host-resolved private target.
 
-    中文：校验 provider、app、频道范围与线程标识。
+    中文：校验 provider、app、频道范围或宿主解析的个人目标。
     """
 
     if not request.HasField("conversation"):
@@ -399,6 +416,8 @@ def _conversation_for_send(
         raise TeamsConnectorError(
             "PERMISSION_DENIED", "Teams account does not match this binding"
         )
+    if conversation.kind == message_contract.CONVERSATION_KIND_PRIVATE:
+        return _private_conversation_for_send(request, config)
     if conversation.kind != message_contract.CONVERSATION_KIND_CHANNEL:
         raise TeamsConnectorError(
             "INVALID_REQUEST", "only channel conversations are supported"
@@ -446,11 +465,69 @@ def _conversation_for_send(
             "INVALID_REQUEST", "Teams channel identity is missing"
         )
     return {
+        "kind": "channel",
         "conversation_id": conversation_id,
         "root_thread_id": root_thread_id,
         "service_url": service_url,
         "team_id": team_id,
         "channel_id": channel_id,
+    }
+
+
+def _private_conversation_for_send(
+    request: message_contract.SendMessageRequest,
+    config: TeamsBindingConfig,
+) -> dict[str, str]:
+    """Require an enabled, host-resolved owner-private conversation target.
+
+    The host resolves the actor's active personal-install binding before it
+    constructs this request. The model-facing notice contract carries only
+    `owner_private`, never this conversation ID.
+
+    中文：要求个人聊天已启用且目标由宿主解析。宿主先根据 actor 的有效个人安装 binding
+    解析目标再构造请求；模型可见的 notice contract 只包含 `owner_private`。
+    """
+
+    if not config.personal_chat_enabled:
+        raise TeamsConnectorError(
+            "PERMISSION_DENIED", "personal Teams conversations are disabled"
+        )
+    conversation_id = _required_text(
+        request.conversation.conversation_id, "conversation_id", limit=512
+    )
+    if request.HasField("reply"):
+        raise TeamsConnectorError(
+            "INVALID_REQUEST", "private Teams messages do not accept a reply thread"
+        )
+    facts = _vendor_facts(request.vendor_extension, config.tenant_id)
+    if facts.get("target_kind") != "owner_private":
+        raise TeamsConnectorError(
+            "PERMISSION_DENIED", "Teams private target must be resolved by the host"
+        )
+    actor_aad_id = facts.get("actor_aad_object_id")
+    if _canonical_actor_uuid(actor_aad_id) is None:
+        raise TeamsConnectorError(
+            "INVALID_REQUEST", "Teams private target actor identity is missing"
+        )
+    route_service_url = facts.get("service_url")
+    if route_service_url is None:
+        raise TeamsConnectorError(
+            "INVALID_REQUEST", "verified Teams service_url is required"
+        )
+    try:
+        service_url = validate_bot_service_url(
+            route_service_url,
+            tenant_id=config.tenant_id,
+        )
+    except ServiceUrlError as exc:
+        raise TeamsConnectorError(
+            "PERMISSION_DENIED", "Teams service_url is outside the provider allowlist"
+        ) from exc
+    return {
+        "kind": "private",
+        "conversation_id": conversation_id,
+        "service_url": service_url,
+        "actor_aad_object_id": actor_aad_id,
     }
 
 
@@ -477,11 +554,21 @@ def _vendor_facts(
         raise TeamsConnectorError(
             "PERMISSION_DENIED", "Teams tenant is outside this binding"
         )
-    if not facts.get("team_id") or not facts.get("channel_id"):
-        raise TeamsConnectorError(
-            "INVALID_REQUEST", "Teams team and channel facts are required"
-        )
     return facts
+
+
+def _canonical_actor_uuid(value: str | None) -> str | None:
+    """Return a canonical AAD UUID or no stable actor identity.
+
+    中文：返回规范 AAD UUID；缺失或格式错误时返回 None。
+    """
+
+    if value is None:
+        return None
+    try:
+        return str(uuid.UUID(value))
+    except ValueError:
+        return None
 
 
 def _text_for_send(request: message_contract.SendMessageRequest) -> str:

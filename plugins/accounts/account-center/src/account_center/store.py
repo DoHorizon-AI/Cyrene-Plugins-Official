@@ -5,6 +5,7 @@ Credential columns contain only authenticated ciphertext. 中文：凭据列仅�
 
 from __future__ import annotations
 
+import json
 import os
 import sqlite3
 import time
@@ -16,7 +17,7 @@ from typing import Any
 
 from .models import AccountCenterError, Anchor
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 
@@ -278,7 +279,7 @@ class AccountStore:
                 "profile_ref TEXT PRIMARY KEY,anchor_issuer TEXT NOT NULL,"
                 "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
                 "provider TEXT NOT NULL CHECK(provider IN "
-                "('github','huggingface','azure','gcp','runpod')),"
+                "('github','huggingface','azure','gcp','runpod','microsoft_graph','azure_devops')),"
                 "identity_ref TEXT NOT NULL,target_scope_json TEXT NOT NULL,"
                 "auth_status TEXT NOT NULL CHECK(auth_status IN "
                 "('unknown','configured','healthy','unavailable','reauthorization_required','revoked')),"
@@ -293,7 +294,8 @@ class AccountStore:
             db.execute(
                 "CREATE UNIQUE INDEX IF NOT EXISTS provider_external_identity "
                 "ON provider_profiles(provider,identity_ref,organization_id) "
-                "WHERE status='active' AND provider IN ('github','huggingface')"
+                "WHERE status='active' AND provider IN "
+                "('github','huggingface','microsoft_graph')"
             )
             db.execute(
                 "CREATE TABLE IF NOT EXISTS provider_credential_leases ("
@@ -314,7 +316,8 @@ class AccountStore:
                 db.execute(
                     "ALTER TABLE provider_profiles ADD COLUMN auth_mode TEXT NOT NULL "
                     "DEFAULT 'legacy' CHECK(auth_mode IN "
-                    "('legacy','fine_grained_token','device_oauth','github_app','host_identity'))"
+                    "('legacy','fine_grained_token','device_oauth','github_app','host_identity',"
+                    "'delegated_oauth'))"
                 )
                 db.execute(
                     "ALTER TABLE provider_profiles ADD COLUMN credential_refresh_blob BLOB"
@@ -391,6 +394,97 @@ class AccountStore:
                     "organization_id,workspace_id,status,expires_at)"
                 )
                 db.execute("PRAGMA user_version = 8")
+            if 5 <= current < 9:
+                # Rebuild the parent table while deferring references from its
+                # lease and renewal rows until the replacement is in place.
+                db.execute("PRAGMA defer_foreign_keys = ON")
+                db.execute(
+                    "CREATE TABLE provider_profiles_new ("
+                    "profile_ref TEXT PRIMARY KEY,anchor_issuer TEXT NOT NULL,"
+                    "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
+                    "provider TEXT NOT NULL CHECK(provider IN "
+                    "('github','huggingface','azure','gcp','runpod','microsoft_graph','azure_devops')),"
+                    "identity_ref TEXT NOT NULL,target_scope_json TEXT NOT NULL,"
+                    "auth_status TEXT NOT NULL CHECK(auth_status IN "
+                    "('unknown','configured','healthy','unavailable','reauthorization_required','revoked')) ,"
+                    "external_subject TEXT,credential_blob BLOB,credential_expires_at INTEGER,"
+                    "credential_secret_ref TEXT,status TEXT NOT NULL CHECK(status IN ('active','unlinked')) ,"
+                    "created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,"
+                    "auth_mode TEXT NOT NULL DEFAULT 'legacy' CHECK(auth_mode IN "
+                    "('legacy','fine_grained_token','device_oauth','github_app','host_identity','delegated_oauth')) ,"
+                    "credential_refresh_blob BLOB,credential_refresh_expires_at INTEGER,"
+                    "oauth_client_id TEXT,oauth_scopes_json TEXT,refresh_claim_id TEXT,"
+                    "refresh_claim_owner TEXT,refresh_claimed_at INTEGER,"
+                    "credential_revision INTEGER NOT NULL DEFAULT 0,"
+                    "access_mode TEXT NOT NULL DEFAULT 'actor_owned' CHECK(access_mode IN "
+                    "('actor_owned','workspace_operator')))"
+                )
+                profile_columns = (
+                    "profile_ref,anchor_issuer,anchor_subject,organization_id,workspace_id,"
+                    "provider,identity_ref,target_scope_json,auth_status,external_subject,"
+                    "credential_blob,credential_expires_at,credential_secret_ref,status,"
+                    "created_at,updated_at,auth_mode,credential_refresh_blob,"
+                    "credential_refresh_expires_at,oauth_client_id,oauth_scopes_json,"
+                    "refresh_claim_id,refresh_claim_owner,refresh_claimed_at,"
+                    "credential_revision,access_mode"
+                )
+                db.execute(
+                    f"INSERT INTO provider_profiles_new({profile_columns}) "
+                    f"SELECT {profile_columns} FROM provider_profiles"
+                )
+                db.execute("DROP TABLE provider_profiles")
+                db.execute(
+                    "ALTER TABLE provider_profiles_new RENAME TO provider_profiles"
+                )
+                db.execute(
+                    "CREATE INDEX provider_profile_owner_scope ON provider_profiles("
+                    "anchor_issuer,anchor_subject,organization_id,workspace_id,status)"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX provider_external_identity "
+                    "ON provider_profiles(provider,identity_ref,organization_id) "
+                    "WHERE status='active' AND provider IN "
+                    "('github','huggingface','microsoft_graph')"
+                )
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS microsoft_entra_oauth_sessions ("
+                "session_ref TEXT PRIMARY KEY,profile_ref TEXT NOT NULL,"
+                "provider TEXT NOT NULL CHECK(provider IN ('microsoft_graph','azure_devops')) ,"
+                "flow TEXT NOT NULL CHECK(flow IN ('link','scope_upgrade')),"
+                "anchor_issuer TEXT NOT NULL,anchor_subject TEXT NOT NULL,"
+                "organization_id TEXT NOT NULL,workspace_id TEXT,state_digest TEXT NOT NULL UNIQUE,"
+                "nonce_digest TEXT NOT NULL,callback_uri TEXT NOT NULL,"
+                "code_verifier_blob BLOB NOT NULL,target_scope_json TEXT NOT NULL,"
+                "oauth_scopes_json TEXT NOT NULL,oauth_client_id TEXT NOT NULL,"
+                "access_mode TEXT NOT NULL CHECK(access_mode IN "
+                "('actor_owned','workspace_operator')),"
+                "profile_revision INTEGER,expires_at INTEGER NOT NULL,"
+                "status TEXT NOT NULL CHECK(status IN "
+                "('pending','processing','completed','failed','expired')) ,"
+                "created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)"
+            )
+            db.execute(
+                "CREATE INDEX IF NOT EXISTS microsoft_entra_oauth_owner ON "
+                "microsoft_entra_oauth_sessions(anchor_issuer,anchor_subject,"
+                "organization_id,workspace_id,status,expires_at)"
+            )
+            db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS provider_azure_devops_profile_scope "
+                "ON provider_profiles(provider,identity_ref,organization_id,target_scope_json) "
+                "WHERE status='active' AND provider='azure_devops'"
+            )
+            db.execute(
+                "CREATE TRIGGER IF NOT EXISTS provider_azure_devops_identity_owner "
+                "BEFORE INSERT ON provider_profiles WHEN NEW.provider='azure_devops' "
+                "AND EXISTS(SELECT 1 FROM provider_profiles AS existing "
+                "WHERE existing.provider='azure_devops' AND existing.identity_ref=NEW.identity_ref "
+                "AND existing.organization_id=NEW.organization_id AND existing.status='active' "
+                "AND (existing.anchor_issuer!=NEW.anchor_issuer "
+                "OR existing.anchor_subject!=NEW.anchor_subject "
+                "OR existing.workspace_id IS NOT NEW.workspace_id)) "
+                "BEGIN SELECT RAISE(ABORT,'external_identity_owned'); END"
+            )
+            db.execute("PRAGMA user_version = 9")
 
     def _recover_interrupted_operations(self) -> None:
         """Mark token rotations, callbacks, and revocations interrupted by restart."""
@@ -426,6 +520,11 @@ class AccountStore:
                 "AND remote_revocation_status='pending' "
                 "AND (remote_revocation_owner IS NULL OR remote_revocation_owner!=?)",
                 (self._instance_id,),
+            )
+            db.execute(
+                "UPDATE microsoft_entra_oauth_sessions SET status='failed',"
+                "code_verifier_blob=X'',updated_at=? WHERE status='processing'",
+                (int(time.time()),),
             )
             db.execute(
                 "UPDATE link_sessions SET status='failed',failure_revocation_status='unknown', "
@@ -677,6 +776,266 @@ class AccountStore:
             if command_result is not None:
                 self._complete_command_in_transaction(db, *command_result)
         return session_ref
+
+    def create_microsoft_entra_oauth_session(
+        self,
+        *,
+        session_ref: str,
+        profile_ref: str,
+        provider: str,
+        flow: str,
+        anchor: Anchor,
+        state_digest: str,
+        nonce_digest: str,
+        callback_uri: str,
+        code_verifier_blob: bytes,
+        target_scope_json: str,
+        oauth_scopes_json: str,
+        oauth_client_id: str,
+        access_mode: str,
+        profile_revision: int | None,
+        expires_at: int,
+        now: int,
+        command_result: tuple[str, bytes] | None = None,
+    ) -> None:
+        """Persist one actor-bound Entra PKCE session and its idempotent result."""
+
+        if (
+            provider not in {"microsoft_graph", "azure_devops"}
+            or flow
+            not in {
+                "link",
+                "scope_upgrade",
+            }
+            or access_mode
+            not in {
+                "actor_owned",
+                "workspace_operator",
+            }
+        ):
+            raise AccountCenterError("invalid_request")
+        if (flow == "link") != (profile_revision is None):
+            raise AccountCenterError("invalid_request")
+        with self.transaction() as db:
+            try:
+                db.execute(
+                    "INSERT INTO microsoft_entra_oauth_sessions(session_ref,profile_ref,"
+                    "provider,flow,anchor_issuer,anchor_subject,organization_id,workspace_id,"
+                    "state_digest,nonce_digest,callback_uri,code_verifier_blob,"
+                    "target_scope_json,oauth_scopes_json,oauth_client_id,access_mode,"
+                    "profile_revision,expires_at,status,created_at,updated_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',?,?)",
+                    (
+                        session_ref,
+                        profile_ref,
+                        provider,
+                        flow,
+                        anchor.issuer,
+                        anchor.subject,
+                        anchor.organization_id,
+                        anchor.workspace_id,
+                        state_digest,
+                        nonce_digest,
+                        callback_uri,
+                        code_verifier_blob,
+                        target_scope_json,
+                        oauth_scopes_json,
+                        oauth_client_id,
+                        access_mode,
+                        profile_revision,
+                        expires_at,
+                        now,
+                        now,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                raise AccountCenterError("link_session_invalid") from None
+            if command_result is not None:
+                self._complete_command_in_transaction(db, *command_result)
+
+    def claim_microsoft_entra_oauth_session(
+        self, state_digest: str, callback_uri: str, *, now: int
+    ) -> sqlite3.Row:
+        """Atomically claim one unexpired Graph callback and prevent state replay."""
+
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM microsoft_entra_oauth_sessions WHERE state_digest=? "
+                "AND callback_uri=? AND status='pending' AND expires_at>?",
+                (state_digest, callback_uri, now),
+            ).fetchone()
+            if row is None:
+                raise AccountCenterError("link_session_invalid")
+            changed = db.execute(
+                "UPDATE microsoft_entra_oauth_sessions SET status='processing',updated_at=? "
+                "WHERE session_ref=? AND status='pending' AND expires_at>?",
+                (now, row["session_ref"], now),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("link_session_invalid")
+            return row
+
+    def fail_microsoft_entra_oauth_session(self, session_ref: str, *, now: int) -> None:
+        """Erase the encrypted verifier after a consumed or failed Graph callback."""
+
+        with self.transaction() as db:
+            changed = db.execute(
+                "UPDATE microsoft_entra_oauth_sessions SET status='failed',"
+                "code_verifier_blob=X'',updated_at=? WHERE session_ref=? "
+                "AND status='processing'",
+                (now, session_ref),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("link_session_invalid")
+
+    def complete_microsoft_entra_oauth_session(
+        self,
+        *,
+        session_ref: str,
+        provider: str,
+        anchor: Anchor,
+        identity_ref: str,
+        external_subject: str,
+        target_scope_json: str,
+        credential_blob: bytes,
+        credential_refresh_blob: bytes,
+        credential_expires_at: int,
+        credential_refresh_expires_at: int | None,
+        oauth_scopes_json: str,
+        oauth_client_id: str,
+        now: int,
+    ) -> sqlite3.Row:
+        """Atomically create or upgrade one Entra profile under its saved owner."""
+
+        with self.transaction() as db:
+            session = db.execute(
+                "SELECT * FROM microsoft_entra_oauth_sessions WHERE session_ref=?",
+                (session_ref,),
+            ).fetchone()
+            if (
+                session is None
+                or session["status"] != "processing"
+                or session["provider"] != provider
+                or session["expires_at"] <= now
+                or session["callback_uri"] == ""
+                or session["oauth_client_id"] != oauth_client_id
+                or not self._owns(session, anchor)
+                or session["oauth_scopes_json"] != oauth_scopes_json
+            ):
+                raise AccountCenterError("link_session_invalid")
+            profile_ref = str(session["profile_ref"])
+            if session["flow"] == "link":
+                if session["profile_revision"] is not None:
+                    raise AccountCenterError("link_session_invalid")
+                try:
+                    scope = json.loads(target_scope_json)
+                    tenant_id, object_id = external_subject.split(":", 1)
+                except (TypeError, ValueError, json.JSONDecodeError):
+                    raise AccountCenterError("external_identity_mismatch") from None
+                if (
+                    identity_ref != external_subject
+                    or not isinstance(scope, dict)
+                    or scope.get("tenant_id") != tenant_id
+                    or not tenant_id
+                    or not object_id
+                    or ":" in object_id
+                ):
+                    raise AccountCenterError("external_identity_mismatch")
+                try:
+                    db.execute(
+                        "INSERT INTO provider_profiles(profile_ref,anchor_issuer,"
+                        "anchor_subject,organization_id,workspace_id,provider,identity_ref,"
+                        "target_scope_json,auth_status,external_subject,credential_blob,"
+                        "credential_expires_at,credential_refresh_blob,"
+                        "credential_refresh_expires_at,oauth_client_id,oauth_scopes_json,"
+                        "credential_secret_ref,status,created_at,updated_at,auth_mode,"
+                        "credential_revision,access_mode) "
+                        "VALUES(?,?,?,?,?,?,?,?,'healthy',?,?,?,?,?,?,?,NULL,"
+                        "'active',?,?,'delegated_oauth',0,?)",
+                        (
+                            profile_ref,
+                            anchor.issuer,
+                            anchor.subject,
+                            anchor.organization_id,
+                            anchor.workspace_id,
+                            provider,
+                            identity_ref,
+                            target_scope_json,
+                            external_subject,
+                            credential_blob,
+                            credential_expires_at,
+                            credential_refresh_blob,
+                            credential_refresh_expires_at,
+                            oauth_client_id,
+                            oauth_scopes_json,
+                            now,
+                            now,
+                            session["access_mode"],
+                        ),
+                    )
+                except sqlite3.IntegrityError:
+                    raise AccountCenterError("external_identity_owned") from None
+            elif session["flow"] == "scope_upgrade":
+                profile = db.execute(
+                    "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                    (profile_ref,),
+                ).fetchone()
+                if (
+                    profile is None
+                    or not self._owns_provider_profile(profile, anchor)
+                    or profile["provider"] != provider
+                    or profile["auth_mode"] != "delegated_oauth"
+                    or profile["auth_status"] != "healthy"
+                    or profile["external_subject"] != external_subject
+                    or profile["identity_ref"] != identity_ref
+                    or profile["credential_revision"] != session["profile_revision"]
+                    or profile["refresh_claim_id"] is not None
+                    or session["target_scope_json"] != target_scope_json
+                ):
+                    raise AccountCenterError("external_identity_mismatch")
+                changed = db.execute(
+                    "UPDATE provider_profiles SET target_scope_json=?,credential_blob=?,"
+                    "credential_refresh_blob=?,credential_expires_at=?,"
+                    "credential_refresh_expires_at=?,oauth_client_id=?,oauth_scopes_json=?,"
+                    "auth_status='healthy',credential_revision=credential_revision+1,"
+                    "updated_at=? WHERE profile_ref=? AND credential_revision=? "
+                    "AND refresh_claim_id IS NULL",
+                    (
+                        target_scope_json,
+                        credential_blob,
+                        credential_refresh_blob,
+                        credential_expires_at,
+                        credential_refresh_expires_at,
+                        oauth_client_id,
+                        oauth_scopes_json,
+                        now,
+                        profile_ref,
+                        session["profile_revision"],
+                    ),
+                ).rowcount
+                if changed != 1:
+                    raise AccountCenterError("credential_refresh_claim_lost")
+                db.execute(
+                    "DELETE FROM provider_credential_leases WHERE profile_ref=?",
+                    (profile_ref,),
+                )
+            else:
+                raise AccountCenterError("link_session_invalid")
+            changed = db.execute(
+                "UPDATE microsoft_entra_oauth_sessions SET status='completed',"
+                "code_verifier_blob=X'',updated_at=? WHERE session_ref=? "
+                "AND status='processing' AND expires_at>?",
+                (now, session_ref, now),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("link_session_invalid")
+            result = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if result is None:
+                raise AccountCenterError("storage_unavailable")
+            return result
 
     def claim_session_by_state(
         self, state_digest: str, callback_uri: str, *, now: int
@@ -1219,12 +1578,15 @@ class AccountStore:
             auth_mode = {
                 "github": "github_app",
                 "huggingface": "fine_grained_token",
+                "microsoft_graph": "delegated_oauth",
+                "azure_devops": "delegated_oauth",
             }.get(provider, "host_identity")
         if auth_mode not in {
             "fine_grained_token",
             "device_oauth",
             "github_app",
             "host_identity",
+            "delegated_oauth",
         }:
             raise AccountCenterError("invalid_request")
         if access_mode not in {"actor_owned", "workspace_operator"}:
@@ -1876,11 +2238,13 @@ class AccountStore:
                 (profile_ref,),
             )
 
-    def claim_huggingface_oauth_refresh(
+    def claim_provider_oauth_refresh(
         self,
         profile_ref: str,
         anchor: Anchor,
         *,
+        provider: str,
+        auth_mode: str,
         now: int,
         refresh_margin_seconds: int = 60,
         claim_stale_seconds: int = 45,
@@ -1896,10 +2260,7 @@ class AccountStore:
                 profile, anchor, allow_workspace_operator=True
             ):
                 raise AccountCenterError("profile_not_found")
-            if (
-                profile["provider"] != "huggingface"
-                or profile["auth_mode"] != "device_oauth"
-            ):
+            if profile["provider"] != provider or profile["auth_mode"] != auth_mode:
                 raise AccountCenterError("profile_provider_mismatch")
             if profile["auth_status"] != "healthy":
                 raise AccountCenterError("credential_reauthorization_required")
@@ -1911,11 +2272,11 @@ class AccountStore:
             ):
                 return "ready", profile, None
             if profile["credential_refresh_blob"] is None:
-                self._mark_huggingface_reauthorization_required(db, profile_ref, now)
+                self._mark_provider_reauthorization_required(db, profile_ref, now)
                 return "reauthorization_required", None, None
             refresh_expires_at = profile["credential_refresh_expires_at"]
             if isinstance(refresh_expires_at, int) and refresh_expires_at <= now:
-                self._mark_huggingface_reauthorization_required(db, profile_ref, now)
+                self._mark_provider_reauthorization_required(db, profile_ref, now)
                 return "reauthorization_required", None, None
             claim_id = profile["refresh_claim_id"]
             if claim_id is not None:
@@ -1925,13 +2286,13 @@ class AccountStore:
                     and now - claimed_at <= claim_stale_seconds
                 ):
                     return "waiting", None, None
-                self._mark_huggingface_reauthorization_required(db, profile_ref, now)
+                self._mark_provider_reauthorization_required(db, profile_ref, now)
                 return "reauthorization_required", None, None
             claim_id = str(uuid.uuid4())
             changed = db.execute(
                 "UPDATE provider_profiles SET refresh_claim_id=?,refresh_claim_owner=?,"
                 "refresh_claimed_at=?,updated_at=? WHERE profile_ref=? AND status='active' "
-                "AND auth_status='healthy' AND auth_mode='device_oauth' "
+                "AND auth_status='healthy' AND provider=? AND auth_mode=? "
                 "AND credential_revision=? AND refresh_claim_id IS NULL",
                 (
                     claim_id,
@@ -1939,6 +2300,8 @@ class AccountStore:
                     now,
                     now,
                     profile_ref,
+                    provider,
+                    auth_mode,
                     profile["credential_revision"],
                 ),
             ).rowcount
@@ -1950,7 +2313,7 @@ class AccountStore:
             ).fetchone()
             return "claimed", claimed, claim_id
 
-    def complete_huggingface_oauth_refresh(
+    def complete_provider_oauth_refresh(
         self,
         *,
         profile_ref: str,
@@ -1961,6 +2324,8 @@ class AccountStore:
         credential_expires_at: int,
         credential_refresh_expires_at: int | None,
         oauth_scopes_json: str | None,
+        provider: str,
+        auth_mode: str,
         now: int,
     ) -> None:
         """Commit rotated token material before the caller can return access."""
@@ -1974,8 +2339,8 @@ class AccountStore:
                 "credential_revision=credential_revision+1,updated_at=? "
                 "WHERE profile_ref=? AND anchor_issuer=? AND organization_id=? "
                 "AND workspace_id IS ? AND (anchor_subject=? OR access_mode='workspace_operator') "
-                "AND provider='huggingface' "
-                "AND status='active' AND auth_mode='device_oauth' "
+                "AND provider=? "
+                "AND status='active' AND auth_mode=? "
                 "AND refresh_claim_id=? AND refresh_claim_owner=?",
                 (
                     credential_blob,
@@ -1989,6 +2354,8 @@ class AccountStore:
                     anchor.organization_id,
                     anchor.workspace_id,
                     anchor.subject,
+                    provider,
+                    auth_mode,
                     claim_id,
                     self._instance_id,
                 ),
@@ -1996,13 +2363,15 @@ class AccountStore:
             if changed != 1:
                 raise AccountCenterError("credential_refresh_claim_lost")
 
-    def release_huggingface_oauth_refresh(
+    def release_provider_oauth_refresh(
         self,
         *,
         profile_ref: str,
         anchor: Anchor,
         claim_id: str,
         now: int,
+        provider: str,
+        auth_mode: str,
         auth_status: str = "healthy",
         clear_credentials: bool = False,
     ) -> None:
@@ -2022,8 +2391,8 @@ class AccountStore:
                 "credential_revision=credential_revision+1,updated_at=? "
                 "WHERE profile_ref=? AND anchor_issuer=? AND organization_id=? "
                 "AND workspace_id IS ? AND (anchor_subject=? OR access_mode='workspace_operator') "
-                "AND provider='huggingface' "
-                "AND status='active' AND refresh_claim_id=? AND refresh_claim_owner=?",
+                "AND provider=? AND status='active' AND auth_mode=? "
+                "AND refresh_claim_id=? AND refresh_claim_owner=?",
                 (
                     auth_status,
                     now,
@@ -2032,6 +2401,8 @@ class AccountStore:
                     anchor.organization_id,
                     anchor.workspace_id,
                     anchor.subject,
+                    provider,
+                    auth_mode,
                     claim_id,
                     self._instance_id,
                 ),
@@ -2045,7 +2416,7 @@ class AccountStore:
                 )
 
     @staticmethod
-    def _mark_huggingface_reauthorization_required(
+    def _mark_provider_reauthorization_required(
         db: sqlite3.Connection, profile_ref: str, now: int
     ) -> None:
         db.execute(
@@ -2082,6 +2453,35 @@ class AccountStore:
             db.execute(
                 "UPDATE provider_profiles SET auth_status=?,updated_at=? WHERE profile_ref=?",
                 (auth_status, now, profile_ref),
+            )
+
+    def require_provider_reauthorization(
+        self, profile_ref: str, anchor: Anchor, *, now: int
+    ) -> None:
+        """Clear mismatched Entra credentials and revoke their pending leases."""
+
+        with self.transaction() as db:
+            profile = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if (
+                profile is None
+                or not self._owns(profile, anchor)
+                or profile["provider"] not in {"microsoft_graph", "azure_devops"}
+                or profile["auth_mode"] != "delegated_oauth"
+            ):
+                raise AccountCenterError("profile_not_found")
+            db.execute(
+                "UPDATE provider_profiles SET auth_status='reauthorization_required',"
+                "credential_blob=NULL,credential_refresh_blob=NULL,refresh_claim_id=NULL,"
+                "refresh_claim_owner=NULL,refresh_claimed_at=NULL,"
+                "credential_revision=credential_revision+1,updated_at=? WHERE profile_ref=?",
+                (now, profile_ref),
+            )
+            db.execute(
+                "DELETE FROM provider_credential_leases WHERE profile_ref=?",
+                (profile_ref,),
             )
 
     def set_provider_profile_secret_ref(
@@ -2185,7 +2585,8 @@ class AccountStore:
                     allow_workspace_operator=allow_workspace_operator,
                 )
                 or profile["auth_status"] != "healthy"
-                or profile["provider"] not in {"github", "huggingface"}
+                or profile["provider"]
+                not in {"github", "huggingface", "microsoft_graph", "azure_devops"}
             ):
                 raise AccountCenterError("profile_unavailable")
             has_grant = grant_ref is not None
