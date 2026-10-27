@@ -158,7 +158,8 @@ jobs:
           set -euo pipefail
           python -m pip install --disable-pip-version-check \
             --requirement tooling/release/build-requirements.lock \
-            --requirement tools/ci/connection-release-requirements.txt
+            --requirement tools/ci/connection-release-requirements.txt \
+            PyYAML==6.0.3
 
       - name: Install exact runtime pins needed by clean-start tests
         run: |
