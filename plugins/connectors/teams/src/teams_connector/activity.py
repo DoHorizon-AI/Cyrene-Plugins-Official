@@ -15,6 +15,7 @@ import re
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Any
 
 from .service_url import ServiceUrlError, validate_bot_service_url
@@ -281,22 +282,59 @@ def normalize_personal_installation(
     except ServiceUrlError as exc:
         raise ActivityRejected("service_url_not_allowed") from exc
 
+    trust = {
+        "version": 1,
+        "provider": "teams",
+        "conversation_kind": "private",
+        "installation_action": action,
+        "tenant_id": observed_tenant,
+        "actor_aad_object_id": actor_aad_id,
+        "bot_app_id": bot_app_id,
+        "conversation_id": conversation_id,
+        "activity_id": activity_id,
+        "service_url": service_url,
+    }
+    raw_occurred_at = _get(activity, "timestamp")
+    if raw_occurred_at is not None:
+        trust["activity_occurred_at"] = _activity_timestamp(raw_occurred_at)
+
     return NormalizedTeamsActivity(
         payload={"action": action},
-        trust={
-            "version": 1,
-            "provider": "teams",
-            "conversation_kind": "private",
-            "installation_action": action,
-            "tenant_id": observed_tenant,
-            "actor_aad_object_id": actor_aad_id,
-            "bot_app_id": bot_app_id,
-            "conversation_id": conversation_id,
-            "activity_id": activity_id,
-            "service_url": service_url,
-        },
+        trust=trust,
         event_type="personal_installation",
     )
+
+
+def _activity_timestamp(value: Any) -> str:
+    """Normalize an actual Bot Framework Activity.timestamp to UTC ISO8601.
+
+    A missing timestamp remains optional at the call site. If the provider
+    supplies one, require an offset-aware datetime so ordering never depends
+    on local time or the time this process received the activity.
+
+    中文：将 Bot Framework Activity.timestamp 规范化为 UTC ISO8601。字段缺失时由
+    调用方保留为可选；字段存在时必须带时区，不能依赖本地时间或接收时间排序。
+    """
+
+    if isinstance(value, datetime):
+        parsed = value
+    elif isinstance(value, str):
+        if not value or len(value) > 128:
+            raise ActivityRejected("invalid_activity_timestamp")
+        try:
+            parsed = datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise ActivityRejected("invalid_activity_timestamp") from exc
+    else:
+        raise ActivityRejected("invalid_activity_timestamp")
+
+    try:
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            raise ActivityRejected("invalid_activity_timestamp")
+        utc_value = parsed.astimezone(UTC)
+    except (OverflowError, TypeError, ValueError) as exc:
+        raise ActivityRejected("invalid_activity_timestamp") from exc
+    return utc_value.isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def _content_parts(

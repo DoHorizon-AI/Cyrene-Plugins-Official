@@ -28,11 +28,17 @@ message starts a thread or continues an active root thread.
 Personal bot messages and installation add/remove events require the explicit
 `personal_chat_enabled` activation flag and `TEAMS_PERSONAL_CHAT_ENABLED=true`.
 Both default to off. The source forwards signed personal installation facts in
-the private trust envelope; Work owns actor authorization, route persistence,
-and revocation. Private sends use the existing canonical PRIVATE conversation
-kind and require a host-resolved `owner_private` target.
+the private trust envelope, including the provider's `Activity.timestamp` as
+`activity_occurred_at` when present. That value is normalized to UTC; a missing
+timestamp stays absent, and an invalid or timezone-naive timestamp is rejected.
+The connector never substitutes local time, `localTimestamp`, or receipt time.
+Work owns actor authorization, route ordering, persistence, and revocation.
+Private sends use the existing canonical PRIVATE conversation kind and require
+a host-resolved `owner_private` target.
 
 个人 bot 消息与安装/移除事件要求显式设置 `personal_chat_enabled` 与
 `TEAMS_PERSONAL_CHAT_ENABLED=true`，两者默认关闭。源码只在私有 trust envelope 中转发经签名的
-个人安装事实；Work 负责 actor 授权、路由持久化与撤销。个人消息发送复用现有 canonical PRIVATE
+个人安装事实；如供应商提供 `Activity.timestamp`，以 `activity_occurred_at` 携带并规范化为 UTC。
+缺失时保持缺失，无效或无时区时间会被拒绝；连接器不会用本地时间、`localTimestamp` 或接收时间替代。
+Work 负责 actor 授权、安装事件排序、路由持久化与撤销。个人消息发送复用现有 canonical PRIVATE
 conversation kind，并要求宿主解析的 `owner_private` 目标。
