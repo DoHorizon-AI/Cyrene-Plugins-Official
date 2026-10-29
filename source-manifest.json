@@ -1720,8 +1720,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/README.md",
-      "sha256": "9e6e8f586adc7f73f6223fb88de747a19f8abbcb8445d1dd0e1939345b096d77",
-      "size_bytes": 2556
+      "sha256": "f7c875080ff5cd125457815ccd535ea53b19cdc685db549730920d2c61b8ccd8",
+      "size_bytes": 3111
     },
     {
       "kind": "file",
@@ -1755,8 +1755,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/activity.py",
-      "sha256": "1b6b0bebd88519ff364264999fea613bacb4e1dc2b9b0f2ff15ca0874c82aa0b",
-      "size_bytes": 21287
+      "sha256": "188a03b30d9bd02b7646ed50fd79776778435cf61eec429fcc2e2fa97e7b923d",
+      "size_bytes": 22851
     },
     {
       "kind": "file",
@@ -1825,8 +1825,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_activity.py",
-      "sha256": "889dd366354871f17e3c186deb24ff3136188340aa769da89faabc932b1c817f",
-      "size_bytes": 21996
+      "sha256": "79381d5eb86f2579542c9273655611e9362b9c1c0cedd8bf40a4d653e1984b08",
+      "size_bytes": 24897
     },
     {
       "kind": "file",

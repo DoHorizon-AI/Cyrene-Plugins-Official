@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -235,14 +236,14 @@ def test_personal_message_rejects_missing_actor_or_mixed_scope(overrides, reason
 
 
 def _personal_installation(
-    action, *, conversation_type="personal", actor_aad_id=ACTOR_ID
+    action, *, conversation_type="personal", actor_aad_id=ACTOR_ID, **overrides
 ):
     """Return a fabricated personal install lifecycle activity.
 
     中文：返回伪造的个人安装生命周期 activity。
     """
 
-    return {
+    value = {
         "type": "installationUpdate",
         "action": action,
         "id": f"installation-{action}-1",
@@ -255,6 +256,8 @@ def _personal_installation(
         "serviceUrl": SERVICE_URL,
         "channelData": {"tenant": {"id": TENANT_ID}},
     }
+    value.update(overrides)
+    return value
 
 
 @pytest.mark.parametrize("action", ["add", "remove"])
@@ -278,6 +281,93 @@ def test_personal_installation_add_and_remove_are_host_only_trust_events(action)
     assert event["trust"]["actor_aad_object_id"] == ACTOR_ID
     assert event["trust"]["conversation_id"] == "a:personal-install-conversation"
     assert event["trust"]["service_url"] == SERVICE_URL
+
+
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_personal_installation_timestamp_datetime_is_normalized_to_utc(action):
+    """Preserve the provider event time when the SDK exposes a datetime.
+
+    中文：SDK 以 datetime 暴露供应商事件时间时，保留并规范化为 UTC。
+    """
+
+    occurred_at = datetime(
+        2026, 10, 27, 9, 8, 7, 123456, tzinfo=timezone(timedelta(hours=-4))
+    )
+    event = normalize_personal_installation(
+        _personal_installation(action, timestamp=occurred_at),
+        action=action,
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        personal_chat_enabled=True,
+    )
+
+    assert event.trust["activity_occurred_at"] == "2026-10-27T13:08:07.123456Z"
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "expected"),
+    [
+        ("2026-10-27T09:08:07-04:00", "2026-10-27T13:08:07.000000Z"),
+        ("2026-10-27T09:08:07.5+02:30", "2026-10-27T06:38:07.500000Z"),
+    ],
+)
+def test_personal_installation_iso_timestamp_is_normalized_to_utc(timestamp, expected):
+    """Normalize the ISO string emitted by the SDK JSON projection.
+
+    中文：将 SDK JSON 投影输出的 ISO 时间字符串规范化为 UTC。
+    """
+
+    event = normalize_personal_installation(
+        _personal_installation("add", timestamp=timestamp),
+        action="add",
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        personal_chat_enabled=True,
+    )
+
+    assert event.trust["activity_occurred_at"] == expected
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-10-27T09:08:07",
+        "not-a-timestamp",
+        1_798_000_000,
+        datetime(2026, 10, 27, 9, 8, 7),
+    ],
+)
+def test_personal_installation_rejects_invalid_or_naive_timestamp(timestamp):
+    """Reject supplied event times that cannot establish a stable order.
+
+    中文：拒绝无法用于稳定排序的无效或无时区事件时间。
+    """
+
+    with pytest.raises(ActivityRejected, match="invalid_activity_timestamp"):
+        normalize_personal_installation(
+            _personal_installation("add", timestamp=timestamp),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
+
+
+def test_personal_installation_missing_timestamp_stays_missing():
+    """Do not synthesize event ordering from localTimestamp or receipt time.
+
+    中文：缺少官方 timestamp 时不从 localTimestamp 或接收时间合成排序字段。
+    """
+
+    event = normalize_personal_installation(
+        _personal_installation("add", localTimestamp="2026-10-27T09:08:07Z"),
+        action="add",
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        personal_chat_enabled=True,
+    )
+
+    assert "activity_occurred_at" not in event.trust
 
 
 def test_personal_installation_rejects_disabled_or_nonpersonal_install():
