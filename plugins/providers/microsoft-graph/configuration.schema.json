@@ -53,9 +53,10 @@
     },
     "officeV2": {
       "type": "object",
-      "description": "Host-owned Office v2 feature switches. Per-actor Account Center scopes and Directory target grants remain mandatory.",
-      "required": ["todo_enabled", "calendar_enabled", "mail_metadata_enabled", "mail_drafts_enabled", "mail_send_enabled", "sharepoint_drive_metadata_enabled"],
+      "description": "Host-owned Office v2 feature switches. Provider source fields are snake_case; deployment host camelCase flags require explicit mapping. Per-actor Account Center scopes and Directory target grants remain mandatory.",
+      "required": ["planner_enabled", "todo_enabled", "calendar_enabled", "mail_metadata_enabled", "mail_drafts_enabled", "mail_send_enabled", "sharepoint_drive_metadata_enabled"],
       "properties": {
+        "planner_enabled": {"type": "boolean", "default": false},
         "todo_enabled": {"type": "boolean", "default": false},
         "calendar_enabled": {"type": "boolean", "default": false},
         "mail_metadata_enabled": {"const": false, "default": false},

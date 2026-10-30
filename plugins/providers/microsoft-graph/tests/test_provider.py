@@ -12,6 +12,7 @@ import time
 import uuid
 from typing import Any
 
+import pytest
 from cyrene_account_center_contracts import (
     AuthMaterial,
     ProviderProfile,
@@ -25,16 +26,30 @@ from microsoft_graph_provider.account_center import AccountCenterUnavailable
 from microsoft_graph_provider.microsoft_graph_api import HttpResponse, MicrosoftGraphApi
 from microsoft_graph_provider.plugin import (
     MicrosoftGraphProvider,
+    ProfileAuthorizationDenied,
+    TrustedActorProfileMismatch,
     _arguments_for_lease,
+    _authorize_profile,
+    _profile_scope,
     _target,
 )
-from microsoft_graph_provider.settings import PROVIDER_CALLER_ID, ProviderSettings
+from microsoft_graph_provider.settings import (
+    PROVIDER_CALLER_ID,
+    ConfigurationError,
+    ProviderSettings,
+    _office_v2_flags,
+)
 
 TENANT_ID = "11111111-1111-4111-8111-111111111111"
 ACTOR_ID = "22222222-2222-4222-8222-222222222222"
 PROFILE_REF = "44444444-4444-4444-8444-444444444444"
 LEASE_REF = "55555555-5555-4555-8555-555555555555"
 PLAN_ID = "plan_01"
+SITE_ID = (
+    "tenant.sharepoint.com,"
+    "77777777-7777-4777-8777-777777777777,"
+    "88888888-8888-4888-8888-888888888888"
+)
 SYNTHETIC_TOKEN = "synthetic-delegated-token"
 EXCHANGE_CALLER_ID = "exchange-test-caller"
 CYRENE_ACTOR = {
@@ -103,6 +118,7 @@ def _settings(
     read_only: bool = False,
     sharepoint_site_id: str | None = None,
     sharepoint_list_ids: tuple[str, ...] = (),
+    office_v2_flags: dict[str, bool] | None = None,
 ) -> ProviderSettings:
     return ProviderSettings(
         binding_id=CYRENE_ACTOR["binding_id"],
@@ -122,6 +138,7 @@ def _settings(
         max_page_size=25,
         sharepoint_site_id=sharepoint_site_id,
         sharepoint_list_ids=sharepoint_list_ids,
+        office_v2_flags=office_v2_flags,
     )
 
 
@@ -544,6 +561,175 @@ def test_read_only_binding_hides_write_tools() -> None:
     assert "microsoft_graph.planner.task.create" not in tool_ids
     assert "microsoft_graph.planner.task.update" not in tool_ids
     assert "microsoft_graph.planner.tasks.list" in tool_ids
+
+
+def test_office_v2_profile_empty_targets_allow_discovery_only_and_bind_workspace() -> None:
+    workspace_id = "66666666-6666-4666-8666-666666666666"
+    scope = {
+        "schema_version": 2,
+        "tenant_id": TENANT_ID,
+        "workspace_id": workspace_id,
+        "planner": {"plan_ids": [], "tasks_read": True, "tasks_write": False},
+        "sharepoint": {
+            "enabled": True,
+            "site_id": SITE_ID,
+            "list_ids": [],
+            "drive_ids": [],
+            "metadata_read": True,
+            "content_read": False,
+        },
+        "todo": {
+            "enabled": True,
+            "task_list_ids": [],
+            "tasks_read": True,
+            "tasks_write": True,
+        },
+        "calendar": {
+            "enabled": True,
+            "calendar_ids": [],
+            "events_read": True,
+            "events_write": True,
+            "freebusy_read": False,
+            "freebusy_subjects": [],
+            "attendees_write": False,
+        },
+        "mail": {
+            "enabled": False,
+            "folder_ids": [],
+            "metadata_read": False,
+            "body_read": False,
+            "drafts_write": False,
+            "send_enabled": False,
+        },
+    }
+    profile = ProviderProfile(
+        profile_ref=PROFILE_REF,
+        provider="microsoft_graph",
+        identity_ref=f"{TENANT_ID}:{ACTOR_ID}",
+        target_scope=scope,
+        auth_status="healthy",
+        auth_mode="delegated_oauth",
+        oauth_scopes=[
+            "User.Read",
+            "Tasks.ReadWrite",
+            "Sites.Selected",
+            "Calendars.ReadWrite",
+        ],
+        access_mode="actor_owned",
+        external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+    )
+    settings = _settings()
+    normalized = _profile_scope(profile)
+
+    _authorize_profile(
+        normalized,
+        "microsoft_graph.planner.plans.list",
+        {},
+        profile,
+        settings=settings,
+        expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+        expected_workspace_id=workspace_id,
+    )
+    _authorize_profile(
+        normalized,
+        "microsoft_graph.todo.lists.list",
+        {},
+        profile,
+        settings=settings,
+        expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+        expected_workspace_id=workspace_id,
+    )
+    _authorize_profile(
+        normalized,
+        "microsoft_graph.calendar.calendars.list",
+        {},
+        profile,
+        settings=settings,
+        expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+        expected_workspace_id=workspace_id,
+    )
+    _authorize_profile(
+        normalized,
+        "microsoft_graph.sharepoint.drives.list",
+        {"site_id": SITE_ID},
+        profile,
+        settings=settings,
+        expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+        expected_workspace_id=workspace_id,
+    )
+    with pytest.raises(ProfileAuthorizationDenied, match="To Do task list is not selected"):
+        _authorize_profile(
+            normalized,
+            "microsoft_graph.todo.tasks.list",
+            {"task_list_id": "todo-list-unselected"},
+            profile,
+            settings=settings,
+            expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+            expected_workspace_id=workspace_id,
+        )
+    with pytest.raises(ProfileAuthorizationDenied, match="Calendar is not selected"):
+        _authorize_profile(
+            normalized,
+            "microsoft_graph.calendar.events.list",
+            {"calendar_id": "calendar-unselected"},
+            profile,
+            settings=settings,
+            expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+            expected_workspace_id=workspace_id,
+        )
+    with pytest.raises(ProfileAuthorizationDenied, match="SharePoint drive is not selected"):
+        _authorize_profile(
+            normalized,
+            "microsoft_graph.sharepoint.drive.items.list",
+            {"site_id": SITE_ID, "drive_id": "drive-unselected"},
+            profile,
+            settings=settings,
+            expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+            expected_workspace_id=workspace_id,
+        )
+    with pytest.raises(TrustedActorProfileMismatch, match="Workspace actor"):
+        _authorize_profile(
+            normalized,
+            "microsoft_graph.todo.lists.list",
+            {},
+            profile,
+            settings=settings,
+            expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+            expected_workspace_id="77777777-7777-4777-8777-777777777777",
+        )
+
+
+def test_office_v2_host_flags_hide_disabled_tools_and_forbid_mail() -> None:
+    flags = {
+        "planner_enabled": True,
+        "todo_enabled": True,
+        "calendar_enabled": False,
+        "mail_metadata_enabled": False,
+        "mail_drafts_enabled": False,
+        "mail_send_enabled": False,
+        "sharepoint_drive_metadata_enabled": False,
+    }
+    provider = MicrosoftGraphProvider(
+        settings=_settings(office_v2_flags=flags),
+        account_center=FakeAccountCenter(_profile(_scope())),
+        graph_api=MicrosoftGraphApi(cursor_key=b"p" * 32, transport=FakeTransport([])),
+    )
+    request = wire.ListToolsRequest(binding_id=CYRENE_ACTOR["binding_id"])
+
+    ok, payload = provider._list_tools(request.SerializeToString())
+
+    assert ok is True
+    tool_ids = {
+        tool.provider_tool_id
+        for tool in wire.ListToolsResponse.FromString(payload.value).catalog.tools
+    }
+    assert "microsoft_graph.planner.plans.list" in tool_ids
+    assert "microsoft_graph.todo.lists.list" in tool_ids
+    assert "microsoft_graph.calendar.calendars.list" not in tool_ids
+    assert "microsoft_graph.sharepoint.drives.list" not in tool_ids
+    assert not any(tool_id.startswith("microsoft_graph.mail.") for tool_id in tool_ids)
+    with pytest.raises(ConfigurationError, match="mail features are deferred"):
+        _office_v2_flags({**flags, "mail_metadata_enabled": True})
 
 
 def test_account_center_channel_failure_is_sanitized_and_retryable() -> None:

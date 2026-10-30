@@ -175,6 +175,10 @@ class ProviderProfile:
     access_mode: str | None = None
     external_subject: str | None = None
     expires_at: int | None = None
+    refresh_expires_at: int | None = None
+    credential_revision: int | None = None
+    scope_schema_version: int | None = None
+    reauth_required: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -188,6 +192,12 @@ class LinkedProviderProfileResponse:
     expires_at: int | None
     auth_mode: str | None = None
     access_mode: str | None = None
+    refresh_expires_at: int | None = None
+    workspace_id: str | None = None
+    scope_schema_version: int | None = None
+    oauth_scopes: list[str] | None = None
+    credential_revision: int | None = None
+    reauth_required: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -530,11 +540,7 @@ def verify_context(
 ) -> bool:
     """Verify signature, exact body hash, caller, clock skew, and 300s maximum TTL."""
 
-    values = (
-        context.as_dict()
-        if isinstance(context, TrustedCallerContext)
-        else dict(context)
-    )
+    values = context.as_dict() if isinstance(context, TrustedCallerContext) else dict(context)
     expected_fields = {
         "method",
         "caller_id",
@@ -588,12 +594,7 @@ def verify_context(
     workspace = values.get("workspace_id")
     if workspace is not None and not _valid_text_claim(workspace):
         return False
-    if (
-        issued > current + 30
-        or expires <= current
-        or expires <= issued
-        or expires - issued > 300
-    ):
+    if issued > current + 30 or expires <= current or expires <= issued or expires - issued > 300:
         return False
     if values.get("payload_sha256") != payload_sha256(payload):
         return False

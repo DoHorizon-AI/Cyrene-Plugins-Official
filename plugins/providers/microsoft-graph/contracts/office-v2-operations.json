@@ -2,6 +2,41 @@
   "contractVersion": "cyrene.microsoft-graph.office-v2",
   "schemaVersion": 2,
   "toolIdentity": "toolId == operationId == provider_tool_id",
+  "activationFeatureFlags": {
+    "plannerDiscovery": "officeV2.planner_enabled",
+    "todo": "officeV2.todo_enabled",
+    "calendar": "officeV2.calendar_enabled",
+    "sharepointDriveMetadata": "officeV2.sharepoint_drive_metadata_enabled",
+    "mailMetadata": false,
+    "mailDrafts": false,
+    "mailSend": false
+  },
+  "hostToProviderFeatureFlagMap": {
+    "plannerEnabled": "officeV2.planner_enabled",
+    "todoEnabled": "officeV2.todo_enabled",
+    "calendarEnabled": "officeV2.calendar_enabled",
+    "mailMetadataEnabled": "officeV2.mail_metadata_enabled",
+    "mailDraftsEnabled": "officeV2.mail_drafts_enabled",
+    "mailSendEnabled": "officeV2.mail_send_enabled",
+    "sharepointDriveMetadataEnabled": "officeV2.sharepoint_drive_metadata_enabled"
+  },
+  "oauthScopeDerivation": {
+    "oidcScopes": ["openid", "profile", "offline_access"],
+    "always": ["User.Read"],
+    "plannerAndTodo": "Tasks.ReadWrite when any selected task feature writes; otherwise Tasks.Read when any selected task feature reads; omit when neither reads nor writes.",
+    "sharepoint": "Sites.Selected only when a host-selected site is enabled; explicit site resource grant remains required.",
+    "calendar": "Calendars.ReadWrite when event writes are enabled; otherwise Calendars.ReadBasic when event or free/busy reads are enabled; omit when calendar features are disabled.",
+    "mail": "No Mail.* scopes are permitted in this release."
+  },
+  "oauthScopeDerivation": {
+    "oidcScopes": ["openid", "profile", "offline_access"],
+    "always": ["User.Read"],
+    "plannerAndTodo": "Tasks.ReadWrite when any selected task feature writes; otherwise Tasks.Read when any selected task feature reads; omit when neither reads nor writes.",
+    "sharepoint": "Sites.Selected only when a host-selected site is enabled; explicit site resource grant remains required.",
+    "calendar": "Calendars.ReadWrite when event writes are enabled; otherwise Calendars.ReadBasic when event or free/busy reads are enabled; omit when calendar features are disabled.",
+    "mail": "No Mail.* scopes are permitted in this release."
+  },
+  "selectionSemantics": "A discovery call returns only the signed-in actor's metadata. Empty plan, task-list, or calendar target arrays authorize only their corresponding list-discovery call; detail and write calls require an exact selected resource ID after a revision-checked scope update.",
   "paging": {
     "defaultPageSize": 50,
     "maximumPageSize": 100,
@@ -20,6 +55,7 @@
   },
   "operations": [
     {"toolId":"microsoft_graph.planner.plan.get","operationId":"microsoft_graph.planner.plan.get","mutating":false,"status":"existing-v1","args":{"required":["plan_id"],"optional":[]},"projection":"plan id, title, owner, container and ETag"},
+    {"toolId":"microsoft_graph.planner.plans.list","operationId":"microsoft_graph.planner.plans.list","mutating":false,"status":"v2-discovery","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"current actor's plan IDs, titles, owner IDs, creation time and ETag; empty plan_ids authorize only this discovery call"},
     {"toolId":"microsoft_graph.planner.tasks.list","operationId":"microsoft_graph.planner.tasks.list","mutating":false,"status":"existing-v1","args":{"required":["plan_id"],"optional":["page_size","page_cursor"]},"projection":"bounded task metadata and signed continuation"},
     {"toolId":"microsoft_graph.planner.task.get","operationId":"microsoft_graph.planner.task.get","mutating":false,"status":"existing-v1","args":{"required":["plan_id","task_id"],"optional":[]},"projection":"task metadata and ETag"},
     {"toolId":"microsoft_graph.planner.task.create","operationId":"microsoft_graph.planner.task.create","mutating":true,"status":"existing-v1","args":{"required":["plan_id","bucket_id","title"],"optional":["due_date_time"]},"projection":"CONFIRMED or UNKNOWN and task metadata"},

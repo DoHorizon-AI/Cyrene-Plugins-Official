@@ -27,6 +27,7 @@ _OPTIONAL_MTLS_REFS = {
     "microsoft-graph/account-center-client-key",
 }
 _OFFICE_V2_FLAGS = {
+    "planner_enabled",
     "todo_enabled",
     "calendar_enabled",
     "mail_metadata_enabled",

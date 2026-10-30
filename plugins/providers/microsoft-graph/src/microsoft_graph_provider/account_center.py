@@ -215,7 +215,10 @@ def _profiles(data: Mapping[str, Any]) -> tuple[ProviderProfile, ...]:
             "access_mode",
             "external_subject",
             "expires_at",
+            "refresh_expires_at",
             "credential_revision",
+            "scope_schema_version",
+            "reauth_required",
         }
         if set(value) - allowed or set(value) & {
             "access_token",
@@ -250,6 +253,26 @@ def _profiles(data: Mapping[str, Any]) -> tuple[ProviderProfile, ...]:
                 isinstance(expires_at, bool) or not isinstance(expires_at, int) or expires_at <= 0
             ):
                 raise TypeError("expires_at is invalid")
+            refresh_expires_at = value.get("refresh_expires_at")
+            if refresh_expires_at is not None and (
+                isinstance(refresh_expires_at, bool)
+                or not isinstance(refresh_expires_at, int)
+                or refresh_expires_at <= 0
+            ):
+                raise TypeError("refresh_expires_at is invalid")
+            credential_revision = value.get("credential_revision")
+            if credential_revision is not None and (
+                isinstance(credential_revision, bool)
+                or not isinstance(credential_revision, int)
+                or credential_revision < 0
+            ):
+                raise TypeError("credential_revision is invalid")
+            scope_schema_version = value.get("scope_schema_version")
+            if scope_schema_version is not None and scope_schema_version not in {1, 2}:
+                raise TypeError("scope_schema_version is invalid")
+            reauth_required = value.get("reauth_required")
+            if reauth_required is not None and not isinstance(reauth_required, bool):
+                raise TypeError("reauth_required is invalid")
             result.append(
                 ProviderProfile(
                     profile_ref=profile_ref,
@@ -262,6 +285,10 @@ def _profiles(data: Mapping[str, Any]) -> tuple[ProviderProfile, ...]:
                     access_mode=_optional_text(value.get("access_mode"), 64),
                     external_subject=external_subject,
                     expires_at=expires_at,
+                    refresh_expires_at=refresh_expires_at,
+                    credential_revision=credential_revision,
+                    scope_schema_version=scope_schema_version,
+                    reauth_required=reauth_required,
                 )
             )
         except (KeyError, TypeError, ValueError):

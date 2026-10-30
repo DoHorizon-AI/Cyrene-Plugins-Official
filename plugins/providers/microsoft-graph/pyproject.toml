@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-microsoft-graph-provider"
-version = "0.1.0"
-description = "Fixed delegated Microsoft Graph Planner and selected SharePoint metadata tools for Cyrene"
+version = "0.2.0"
+description = "Actor-scoped Planner, To Do, calendar, and selected SharePoint metadata tools for Cyrene"
 requires-python = ">=3.11"
 dependencies = [
   "cyrene-account-center-contracts>=0.1,<0.2",
@@ -22,6 +22,10 @@ package-dir = {"" = "src"}
 "share/cyrene/plugins/cyrene.providers.microsoft-graph" = [
   "plugin.manifest.json",
   "configuration.schema.json",
+]
+"share/cyrene/plugins/cyrene.providers.microsoft-graph/contracts" = [
+  "contracts/office-v2-operations.json",
+  "contracts/office-v2-target-scope.schema.json",
 ]
 
 [tool.setuptools.packages.find]

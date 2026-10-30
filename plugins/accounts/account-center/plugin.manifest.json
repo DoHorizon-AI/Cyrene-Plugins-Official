@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "cyrene.accounts.account-center",
   "name": "Cyrene Account Center",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Private, actor-scoped external account links and provider credential leases.",
   "license": "MIT",
   "kind": "capability-plugin",
@@ -33,6 +33,7 @@
     {"name": "complete_microsoft_graph_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteMicrosoftGraphLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
     {"name": "begin_microsoft_graph_scope_upgrade", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginMicrosoftGraphScopeUpgradeRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphOAuthSession"},
     {"name": "complete_microsoft_graph_scope_upgrade", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteMicrosoftGraphLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "update_microsoft_graph_v2_scope", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphV2ScopeUpdateRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphV2ScopeUpdateResponse"},
     {"name": "begin_azure_devops_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginAzureDevOpsLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphOAuthSession"},
     {"name": "complete_azure_devops_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteAzureDevOpsLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"}
   ],

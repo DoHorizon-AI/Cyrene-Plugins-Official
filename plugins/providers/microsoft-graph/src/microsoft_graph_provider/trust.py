@@ -22,6 +22,7 @@ PROFILE_LIST_METHOD = "list_provider_profiles"
 OPERATIONS = frozenset(
     {
         "microsoft_graph.planner.plan.get",
+        "microsoft_graph.planner.plans.list",
         "microsoft_graph.planner.tasks.list",
         "microsoft_graph.planner.task.get",
         "microsoft_graph.planner.task.create",
@@ -29,6 +30,21 @@ OPERATIONS = frozenset(
         "microsoft_graph.sharepoint.site.get",
         "microsoft_graph.sharepoint.list.get",
         "microsoft_graph.sharepoint.list.items.delta",
+        "microsoft_graph.todo.lists.list",
+        "microsoft_graph.todo.tasks.list",
+        "microsoft_graph.todo.task.get",
+        "microsoft_graph.todo.task.create",
+        "microsoft_graph.todo.task.update",
+        "microsoft_graph.todo.task.delete",
+        "microsoft_graph.calendar.calendars.list",
+        "microsoft_graph.calendar.events.list",
+        "microsoft_graph.calendar.event.get",
+        "microsoft_graph.calendar.event.create",
+        "microsoft_graph.calendar.event.update",
+        "microsoft_graph.calendar.event.delete",
+        "microsoft_graph.calendar.freebusy.get",
+        "microsoft_graph.sharepoint.drives.list",
+        "microsoft_graph.sharepoint.drive.items.list",
     }
 )
 

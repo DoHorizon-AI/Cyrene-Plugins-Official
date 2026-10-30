@@ -23,16 +23,22 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
-AUTHORIZE_ENDPOINT = (
-    "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize"
-)
+AUTHORIZE_ENDPOINT = "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize"
 TOKEN_ENDPOINT = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 JWKS_ENDPOINT = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
 GRAPH_ME_ENDPOINT = "https://graph.microsoft.com/v1.0/me?$select=id"
 AZURE_DEVOPS_RESOURCE_SCOPE = "https://app.vssps.visualstudio.com/.default"
 INITIAL_GRAPH_SCOPES = frozenset({"User.Read", "Tasks.Read"})
+INITIAL_OFFICE_V2_GRAPH_SCOPES = frozenset({"User.Read"})
 ALLOWED_GRAPH_SCOPES = frozenset(
-    {"User.Read", "Tasks.Read", "Tasks.ReadWrite", "Sites.Selected"}
+    {
+        "User.Read",
+        "Tasks.Read",
+        "Tasks.ReadWrite",
+        "Sites.Selected",
+        "Calendars.ReadBasic",
+        "Calendars.ReadWrite",
+    }
 )
 MAX_TOKEN_LIFETIME_SECONDS = 86_400
 
@@ -80,12 +86,14 @@ class MicrosoftGraphOAuthClient:
         *,
         client_id: str,
         client_secret: str,
+        office_v2_enabled: bool = False,
         now: Any = time.time,
     ) -> None:
         if not client_id or not client_secret:
             raise MicrosoftGraphOAuthError("provider_not_configured")
         self.client_id = client_id
         self._client_secret = client_secret
+        self._office_v2_enabled = office_v2_enabled
         self._now = now
 
     def authorization_url(
@@ -100,7 +108,7 @@ class MicrosoftGraphOAuthClient:
     ) -> str:
         """Build a fixed Microsoft authorization URL with PKCE and OIDC nonce."""
 
-        _validate_scope_request(scopes)
+        _validate_scope_request(scopes, office_v2=self._office_v2_enabled)
         params = {
             "client_id": self.client_id,
             "response_type": "code",
@@ -129,7 +137,7 @@ class MicrosoftGraphOAuthClient:
     ) -> tuple[MicrosoftGraphToken, MicrosoftGraphIdentity]:
         """Exchange one PKCE code, verify its ID token, then check Graph `/me`."""
 
-        _validate_scope_request(requested_scopes)
+        _validate_scope_request(requested_scopes, office_v2=self._office_v2_enabled)
         response = self._post_token(
             "organizations",
             {
@@ -162,7 +170,7 @@ class MicrosoftGraphOAuthClient:
         """Refresh only through the already-bound tenant and saved scope set."""
 
         tenant = _canonical_uuid(tenant_id)
-        _validate_scope_request(requested_scopes)
+        _validate_scope_request(requested_scopes, office_v2=self._office_v2_enabled)
         response = self._post_token(
             tenant,
             {
@@ -187,9 +195,7 @@ class MicrosoftGraphOAuthClient:
             identity=identity,
         )
 
-    def verify_identity(
-        self, access_token: str, tenant_id: str
-    ) -> MicrosoftGraphIdentity:
+    def verify_identity(self, access_token: str, tenant_id: str) -> MicrosoftGraphIdentity:
         """Resolve `/me` with the supplied token and require an object UUID."""
 
         tenant = _canonical_uuid(tenant_id)
@@ -249,7 +255,11 @@ class MicrosoftGraphOAuthClient:
             raise MicrosoftGraphOAuthError("credential_unavailable")
         if require_id_token and not isinstance(value.get("id_token"), str):
             raise MicrosoftGraphOAuthError("identity_verification_failed")
-        scopes = _validate_scope_response(scope_text, requested_scopes)
+        scopes = _validate_scope_response(
+            scope_text,
+            requested_scopes,
+            office_v2=self._office_v2_enabled,
+        )
         now = int(self._now())
         return MicrosoftGraphToken(
             access_token=access_token,
@@ -512,9 +522,7 @@ class AzureDevOpsOAuthClient(MicrosoftGraphOAuthClient):
         )
 
 
-def _parse_azure_devops_token(
-    value: dict[str, Any], *, now: int
-) -> MicrosoftGraphToken:
+def _parse_azure_devops_token(value: dict[str, Any], *, now: int) -> MicrosoftGraphToken:
     """Validate opaque ADO bearer material and token lifetime without decoding it."""
 
     access_token = value.get("access_token")
@@ -547,32 +555,57 @@ def _parse_azure_devops_token(
     )
 
 
-def _validate_scope_request(scopes: tuple[str, ...]) -> None:
+def _validate_scope_request(scopes: tuple[str, ...], *, office_v2: bool = False) -> None:
+    """Validate an exact known delegated-scope request.
+
+    The default path deliberately preserves the v1 Planner/SharePoint scope
+    boundary. Office v2 is enabled only by Account Center's fixed feature
+    selector and still cannot request mail, application, or arbitrary scopes.
+    """
+
+    allowed = (
+        ALLOWED_GRAPH_SCOPES
+        if office_v2
+        else INITIAL_GRAPH_SCOPES
+        | {
+            "Tasks.ReadWrite",
+            "Sites.Selected",
+        }
+    )
+    required = INITIAL_OFFICE_V2_GRAPH_SCOPES if office_v2 else INITIAL_GRAPH_SCOPES
     if (
         not scopes
         or len(scopes) != len(set(scopes))
         or any(
-            scope not in ALLOWED_GRAPH_SCOPES
-            and scope not in {"openid", "profile", "offline_access"}
+            scope not in allowed and scope not in {"openid", "profile", "offline_access"}
             for scope in scopes
         )
-        or not INITIAL_GRAPH_SCOPES.issubset(scopes)
+        or not required.issubset(scopes)
     ):
         raise MicrosoftGraphOAuthError("authorization_denied")
 
 
 def _validate_scope_response(
-    scope_text: str, requested_scopes: tuple[str, ...]
+    scope_text: str,
+    requested_scopes: tuple[str, ...],
+    *,
+    office_v2: bool = False,
 ) -> set[str]:
     actual = set(scope_text.split())
-    requested_graph = set(requested_scopes) & ALLOWED_GRAPH_SCOPES
+    allowed = (
+        ALLOWED_GRAPH_SCOPES
+        if office_v2
+        else INITIAL_GRAPH_SCOPES
+        | {
+            "Tasks.ReadWrite",
+            "Sites.Selected",
+        }
+    )
+    requested_graph = set(requested_scopes) & allowed
     if (
         not actual
-        or not actual <= ALLOWED_GRAPH_SCOPES
+        or not actual <= allowed
         or not requested_graph <= actual
-        or any(
-            "mail" in scope.lower() or "calendar" in scope.lower() for scope in actual
-        )
         or "Tasks.ReadWrite.All" in actual
     ):
         raise MicrosoftGraphOAuthError("scope_rejected")
@@ -596,9 +629,7 @@ def _decode_segment(value: str) -> bytes:
 
 
 def _decode_json_segment(value: str) -> dict[str, Any]:
-    decoded = json.loads(
-        _decode_segment(value), object_pairs_hook=_reject_duplicate_pairs
-    )
+    decoded = json.loads(_decode_segment(value), object_pairs_hook=_reject_duplicate_pairs)
     if not isinstance(decoded, dict):
         raise TypeError("invalid JWT object")
     return decoded

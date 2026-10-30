@@ -1652,7 +1652,8 @@ class AccountStore:
             rows = db.execute(
                 "SELECT profile_ref,provider,identity_ref,target_scope_json,auth_status,"
                 "external_subject,credential_expires_at,status,created_at,updated_at,"
-                "auth_mode,oauth_scopes_json,access_mode,credential_revision "
+                "auth_mode,oauth_scopes_json,access_mode,credential_revision,"
+                "credential_refresh_expires_at "
                 "FROM provider_profiles WHERE anchor_issuer=? AND anchor_subject=? "
                 "AND organization_id=? AND workspace_id IS ? AND status='active' "
                 "ORDER BY created_at,profile_ref",
@@ -2168,6 +2169,47 @@ class AccountStore:
                     profile_ref,
                 ),
             )
+
+    def update_provider_profile_target_scope(
+        self,
+        *,
+        profile_ref: str,
+        anchor: Anchor,
+        expected_revision: int,
+        target_scope_json: str,
+        now: int,
+    ) -> int:
+        """CAS-update one owner-bound provider target scope and bump its revision."""
+
+        if (
+            isinstance(expected_revision, bool)
+            or not isinstance(expected_revision, int)
+            or expected_revision < 0
+        ):
+            raise AccountCenterError("profile_revision_conflict")
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if row is None or not self._owns_provider_profile(row, anchor):
+                raise AccountCenterError("profile_not_found")
+            if (
+                row["provider"] != "microsoft_graph"
+                or row["access_mode"] != "actor_owned"
+                or row["auth_status"] != "healthy"
+                or row["credential_revision"] != expected_revision
+            ):
+                raise AccountCenterError("profile_revision_conflict")
+            updated = db.execute(
+                "UPDATE provider_profiles SET target_scope_json=?,"
+                "credential_revision=credential_revision+1,updated_at=? "
+                "WHERE profile_ref=? AND credential_revision=? AND status='active'",
+                (target_scope_json, now, profile_ref, expected_revision),
+            ).rowcount
+            if updated != 1:
+                raise AccountCenterError("profile_revision_conflict")
+            return expected_revision + 1
 
     def update_huggingface_profile_credentials(
         self,

@@ -132,9 +132,7 @@ def test_graph_code_exchange_verifies_oidc_nonce_and_same_token_me(
                 "token_type": "Bearer",
                 "expires_in": 3600,
                 "scope": "Tasks.Read User.Read",
-                "id_token": _id_token(
-                    private_key, "random-nonce-value-with-enough-entropy"
-                ),
+                "id_token": _id_token(private_key, "random-nonce-value-with-enough-entropy"),
             }
         if url == JWKS_ENDPOINT:
             return _jwks(private_key)
@@ -148,9 +146,7 @@ def test_graph_code_exchange_verifies_oidc_nonce_and_same_token_me(
         code="synthetic-code",
         redirect_uri="https://account.example.test/oauth/entra/callback",
         code_verifier="r" * 43,
-        nonce_digest=hashlib.sha256(
-            b"random-nonce-value-with-enough-entropy"
-        ).hexdigest(),
+        nonce_digest=hashlib.sha256(b"random-nonce-value-with-enough-entropy").hexdigest(),
         requested_scopes=scopes,
     )
     assert identity.external_subject == f"{TENANT_ID}:{OBJECT_ID}"
@@ -217,9 +213,7 @@ def test_azure_devops_uses_its_own_default_resource_and_verified_oidc(
         headers: dict[str, str] | None = None,
         body: bytes | None = None,
     ) -> dict[str, Any]:
-        if url.startswith("https://login.microsoftonline.com/") and url.endswith(
-            "/token"
-        ):
+        if url.startswith("https://login.microsoftonline.com/") and url.endswith("/token"):
             form = dict(parse_qsl((body or b"").decode("ascii")))
             requested_urls.append(form["scope"])
             assert form["scope"] == AZURE_DEVOPS_RESOURCE_SCOPE
@@ -228,9 +222,7 @@ def test_azure_devops_uses_its_own_default_resource_and_verified_oidc(
                 "refresh_token": "opaque-ado-refresh-token",
                 "token_type": "Bearer",
                 "expires_in": 3600,
-                "id_token": _id_token(
-                    private_key, "random-ado-nonce-value-with-enough-entropy"
-                ),
+                "id_token": _id_token(private_key, "random-ado-nonce-value-with-enough-entropy"),
             }
         if url == JWKS_ENDPOINT:
             return _jwks(private_key)
@@ -241,9 +233,7 @@ def test_azure_devops_uses_its_own_default_resource_and_verified_oidc(
         code="synthetic-ado-code",
         redirect_uri="https://account.example.test/oauth/entra/callback",
         code_verifier="a" * 43,
-        nonce_digest=hashlib.sha256(
-            b"random-ado-nonce-value-with-enough-entropy"
-        ).hexdigest(),
+        nonce_digest=hashlib.sha256(b"random-ado-nonce-value-with-enough-entropy").hexdigest(),
         requested_scopes=scopes,
     )
     assert requested_urls == [AZURE_DEVOPS_RESOURCE_SCOPE]
@@ -358,3 +348,39 @@ def test_graph_refresh_requires_verified_id_token_identity(
     assert requests[0][1]["scope"] == "openid Tasks.Read User.Read"
     assert token.identity is not None
     assert token.identity.external_subject == f"{TENANT_ID}:{OBJECT_ID}"
+
+
+def test_office_v2_oauth_is_explicit_and_never_accepts_mail_scopes() -> None:
+    scopes = (
+        "openid",
+        "profile",
+        "offline_access",
+        "User.Read",
+        "Tasks.ReadWrite",
+        "Calendars.ReadWrite",
+    )
+    parameters = {
+        "redirect_uri": "http://localhost:52191/oauth/callback",
+        "state": "office-v2-state-with-sufficient-entropy",
+        "nonce": "office-v2-nonce-with-sufficient-entropy",
+        "code_challenge": "a" * 43,
+        "scopes": scopes,
+    }
+    legacy = MicrosoftGraphOAuthClient(
+        client_id=CLIENT_ID,
+        client_secret="synthetic-secret",
+        now=lambda: NOW,
+    )
+    with pytest.raises(MicrosoftGraphOAuthError, match="authorization_denied"):
+        legacy.authorization_url(**parameters)
+
+    office_v2 = MicrosoftGraphOAuthClient(
+        client_id=CLIENT_ID,
+        client_secret="synthetic-secret",
+        office_v2_enabled=True,
+        now=lambda: NOW,
+    )
+    authorization = parse_qs(urlparse(office_v2.authorization_url(**parameters)).query)
+    assert set(authorization["scope"][0].split()) == set(scopes)
+    with pytest.raises(MicrosoftGraphOAuthError, match="authorization_denied"):
+        office_v2.authorization_url(**{**parameters, "scopes": (*scopes, "Mail.ReadBasic")})

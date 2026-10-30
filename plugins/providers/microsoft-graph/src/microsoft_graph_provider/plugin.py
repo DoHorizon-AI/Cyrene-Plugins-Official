@@ -13,7 +13,7 @@ import json
 import re
 import time
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cyrene_account_center_contracts import ProviderProfile, payload_sha256
@@ -40,7 +40,7 @@ from .trust import (
 
 CAPABILITY_ID = "tool.provider.v1"
 PLUGIN_ID = "cyrene.providers.microsoft-graph"
-PLUGIN_VERSION = "0.1.0"
+PLUGIN_VERSION = "0.2.0"
 LIST_TOOLS_METHOD = "list_tools"
 CALL_TOOL_METHOD = "call_tool"
 LIST_TOOLS_REQUEST_TYPE_URL = "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest"
@@ -61,6 +61,9 @@ _PAGE_ARGUMENTS = {
     "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
     "page_cursor": {"type": "string", "minLength": 1, "maxLength": 12000},
 }
+_OPAQUE_ID = {"type": "string", "pattern": "^[A-Za-z0-9._!:-]{1,512}$"}
+_OFFSET_DATE_TIME = {"type": "string", "minLength": 20, "maxLength": 64}
+_ETAG = {"type": "string", "minLength": 1, "maxLength": 1024}
 _SITE_ARGUMENT = {
     "site_id": {
         "type": "string",
@@ -83,6 +86,18 @@ _UPDATE_FIELDS = {
 }
 
 CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
+    {
+        "provider_tool_id": "microsoft_graph.planner.plans.list",
+        "display_name": "List Planner Plans",
+        "description": (
+            "Discover plan metadata visible to the signed-in user for explicit selection."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": dict(_PAGE_ARGUMENTS),
+            "additionalProperties": False,
+        },
+    },
     {
         "provider_tool_id": "microsoft_graph.planner.plan.get",
         "display_name": "Get Planner Plan Metadata",
@@ -192,16 +207,301 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
             "additionalProperties": False,
         },
     },
+    {
+        "provider_tool_id": "microsoft_graph.todo.lists.list",
+        "display_name": "List Microsoft To Do Lists",
+        "description": "Read bounded metadata for lists owned by the signed-in user.",
+        "input_schema": {
+            "type": "object",
+            "properties": dict(_PAGE_ARGUMENTS),
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.todo.tasks.list",
+        "display_name": "List Microsoft To Do Tasks",
+        "description": "Read bounded task metadata from one selected To Do list.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"task_list_id": dict(_OPAQUE_ID), **_PAGE_ARGUMENTS},
+            "required": ["task_list_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.todo.task.get",
+        "display_name": "Get Microsoft To Do Task",
+        "description": "Read one task's metadata and ETag from a selected list.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"task_list_id": dict(_OPAQUE_ID), "task_id": dict(_OPAQUE_ID)},
+            "required": ["task_list_id", "task_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.todo.task.create",
+        "display_name": "Create Microsoft To Do Task",
+        "description": "Create one task in a selected list; ambiguous outcomes are never replayed.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_list_id": dict(_OPAQUE_ID),
+                "title": {"type": "string", "minLength": 1, "maxLength": 255},
+                "due_date_time": _OFFSET_DATE_TIME,
+                "importance": {"enum": ["low", "normal", "high"]},
+            },
+            "required": ["task_list_id", "title"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.todo.task.update",
+        "display_name": "Update Microsoft To Do Task",
+        "description": "Update a narrow set of fields only when the supplied ETag matches.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_list_id": dict(_OPAQUE_ID),
+                "task_id": dict(_OPAQUE_ID),
+                "if_match": dict(_ETAG),
+                "changes": {
+                    "type": "object",
+                    "properties": {
+                        "title": {"type": "string", "minLength": 1, "maxLength": 255},
+                        "due_date_time": _OFFSET_DATE_TIME,
+                        "status": {
+                            "enum": [
+                                "notStarted",
+                                "inProgress",
+                                "completed",
+                                "waitingOnOthers",
+                                "deferred",
+                            ]
+                        },
+                        "importance": {"enum": ["low", "normal", "high"]},
+                    },
+                    "minProperties": 1,
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["task_list_id", "task_id", "if_match", "changes"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.todo.task.delete",
+        "display_name": "Delete Microsoft To Do Task",
+        "description": "Delete one selected task only when its current ETag matches.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "task_list_id": dict(_OPAQUE_ID),
+                "task_id": dict(_OPAQUE_ID),
+                "if_match": dict(_ETAG),
+            },
+            "required": ["task_list_id", "task_id", "if_match"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.calendar.calendars.list",
+        "display_name": "List Microsoft Calendars",
+        "description": "Read bounded calendar metadata for the signed-in user.",
+        "input_schema": {
+            "type": "object",
+            "properties": dict(_PAGE_ARGUMENTS),
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.calendar.events.list",
+        "display_name": "List Microsoft Calendar Events",
+        "description": "Read event metadata in an exact UTC-normalized calendar range.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "calendar_id": dict(_OPAQUE_ID),
+                "start_date_time": _OFFSET_DATE_TIME,
+                "end_date_time": _OFFSET_DATE_TIME,
+                **_PAGE_ARGUMENTS,
+            },
+            "required": ["calendar_id", "start_date_time", "end_date_time"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.calendar.event.get",
+        "display_name": "Get Microsoft Calendar Event",
+        "description": "Read one event projection without body or attendee identities.",
+        "input_schema": {
+            "type": "object",
+            "properties": {"calendar_id": dict(_OPAQUE_ID), "event_id": dict(_OPAQUE_ID)},
+            "required": ["calendar_id", "event_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.calendar.freebusy.get",
+        "display_name": "Get Microsoft Calendar Availability",
+        "description": "Read availability slots for explicitly selected schedules only.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "schedules": {
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 20,
+                    "uniqueItems": True,
+                    "items": {"type": "string", "minLength": 3, "maxLength": 320},
+                },
+                "start_date_time": _OFFSET_DATE_TIME,
+                "end_date_time": _OFFSET_DATE_TIME,
+                "interval_minutes": {"enum": [5, 10, 15, 30, 60]},
+            },
+            "required": ["schedules", "start_date_time", "end_date_time", "interval_minutes"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.calendar.event.create",
+        "display_name": "Create Microsoft Calendar Event",
+        "description": "Create one event with no attendees and a caller-provided transaction ID.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "calendar_id": dict(_OPAQUE_ID),
+                "subject": {"type": "string", "minLength": 1, "maxLength": 255},
+                "start_date_time": _OFFSET_DATE_TIME,
+                "end_date_time": _OFFSET_DATE_TIME,
+                "transaction_id": {"type": "string", "format": "uuid"},
+                "location": {"type": "string", "minLength": 1, "maxLength": 255},
+            },
+            "required": [
+                "calendar_id",
+                "subject",
+                "start_date_time",
+                "end_date_time",
+                "transaction_id",
+            ],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.calendar.event.update",
+        "display_name": "Update Microsoft Calendar Event",
+        "description": "Update one event without attendee changes and with ETag protection.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "calendar_id": dict(_OPAQUE_ID),
+                "event_id": dict(_OPAQUE_ID),
+                "if_match": dict(_ETAG),
+                "changes": {
+                    "type": "object",
+                    "properties": {
+                        "subject": {"type": "string", "minLength": 1, "maxLength": 255},
+                        "start_date_time": _OFFSET_DATE_TIME,
+                        "end_date_time": _OFFSET_DATE_TIME,
+                        "location": {"type": "string", "minLength": 1, "maxLength": 255},
+                    },
+                    "minProperties": 1,
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["calendar_id", "event_id", "if_match", "changes"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.calendar.event.delete",
+        "display_name": "Delete Microsoft Calendar Event",
+        "description": "Delete an event only if it has no attendees and its ETag matches.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "calendar_id": dict(_OPAQUE_ID),
+                "event_id": dict(_OPAQUE_ID),
+                "if_match": dict(_ETAG),
+            },
+            "required": ["calendar_id", "event_id", "if_match"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.sharepoint.drives.list",
+        "display_name": "List Selected SharePoint Document Libraries",
+        "description": "Read document-library metadata for one selected site.",
+        "input_schema": {
+            "type": "object",
+            "properties": {**_SITE_ARGUMENT, **_PAGE_ARGUMENTS},
+            "required": ["site_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.sharepoint.drive.items.list",
+        "display_name": "List Selected SharePoint Library Items",
+        "description": "Read item metadata and original links only; file content is never fetched.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_SITE_ARGUMENT,
+                "drive_id": dict(_OPAQUE_ID),
+                "parent_item_id": dict(_OPAQUE_ID),
+                **_PAGE_ARGUMENTS,
+            },
+            "required": ["site_id", "drive_id"],
+            "additionalProperties": False,
+        },
+    },
 )
 _TOOLS_BY_ID = {item["provider_tool_id"]: item for item in CANONICAL_TOOLS}
+_V2_TOOLS = frozenset(
+    item["provider_tool_id"]
+    for item in CANONICAL_TOOLS
+    if item["provider_tool_id"].startswith(
+        ("microsoft_graph.todo.", "microsoft_graph.calendar.", "microsoft_graph.sharepoint.drive")
+    )
+) | {"microsoft_graph.planner.plans.list"}
+_V2_WRITE_TOOLS = frozenset(
+    {
+        "microsoft_graph.todo.task.create",
+        "microsoft_graph.todo.task.update",
+        "microsoft_graph.todo.task.delete",
+        "microsoft_graph.calendar.event.create",
+        "microsoft_graph.calendar.event.update",
+        "microsoft_graph.calendar.event.delete",
+    }
+)
 _WRITE_TOOLS = frozenset(
     {
         "microsoft_graph.planner.task.create",
         "microsoft_graph.planner.task.update",
     }
+    | set(_V2_WRITE_TOOLS)
 )
+_TOOL_FEATURES = {
+    "microsoft_graph.planner.plans.list": "planner_enabled",
+    **{
+        tool_id: "todo_enabled"
+        for tool_id in _V2_TOOLS
+        if tool_id.startswith("microsoft_graph.todo.")
+    },
+    **{
+        tool_id: "calendar_enabled"
+        for tool_id in _V2_TOOLS
+        if tool_id.startswith("microsoft_graph.calendar.")
+    },
+    **{
+        tool_id: "sharepoint_drive_metadata_enabled"
+        for tool_id in _V2_TOOLS
+        if tool_id.startswith("microsoft_graph.sharepoint.drive")
+    },
+}
 _LEASE_TARGET_ARGUMENTS: Mapping[str, frozenset[str]] = {
     "microsoft_graph.planner.plan.get": frozenset({"plan_id"}),
+    "microsoft_graph.planner.plans.list": frozenset(),
     "microsoft_graph.planner.tasks.list": frozenset({"plan_id"}),
     "microsoft_graph.planner.task.get": frozenset({"plan_id", "task_id"}),
     "microsoft_graph.planner.task.create": frozenset({"plan_id", "bucket_id"}),
@@ -209,6 +509,23 @@ _LEASE_TARGET_ARGUMENTS: Mapping[str, frozenset[str]] = {
     "microsoft_graph.sharepoint.site.get": frozenset({"site_id"}),
     "microsoft_graph.sharepoint.list.get": frozenset({"site_id", "list_id"}),
     "microsoft_graph.sharepoint.list.items.delta": frozenset({"site_id", "list_id"}),
+    "microsoft_graph.todo.lists.list": frozenset(),
+    "microsoft_graph.todo.tasks.list": frozenset({"task_list_id"}),
+    "microsoft_graph.todo.task.get": frozenset({"task_list_id", "task_id"}),
+    "microsoft_graph.todo.task.create": frozenset({"task_list_id"}),
+    "microsoft_graph.todo.task.update": frozenset({"task_list_id", "task_id"}),
+    "microsoft_graph.todo.task.delete": frozenset({"task_list_id", "task_id"}),
+    "microsoft_graph.calendar.calendars.list": frozenset(),
+    "microsoft_graph.calendar.events.list": frozenset({"calendar_id"}),
+    "microsoft_graph.calendar.event.get": frozenset({"calendar_id", "event_id"}),
+    "microsoft_graph.calendar.event.create": frozenset({"calendar_id", "transaction_id"}),
+    "microsoft_graph.calendar.event.update": frozenset({"calendar_id", "event_id"}),
+    "microsoft_graph.calendar.event.delete": frozenset({"calendar_id", "event_id"}),
+    "microsoft_graph.calendar.freebusy.get": frozenset({"schedules"}),
+    "microsoft_graph.sharepoint.drives.list": frozenset({"site_id"}),
+    "microsoft_graph.sharepoint.drive.items.list": frozenset(
+        {"site_id", "drive_id", "parent_item_id"}
+    ),
 }
 
 
@@ -306,6 +623,11 @@ class MicrosoftGraphProvider:
         response.catalog.catalog_version = PLUGIN_VERSION
         for definition in CANONICAL_TOOLS:
             tool_id = str(definition["provider_tool_id"])
+            feature = _TOOL_FEATURES.get(tool_id)
+            if feature is not None and not (
+                settings.office_v2_flags and settings.office_v2_flags.get(feature, False)
+            ):
+                continue
             if settings.read_only and tool_id in _WRITE_TOOLS:
                 continue
             descriptor = response.catalog.tools.add()
@@ -333,6 +655,11 @@ class MicrosoftGraphProvider:
         tool_id = request.provider_tool_id
         if tool_id not in _TOOLS_BY_ID:
             return False, "METHOD_NOT_FOUND: provider tool is not available"
+        feature = _TOOL_FEATURES.get(tool_id)
+        if feature is not None and not (
+            settings.office_v2_flags and settings.office_v2_flags.get(feature, False)
+        ):
+            return True, _tool_error("FEATURE_DISABLED")
         if not isinstance(envelope, Mapping) or set(envelope) != {
             "payload",
             "profile_ref",
@@ -392,6 +719,7 @@ class MicrosoftGraphProvider:
                 profile,
                 settings=settings,
                 expected_external_subject=trusted_external_subject,
+                expected_workspace_id=actor.get("workspace_id"),
             )
             target = _target(scope, tool_id, arguments)
             operation_digest = payload_sha256(_arguments_for_lease(tool_id, arguments))
@@ -510,6 +838,10 @@ def _valid_arguments(
     required = set(schema.get("required", []))
     if not required.issubset(arguments) or set(arguments) - fields:
         return False
+    if ("page_size" in arguments or "page_cursor" in arguments) and not _valid_page_arguments(
+        arguments, settings.max_page_size
+    ):
+        return False
     if tool_id in {
         "microsoft_graph.planner.plan.get",
         "microsoft_graph.planner.tasks.list",
@@ -544,14 +876,150 @@ def _valid_arguments(
         "microsoft_graph.sharepoint.list.items.delta",
     } and not _valid_uuid(arguments.get("list_id")):
         return False
-    if (tool_id.endswith(".tasks.list") or tool_id.endswith(".list.items.delta")) and not (
-        _valid_page_arguments(arguments, settings.max_page_size)
+    if (
+        tool_id
+        in {
+            "microsoft_graph.planner.task.create",
+            "microsoft_graph.todo.task.create",
+        }
+        and "due_date_time" in arguments
+        and not _valid_offset_datetime_text(arguments["due_date_time"])
     ):
         return False
-    return not (
-        tool_id == "microsoft_graph.planner.task.create"
-        and "due_date_time" in arguments
-        and not _valid_datetime_text(arguments["due_date_time"])
+    if tool_id.startswith("microsoft_graph.todo."):
+        if "task_list_id" in arguments and not _valid_opaque_id(arguments["task_list_id"]):
+            return False
+        if "task_id" in arguments and not _valid_opaque_id(arguments["task_id"]):
+            return False
+        if tool_id.endswith((".create", ".update")):
+            changes = arguments.get("changes") if tool_id.endswith(".update") else None
+            if tool_id.endswith(".update") and not _valid_todo_changes(changes):
+                return False
+            title = arguments.get("title") if tool_id.endswith(".create") else None
+            if title is not None and not _valid_plain_text(title, 255):
+                return False
+            if "if_match" in arguments and not _valid_etag(arguments.get("if_match")):
+                return False
+    if tool_id.startswith("microsoft_graph.calendar."):
+        for field in ("calendar_id", "event_id"):
+            if field in arguments and not _valid_opaque_id(arguments[field]):
+                return False
+        if "if_match" in arguments and not _valid_etag(arguments.get("if_match")):
+            return False
+        for field in ("start_date_time", "end_date_time"):
+            if field in arguments and not _valid_offset_datetime_text(arguments[field]):
+                return False
+        start = _parse_aware_datetime(arguments.get("start_date_time"))
+        end = _parse_aware_datetime(arguments.get("end_date_time"))
+        if ("start_date_time" in arguments or "end_date_time" in arguments) and (
+            start is None or end is None or end <= start
+        ):
+            return False
+        if tool_id.endswith(".create"):
+            if not _valid_plain_text(arguments.get("subject"), 255):
+                return False
+            if not _valid_uuid(arguments.get("transaction_id")):
+                return False
+        if tool_id.endswith(".update") and not _valid_event_changes(arguments.get("changes")):
+            return False
+        if "location" in arguments and not _valid_plain_text(arguments["location"], 255):
+            return False
+        if tool_id.endswith(".freebusy.get"):
+            schedules = arguments.get("schedules")
+            if (
+                not isinstance(schedules, list)
+                or not 1 <= len(schedules) <= 20
+                or any(not _valid_schedule_id(item) for item in schedules)
+                or len({item.casefold() for item in schedules}) != len(schedules)
+                or start is None
+                or end is None
+                or end - start > timedelta(days=31)
+                or arguments.get("interval_minutes") not in {5, 10, 15, 30, 60}
+            ):
+                return False
+    if tool_id.startswith("microsoft_graph.sharepoint.drive"):
+        if "drive_id" in arguments and not _valid_opaque_id(arguments["drive_id"]):
+            return False
+        if "parent_item_id" in arguments and not _valid_opaque_id(arguments["parent_item_id"]):
+            return False
+    if tool_id == "microsoft_graph.planner.task.create" and "due_date_time" in arguments:
+        return _valid_datetime_text(arguments["due_date_time"])
+    return True
+
+
+def _valid_offset_datetime_text(value: Any) -> bool:
+    """Accept an ISO timestamp only when it carries an explicit UTC offset."""
+
+    return _parse_aware_datetime(value) is not None
+
+
+def _parse_aware_datetime(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not 1 <= len(value) <= 64:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None and parsed.utcoffset() is not None else None
+
+
+def _valid_opaque_id(value: Any) -> bool:
+    return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9._!:-]{1,512}", value) is not None
+
+
+def _valid_plain_text(value: Any, maximum: int) -> bool:
+    return (
+        isinstance(value, str)
+        and 1 <= len(value) <= maximum
+        and bool(value.strip())
+        and not any(ord(char) < 32 for char in value)
+    )
+
+
+def _valid_schedule_id(value: Any) -> bool:
+    return (
+        isinstance(value, str)
+        and 3 <= len(value) <= 320
+        and re.fullmatch(r"[^\s@]+@[^\s@]+", value) is not None
+    )
+
+
+def _valid_todo_changes(value: Any) -> bool:
+    if (
+        not isinstance(value, Mapping)
+        or not value
+        or set(value) - {"title", "due_date_time", "status", "importance"}
+    ):
+        return False
+    if "title" in value and not _valid_plain_text(value["title"], 255):
+        return False
+    if "due_date_time" in value and not _valid_offset_datetime_text(value["due_date_time"]):
+        return False
+    if "status" in value and value["status"] not in {
+        "notStarted",
+        "inProgress",
+        "completed",
+        "waitingOnOthers",
+        "deferred",
+    }:
+        return False
+    return not ("importance" in value and value["importance"] not in {"low", "normal", "high"})
+
+
+def _valid_event_changes(value: Any) -> bool:
+    if (
+        not isinstance(value, Mapping)
+        or not value
+        or set(value) - {"subject", "start_date_time", "end_date_time", "location"}
+    ):
+        return False
+    for field in ("subject", "location"):
+        if field in value and not _valid_plain_text(value[field], 255):
+            return False
+    return all(
+        _valid_offset_datetime_text(value[field])
+        for field in ("start_date_time", "end_date_time")
+        if field in value
     )
 
 
@@ -584,6 +1052,8 @@ def _profile_scope(profile: ProviderProfile) -> dict[str, Any]:
     """Validate the exact Account Center Graph scope without expanding it locally."""
 
     scope = profile.target_scope
+    if isinstance(scope, Mapping) and scope.get("schema_version") == 2:
+        return _office_v2_profile_scope(scope)
     if not isinstance(scope, Mapping) or set(scope) != {"tenant_id", "planner", "sharepoint"}:
         raise ProfileScopeMismatch("profile Graph scope shape differs")
     tenant_id = scope.get("tenant_id")
@@ -628,6 +1098,175 @@ def _profile_scope(profile: ProviderProfile) -> dict[str, Any]:
     return dict(scope)
 
 
+def _office_v2_profile_scope(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate v2 feature grants and target lists without widening v1 rules."""
+
+    expected_keys = {
+        "schema_version",
+        "tenant_id",
+        "workspace_id",
+        "planner",
+        "sharepoint",
+        "todo",
+        "calendar",
+        "mail",
+    }
+    if set(value) != expected_keys or value.get("schema_version") != 2:
+        raise ProfileScopeMismatch("Office v2 profile scope shape differs")
+    if not _valid_uuid(value.get("tenant_id")) or not _valid_uuid(value.get("workspace_id")):
+        raise ProfileScopeMismatch("Office v2 tenant or workspace is invalid")
+
+    planner = value.get("planner")
+    if not isinstance(planner, Mapping) or set(planner) != {
+        "plan_ids",
+        "tasks_read",
+        "tasks_write",
+    }:
+        raise ProfileScopeMismatch("Office v2 Planner scope shape differs")
+    plan_ids = planner.get("plan_ids")
+    if (
+        not isinstance(plan_ids, list)
+        or len(plan_ids) > 100
+        or any(not _valid_planner_id(item) for item in plan_ids)
+        or len(set(plan_ids)) != len(plan_ids)
+        or not isinstance(planner.get("tasks_read"), bool)
+        or not isinstance(planner.get("tasks_write"), bool)
+        or (planner["tasks_write"] and not planner["tasks_read"])
+        or (not planner["tasks_read"] and (plan_ids or planner["tasks_write"]))
+    ):
+        raise ProfileScopeMismatch("Office v2 Planner scope values are invalid")
+
+    sharepoint = value.get("sharepoint")
+    if not isinstance(sharepoint, Mapping) or set(sharepoint) != {
+        "enabled",
+        "site_id",
+        "list_ids",
+        "drive_ids",
+        "metadata_read",
+        "content_read",
+    }:
+        raise ProfileScopeMismatch("Office v2 SharePoint scope shape differs")
+    sp_enabled = sharepoint.get("enabled")
+    list_ids = sharepoint.get("list_ids")
+    drive_ids = sharepoint.get("drive_ids")
+    if (
+        not isinstance(sp_enabled, bool)
+        or not isinstance(sharepoint.get("metadata_read"), bool)
+        or sharepoint.get("content_read") is not False
+        or not isinstance(list_ids, list)
+        or len(list_ids) > 100
+        or any(not _valid_uuid(item) for item in list_ids)
+        or len(set(list_ids)) != len(list_ids)
+        or not isinstance(drive_ids, list)
+        or len(drive_ids) > 100
+        or any(not _valid_opaque_id(item) for item in drive_ids)
+        or len(set(drive_ids)) != len(drive_ids)
+    ):
+        raise ProfileScopeMismatch("Office v2 SharePoint scope values are invalid")
+    if sp_enabled:
+        if not _valid_site_id(sharepoint.get("site_id")) or not sharepoint["metadata_read"]:
+            raise ProfileScopeMismatch("Office v2 SharePoint site scope is invalid")
+    elif (
+        sharepoint.get("site_id") is not None
+        or list_ids
+        or drive_ids
+        or sharepoint["metadata_read"]
+    ):
+        raise ProfileScopeMismatch("disabled SharePoint scope contains targets")
+
+    todo = value.get("todo")
+    if not isinstance(todo, Mapping) or set(todo) != {
+        "enabled",
+        "task_list_ids",
+        "tasks_read",
+        "tasks_write",
+    }:
+        raise ProfileScopeMismatch("Office v2 To Do scope shape differs")
+    task_list_ids = todo.get("task_list_ids")
+    if (
+        not isinstance(todo.get("enabled"), bool)
+        or not isinstance(todo.get("tasks_read"), bool)
+        or not isinstance(todo.get("tasks_write"), bool)
+        or not isinstance(task_list_ids, list)
+        or len(task_list_ids) > 100
+        or any(not _valid_opaque_id(item) for item in task_list_ids)
+        or len(set(task_list_ids)) != len(task_list_ids)
+        or (todo["tasks_write"] and not todo["tasks_read"])
+        or (todo["enabled"] and not todo["tasks_read"])
+        or (not todo["enabled"] and (todo["tasks_read"] or todo["tasks_write"] or task_list_ids))
+    ):
+        raise ProfileScopeMismatch("Office v2 To Do scope values are invalid")
+
+    calendar = value.get("calendar")
+    calendar_keys = {
+        "enabled",
+        "calendar_ids",
+        "events_read",
+        "events_write",
+        "freebusy_read",
+        "freebusy_subjects",
+        "attendees_write",
+    }
+    if not isinstance(calendar, Mapping) or set(calendar) != calendar_keys:
+        raise ProfileScopeMismatch("Office v2 Calendar scope shape differs")
+    calendar_ids = calendar.get("calendar_ids")
+    freebusy = calendar.get("freebusy_subjects")
+    calendar_flags = (
+        calendar.get("enabled"),
+        calendar.get("events_read"),
+        calendar.get("events_write"),
+        calendar.get("freebusy_read"),
+        calendar.get("attendees_write"),
+    )
+    if (
+        any(not isinstance(flag, bool) for flag in calendar_flags)
+        or not isinstance(calendar_ids, list)
+        or len(calendar_ids) > 100
+        or any(not _valid_opaque_id(item) for item in calendar_ids)
+        or len(set(calendar_ids)) != len(calendar_ids)
+        or not isinstance(freebusy, list)
+        or len(freebusy) > 100
+        or any(not _valid_schedule_id(item) for item in freebusy)
+        or len({item.casefold() for item in freebusy}) != len(freebusy)
+        or calendar["attendees_write"]
+        or (calendar["events_write"] and not calendar["events_read"])
+        or (calendar["enabled"] and not (calendar["events_read"] or calendar["freebusy_read"]))
+        or (
+            not calendar["enabled"]
+            and (
+                calendar_ids
+                or calendar["events_read"]
+                or calendar["events_write"]
+                or calendar["freebusy_read"]
+                or freebusy
+            )
+        )
+        or (not calendar["events_read"] and calendar_ids)
+        or (not calendar["freebusy_read"] and freebusy)
+    ):
+        raise ProfileScopeMismatch("Office v2 Calendar scope values are invalid")
+
+    mail = value.get("mail")
+    if (
+        not isinstance(mail, Mapping)
+        or set(mail)
+        != {"enabled", "folder_ids", "metadata_read", "body_read", "drafts_write", "send_enabled"}
+        or any(
+            mail.get(key) is not expected
+            for key, expected in {
+                "enabled": False,
+                "metadata_read": False,
+                "body_read": False,
+                "drafts_write": False,
+                "send_enabled": False,
+            }.items()
+        )
+        or mail.get("folder_ids") != []
+    ):
+        raise ProfileScopeMismatch("Microsoft Graph mail features are not enabled in this release")
+    return dict(value)
+
+
 def _authorize_profile(
     scope: Mapping[str, Any],
     tool_id: str,
@@ -636,6 +1275,7 @@ def _authorize_profile(
     *,
     settings: ProviderSettings,
     expected_external_subject: str,
+    expected_workspace_id: str | None,
 ) -> None:
     """Require exact per-user target membership and the selected operation scope."""
 
@@ -662,6 +1302,95 @@ def _authorize_profile(
         or len(oauth_scopes) != len(set(oauth_scopes))
     ):
         raise ProfileScopeMismatch("Graph delegated scopes are invalid")
+    if scope.get("schema_version") == 2:
+        if (
+            not isinstance(expected_workspace_id, str)
+            or scope.get("workspace_id") != expected_workspace_id
+        ):
+            raise TrustedActorProfileMismatch(
+                "Graph profile differs from the signed Workspace actor"
+            )
+        expected_scopes = {"User.Read"}
+        planner = scope["planner"]
+        todo = scope["todo"]
+        sharepoint = scope["sharepoint"]
+        calendar = scope["calendar"]
+        if planner["tasks_write"] or todo["tasks_write"]:
+            expected_scopes.add("Tasks.ReadWrite")
+        elif planner["tasks_read"] or todo["tasks_read"]:
+            expected_scopes.add("Tasks.Read")
+        if sharepoint["enabled"]:
+            expected_scopes.add("Sites.Selected")
+        if calendar["events_write"]:
+            expected_scopes.add("Calendars.ReadWrite")
+        elif calendar["events_read"] or calendar["freebusy_read"]:
+            expected_scopes.add("Calendars.ReadBasic")
+        if set(oauth_scopes) != expected_scopes:
+            raise ProfileScopeMismatch("Office v2 delegated scopes exceed the selected profile")
+        if tool_id.startswith("microsoft_graph.planner."):
+            if not planner["tasks_read"]:
+                raise ProfileAuthorizationDenied("Planner read permission is not granted")
+            if tool_id == "microsoft_graph.planner.plans.list":
+                return
+            if arguments.get("plan_id") not in planner["plan_ids"]:
+                raise ProfileAuthorizationDenied("Planner plan is not selected")
+            if tool_id in _WRITE_TOOLS and not planner["tasks_write"]:
+                raise ProfileAuthorizationDenied("Planner write permission is not granted")
+            return
+        if tool_id.startswith("microsoft_graph.todo."):
+            if not todo["enabled"] or not todo["tasks_read"]:
+                raise ProfileAuthorizationDenied("To Do access is not enabled")
+            if tool_id == "microsoft_graph.todo.lists.list":
+                return
+            if arguments.get("task_list_id") not in todo["task_list_ids"]:
+                raise ProfileAuthorizationDenied("To Do task list is not selected")
+            if tool_id in _V2_WRITE_TOOLS and not todo["tasks_write"]:
+                raise ProfileAuthorizationDenied("To Do write permission is not granted")
+            return
+        if tool_id.startswith("microsoft_graph.calendar."):
+            if not calendar["enabled"]:
+                raise ProfileAuthorizationDenied("Calendar access is not enabled")
+            if tool_id == "microsoft_graph.calendar.calendars.list":
+                return
+            if tool_id == "microsoft_graph.calendar.freebusy.get":
+                if not calendar["freebusy_read"]:
+                    raise ProfileAuthorizationDenied("Free/busy permission is not granted")
+                if not set(item.casefold() for item in arguments["schedules"]) <= set(
+                    calendar["freebusy_subjects"]
+                ):
+                    raise ProfileAuthorizationDenied("Free/busy target is not selected")
+                return
+            if arguments.get("calendar_id") not in calendar["calendar_ids"]:
+                raise ProfileAuthorizationDenied("Calendar is not selected")
+            if tool_id in _V2_WRITE_TOOLS:
+                if not calendar["events_write"]:
+                    raise ProfileAuthorizationDenied("Calendar write permission is not granted")
+            elif not calendar["events_read"]:
+                raise ProfileAuthorizationDenied("Calendar read permission is not granted")
+            return
+        if tool_id.startswith("microsoft_graph.sharepoint."):
+            if (
+                not sharepoint["enabled"]
+                or not sharepoint["metadata_read"]
+                or arguments.get("site_id") != sharepoint["site_id"]
+            ):
+                raise ProfileAuthorizationDenied("SharePoint site is not selected")
+            if tool_id == "microsoft_graph.sharepoint.site.get":
+                return
+            if tool_id in {
+                "microsoft_graph.sharepoint.drives.list",
+                "microsoft_graph.sharepoint.drive.items.list",
+            }:
+                if (
+                    tool_id.endswith("drive.items.list")
+                    and arguments.get("drive_id") not in sharepoint["drive_ids"]
+                ):
+                    raise ProfileAuthorizationDenied("SharePoint drive is not selected")
+                return
+            if arguments.get("list_id") not in sharepoint["list_ids"]:
+                raise ProfileAuthorizationDenied("SharePoint list is not selected")
+            return
+        raise ProfileAuthorizationDenied("Microsoft Graph operation is not enabled")
     expected_scopes = {"User.Read", "Tasks.Read"}
     if scope["planner"]["tasks_write"]:
         expected_scopes.add("Tasks.ReadWrite")
@@ -700,10 +1429,41 @@ def _target(
     scope: Mapping[str, Any],
     tool_id: str,
     arguments: Mapping[str, Any],
-) -> dict[str, str]:
+) -> dict[str, Any]:
     """Build the exact Account Center resource target for the selected operation."""
 
     target = {"tenant_id": str(scope["tenant_id"])}
+    if scope.get("schema_version") == 2:
+        if tool_id in {
+            "microsoft_graph.planner.plans.list",
+            "microsoft_graph.todo.lists.list",
+            "microsoft_graph.calendar.calendars.list",
+        }:
+            return target
+        if tool_id.startswith("microsoft_graph.todo."):
+            result = {**target, "task_list_id": str(arguments["task_list_id"])}
+            if "task_id" in arguments:
+                result["task_id"] = str(arguments["task_id"])
+            return result
+        if tool_id.startswith("microsoft_graph.calendar."):
+            if tool_id == "microsoft_graph.calendar.freebusy.get":
+                return {
+                    **target,
+                    "schedule_ids": sorted(item.casefold() for item in arguments["schedules"]),
+                }
+            result = {**target, "calendar_id": str(arguments["calendar_id"])}
+            if "event_id" in arguments:
+                result["event_id"] = str(arguments["event_id"])
+            if "transaction_id" in arguments:
+                result["transaction_id"] = str(arguments["transaction_id"])
+            return result
+        if tool_id.startswith("microsoft_graph.sharepoint."):
+            result = {**target, "site_id": str(arguments["site_id"])}
+            if "list_id" in arguments:
+                result["list_id"] = str(arguments["list_id"])
+            if "drive_id" in arguments:
+                result["drive_id"] = str(arguments["drive_id"])
+            return result
     if tool_id in {
         "microsoft_graph.planner.plan.get",
         "microsoft_graph.planner.tasks.list",
@@ -789,6 +1549,11 @@ def _run_tool(
 
     if tool_id == "microsoft_graph.planner.plan.get":
         return session.get_plan(str(arguments["plan_id"]))
+    if tool_id == "microsoft_graph.planner.plans.list":
+        return session.list_plans(
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
     if tool_id == "microsoft_graph.planner.tasks.list":
         return session.list_tasks(
             str(arguments["plan_id"]),
@@ -820,12 +1585,113 @@ def _run_tool(
         return session.get_site(str(arguments["site_id"]))
     if tool_id == "microsoft_graph.sharepoint.list.get":
         return session.get_list(str(arguments["site_id"]), str(arguments["list_id"]))
-    return session.list_items_delta(
-        str(arguments["site_id"]),
-        str(arguments["list_id"]),
-        page_size=int(arguments.get("page_size", settings.max_page_size)),
-        page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
-    )
+    if tool_id == "microsoft_graph.sharepoint.list.items.delta":
+        return session.list_items_delta(
+            str(arguments["site_id"]),
+            str(arguments["list_id"]),
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.todo.lists.list":
+        return session.list_todo_lists(
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.todo.tasks.list":
+        return session.list_todo_tasks(
+            str(arguments["task_list_id"]),
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.todo.task.get":
+        return session.get_todo_task(str(arguments["task_list_id"]), str(arguments["task_id"]))
+    if tool_id == "microsoft_graph.todo.task.create":
+        return session.create_todo_task(
+            str(arguments["task_list_id"]),
+            str(arguments["title"]),
+            due_date_time=str(arguments["due_date_time"]) if "due_date_time" in arguments else None,
+            importance=str(arguments["importance"]) if "importance" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.todo.task.update":
+        changes = arguments["changes"]
+        if not isinstance(changes, Mapping):
+            raise GraphApiFailure("INVALID_ARGUMENTS")
+        return session.update_todo_task(
+            str(arguments["task_list_id"]),
+            str(arguments["task_id"]),
+            str(arguments["if_match"]),
+            changes,
+        )
+    if tool_id == "microsoft_graph.todo.task.delete":
+        return session.delete_todo_task(
+            str(arguments["task_list_id"]),
+            str(arguments["task_id"]),
+            str(arguments["if_match"]),
+        )
+    if tool_id == "microsoft_graph.calendar.calendars.list":
+        return session.list_calendars(
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.calendar.events.list":
+        return session.list_calendar_events(
+            str(arguments["calendar_id"]),
+            str(arguments["start_date_time"]),
+            str(arguments["end_date_time"]),
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.calendar.event.get":
+        return session.get_calendar_event(str(arguments["calendar_id"]), str(arguments["event_id"]))
+    if tool_id == "microsoft_graph.calendar.freebusy.get":
+        return session.get_calendar_freebusy(
+            list(arguments["schedules"]),
+            str(arguments["start_date_time"]),
+            str(arguments["end_date_time"]),
+            int(arguments["interval_minutes"]),
+        )
+    if tool_id == "microsoft_graph.calendar.event.create":
+        return session.create_calendar_event(
+            str(arguments["calendar_id"]),
+            str(arguments["subject"]),
+            str(arguments["start_date_time"]),
+            str(arguments["end_date_time"]),
+            str(arguments["transaction_id"]),
+            location=str(arguments["location"]) if "location" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.calendar.event.update":
+        changes = arguments["changes"]
+        if not isinstance(changes, Mapping):
+            raise GraphApiFailure("INVALID_ARGUMENTS")
+        return session.update_calendar_event(
+            str(arguments["calendar_id"]),
+            str(arguments["event_id"]),
+            str(arguments["if_match"]),
+            changes,
+        )
+    if tool_id == "microsoft_graph.calendar.event.delete":
+        return session.delete_calendar_event(
+            str(arguments["calendar_id"]),
+            str(arguments["event_id"]),
+            str(arguments["if_match"]),
+        )
+    if tool_id == "microsoft_graph.sharepoint.drives.list":
+        return session.list_sharepoint_drives(
+            str(arguments["site_id"]),
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.sharepoint.drive.items.list":
+        return session.list_sharepoint_drive_items(
+            str(arguments["site_id"]),
+            str(arguments["drive_id"]),
+            parent_item_id=str(arguments["parent_item_id"])
+            if "parent_item_id" in arguments
+            else None,
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    raise GraphApiFailure("INVALID_OPERATION")
 
 
 def _valid_page_arguments(arguments: Mapping[str, Any], maximum: int) -> bool:
