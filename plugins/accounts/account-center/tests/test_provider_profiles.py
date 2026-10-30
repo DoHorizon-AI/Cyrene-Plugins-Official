@@ -1910,6 +1910,137 @@ def test_manifest_keeps_disabled_legacy_and_provider_secrets_optional() -> None:
     } <= optional
 
 
+def test_schema_v8_migration_preserves_provider_rows_with_foreign_key_children(
+    tmp_path: Path,
+) -> None:
+    """Rebuild provider profiles atomically without losing referenced child rows."""
+
+    db_path = tmp_path / "accounts-v8-with-references.sqlite"
+    ProfileHarness(db_path)
+    now = int(time.time())
+    profile_ref = "00000000-0000-4000-8000-000000000901"
+    lease_ref = "00000000-0000-4000-8000-000000000902"
+    session_ref = "00000000-0000-4000-8000-000000000903"
+    profile_values = (
+        profile_ref,
+        ACTOR["issuer"],
+        ACTOR["subject"],
+        ACTOR["organization_id"],
+        ACTOR["workspace_id"],
+        "huggingface",
+        "hf-user-1",
+        '{"repositories":["owner/model"]}',
+        "healthy",
+        "hf-user-1",
+        b"access-ciphertext-v8",
+        now + 3600,
+        None,
+        "active",
+        now - 20,
+        now - 10,
+        "device_oauth",
+        b"refresh-ciphertext-v8",
+        now + 7200,
+        "oauth-client-v8",
+        '["read-repos"]',
+        "refresh-claim-v8",
+        "other-account-center-instance",
+        now,
+        7,
+        "actor_owned",
+    )
+    lease_values = (
+        lease_ref,
+        profile_ref,
+        ACTOR["issuer"],
+        ACTOR["subject"],
+        ACTOR["organization_id"],
+        ACTOR["workspace_id"],
+        "account-center-binding",
+        HF_PROVIDER,
+        "huggingface.repo.get",
+        '{"repo_type":"model","repo_id":"owner/model"}',
+        "a" * 64,
+        now + 600,
+        None,
+        "provider-connection-v8",
+    )
+    renewal_values = (
+        session_ref,
+        profile_ref,
+        ACTOR["issuer"],
+        ACTOR["subject"],
+        ACTOR["organization_id"],
+        ACTOR["workspace_id"],
+        "waiting_user",
+        b"device-code-ciphertext-v8",
+        "ABCD-EFGH",
+        "https://hf.co/oauth/device",
+        now + 600,
+        5,
+        now + 10,
+        7,
+        "poll-claim-v8",
+        "other-account-center-instance",
+        now,
+        "poll-pending-v8",
+        now - 20,
+        now - 10,
+    )
+    with sqlite3.connect(db_path) as db:
+        db.execute(
+            "INSERT INTO provider_profiles(profile_ref,anchor_issuer,anchor_subject,"
+            "organization_id,workspace_id,provider,identity_ref,target_scope_json,"
+            "auth_status,external_subject,credential_blob,credential_expires_at,"
+            "credential_secret_ref,status,created_at,updated_at,auth_mode,"
+            "credential_refresh_blob,credential_refresh_expires_at,oauth_client_id,"
+            "oauth_scopes_json,refresh_claim_id,refresh_claim_owner,refresh_claimed_at,"
+            "credential_revision,access_mode) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            profile_values,
+        )
+        db.execute(
+            "INSERT INTO provider_credential_leases(lease_ref,profile_ref,anchor_issuer,"
+            "anchor_subject,organization_id,workspace_id,binding_id,provider_caller_id,"
+            "operation_id,target_json,arguments_sha256,expires_at,redeemed_at,connection_ref) "
+            "VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            lease_values,
+        )
+        db.execute(
+            "INSERT INTO huggingface_device_renewal_sessions(session_ref,profile_ref,"
+            "anchor_issuer,anchor_subject,organization_id,workspace_id,status,device_code_blob,"
+            "user_code,verification_uri,expires_at,interval_seconds,next_poll_at,"
+            "profile_revision,poll_claim_id,poll_claim_owner,poll_claimed_at,reason_code,"
+            "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            renewal_values,
+        )
+
+    def snapshot() -> dict[str, list[tuple[Any, ...]]]:
+        with sqlite3.connect(db_path) as db:
+            tables = (
+                "provider_profiles",
+                "provider_credential_leases",
+                "huggingface_device_renewal_sessions",
+            )
+            return {
+                table: [
+                    tuple(row)
+                    for row in db.execute(f"SELECT * FROM {table} ORDER BY 1").fetchall()
+                ]
+                for table in tables
+            }
+
+    before = snapshot()
+    with sqlite3.connect(db_path) as db:
+        db.execute("PRAGMA user_version = 8")
+
+    store = account_center_plugin_module.AccountStore(db_path)
+
+    assert snapshot() == before
+    with store._connect() as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
 @pytest.mark.parametrize(
     ("status", "expected"),
     [

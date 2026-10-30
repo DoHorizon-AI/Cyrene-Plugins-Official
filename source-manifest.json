@@ -1013,8 +1013,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/store.py",
-      "sha256": "c8c70178922febeab7a1b20b91ea24bbf81eb59680a311d5a9d92e2610ea0566",
-      "size_bytes": 131741
+      "sha256": "e973d08e650302d9bded30582e4058e526822128974faa4c606e03621fd9ed91",
+      "size_bytes": 132517
     },
     {
       "kind": "file",
@@ -1055,8 +1055,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "5acbb5d9495c2dd3d4d2e37c8000d80ceecf0c7fbad5582ca2a1292bc777d51f",
-      "size_bytes": 128184
+      "sha256": "2862ed06c5199ad1f031ad0c70cb792b46ccf3102c8888d48d7f73e64558718f",
+      "size_bytes": 132738
     },
     {
       "kind": "file",
