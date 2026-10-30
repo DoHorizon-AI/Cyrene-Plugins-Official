@@ -27,9 +27,13 @@ AUTHORIZE_ENDPOINT = "https://login.microsoftonline.com/organizations/oauth2/v2.
 TOKEN_ENDPOINT = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
 JWKS_ENDPOINT = "https://login.microsoftonline.com/common/discovery/v2.0/keys"
 GRAPH_ME_ENDPOINT = "https://graph.microsoft.com/v1.0/me?$select=id"
+GRAPH_SCOPE_URI_PREFIX = "https://graph.microsoft.com/"
+ENCODED_GRAPH_SCOPE_URI_PREFIX = "https%3A%2F%2Fgraph.microsoft.com%2F"
 AZURE_DEVOPS_RESOURCE_SCOPE = "https://app.vssps.visualstudio.com/.default"
 INITIAL_GRAPH_SCOPES = frozenset({"User.Read", "Tasks.Read"})
 INITIAL_OFFICE_V2_GRAPH_SCOPES = frozenset({"User.Read"})
+REQUEST_OIDC_SCOPES = frozenset({"openid", "profile", "offline_access"})
+RESPONSE_OIDC_SCOPES = frozenset({"openid", "profile", "email", "offline_access"})
 ALLOWED_GRAPH_SCOPES = frozenset(
     {
         "User.Read",
@@ -225,7 +229,9 @@ class MicrosoftGraphOAuthClient:
         access_token = value.get("access_token")
         refresh_token = value.get("refresh_token")
         expires_in = value.get("expires_in")
-        scope_text = value.get("scope")
+        scope_text = (
+            " ".join(requested_scopes) if "scope" not in value else value["scope"]
+        )
         if (
             not isinstance(access_token, str)
             or not access_token
@@ -577,7 +583,7 @@ def _validate_scope_request(scopes: tuple[str, ...], *, office_v2: bool = False)
         not scopes
         or len(scopes) != len(set(scopes))
         or any(
-            scope not in allowed and scope not in {"openid", "profile", "offline_access"}
+            scope not in allowed and scope not in REQUEST_OIDC_SCOPES
             for scope in scopes
         )
         or not required.issubset(scopes)
@@ -591,7 +597,13 @@ def _validate_scope_response(
     *,
     office_v2: bool = False,
 ) -> set[str]:
-    actual = set(scope_text.split())
+    """Separate known OIDC response scopes from exact Graph API permissions.
+
+    Microsoft can include identity scopes alongside the resource grant, while an
+    omitted `scope` response is handled by the token parser using this request's
+    fixed scope tuple. OIDC values never become returned Graph permissions.
+    """
+
     allowed = (
         ALLOWED_GRAPH_SCOPES
         if office_v2
@@ -601,15 +613,43 @@ def _validate_scope_response(
             "Sites.Selected",
         }
     )
-    requested_graph = set(requested_scopes) & allowed
-    if (
-        not actual
-        or not actual <= allowed
-        or not requested_graph <= actual
-        or "Tasks.ReadWrite.All" in actual
-    ):
+    if not isinstance(scope_text, str):
         raise MicrosoftGraphOAuthError("scope_rejected")
-    return actual
+    actual_graph = {
+        graph_scope
+        for token in scope_text.split()
+        if (graph_scope := _graph_scope_from_response_token(token, allowed)) is not None
+    }
+    requested_graph = {
+        graph_scope
+        for token in requested_scopes
+        if (graph_scope := _graph_scope_from_response_token(token, allowed)) is not None
+    }
+    if not actual_graph or actual_graph != requested_graph:
+        raise MicrosoftGraphOAuthError("scope_rejected")
+    return actual_graph
+
+
+def _graph_scope_from_response_token(
+    token: str, allowed: frozenset[str]
+) -> str | None:
+    """Return a canonical Graph permission, or None for one known OIDC scope.
+
+    Only the fixed Microsoft Graph URI prefix (plain or URI-escaped) and
+    explicitly allowed permission names are normalized. Unknown resource URIs
+    and permissions fail closed.
+    """
+
+    scope_name = token
+    for prefix in (GRAPH_SCOPE_URI_PREFIX, ENCODED_GRAPH_SCOPE_URI_PREFIX):
+        if token[: len(prefix)].casefold() == prefix.casefold():
+            scope_name = token[len(prefix) :]
+            break
+    if scope_name.casefold() in RESPONSE_OIDC_SCOPES:
+        return None
+    if scope_name in allowed:
+        return scope_name
+    raise MicrosoftGraphOAuthError("scope_rejected")
 
 
 def _canonical_uuid(value: Any) -> str:

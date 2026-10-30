@@ -985,8 +985,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/microsoft_graph_oauth.py",
-      "sha256": "775867de81881533896a8052b6f79c34bb090881383a549d8524b53ee87f05c2",
-      "size_bytes": 23440
+      "sha256": "6559cac6a9f0397c72b5883caf30a10c7d5bf9eb4438dd893d07dd878506e932",
+      "size_bytes": 25158
     },
     {
       "kind": "file",
@@ -1048,8 +1048,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_microsoft_graph_oauth.py",
-      "sha256": "7b50801e0fb8d1d14b8a8360ed4c8bdd5fe338e7b6613e3473e01ba99937d7cd",
-      "size_bytes": 14272
+      "sha256": "8374603e3a6c229dbfe6d36de88019b1a28fad91efa87e811f6e6c4eddf9376e",
+      "size_bytes": 20934
     },
     {
       "kind": "file",
