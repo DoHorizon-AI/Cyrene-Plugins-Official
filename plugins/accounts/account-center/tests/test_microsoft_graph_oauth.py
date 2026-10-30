@@ -18,6 +18,7 @@ from account_center.microsoft_graph_oauth import (
     JWKS_ENDPOINT,
     TOKEN_ENDPOINT,
     AzureDevOpsOAuthClient,
+    MicrosoftGraphIdentity,
     MicrosoftGraphOAuthClient,
     MicrosoftGraphOAuthError,
 )
@@ -83,8 +84,42 @@ def _jwks(private_key: Any) -> dict[str, Any]:
     }
 
 
+@pytest.mark.parametrize(
+    "response_scope",
+    [
+        "Tasks.Read User.Read",
+        "openid profile email offline_access Tasks.Read User.Read",
+        (
+            "OPENID Profile EMAIL OFFLINE_ACCESS "
+            "https://graph.microsoft.com/Tasks.Read "
+            "HTTPS://GRAPH.MICROSOFT.COM/User.Read"
+        ),
+        (
+            "https://graph.microsoft.com/openid "
+            "https://graph.microsoft.com/profile "
+            "https://graph.microsoft.com/email "
+            "https://graph.microsoft.com/offline_access "
+            "https://graph.microsoft.com/Tasks.Read "
+            "https://graph.microsoft.com/User.Read"
+        ),
+        (
+            "openid profile offline_access "
+            "https%3A%2F%2Fgraph.microsoft.com%2FTasks.Read "
+            "https%3A%2F%2Fgraph.microsoft.com%2FUser.Read"
+        ),
+        None,
+    ],
+    ids=(
+        "graph-only",
+        "oidc-mixed",
+        "oidc-case-and-graph-uri",
+        "oidc-and-graph-uri",
+        "escaped-graph-uri",
+        "scope-omitted",
+    ),
+)
 def test_graph_code_exchange_verifies_oidc_nonce_and_same_token_me(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, response_scope: str | None
 ) -> None:
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     client = MicrosoftGraphOAuthClient(
@@ -126,14 +161,16 @@ def test_graph_code_exchange_verifies_oidc_nonce_and_same_token_me(
             form = dict(parse_qsl(body.decode("ascii")))
             assert form["scope"] == " ".join(scopes)
             assert form["code_verifier"] == "r" * 43
-            return {
+            token_response = {
                 "access_token": "opaque-graph-access-token",
                 "refresh_token": "opaque-graph-refresh-token",
                 "token_type": "Bearer",
                 "expires_in": 3600,
-                "scope": "Tasks.Read User.Read",
                 "id_token": _id_token(private_key, "random-nonce-value-with-enough-entropy"),
             }
+            if response_scope is not None:
+                token_response["scope"] = response_scope
+            return token_response
         if url == JWKS_ENDPOINT:
             return _jwks(private_key)
         if url == GRAPH_ME_ENDPOINT:
@@ -153,7 +190,166 @@ def test_graph_code_exchange_verifies_oidc_nonce_and_same_token_me(
     assert token.access_token == "opaque-graph-access-token"
     assert token.refresh_token == "opaque-graph-refresh-token"
     assert token.expires_at == NOW + 3600
+    assert token.scopes == ("Tasks.Read", "User.Read")
     assert [url for url, _, _ in requests].count(GRAPH_ME_ENDPOINT) == 1
+
+
+@pytest.mark.parametrize(
+    ("response_scope", "expected_error"),
+    [
+        (None, "credential_unavailable"),
+        ([], "credential_unavailable"),
+        ("", "scope_rejected"),
+        ("Tasks.Read User.Read Mail.Read", "scope_rejected"),
+        ("Tasks.Read User.Read Calendars.ReadWrite", "scope_rejected"),
+        ("Tasks.Read", "scope_rejected"),
+        (
+            "Tasks.Read User.Read https://graph.microsoft.com/Mail.Read",
+            "scope_rejected",
+        ),
+        (
+            "Tasks.Read User.Read https://evil.example/User.Read",
+            "scope_rejected",
+        ),
+        ("openid profile phone Tasks.Read User.Read", "scope_rejected"),
+    ],
+    ids=(
+        "null",
+        "wrong-type",
+        "explicit-empty",
+        "mail-permission",
+        "unrequested-known-graph-permission",
+        "missing-requested-graph-permission",
+        "unknown-graph-uri-permission",
+        "cross-origin-graph-uri",
+        "unknown-oidc-scope",
+    ),
+)
+def test_graph_token_response_rejects_invalid_scope_values_and_permissions(
+    response_scope: Any, expected_error: str
+) -> None:
+    client = MicrosoftGraphOAuthClient(
+        client_id=CLIENT_ID,
+        client_secret="synthetic-secret",
+        now=lambda: NOW,
+    )
+    response = {
+        "access_token": "opaque-graph-access-token",
+        "refresh_token": "opaque-graph-refresh-token",
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "id_token": "synthetic-id-token",
+        "scope": response_scope,
+    }
+    with pytest.raises(MicrosoftGraphOAuthError, match=expected_error):
+        client._parse_token(
+            response,
+            ("openid", "profile", "offline_access", "Tasks.Read", "User.Read"),
+        )
+
+
+def test_omitted_scope_fallback_uses_only_the_current_office_v2_request() -> None:
+    client = MicrosoftGraphOAuthClient(
+        client_id=CLIENT_ID,
+        client_secret="synthetic-secret",
+        office_v2_enabled=True,
+        now=lambda: NOW,
+    )
+    requested = (
+        "openid",
+        "profile",
+        "offline_access",
+        "User.Read",
+        "Calendars.ReadWrite",
+    )
+    token = client._parse_token(
+        {
+            "access_token": "opaque-graph-access-token",
+            "refresh_token": "opaque-graph-refresh-token",
+            "token_type": "Bearer",
+            "expires_in": 3600,
+            "id_token": "synthetic-id-token",
+        },
+        requested,
+    )
+    assert token.scopes == ("Calendars.ReadWrite", "User.Read")
+
+
+def test_graph_response_rejects_an_unrequested_but_known_office_v2_permission() -> None:
+    client = MicrosoftGraphOAuthClient(
+        client_id=CLIENT_ID,
+        client_secret="synthetic-secret",
+        office_v2_enabled=True,
+        now=lambda: NOW,
+    )
+    with pytest.raises(MicrosoftGraphOAuthError, match="scope_rejected"):
+        client._parse_token(
+            {
+                "access_token": "opaque-graph-access-token",
+                "refresh_token": "opaque-graph-refresh-token",
+                "token_type": "Bearer",
+                "expires_in": 3600,
+                "id_token": "synthetic-id-token",
+                "scope": "User.Read Calendars.ReadWrite",
+            },
+            ("openid", "profile", "offline_access", "User.Read"),
+        )
+
+
+def test_graph_refresh_uses_the_exact_requested_scope_when_response_omits_scope(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    client = MicrosoftGraphOAuthClient(
+        client_id=CLIENT_ID,
+        client_secret="synthetic-secret",
+        now=lambda: NOW,
+    )
+    requests: list[tuple[str, str]] = []
+
+    def request_json(
+        url: str,
+        *,
+        method: str,
+        headers: dict[str, str] | None = None,
+        body: bytes | None = None,
+    ) -> dict[str, Any]:
+        if url == TOKEN_ENDPOINT.format(tenant=TENANT_ID):
+            form = dict(parse_qsl((body or b"").decode("ascii")))
+            requests.append((url, form["scope"]))
+            return {
+                "access_token": "opaque-refreshed-graph-token",
+                "refresh_token": "opaque-rotated-graph-refresh-token",
+                "token_type": "Bearer",
+                "expires_in": 1800,
+                "id_token": _jwt(
+                    private_key,
+                    {
+                        "iss": f"https://login.microsoftonline.com/{TENANT_ID}/v2.0",
+                        "aud": CLIENT_ID,
+                        "tid": TENANT_ID,
+                        "oid": OBJECT_ID,
+                        "iat": NOW,
+                        "exp": NOW + 1800,
+                    },
+                ),
+            }
+        if url == JWKS_ENDPOINT:
+            return _jwks(private_key)
+        raise AssertionError(f"unexpected request URL: {url}")
+
+    monkeypatch.setattr(client, "_request_json", request_json)
+    token = client.refresh(
+        tenant_id=TENANT_ID,
+        refresh_token="opaque-current-refresh-token",
+        requested_scopes=("Tasks.Read", "User.Read"),
+    )
+    assert requests == [
+        (TOKEN_ENDPOINT.format(tenant=TENANT_ID), "openid Tasks.Read User.Read")
+    ]
+    assert token.scopes == ("Tasks.Read", "User.Read")
+    assert token.refresh_token == "opaque-rotated-graph-refresh-token"
+    assert token.identity == MicrosoftGraphIdentity(TENANT_ID, OBJECT_ID)
 
 
 def test_graph_rejects_invalid_nonce_or_signature(
