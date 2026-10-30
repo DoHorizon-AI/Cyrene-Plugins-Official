@@ -339,6 +339,24 @@ def test_outer_trusted_context_still_binds_target_ids_when_lease_digest_excludes
     assert transport.calls == []
 
 
+def test_sharepoint_parent_folder_is_bound_by_the_lease_argument_digest() -> None:
+    """Keep folder selection inside the signed argument digest, not an unbound target."""
+
+    arguments = {
+        "site_id": SITE_ID,
+        "drive_id": "drive!1",
+        "parent_item_id": "folder!1",
+        "page_size": 25,
+    }
+
+    lease_arguments = _arguments_for_lease("microsoft_graph.sharepoint.drive.items.list", arguments)
+
+    assert lease_arguments == {"parent_item_id": "folder!1", "page_size": 25}
+    assert payload_sha256(lease_arguments) != payload_sha256(
+        {"parent_item_id": "folder!2", "page_size": 25}
+    )
+
+
 def test_actor_a_cannot_use_actor_b_profile_even_when_account_center_returns_it() -> None:
     actor_b_subject = f"{TENANT_ID}:88888888-8888-4888-8888-888888888888"
     account_center = FakeAccountCenter(_profile(_scope(), external_subject=actor_b_subject))

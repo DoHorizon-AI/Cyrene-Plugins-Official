@@ -523,9 +523,7 @@ _LEASE_TARGET_ARGUMENTS: Mapping[str, frozenset[str]] = {
     "microsoft_graph.calendar.event.delete": frozenset({"calendar_id", "event_id"}),
     "microsoft_graph.calendar.freebusy.get": frozenset({"schedules"}),
     "microsoft_graph.sharepoint.drives.list": frozenset({"site_id"}),
-    "microsoft_graph.sharepoint.drive.items.list": frozenset(
-        {"site_id", "drive_id", "parent_item_id"}
-    ),
+    "microsoft_graph.sharepoint.drive.items.list": frozenset({"site_id", "drive_id"}),
 }
 
 
