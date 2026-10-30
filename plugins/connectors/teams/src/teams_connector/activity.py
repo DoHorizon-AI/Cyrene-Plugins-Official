@@ -114,22 +114,30 @@ def normalize_activity(
     observed_tenant = _canonical_uuid(raw_tenant)
     observed_team = _optional_text(_get(team, "id"), limit=512)
     channel_id = _optional_text(_get(channel, "id"), limit=512)
-    conversation_id = _optional_text(_get(conversation, "id"), limit=512)
+    raw_conversation_id = _get(conversation, "id")
+    conversation_id = _optional_text(raw_conversation_id, limit=512)
     message_id = _optional_text(_get(activity, "id"), limit=512)
 
     if observed_tenant is None or observed_tenant != tenant_id.lower():
         raise ActivityRejected("tenant_not_allowed")
-    if conversation_id is None or message_id is None:
-        raise ActivityRejected("missing_conversation_identity")
     if is_personal:
         if observed_team is not None or channel_id is not None:
             raise ActivityRejected("invalid_personal_scope")
-    elif (
-        observed_team is None
-        or channel_id is None
-        or observed_team not in allowed_team_ids
-    ):
-        raise ActivityRejected("team_or_channel_not_allowed")
+        conversation_id = _personal_conversation_id(
+            raw_conversation_id,
+            missing_reason="missing_conversation_identity",
+        )
+        if message_id is None:
+            raise ActivityRejected("missing_conversation_identity")
+    else:
+        if conversation_id is None or message_id is None:
+            raise ActivityRejected("missing_conversation_identity")
+        if (
+            observed_team is None
+            or channel_id is None
+            or observed_team not in allowed_team_ids
+        ):
+            raise ActivityRejected("team_or_channel_not_allowed")
 
     raw_service_url = _get(activity, "serviceUrl", "service_url")
     if not isinstance(raw_service_url, str) or not raw_service_url:
@@ -267,9 +275,17 @@ def normalize_personal_installation(
     ):
         raise ActivityRejected("invalid_personal_scope")
 
-    conversation_id = _optional_text(_get(conversation, "id"), limit=512)
+    raw_occurred_at = _get(activity, "timestamp")
+    if raw_occurred_at is None:
+        raise ActivityRejected("missing_activity_timestamp")
+    occurred_at = _activity_timestamp(raw_occurred_at)
+
+    conversation_id = _personal_conversation_id(
+        _get(conversation, "id"),
+        missing_reason="missing_installation_identity",
+    )
     activity_id = _optional_text(_get(activity, "id"), limit=512)
-    if conversation_id is None or activity_id is None:
+    if activity_id is None:
         raise ActivityRejected("missing_installation_identity")
     raw_service_url = _get(activity, "serviceUrl", "service_url")
     if not isinstance(raw_service_url, str) or not raw_service_url:
@@ -293,10 +309,8 @@ def normalize_personal_installation(
         "conversation_id": conversation_id,
         "activity_id": activity_id,
         "service_url": service_url,
+        "activity_occurred_at": occurred_at,
     }
-    raw_occurred_at = _get(activity, "timestamp")
-    if raw_occurred_at is not None:
-        trust["activity_occurred_at"] = _activity_timestamp(raw_occurred_at)
 
     return NormalizedTeamsActivity(
         payload={"action": action},
@@ -602,6 +616,17 @@ def _optional_text(value: Any, *, limit: int = 16_384) -> str | None:
     if not isinstance(value, str) or not value.strip() or len(value) > limit:
         return None
     return value.strip()
+
+
+def _personal_conversation_id(value: Any, *, missing_reason: str) -> str:
+    """Require the bounded ``a:`` identifier accepted by private Teams sends."""
+
+    if not isinstance(value, str) or not value.strip():
+        raise ActivityRejected(missing_reason)
+    conversation_id = value.strip()
+    if len(conversation_id) > 512 or not conversation_id.startswith("a:"):
+        raise ActivityRejected("invalid_personal_conversation_id")
+    return conversation_id
 
 
 def _bounded_text(value: Any, field: str) -> str:

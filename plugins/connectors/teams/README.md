@@ -56,7 +56,11 @@ Framework or Navigator Authorization headers are never stored.
 Personal installation events carry actor, tenant, bot, conversation, activity,
 and validated service URL only in the HMAC-protected `trust` envelope. The Work
 host authorizes the actor against its live owner projection and owns the active
-route record and revocation. Channel thread identity stays shared; Navigator
+route record and revocation. Personal conversation IDs are limited to the
+bounded `a:` form accepted by the existing Exchange direct-send contract;
+channel-style `19:` IDs are rejected without a channel fallback. Installation
+events without an official `Activity.timestamp` are also rejected before they
+enter the durable delivery spool. Channel thread identity stays shared; Navigator
 must keep each actor's native session separate within that thread. Shared
 channels receive approved shared metadata only. A private source query from a
 shared channel fails until an approved personal binding exists. The model and

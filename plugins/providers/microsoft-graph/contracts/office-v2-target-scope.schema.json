@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/microsoft-graph/office-v2-target-scope.schema.json",
+  "title": "Microsoft Graph actor-owned Office v2 target scope",
+  "type": "object",
+  "required": ["schema_version", "tenant_id", "workspace_id", "planner", "sharepoint", "todo", "calendar", "mail"],
+  "properties": {
+    "schema_version": {"const": 2},
+    "tenant_id": {"type": "string", "format": "uuid"},
+    "workspace_id": {"type": "string", "format": "uuid"},
+    "planner": {
+      "type": "object",
+      "required": ["plan_ids", "tasks_read", "tasks_write"],
+      "properties": {
+        "plan_ids": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}},
+        "tasks_read": {"type": "boolean"},
+        "tasks_write": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "sharepoint": {
+      "type": "object",
+      "required": ["enabled", "site_id", "list_ids", "drive_ids", "metadata_read", "content_read"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "site_id": {"type": ["string", "null"], "pattern": "^[A-Za-z0-9.-]{1,255},[0-9a-fA-F-]{36},[0-9a-fA-F-]{36}$"},
+        "list_ids": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "format": "uuid"}},
+        "drive_ids": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._!~+=-]{1,512}$"}},
+        "metadata_read": {"type": "boolean"},
+        "content_read": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "todo": {
+      "type": "object",
+      "required": ["enabled", "task_list_ids", "tasks_read", "tasks_write"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "task_list_ids": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._!~+=-]{1,512}$"}},
+        "tasks_read": {"type": "boolean"},
+        "tasks_write": {"type": "boolean"}
+      },
+      "additionalProperties": false
+    },
+    "calendar": {
+      "type": "object",
+      "required": ["enabled", "calendar_ids", "events_read", "events_write", "freebusy_read", "freebusy_subjects", "attendees_write"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "calendar_ids": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._!~+=-]{1,512}$"}},
+        "events_read": {"type": "boolean"},
+        "events_write": {"type": "boolean"},
+        "freebusy_read": {"type": "boolean"},
+        "freebusy_subjects": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 3, "maxLength": 320}},
+        "attendees_write": {"const": false}
+      },
+      "additionalProperties": false
+    },
+    "mail": {
+      "type": "object",
+      "required": ["enabled", "folder_ids", "metadata_read", "body_read", "drafts_write", "send_enabled"],
+      "properties": {
+        "enabled": {"const": false},
+        "folder_ids": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._!~+=-]{1,512}$"}},
+        "metadata_read": {"const": false},
+        "body_read": {"const": false},
+        "drafts_write": {"const": false},
+        "send_enabled": {"const": false}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

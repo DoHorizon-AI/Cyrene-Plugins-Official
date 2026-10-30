@@ -36,6 +36,7 @@ capabilities:
       - rotate_huggingface_profile
       - unlink
       - unlink_provider_profile
+      - update_microsoft_graph_v2_scope
     implementations:
       - ref: cyrene.accounts.account-center
         source: plugins/accounts/account-center/plugin.manifest.json
@@ -69,6 +70,7 @@ capabilities:
           - rotate_huggingface_profile
           - unlink
           - unlink_provider_profile
+          - update_microsoft_graph_v2_scope
         interface_versions:
           - "1"
         verification_level: IMPLEMENTATION_VERIFIED

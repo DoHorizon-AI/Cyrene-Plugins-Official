@@ -134,4 +134,9 @@ def test_tool_catalog_has_closed_fixed_argument_schemas_without_urls_or_tokens()
         assert "url" not in input_schema["properties"]
         assert "access_token" not in input_schema["properties"]
         assert "authorization" not in input_schema["properties"]
-    assert len(response.catalog.tools) == 8
+    tool_ids = {tool.provider_tool_id for tool in response.catalog.tools}
+    assert len(tool_ids) == 8
+    assert "microsoft_graph.planner.plans.list" not in tool_ids
+    assert "microsoft_graph.todo.lists.list" not in tool_ids
+    assert "microsoft_graph.calendar.calendars.list" not in tool_ids
+    assert "microsoft_graph.sharepoint.drives.list" not in tool_ids

@@ -20,6 +20,7 @@ from cyrene_account_center_contracts import (
     MicrosoftGraphPermissionUpgrade,
     PollHuggingFaceRenewalRequest,
     RedeemProviderCredentialLeaseRequest,
+    UpdateMicrosoftGraphV2ScopeRequest,
     canonical_json,
     payload_sha256,
     sign_context,
@@ -309,7 +310,9 @@ def test_provider_oauth_dtos_keep_scopes_and_credentials_out_of_requests() -> No
         "profile_ref",
         "planner_plan_ids",
         "idempotency_key",
+        "office_v2_scope",
     }
+    assert asdict(graph)["office_v2_scope"] is None
     assert set(asdict(graph_upgrade)) == {
         "profile_ref",
         "permission",
@@ -336,6 +339,116 @@ def test_provider_oauth_dtos_keep_scopes_and_credentials_out_of_requests() -> No
     assert AzureDevOpsOperation.RELEASE_ENVIRONMENT_GET == (
         "azure_devops.release_environment.get"
     )
+
+
+def test_microsoft_graph_link_dto_preserves_v1_and_v2_wire_selectors() -> None:
+    """Keep the v1 positional contract and make v2 requests omit the v1 selector."""
+
+    v1 = BeginMicrosoftGraphLinkRequest(
+        "00000000-0000-4000-8000-000000000401",
+        ["plan_opaque-1"],
+        "graph-link-v1",
+    )
+    scope = {
+        "schema_version": 2,
+        "tenant_id": "11111111-2222-4333-8444-555555555555",
+        "workspace_id": "22222222-3333-4444-8555-666666666666",
+        "planner": {"plan_ids": [], "tasks_read": False, "tasks_write": False},
+        "sharepoint": {
+            "enabled": False,
+            "site_id": None,
+            "list_ids": [],
+            "drive_ids": [],
+            "metadata_read": False,
+            "content_read": False,
+        },
+        "todo": {
+            "enabled": False,
+            "task_list_ids": [],
+            "tasks_read": False,
+            "tasks_write": False,
+        },
+        "calendar": {
+            "enabled": False,
+            "calendar_ids": [],
+            "events_read": False,
+            "freebusy_read": False,
+            "events_write": False,
+            "freebusy_subjects": [],
+            "attendees_write": False,
+        },
+        "mail": {
+            "enabled": False,
+            "folder_ids": [],
+            "metadata_read": False,
+            "body_read": False,
+            "drafts_write": False,
+            "send_enabled": False,
+        },
+    }
+    v2 = BeginMicrosoftGraphLinkRequest(
+        profile_ref="00000000-0000-4000-8000-000000000401",
+        idempotency_key="graph-link-v2",
+        office_v2_scope=scope,
+    )
+
+    assert asdict(v1) == {
+        "profile_ref": "00000000-0000-4000-8000-000000000401",
+        "planner_plan_ids": ["plan_opaque-1"],
+        "idempotency_key": "graph-link-v1",
+        "office_v2_scope": None,
+    }
+    assert asdict(v2) == {
+        "profile_ref": "00000000-0000-4000-8000-000000000401",
+        "planner_plan_ids": None,
+        "idempotency_key": "graph-link-v2",
+        "office_v2_scope": scope,
+    }
+
+
+def test_microsoft_graph_v2_scope_update_dto_has_exact_cas_fields() -> None:
+    """Expose the exact owner/workspace/revision-bound resource-selection request."""
+
+    scope = {
+        "schema_version": 2,
+        "tenant_id": "11111111-2222-4333-8444-555555555555",
+        "workspace_id": "22222222-3333-4444-8555-666666666666",
+    }
+    update = UpdateMicrosoftGraphV2ScopeRequest(
+        profile_ref="00000000-0000-4000-8000-000000000401",
+        workspace_id=scope["workspace_id"],
+        expected_credential_revision=3,
+        target_scope=scope,
+        idempotency_key="graph-scope-update-1",
+    )
+
+    assert set(asdict(update)) == {
+        "profile_ref",
+        "workspace_id",
+        "expected_credential_revision",
+        "target_scope",
+        "idempotency_key",
+    }
+    with pytest.raises(ValueError, match="exactly one Graph link scope"):
+        BeginMicrosoftGraphLinkRequest(
+            profile_ref="profile-1",
+            idempotency_key="graph-link-invalid",
+        )
+    with pytest.raises(ValueError, match="exactly one Graph link scope"):
+        BeginMicrosoftGraphLinkRequest(
+            profile_ref="profile-1",
+            planner_plan_ids=[],
+            idempotency_key="graph-link-invalid",
+            office_v2_scope=scope,
+        )
+    with pytest.raises(ValueError, match="non-negative"):
+        UpdateMicrosoftGraphV2ScopeRequest(
+            profile_ref="profile-1",
+            workspace_id=scope["workspace_id"],
+            expected_credential_revision=True,
+            target_scope=scope,
+            idempotency_key="graph-scope-update-invalid",
+        )
 
 
 def test_sdk_signer_and_verifier_reject_empty_trusted_claims() -> None:

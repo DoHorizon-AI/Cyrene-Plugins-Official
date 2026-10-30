@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-account-center-contracts"
-version = "0.1.1"
+version = "0.1.2"
 description = "Plugins-owned account.center.v1 Python DTOs and caller-context signing"
 requires-python = ">=3.11"
 dependencies = ["rfc8785==0.1.4"]

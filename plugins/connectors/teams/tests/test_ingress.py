@@ -144,6 +144,7 @@ def _personal_install_activity(action, *, activity_id):
         "type": "installationUpdate",
         "action": action,
         "id": activity_id,
+        "timestamp": "2026-10-30T04:00:00Z",
         "channelId": "msteams",
         "serviceUrl": SERVICE_URL,
         "from": {"id": "29:actor", "aadObjectId": ACTOR_ID, "name": "Actor"},
@@ -349,6 +350,15 @@ async def test_personal_install_and_removal_require_sdk_auth_and_forward_binding
                 ),
                 headers=headers,
             )
+            missing_timestamp_activity = _personal_install_activity(
+                "add", activity_id="install-add-missing-time"
+            )
+            del missing_timestamp_activity["timestamp"]
+            missing_timestamp = client.post(
+                "/api/messages",
+                json=missing_timestamp_activity,
+                headers=headers,
+            )
             rejected = client.post(
                 "/api/messages",
                 json=_personal_install_activity("add", activity_id="install-add-2"),
@@ -364,6 +374,7 @@ async def test_personal_install_and_removal_require_sdk_auth_and_forward_binding
 
     assert added.status_code == 200
     assert removed.status_code == 200
+    assert missing_timestamp.status_code == 200
     assert rejected.status_code == 401
     assert [event["trust"]["installation_action"] for event in navigator.events] == [
         "add",
@@ -494,6 +505,113 @@ async def test_durable_mode_rejects_unverified_activity_before_sqlite_enqueue(
                 headers={"Authorization": f"Bearer {mismatched_token}"},
             )
         assert response.status_code == 401
+        with sqlite3.connect(service.delivery_spool.database_path) as connection:
+            count = connection.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0]
+        assert count == 0
+    finally:
+        await service.close()
+
+
+@pytest.mark.asyncio
+async def test_durable_mode_rejects_personal_routes_before_sqlite_enqueue(
+    monkeypatch, tmp_path
+):
+    """Reject unordered or unsendable private identities before durable admission."""
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+
+    class UnusedNavigator:
+        async def submit_body(self, _body: bytes):
+            raise AssertionError("rejected personal events must never be queued")
+
+        async def aclose(self):
+            return None
+
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=b"0123456789abcdef0123456789abcdef",
+            personal_chat_enabled=True,
+        ),
+        navigator=UnusedNavigator(),
+    )
+    headers = {"Authorization": f"Bearer {_service_token(private_key)}"}
+    missing_timestamp = _personal_install_activity(
+        "add", activity_id="install-add-missing-time"
+    )
+    del missing_timestamp["timestamp"]
+    invalid_install_id = _personal_install_activity(
+        "add", activity_id="install-add-invalid-id"
+    )
+    invalid_install_id["conversation"]["id"] = "19:personal@thread.v2"
+    invalid_message_id = _personal_message_activity(
+        activity_id="personal-message-invalid-id"
+    )
+    invalid_message_id["conversation"]["id"] = "19:personal@thread.v2"
+
+    try:
+        with TestClient(service.http_app) as client:
+            responses = [
+                client.post("/api/messages", json=missing_timestamp, headers=headers),
+                client.post("/api/messages", json=invalid_install_id, headers=headers),
+                client.post("/api/messages", json=invalid_message_id, headers=headers),
+            ]
+        assert [response.status_code for response in responses] == [200, 200, 200]
+        with sqlite3.connect(service.delivery_spool.database_path) as connection:
+            count = connection.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0]
+        assert count == 0
+    finally:
+        await service.close()
+
+
+@pytest.mark.asyncio
+async def test_durable_mode_rejects_personal_routes_without_order_or_sendable_id(
+    monkeypatch, tmp_path
+):
+    """Do not persist installation events lacking official time or sendable IDs."""
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    _install_test_jwks(monkeypatch, private_key)
+
+    class UnusedNavigator:
+        async def submit_body(self, _body: bytes):
+            raise AssertionError("rejected personal events must never be queued")
+
+        async def aclose(self):
+            return None
+
+    service = await build_ingress_service(
+        _settings(
+            delivery_state_dir=tmp_path / "delivery-state",
+            delivery_admin_token=b"0123456789abcdef0123456789abcdef",
+            personal_chat_enabled=True,
+        ),
+        navigator=UnusedNavigator(),
+    )
+    token = _service_token(private_key)
+    headers = {"Authorization": f"Bearer {token}"}
+    missing_timestamp = _personal_install_activity(
+        "add", activity_id="install-add-missing-time"
+    )
+    del missing_timestamp["timestamp"]
+    invalid_install_id = _personal_install_activity(
+        "add", activity_id="install-add-invalid-id"
+    )
+    invalid_install_id["conversation"]["id"] = "19:personal@thread.v2"
+    invalid_message_id = _personal_message_activity(
+        activity_id="personal-message-invalid-id"
+    )
+    invalid_message_id["conversation"]["id"] = "19:personal@thread.v2"
+
+    try:
+        with TestClient(service.http_app) as client:
+            responses = [
+                client.post("/api/messages", json=missing_timestamp, headers=headers),
+                client.post("/api/messages", json=invalid_install_id, headers=headers),
+                client.post("/api/messages", json=invalid_message_id, headers=headers),
+            ]
+        assert [response.status_code for response in responses] == [200, 200, 200]
         with sqlite3.connect(service.delivery_spool.database_path) as connection:
             count = connection.execute("SELECT COUNT(*) FROM deliveries").fetchone()[0]
         assert count == 0

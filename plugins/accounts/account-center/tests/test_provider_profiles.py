@@ -40,7 +40,10 @@ from account_center.microsoft_graph_oauth import (
     MicrosoftGraphToken,
 )
 from account_center.models import AccountCenterError, Anchor
-from account_center.plugin import AccountCenterPlugin
+from account_center.plugin import (
+    AccountCenterPlugin,
+    _validated_microsoft_graph_callback_uri,
+)
 from cyrene_account_center_contracts import canonical_json, sign_context
 
 EXCHANGE = "exchange-service"
@@ -53,6 +56,8 @@ GRAPH_TENANT_ID = "11111111-2222-4333-8444-555555555555"
 GRAPH_OBJECT_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
 OTHER_GRAPH_OBJECT_ID = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
 GRAPH_PROFILE_REF = "00000000-0000-4000-8000-000000000401"
+GRAPH_V2_WORKSPACE_ID = "dddddddd-eeee-4fff-8000-111111111112"
+GRAPH_LOOPBACK_CALLBACK = "http://localhost:52191/oauth/callback"
 GRAPH_PLAN_ID = "plan_A2b_935s-FIFm2QAFkHM"
 GRAPH_TASK_ID = "task_yQk3-opaque_ID"
 GRAPH_BUCKET_ID = "bucket_936w-A2b"
@@ -212,9 +217,7 @@ class FakeGitHubApp:
         self.verify_calls.append(installation_id)
         return {"account_id": "88", "login": "acme"}
 
-    def create_installation_token(
-        self, installation_id: str, repository_ids: list[str]
-    ) -> Any:
+    def create_installation_token(self, installation_id: str, repository_ids: list[str]) -> Any:
         from account_center.github_app import InstallationToken
 
         self.token_calls.append((installation_id, repository_ids))
@@ -379,9 +382,8 @@ class FakeMicrosoftEntraOAuth:
         if prompt is not None:
             values["prompt"] = prompt
         self.authorizations.append(values)
-        return (
-            "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?"
-            + urlencode(values)
+        return "https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?" + urlencode(
+            values
         )
 
     def exchange_code(
@@ -417,6 +419,8 @@ class FakeMicrosoftEntraOAuth:
                 "Tasks.Read",
                 "Tasks.ReadWrite",
                 "Sites.Selected",
+                "Calendars.ReadBasic",
+                "Calendars.ReadWrite",
                 AZURE_DEVOPS_RESOURCE_SCOPE,
             }
         )
@@ -452,9 +456,7 @@ class FakeMicrosoftEntraOAuth:
         if self.refresh_delay:
             time.sleep(self.refresh_delay)
         access_token = f"entra-refreshed-access-{number}"
-        self.identities[access_token] = MicrosoftGraphIdentity(
-            GRAPH_TENANT_ID, GRAPH_OBJECT_ID
-        )
+        self.identities[access_token] = MicrosoftGraphIdentity(GRAPH_TENANT_ID, GRAPH_OBJECT_ID)
         return MicrosoftGraphToken(
             access_token=access_token,
             refresh_token=f"entra-rotated-refresh-{number}",
@@ -464,9 +466,7 @@ class FakeMicrosoftEntraOAuth:
             identity=self.refresh_identity,
         )
 
-    def verify_identity(
-        self, access_token: str, tenant_id: str
-    ) -> MicrosoftGraphIdentity:
+    def verify_identity(self, access_token: str, tenant_id: str) -> MicrosoftGraphIdentity:
         identity = self.identities.get(access_token)
         if identity is None or identity.tenant_id != tenant_id:
             raise MicrosoftGraphOAuthError("credential_rejected")
@@ -496,9 +496,7 @@ class ProfileHarness:
         self.github_app = FakeGitHubApp(lambda: self.now)
         self.huggingface = FakeHuggingFace()
         self.huggingface_oauth = oauth_client or FakeHuggingFaceOAuth()
-        self.entra_oauth = entra_oauth_client or FakeMicrosoftEntraOAuth(
-            lambda: self.now
-        )
+        self.entra_oauth = entra_oauth_client or FakeMicrosoftEntraOAuth(lambda: self.now)
         provider_secrets = {
             "huggingface/fine-grained-token": "hf_token_original",
             "huggingface/rotated-token": "hf_token_rotated",
@@ -528,9 +526,7 @@ class ProfileHarness:
             self.config.update(
                 {
                     "caller_keys": self.keys,
-                    "microsoft_graph_callback_uri": (
-                        "https://account.example.test/oauth/entra/callback"
-                    ),
+                    "microsoft_graph_callback_uri": GRAPH_LOOPBACK_CALLBACK,
                     "microsoft_graph_callback_caller_id": GRAPH_CALLBACK,
                     "microsoft_graph_client_id": self.entra_oauth.client_id,
                     "microsoft_graph_client_secret": "synthetic-client-secret",
@@ -539,9 +535,7 @@ class ProfileHarness:
                 }
             )
         if workspace_operator_profile_refs is not None:
-            self.config["workspace_operator_profile_refs"] = (
-                workspace_operator_profile_refs
-            )
+            self.config["workspace_operator_profile_refs"] = workspace_operator_profile_refs
         self.plugin = self._new_plugin()
 
     def _new_plugin(self) -> AccountCenterPlugin:
@@ -576,6 +570,7 @@ class ProfileHarness:
             "unlink_provider_profile",
             "begin_microsoft_graph_link",
             "begin_microsoft_graph_scope_upgrade",
+            "update_microsoft_graph_v2_scope",
             "begin_azure_devops_link",
         }:
             request.setdefault("idempotency_key", f"idem-{method}-{self.sequence + 1}")
@@ -624,9 +619,9 @@ class ProfileHarness:
             issued_at=self.now,
             expires_at=self.now + 120,
         )
-        envelope = json.dumps(
-            {"payload": request, "trusted_context": context.as_dict()}
-        ).encode("utf-8")
+        envelope = json.dumps({"payload": request, "trusted_context": context.as_dict()}).encode(
+            "utf-8"
+        )
         succeeded, response = self.plugin.on_invoke(
             account_center_plugin_module.CAPABILITY_ID,
             method,
@@ -645,11 +640,7 @@ def _digest(arguments: dict[str, Any]) -> str:
 
 
 def _huggingface_scope(repo_id: str = "derek/oauth-model") -> dict[str, Any]:
-    return {
-        "repositories": [
-            {"repo_type": "model", "repo_id": repo_id, "permissions": ["read"]}
-        ]
-    }
+    return {"repositories": [{"repo_type": "model", "repo_id": repo_id, "permissions": ["read"]}]}
 
 
 def _oauth_seed(
@@ -773,9 +764,7 @@ def test_github_app_profile_mints_refreshes_caches_and_scope_binds_leases(
             {**redeem, "arguments_sha256": "0" * 64},
             caller=GITHUB_PROVIDER,
         )
-    material = harness.call(
-        "redeem_provider_credential_lease", redeem, caller=GITHUB_PROVIDER
-    )
+    material = harness.call("redeem_provider_credential_lease", redeem, caller=GITHUB_PROVIDER)
     assert material["access_token"] == "installation-token-2"
     assert material["expires_at"] == harness.now + 3600
     assert len(harness.github_app.token_calls) == 2
@@ -834,9 +823,7 @@ def test_github_profile_operation_catalog_is_closed_for_typed_tools(
         )
 
 
-@pytest.mark.parametrize(
-    ("operation", "target", "arguments"), GITHUB_TYPED_TARGET_CASES
-)
+@pytest.mark.parametrize(("operation", "target", "arguments"), GITHUB_TYPED_TARGET_CASES)
 def test_typed_github_app_leases_bind_exact_locator_digest_and_one_use(
     tmp_path: Path,
     operation: str,
@@ -845,9 +832,7 @@ def test_typed_github_app_leases_bind_exact_locator_digest_and_one_use(
 ) -> None:
     harness = ProfileHarness(tmp_path / f"{operation.replace('.', '-')}.sqlite3")
     profile_ref = _github_profile(harness)
-    allowed_operations = account_center_plugin_module.PROVIDER_OPERATIONS_BY_PROVIDER[
-        "github"
-    ]
+    allowed_operations = account_center_plugin_module.PROVIDER_OPERATIONS_BY_PROVIDER["github"]
     assert operation in allowed_operations
 
     with pytest.raises(AccountCenterError, match="invalid_request"):
@@ -931,14 +916,10 @@ def test_typed_github_app_leases_bind_exact_locator_digest_and_one_use(
             caller=GITHUB_PROVIDER,
         )
 
-    material = harness.call(
-        "redeem_provider_credential_lease", redemption, caller=GITHUB_PROVIDER
-    )
+    material = harness.call("redeem_provider_credential_lease", redemption, caller=GITHUB_PROVIDER)
     assert material["access_token"].startswith("installation-token-")
     with pytest.raises(AccountCenterError, match="lease_rejected"):
-        harness.call(
-            "redeem_provider_credential_lease", redemption, caller=GITHUB_PROVIDER
-        )
+        harness.call("redeem_provider_credential_lease", redemption, caller=GITHUB_PROVIDER)
 
 
 def test_github_vendor_cli_lease_uses_profile_scope_and_empty_target(
@@ -1173,9 +1154,7 @@ def test_huggingface_device_oauth_refresh_persists_rotation_and_survives_restart
     initial_revision = listed["credential_revision"]
 
     _, redemption = _huggingface_oauth_lease(harness, profile_ref, scope)
-    result = harness.call(
-        "redeem_provider_credential_lease", redemption, caller=HF_PROVIDER
-    )
+    result = harness.call("redeem_provider_credential_lease", redemption, caller=HF_PROVIDER)
     assert result["access_token"] == "oauth_access_refreshed"
     assert oauth.calls == [("first-party-public-client-id", "oauth_refresh_initial")]
     row = harness.plugin._store.get_provider_profile(profile_ref, Anchor(**ACTOR))
@@ -1394,9 +1373,7 @@ def test_workspace_operator_profile_requires_fresh_one_use_exchange_grant(
         grant_ref="sha256:" + "2" * 64,
     )
     authorized = {**request, "connector_grant": grant}
-    lease = harness.invoke_runtime(
-        "create_provider_credential_lease", authorized, actor=operator
-    )
+    lease = harness.invoke_runtime("create_provider_credential_lease", authorized, actor=operator)
     assert lease["expires_at"] == grant["expires_at"]
     harness.plugin._store.prune_expired(now=harness.now + 5)
     with harness.plugin._store._connect() as db:
@@ -1569,9 +1546,7 @@ def test_platform_rust_wire_grant_ref_survives_exchange_signed_runtime_envelope(
     assert linked["access_mode"] == "workspace_operator"
     operation = "github.repository.list"
     arguments_sha256 = _digest({})
-    wire_grant_ref = (
-        "sha256:1d7617748443c2d6dab3bb08835c49659a875aeac010314dddc24308aa3d60f1"
-    )
+    wire_grant_ref = "sha256:1d7617748443c2d6dab3bb08835c49659a875aeac010314dddc24308aa3d60f1"
     proof = {
         "grant_ref": wire_grant_ref,
         "issued_at": harness.now,
@@ -1767,9 +1742,7 @@ def test_app_only_runtime_config_omits_legacy_personal_oauth_secrets(
         secret = "host-secret-value"
         if reference == "account-center/encryption-key":
             secret = (b"e" * 32).hex()
-        elif reference.endswith(
-            ("/exchange", "/github-provider", "/huggingface-provider")
-        ):
+        elif reference.endswith(("/exchange", "/github-provider", "/huggingface-provider")):
             secret = (reference.encode("ascii") * 32)[:32].hex()
         monkeypatch.setenv(environment_name, secret)
     config = {
@@ -1800,9 +1773,7 @@ def test_app_only_runtime_config_omits_legacy_personal_oauth_secrets(
     assert "github_client_secret" not in resolved
     assert "github_callback_uri" not in resolved
     assert resolved["github_app_id"] == "12345"
-    assert resolved["provider_secrets"] == {
-        "huggingface/fine-grained-token": "host-secret-value"
-    }
+    assert resolved["provider_secrets"] == {"huggingface/fine-grained-token": "host-secret-value"}
 
 
 def test_device_oauth_runtime_config_reads_only_launcher_mounted_secret_file(
@@ -1819,9 +1790,7 @@ def test_device_oauth_runtime_config_reads_only_launcher_mounted_secret_file(
     }
     for reference, environment_name in environment_names.items():
         secret = (b"e" * 32).hex()
-        if reference.endswith(
-            ("/exchange", "/github-provider", "/huggingface-provider")
-        ):
+        if reference.endswith(("/exchange", "/github-provider", "/huggingface-provider")):
             secret = (reference.encode("ascii") * 32)[:32].hex()
         monkeypatch.setenv(environment_name, secret)
     oauth_seed_text = json.dumps(_oauth_seed(_huggingface_scope()))
@@ -1860,9 +1829,7 @@ def test_device_oauth_runtime_config_reads_only_launcher_mounted_secret_file(
 
     resolved = account_center_plugin_module._environment_config()
 
-    assert resolved["provider_secrets"] == {
-        "huggingface/connector-token": oauth_seed_text
-    }
+    assert resolved["provider_secrets"] == {"huggingface/connector-token": oauth_seed_text}
     assert "huggingface/connector-token" not in resolved["hostSecretRefs"]
     assert resolved["workspace_operator_profile_refs"] == []
 
@@ -1972,9 +1939,7 @@ def test_huggingface_identity_failures_are_structured_and_redacted(
     assert "hf_private_value" not in str(caught.value)
 
 
-def test_huggingface_oauth_refresh_uses_fixed_endpoint_and_preserves_actual_scope() -> (
-    None
-):
+def test_huggingface_oauth_refresh_uses_fixed_endpoint_and_preserves_actual_scope() -> None:
     captured: dict[str, Any] = {}
 
     def transport(
@@ -2065,9 +2030,7 @@ def test_huggingface_oauth_invalid_grant_is_sanitized() -> None:
     assert "revoked" not in str(caught.value)
 
 
-def test_huggingface_device_oauth_uses_official_fixed_endpoints_and_poll_grant() -> (
-    None
-):
+def test_huggingface_device_oauth_uses_official_fixed_endpoints_and_poll_grant() -> None:
     captured: list[dict[str, Any]] = []
 
     def transport(
@@ -2129,8 +2092,7 @@ def test_huggingface_device_oauth_uses_official_fixed_endpoints_and_poll_grant()
     assert all(call["host"] == "huggingface.co" for call in captured)
     assert "scope=openid+profile+read-repos" in captured[0]["body"]
     assert (
-        "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code"
-        in captured[1]["body"]
+        "grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code" in captured[1]["body"]
     )
     assert "device-secret-code" not in str(captured[0])
 
@@ -2641,6 +2603,46 @@ def _link_graph_profile(harness: ProfileHarness) -> dict[str, Any]:
     )
 
 
+def _graph_office_v2_scope(workspace_id: str) -> dict[str, Any]:
+    return {
+        "schema_version": 2,
+        "tenant_id": GRAPH_TENANT_ID,
+        "workspace_id": workspace_id,
+        "planner": {"plan_ids": [], "tasks_read": True, "tasks_write": False},
+        "sharepoint": {
+            "enabled": True,
+            "site_id": GRAPH_SITE_ID,
+            "list_ids": [],
+            "drive_ids": [],
+            "metadata_read": True,
+            "content_read": False,
+        },
+        "todo": {
+            "enabled": True,
+            "task_list_ids": [],
+            "tasks_read": True,
+            "tasks_write": True,
+        },
+        "calendar": {
+            "enabled": True,
+            "calendar_ids": [],
+            "events_read": True,
+            "events_write": True,
+            "freebusy_read": False,
+            "freebusy_subjects": [],
+            "attendees_write": False,
+        },
+        "mail": {
+            "enabled": False,
+            "folder_ids": [],
+            "metadata_read": False,
+            "body_read": False,
+            "drafts_write": False,
+            "send_enabled": False,
+        },
+    }
+
+
 def _link_azure_devops_profile(
     harness: ProfileHarness,
     *,
@@ -2694,8 +2696,7 @@ def test_graph_pkce_profile_and_provider_lease_are_owner_scope_and_target_bound(
         "Tasks.Read",
     }
     assert not any(
-        "mail" in scope.lower() or "calendar" in scope.lower()
-        for scope in authorization_scope
+        "mail" in scope.lower() or "calendar" in scope.lower() for scope in authorization_scope
     )
 
     profile = harness.call("list_provider_profiles", {})["profiles"][0]
@@ -2740,9 +2741,7 @@ def test_graph_pkce_profile_and_provider_lease_are_owner_scope_and_target_bound(
             caller=GRAPH_PROVIDER,
             actor=other_actor,
         )
-    expected_scope_digest = hashlib.sha256(
-        canonical_json(profile["target_scope"])
-    ).hexdigest()
+    expected_scope_digest = hashlib.sha256(canonical_json(profile["target_scope"])).hexdigest()
     assert lease["profile_scope_sha256"] == expected_scope_digest
     redemption = harness.call(
         "redeem_provider_credential_lease",
@@ -2951,6 +2950,191 @@ def test_graph_scope_upgrades_are_explicit_and_sharepoint_is_selected(
         )
 
 
+def test_graph_office_v2_uses_minimum_scopes_discovery_and_revision_checked_selection(
+    tmp_path: Path,
+) -> None:
+    oauth = FakeMicrosoftEntraOAuth(lambda: 10_000)
+    actor = {**ENTRA_ACTOR, "workspace_id": GRAPH_V2_WORKSPACE_ID}
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        entra_oauth_client=oauth,
+        default_actor=actor,
+    )
+    scope = _graph_office_v2_scope(GRAPH_V2_WORKSPACE_ID)
+    session = harness.call(
+        "begin_microsoft_graph_link",
+        {"profile_ref": GRAPH_PROFILE_REF, "office_v2_scope": scope},
+    )
+    requested = set(oauth.authorizations[-1]["scope"].split())
+    assert requested == {
+        "openid",
+        "profile",
+        "offline_access",
+        "User.Read",
+        "Tasks.ReadWrite",
+        "Sites.Selected",
+        "Calendars.ReadWrite",
+    }
+    assert not any(scope_name.startswith("Mail.") for scope_name in requested)
+    assert "Tasks.Read" not in requested
+    assert "Calendars.ReadBasic" not in requested
+
+    linked = harness.call(
+        "complete_microsoft_graph_link",
+        {"state": _callback_state(session), "code": "synthetic-office-v2-code"},
+        caller=GRAPH_CALLBACK,
+        actor=actor,
+    )
+    assert linked["scope_schema_version"] == 2
+    assert linked["workspace_id"] == GRAPH_V2_WORKSPACE_ID
+    assert linked["refresh_expires_at"] is None
+    profile = harness.call("list_provider_profiles", {}, actor=actor)["profiles"][0]
+    assert profile["target_scope"] == scope
+    assert profile["scope_schema_version"] == 2
+    assert profile["reauth_required"] is False
+    assert profile["refresh_expires_at"] is None
+    assert "credential_blob" not in profile
+
+    discovery = (
+        ("microsoft_graph.planner.plans.list", {"tenant_id": GRAPH_TENANT_ID}),
+        ("microsoft_graph.todo.lists.list", {"tenant_id": GRAPH_TENANT_ID}),
+        ("microsoft_graph.calendar.calendars.list", {"tenant_id": GRAPH_TENANT_ID}),
+        (
+            "microsoft_graph.sharepoint.drives.list",
+            {"tenant_id": GRAPH_TENANT_ID, "site_id": GRAPH_SITE_ID},
+        ),
+    )
+    for operation_id, target in discovery:
+        lease = harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": operation_id,
+                "target": target,
+                "arguments_sha256": _digest({"page_size": 10}),
+            },
+            actor=actor,
+        )
+        assert lease["operation_id"] == operation_id
+
+    with pytest.raises(AccountCenterError, match="authorization_denied"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": "microsoft_graph.todo.tasks.list",
+                "target": {"tenant_id": GRAPH_TENANT_ID, "task_list_id": "unselected"},
+                "arguments_sha256": _digest({}),
+            },
+            actor=actor,
+        )
+
+    selected = json.loads(json.dumps(scope))
+    selected["planner"]["plan_ids"] = [GRAPH_PLAN_ID]
+    selected["sharepoint"]["list_ids"] = [GRAPH_LIST_ID]
+    selected["sharepoint"]["drive_ids"] = ["drive!1"]
+    selected["todo"]["task_list_ids"] = ["AAMkAGI2...=="]
+    selected["calendar"]["calendar_ids"] = ["calendar!1"]
+    old_revision = profile["credential_revision"]
+    updated = harness.call(
+        "update_microsoft_graph_v2_scope",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "workspace_id": GRAPH_V2_WORKSPACE_ID,
+            "expected_credential_revision": old_revision,
+            "target_scope": selected,
+        },
+        actor=actor,
+    )
+    assert updated["credential_revision"] == old_revision + 1
+    assert updated["target_scope"] == selected
+    assert updated["oauth_scopes"] == [
+        "Calendars.ReadWrite",
+        "Sites.Selected",
+        "Tasks.ReadWrite",
+        "User.Read",
+    ]
+
+    task_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.todo.tasks.list",
+            "target": {"tenant_id": GRAPH_TENANT_ID, "task_list_id": "AAMkAGI2...=="},
+            "arguments_sha256": _digest({"page_size": 10}),
+        },
+        actor=actor,
+    )
+    assert task_lease["operation_id"] == "microsoft_graph.todo.tasks.list"
+
+    opaque_task_id = "AAMkTaskID...=="
+    for operation_id in (
+        "microsoft_graph.todo.task.get",
+        "microsoft_graph.todo.task.update",
+        "microsoft_graph.todo.task.delete",
+    ):
+        task_target = {
+            "tenant_id": GRAPH_TENANT_ID,
+            "task_list_id": "AAMkAGI2...==",
+            "task_id": opaque_task_id,
+        }
+        task_operation_lease = harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": operation_id,
+                "target": task_target,
+                "arguments_sha256": _digest({}),
+            },
+            actor=actor,
+        )
+        assert task_operation_lease["operation_id"] == operation_id
+
+    with pytest.raises(AccountCenterError, match="invalid_request"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": "microsoft_graph.planner.task.get",
+                "target": {
+                    "tenant_id": GRAPH_TENANT_ID,
+                    "plan_id": GRAPH_PLAN_ID,
+                    "task_id": opaque_task_id,
+                },
+                "arguments_sha256": _digest({}),
+            },
+            actor=actor,
+        )
+
+    with pytest.raises(AccountCenterError, match="profile_revision_conflict"):
+        harness.call(
+            "update_microsoft_graph_v2_scope",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "workspace_id": GRAPH_V2_WORKSPACE_ID,
+                "expected_credential_revision": old_revision,
+                "target_scope": selected,
+            },
+            actor=actor,
+        )
+
+
+def test_graph_callback_configuration_is_loopback_only_and_fixed_path() -> None:
+    assert (
+        _validated_microsoft_graph_callback_uri("http://localhost:52191/oauth/callback")
+        == "http://localhost:52191/oauth/callback"
+    )
+    for callback in (
+        "https://localhost:52191/oauth/callback",
+        "http://127.0.0.1:52191/oauth/callback",
+        "http://localhost:52191/api/v1/accounts/microsoft-graph/callback",
+        "http://localhost:52191/oauth/callback?next=https://example.test",
+        "http://example.test:52191/oauth/callback",
+    ):
+        with pytest.raises(AccountCenterError, match="configuration_unavailable"):
+            _validated_microsoft_graph_callback_uri(callback)
+
+
 def test_entra_oauth_state_replay_and_nonce_mismatch_fail_closed(
     tmp_path: Path,
 ) -> None:
@@ -3035,9 +3219,7 @@ def test_azure_devops_profile_uses_separate_resource_and_source_bound_lease(
         ENTRA_ACTOR["workspace_id"],
     )
     stored_profile = harness.plugin._store.get_provider_profile(ADO_PROFILE_REF, anchor)
-    refreshed_token, expires_at = harness.plugin._fresh_provider_credential(
-        stored_profile, anchor
-    )
+    refreshed_token, expires_at = harness.plugin._fresh_provider_credential(stored_profile, anchor)
     assert refreshed_token == "entra-refreshed-access-1"
     assert expires_at == harness.now + 3600
     assert oauth.refresh_calls == [
@@ -3136,13 +3318,9 @@ def test_graph_provider_profile_read_is_owner_workspace_and_provider_filtered(
     assert graph_view[0]["profile_ref"] == GRAPH_PROFILE_REF
     assert graph_view[0]["external_subject"] == f"{GRAPH_TENANT_ID}:{GRAPH_OBJECT_ID}"
     assert graph_view[0]["oauth_scopes"] == ["Tasks.Read", "User.Read"]
-    assert not {"openid", "profile", "offline_access"} & set(
-        graph_view[0]["oauth_scopes"]
-    )
+    assert not {"openid", "profile", "offline_access"} & set(graph_view[0]["oauth_scopes"])
 
-    exchange_view = harness.call("list_provider_profiles", {}, actor=ENTRA_ACTOR)[
-        "profiles"
-    ]
+    exchange_view = harness.call("list_provider_profiles", {}, actor=ENTRA_ACTOR)["profiles"]
     assert {profile["provider"] for profile in exchange_view} == {
         "microsoft_graph",
         "azure_devops",
@@ -3150,25 +3328,23 @@ def test_graph_provider_profile_read_is_owner_workspace_and_provider_filtered(
 
     other_actor = {**ENTRA_ACTOR, "subject": OTHER_GRAPH_OBJECT_ID}
     assert (
-        harness.call(
-            "list_provider_profiles", {}, caller=GRAPH_PROVIDER, actor=other_actor
-        )["profiles"]
+        harness.call("list_provider_profiles", {}, caller=GRAPH_PROVIDER, actor=other_actor)[
+            "profiles"
+        ]
         == []
     )
     other_workspace = {**ENTRA_ACTOR, "workspace_id": "different-workspace"}
     assert (
-        harness.call(
-            "list_provider_profiles", {}, caller=GRAPH_PROVIDER, actor=other_workspace
-        )["profiles"]
+        harness.call("list_provider_profiles", {}, caller=GRAPH_PROVIDER, actor=other_workspace)[
+            "profiles"
+        ]
         == []
     )
 
     with pytest.raises(AccountCenterError, match="external_identity_mismatch"):
         harness.call("list_provider_profiles", {}, caller=GRAPH_PROVIDER, actor=ACTOR)
     with pytest.raises(AccountCenterError, match="untrusted_caller"):
-        harness.call(
-            "list_provider_profiles", {}, caller=ADO_PROVIDER, actor=ENTRA_ACTOR
-        )
+        harness.call("list_provider_profiles", {}, caller=ADO_PROVIDER, actor=ENTRA_ACTOR)
 
 
 def test_graph_refresh_identity_mismatch_revokes_cached_material_and_leases(
@@ -3199,9 +3375,7 @@ def test_graph_refresh_identity_mismatch_revokes_cached_material_and_leases(
             "arguments_sha256": _digest({"page_size": 3}),
         },
     )
-    oauth.refresh_identity = MicrosoftGraphIdentity(
-        GRAPH_TENANT_ID, OTHER_GRAPH_OBJECT_ID
-    )
+    oauth.refresh_identity = MicrosoftGraphIdentity(GRAPH_TENANT_ID, OTHER_GRAPH_OBJECT_ID)
     harness.now += 2
     with pytest.raises(AccountCenterError, match="external_identity_mismatch"):
         harness.plugin._fresh_provider_credential(profile, anchor)
@@ -3240,9 +3414,7 @@ def test_azure_devops_refresh_identity_mismatch_requires_reauthorization(
         ENTRA_ACTOR["workspace_id"],
     )
     profile = harness.plugin._store.get_provider_profile(ADO_PROFILE_REF, anchor)
-    oauth.refresh_identity = MicrosoftGraphIdentity(
-        GRAPH_TENANT_ID, OTHER_GRAPH_OBJECT_ID
-    )
+    oauth.refresh_identity = MicrosoftGraphIdentity(GRAPH_TENANT_ID, OTHER_GRAPH_OBJECT_ID)
     harness.now += 2
     with pytest.raises(AccountCenterError, match="external_identity_mismatch"):
         harness.plugin._fresh_provider_credential(profile, anchor)

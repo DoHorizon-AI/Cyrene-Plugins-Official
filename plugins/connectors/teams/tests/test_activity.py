@@ -199,6 +199,29 @@ def test_personal_message_is_opt_in_and_keeps_private_route_in_trust():
 
 
 @pytest.mark.parametrize(
+    "conversation_id",
+    ["19:personal@thread.v2", "personal-conversation", "a:" + ("x" * 511)],
+)
+def test_personal_message_requires_bounded_a_prefix_conversation_id(conversation_id):
+    """Reject personal routes that Exchange cannot use for direct sends."""
+
+    with pytest.raises(ActivityRejected, match="invalid_personal_conversation_id"):
+        normalize_activity(
+            _personal_activity(
+                conversation={
+                    "id": conversation_id,
+                    "tenantId": TENANT_ID,
+                    "conversationType": "personal",
+                }
+            ),
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            allowed_team_ids=frozenset({TEAM_ID}),
+            personal_chat_enabled=True,
+        )
+
+
+@pytest.mark.parametrize(
     ("overrides", "reason"),
     [
         (
@@ -247,6 +270,7 @@ def _personal_installation(
         "type": "installationUpdate",
         "action": action,
         "id": f"installation-{action}-1",
+        "timestamp": "2026-10-30T04:00:00Z",
         "from": {"id": "29:actor", "aadObjectId": actor_aad_id},
         "conversation": {
             "id": "a:personal-install-conversation",
@@ -281,6 +305,7 @@ def test_personal_installation_add_and_remove_are_host_only_trust_events(action)
     assert event["trust"]["actor_aad_object_id"] == ACTOR_ID
     assert event["trust"]["conversation_id"] == "a:personal-install-conversation"
     assert event["trust"]["service_url"] == SERVICE_URL
+    assert event["trust"]["activity_occurred_at"] == "2026-10-30T04:00:00.000000Z"
 
 
 @pytest.mark.parametrize("action", ["add", "remove"])
@@ -353,21 +378,24 @@ def test_personal_installation_rejects_invalid_or_naive_timestamp(timestamp):
         )
 
 
-def test_personal_installation_missing_timestamp_stays_missing():
-    """Do not synthesize event ordering from localTimestamp or receipt time.
+def test_personal_installation_rejects_missing_timestamp_without_synthesizing_time():
+    """Reject installation events without official time instead of synthesizing one.
 
-    中文：缺少官方 timestamp 时不从 localTimestamp 或接收时间合成排序字段。
+    中文：缺少官方 timestamp 时，不从 localTimestamp 或接收时间合成排序字段。
     """
 
-    event = normalize_personal_installation(
-        _personal_installation("add", localTimestamp="2026-10-27T09:08:07Z"),
-        action="add",
-        bot_app_id=BOT_APP_ID,
-        tenant_id=TENANT_ID,
-        personal_chat_enabled=True,
-    )
-
-    assert "activity_occurred_at" not in event.trust
+    with pytest.raises(ActivityRejected, match="missing_activity_timestamp"):
+        normalize_personal_installation(
+            _personal_installation(
+                "add",
+                timestamp=None,
+                localTimestamp="2026-10-27T09:08:07Z",
+            ),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
 
 
 def test_personal_installation_rejects_disabled_or_nonpersonal_install():
@@ -386,6 +414,21 @@ def test_personal_installation_rejects_disabled_or_nonpersonal_install():
     with pytest.raises(ActivityRejected, match="personal_installation_required"):
         normalize_personal_installation(
             _personal_installation("add", conversation_type="channel"),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
+    with pytest.raises(ActivityRejected, match="invalid_personal_conversation_id"):
+        normalize_personal_installation(
+            _personal_installation(
+                "add",
+                conversation={
+                    "id": "19:personal@thread.v2",
+                    "tenantId": TENANT_ID,
+                    "conversationType": "personal",
+                },
+            ),
             action="add",
             bot_app_id=BOT_APP_ID,
             tenant_id=TENANT_ID,

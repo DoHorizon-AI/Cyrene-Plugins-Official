@@ -393,3 +393,197 @@ def test_rate_limit_is_explicit_and_provider_does_not_retry() -> None:
     assert raised.value.retryable is True
     assert raised.value.retry_after == 17
     assert len(transport.calls) == 2
+
+
+def test_planner_plan_discovery_is_bounded_and_cursor_bound() -> None:
+    base = "https://graph.microsoft.com/v1.0/me/planner/plans"
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(
+                {
+                    "value": [
+                        {
+                            "id": PLAN_ID,
+                            "title": "Engineering",
+                            "owner": "group-1",
+                            "createdDateTime": "2026-10-27T08:00:00Z",
+                            "@odata.etag": 'W/"plan-1"',
+                        }
+                    ],
+                    "@odata.nextLink": f"{base}?$skiptoken=next&$top=2",
+                }
+            ),
+            _json_response({"value": []}),
+        ]
+    )
+    session = _open(transport)
+
+    first = session.list_plans(page_size=2)
+    second = session.list_plans(page_size=2, page_cursor=first["next_cursor"])
+
+    assert first["complete"] is False
+    assert first["items"][0] == {
+        "plan_id": PLAN_ID,
+        "title": "Engineering",
+        "owner_id": "group-1",
+        "created_date_time": "2026-10-27T08:00:00Z",
+        "etag": 'W/"plan-1"',
+    }
+    assert second["complete"] is True
+    assert "next" not in first["next_cursor"]
+    assert urlsplit(transport.calls[1][2]).path == "/v1.0/me/planner/plans"
+    assert parse_qs(urlsplit(transport.calls[2][2]).query) == {
+        "$select": ["id,title,owner,createdDateTime"],
+        "$top": ["2"],
+        "$skiptoken": ["next"],
+    }
+
+
+def _todo_task(task_id: str = "todo-task-1") -> dict[str, object]:
+    return {
+        "id": task_id,
+        "title": "Office acceptance cleanup",
+        "status": "notStarted",
+        "dueDateTime": None,
+        "completedDateTime": None,
+        "importance": "normal",
+        "@odata.etag": 'W/"todo-etag-1"',
+    }
+
+
+def test_todo_create_readback_and_delete_use_exact_list_and_etag() -> None:
+    task_list_id = "AAMkAGI2...=="
+    task_path = "/v1.0/me/todo/lists/AAMkAGI2...%3D%3D/tasks/todo-task-1"
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(_todo_task(), status=201),
+            _json_response(_todo_task()),
+            _json_response(_todo_task()),
+            _empty_response(status=204),
+            HttpResponse(404, {}, b"{}"),
+        ]
+    )
+    session = _open(transport)
+
+    created = session.create_todo_task(task_list_id, "Office acceptance cleanup")
+    deleted = session.delete_todo_task(task_list_id, "todo-task-1", 'W/"todo-etag-1"')
+
+    assert created["status"] == "CONFIRMED"
+    assert created["task"]["task_list_id"] == task_list_id
+    assert deleted == {
+        "status": "CONFIRMED",
+        "task_list_id": task_list_id,
+        "task_id": "todo-task-1",
+        "reconciliation": "deleted_readback",
+    }
+    assert [call[0] for call in transport.calls[1:]] == ["POST", "GET", "GET", "DELETE", "GET"]
+    assert all(urlsplit(call[2]).path == task_path for call in transport.calls[2:])
+    assert transport.calls[4][3]["If-Match"] == 'W/"todo-etag-1"'
+    assert not any(call[0] == "POST" for call in transport.calls[2:])
+
+
+def _event(*, event_id: str = "event-1") -> dict[str, object]:
+    return {
+        "id": event_id,
+        "subject": "Office acceptance",
+        "start": {"dateTime": "2026-10-30T14:00:00.0000000", "timeZone": "UTC"},
+        "end": {"dateTime": "2026-10-30T14:30:00.0000000", "timeZone": "UTC"},
+        "isAllDay": False,
+        "showAs": "busy",
+        "location": {"displayName": ""},
+        "webLink": "https://outlook.office.com/calendar/item/event-1",
+        "transactionId": "88888888-8888-4888-8888-888888888888",
+        "@odata.etag": 'W/"event-etag-1"',
+        "attendees": [],
+    }
+
+
+def test_calendar_event_create_and_delete_are_recipient_free() -> None:
+    calendar_id = "calendar-1"
+    transaction_id = "88888888-8888-4888-8888-888888888888"
+    event_path = "/v1.0/me/calendars/calendar-1/events/event-1"
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(_event(), status=201),
+            _json_response(_event()),
+            _json_response(_event()),
+            _empty_response(status=204),
+            HttpResponse(404, {}, b"{}"),
+        ]
+    )
+    session = _open(transport)
+
+    created = session.create_calendar_event(
+        calendar_id,
+        "Office acceptance",
+        "2026-10-30T10:00:00-04:00",
+        "2026-10-30T10:30:00-04:00",
+        transaction_id,
+    )
+    deleted = session.delete_calendar_event(calendar_id, "event-1", 'W/"event-etag-1"')
+
+    assert created["status"] == "CONFIRMED"
+    assert created["event"]["start_date_time"] == "2026-10-30T14:00:00Z"
+    assert created["event"]["has_attendees"] is False
+    assert deleted["status"] == "CONFIRMED"
+    request_body = json.loads(transport.calls[1][4] or b"{}")
+    assert request_body["attendees"] == []
+    assert "body" not in request_body
+    assert "attendees" not in created["event"]
+    assert all(urlsplit(call[2]).path == event_path for call in transport.calls[2:])
+
+
+def test_calendar_event_write_refuses_existing_attendees() -> None:
+    event = _event()
+    event["attendees"] = [{"emailAddress": {"address": "redacted@example.test"}}]
+    transport = FakeTransport([_me(), _json_response(event)])
+
+    with pytest.raises(GraphApiFailure, match="EVENT_HAS_ATTENDEES"):
+        _open(transport).delete_calendar_event("calendar-1", "event-1", 'W/"event-etag-1"')
+
+    assert len(transport.calls) == 2
+    assert all(call[0] != "DELETE" for call in transport.calls)
+
+
+def test_sharepoint_drive_items_never_request_file_bytes_or_download_urls() -> None:
+    drive_id = "drive!opaque-1"
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(
+                {
+                    "value": [
+                        {
+                            "id": "item-1",
+                            "name": "design.docx",
+                            "size": 128,
+                            "eTag": 'W/"item-etag"',
+                            "createdDateTime": "2026-10-28T10:00:00Z",
+                            "lastModifiedDateTime": "2026-10-29T10:00:00Z",
+                            "webUrl": "https://example.sharepoint.com/design.docx",
+                            "file": {
+                                "mimeType": (
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                )
+                            },
+                            "parentReference": {"driveId": drive_id, "id": "root-1"},
+                            "@microsoft.graph.downloadUrl": "must-not-escape",
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+
+    result = _open(transport).list_sharepoint_drive_items(SITE_ID, drive_id)
+
+    assert result["items"][0]["web_url"] == "https://example.sharepoint.com/design.docx"
+    assert "must-not-escape" not in json.dumps(result)
+    query = parse_qs(urlsplit(transport.calls[1][2]).query)
+    assert "@microsoft.graph.downloadUrl" not in query["$select"][0]
+    assert urlsplit(transport.calls[1][2]).path == (
+        f"/v1.0/sites/{SITE_ID}/drives/drive%21opaque-1/root/children"
+    )
