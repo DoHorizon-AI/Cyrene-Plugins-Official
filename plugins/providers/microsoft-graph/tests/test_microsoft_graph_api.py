@@ -453,8 +453,8 @@ def _todo_task(task_id: str = "todo-task-1") -> dict[str, object]:
 
 
 def test_todo_create_readback_and_delete_use_exact_list_and_etag() -> None:
-    task_list_id = "list-1"
-    task_path = "/v1.0/me/todo/lists/list-1/tasks/todo-task-1"
+    task_list_id = "AAMkAGI2...=="
+    task_path = "/v1.0/me/todo/lists/AAMkAGI2...%3D%3D/tasks/todo-task-1"
     transport = FakeTransport(
         [
             _me(),
@@ -565,9 +565,9 @@ def test_sharepoint_drive_items_never_request_file_bytes_or_download_urls() -> N
                             "lastModifiedDateTime": "2026-10-29T10:00:00Z",
                             "webUrl": "https://example.sharepoint.com/design.docx",
                             "file": {
-                            "mimeType": (
-                                "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                            )
+                                "mimeType": (
+                                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                                )
                             },
                             "parentReference": {"driveId": drive_id, "id": "root-1"},
                             "@microsoft.graph.downloadUrl": "must-not-escape",

@@ -61,7 +61,7 @@ _PAGE_ARGUMENTS = {
     "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
     "page_cursor": {"type": "string", "minLength": 1, "maxLength": 12000},
 }
-_OPAQUE_ID = {"type": "string", "pattern": "^[A-Za-z0-9._!:-]{1,512}$"}
+_OPAQUE_ID = {"type": "string", "pattern": "^[A-Za-z0-9._!~+=-]{1,512}$"}
 _OFFSET_DATE_TIME = {"type": "string", "minLength": 20, "maxLength": 64}
 _ETAG = {"type": "string", "minLength": 1, "maxLength": 1024}
 _SITE_ARGUMENT = {
@@ -962,7 +962,7 @@ def _parse_aware_datetime(value: Any) -> datetime | None:
 
 
 def _valid_opaque_id(value: Any) -> bool:
-    return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9._!:-]{1,512}", value) is not None
+    return isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9._!~+=-]{1,512}", value) is not None
 
 
 def _valid_plain_text(value: Any, maximum: int) -> bool:

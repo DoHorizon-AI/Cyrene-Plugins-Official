@@ -3033,7 +3033,7 @@ def test_graph_office_v2_uses_minimum_scopes_discovery_and_revision_checked_sele
     selected["planner"]["plan_ids"] = [GRAPH_PLAN_ID]
     selected["sharepoint"]["list_ids"] = [GRAPH_LIST_ID]
     selected["sharepoint"]["drive_ids"] = ["drive!1"]
-    selected["todo"]["task_list_ids"] = ["todo-list-1"]
+    selected["todo"]["task_list_ids"] = ["AAMkAGI2...=="]
     selected["calendar"]["calendar_ids"] = ["calendar!1"]
     old_revision = profile["credential_revision"]
     updated = harness.call(
@@ -3060,12 +3060,51 @@ def test_graph_office_v2_uses_minimum_scopes_discovery_and_revision_checked_sele
         {
             "profile_ref": GRAPH_PROFILE_REF,
             "operation_id": "microsoft_graph.todo.tasks.list",
-            "target": {"tenant_id": GRAPH_TENANT_ID, "task_list_id": "todo-list-1"},
+            "target": {"tenant_id": GRAPH_TENANT_ID, "task_list_id": "AAMkAGI2...=="},
             "arguments_sha256": _digest({"page_size": 10}),
         },
         actor=actor,
     )
     assert task_lease["operation_id"] == "microsoft_graph.todo.tasks.list"
+
+    opaque_task_id = "AAMkTaskID...=="
+    for operation_id in (
+        "microsoft_graph.todo.task.get",
+        "microsoft_graph.todo.task.update",
+        "microsoft_graph.todo.task.delete",
+    ):
+        task_target = {
+            "tenant_id": GRAPH_TENANT_ID,
+            "task_list_id": "AAMkAGI2...==",
+            "task_id": opaque_task_id,
+        }
+        task_operation_lease = harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": operation_id,
+                "target": task_target,
+                "arguments_sha256": _digest({}),
+            },
+            actor=actor,
+        )
+        assert task_operation_lease["operation_id"] == operation_id
+
+    with pytest.raises(AccountCenterError, match="invalid_request"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": "microsoft_graph.planner.task.get",
+                "target": {
+                    "tenant_id": GRAPH_TENANT_ID,
+                    "plan_id": GRAPH_PLAN_ID,
+                    "task_id": opaque_task_id,
+                },
+                "arguments_sha256": _digest({}),
+            },
+            actor=actor,
+        )
 
     with pytest.raises(AccountCenterError, match="profile_revision_conflict"):
         harness.call(

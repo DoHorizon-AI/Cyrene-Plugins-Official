@@ -3593,7 +3593,7 @@ def _safe_graph_opaque_id(value: Any) -> str:
     if (
         not isinstance(value, str)
         or not 1 <= len(value) <= 512
-        or re.fullmatch(r"[A-Za-z0-9._!:-]+", value) is None
+        or re.fullmatch(r"[A-Za-z0-9._!~+=-]{1,512}", value) is None
     ):
         raise AccountCenterError("invalid_request")
     return value
@@ -4449,7 +4449,12 @@ def _safe_provider_target(provider: str, operation_id: str, value: Any) -> dict[
         if "plan_id" in expected:
             normalized["plan_id"] = _safe_graph_planner_id(target["plan_id"])
         if "task_id" in expected:
-            normalized["task_id"] = _safe_graph_planner_id(target["task_id"])
+            task_id_validator = (
+                _safe_graph_opaque_id
+                if operation_id.startswith("microsoft_graph.todo.")
+                else _safe_graph_planner_id
+            )
+            normalized["task_id"] = task_id_validator(target["task_id"])
         if "bucket_id" in expected:
             normalized["bucket_id"] = _safe_graph_planner_id(target["bucket_id"])
         if "site_id" in expected:

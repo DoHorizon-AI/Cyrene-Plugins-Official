@@ -915,8 +915,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/contracts/v1/schema.json",
-      "sha256": "f97e1b5132e2b345e46befa0448cb58f199064107abe21cf741f56c9bb1fa58e",
-      "size_bytes": 29121
+      "sha256": "43eea98f355ca110af93f2febec5d990569473e5000d5c5477945bbb77d3164c",
+      "size_bytes": 29292
     },
     {
       "kind": "file",
@@ -999,8 +999,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/plugin.py",
-      "sha256": "d89cf1fee3503afe791721ae35a4b8c0736aeb0e6e403840e73ad5d2716d289a",
-      "size_bytes": 230563
+      "sha256": "755c30d21c998286ab6ba9b9256fcd8656de29ece525512bd8a073ec8d7e9230",
+      "size_bytes": 230764
     },
     {
       "kind": "file",
@@ -1055,8 +1055,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "a8fcefd810ce2a8eeb3080b0afa511879f5173fe30f9ad79a3609d9af461a8cf",
-      "size_bytes": 126848
+      "sha256": "5acbb5d9495c2dd3d4d2e37c8000d80ceecf0c7fbad5582ca2a1292bc777d51f",
+      "size_bytes": 128184
     },
     {
       "kind": "file",
@@ -1671,8 +1671,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/README.md",
-      "sha256": "4056cc36bba89585168f536c8d349b6f838cad5fee5e2751737d804b51e69d3a",
-      "size_bytes": 18578
+      "sha256": "57cc495a02ff0e9648544c2ee8a450cfcca0e709d7b5023b44695ad5acba9444",
+      "size_bytes": 18887
     },
     {
       "kind": "file",
@@ -1727,8 +1727,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/README.md",
-      "sha256": "f7c875080ff5cd125457815ccd535ea53b19cdc685db549730920d2c61b8ccd8",
-      "size_bytes": 3111
+      "sha256": "6a11e306c5eb780a20e7a548d3448306da29ec6df81d7aa2fd9b4c23700486e1",
+      "size_bytes": 3462
     },
     {
       "kind": "file",
@@ -1762,8 +1762,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/activity.py",
-      "sha256": "188a03b30d9bd02b7646ed50fd79776778435cf61eec429fcc2e2fa97e7b923d",
-      "size_bytes": 22851
+      "sha256": "c38801d726f7f308b9a1a4a1dd01020279e9c700e186877866e2a3ac6a61c6a5",
+      "size_bytes": 23783
     },
     {
       "kind": "file",
@@ -1832,8 +1832,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_activity.py",
-      "sha256": "79381d5eb86f2579542c9273655611e9362b9c1c0cedd8bf40a4d653e1984b08",
-      "size_bytes": 24897
+      "sha256": "af976a4c4b88b3bc83cc8f706d5c637470361d0d545d6376157c4dc0b34148e3",
+      "size_bytes": 26525
     },
     {
       "kind": "file",
@@ -1867,8 +1867,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_ingress.py",
-      "sha256": "faa5e5d0d6b20c3d246deb81482054b66ae82a39810c632a3e80698db4c24868",
-      "size_bytes": 36121
+      "sha256": "9a9a56551ab5bba73dda363c3986ccf6cde9da98bd1c3151b8548816f363060b",
+      "size_bytes": 40858
     },
     {
       "kind": "file",
@@ -3064,8 +3064,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/contracts/office-v2-target-scope.schema.json",
-      "sha256": "038c88544b2c2073a57ea4bad084fdbebaa4fa1658d8b2ff80d26eb7c0ee3af0",
-      "size_bytes": 3481
+      "sha256": "1c6162a922211aae8629089f9c42ef78da9a1f50a6fd05b3e676efb64a5fb14d",
+      "size_bytes": 3649
     },
     {
       "kind": "file",
@@ -3141,15 +3141,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/microsoft_graph_api.py",
-      "sha256": "aa1af156d1d0429ab0d41f5ac77b830e9e6a750fb8869a5ee952b49a4c99e853",
-      "size_bytes": 90053
+      "sha256": "1f133fe056cd778cbaf86f8e757fe26d51698783213cc184690ae38ae86b9143",
+      "size_bytes": 90061
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/plugin.py",
-      "sha256": "a1b034ef5018907564612aac8c552801eef3ac44ba25b3080c95b206833358c4",
-      "size_bytes": 77178
+      "sha256": "4f8d876ea90082166defc427c9b27d8d989c3729a1deb43933590911eab4ce4c",
+      "size_bytes": 77182
     },
     {
       "kind": "file",
@@ -3183,8 +3183,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_microsoft_graph_api.py",
-      "sha256": "a5ec3f32f38460b4d026a801bffd75d79dd0e77f4f8955e29cfbedb9228535d7",
-      "size_bytes": 20808
+      "sha256": "e6b788cd6b789951cf2b05b842cef8342e03d45c48f8bdf101a7ec1646548421",
+      "size_bytes": 20838
     },
     {
       "kind": "file",
@@ -3197,8 +3197,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_provider.py",
-      "sha256": "adc34bcc388ae67af1bf995b50a36e8ec08d6781af7afa6dc1e0907967db1d70",
-      "size_bytes": 27152
+      "sha256": "368c510be484fcafffad9d2c4f0be997514c5f15f761a4cbadb1a27dd299d365",
+      "size_bytes": 27524
     },
     {
       "kind": "file",

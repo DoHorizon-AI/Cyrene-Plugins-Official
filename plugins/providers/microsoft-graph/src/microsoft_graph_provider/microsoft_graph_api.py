@@ -1834,7 +1834,7 @@ def _graph_opaque_id(value: Any, field: str) -> str:
     if (
         not isinstance(value, str)
         or not 1 <= len(value) <= 512
-        or re.fullmatch(r"[A-Za-z0-9._!:-]+", value) is None
+        or re.fullmatch(r"[A-Za-z0-9._!~+=-]{1,512}", value) is None
     ):
         raise GraphApiFailure("INVALID_ARGUMENTS")
     return value

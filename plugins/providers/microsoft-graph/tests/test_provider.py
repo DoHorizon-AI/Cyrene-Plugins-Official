@@ -32,6 +32,7 @@ from microsoft_graph_provider.plugin import (
     _authorize_profile,
     _profile_scope,
     _target,
+    _valid_opaque_id,
 )
 from microsoft_graph_provider.settings import (
     PROVIDER_CALLER_ID,
@@ -355,6 +356,15 @@ def test_sharepoint_parent_folder_is_bound_by_the_lease_argument_digest() -> Non
     assert payload_sha256(lease_arguments) != payload_sha256(
         {"parent_item_id": "folder!2", "page_size": 25}
     )
+
+
+def test_graph_opaque_resource_ids_accept_padding_without_path_syntax() -> None:
+    """Accept Graph base64 padding while keeping URL path separators closed."""
+
+    assert _valid_opaque_id("AAMkAGI2...==")
+    assert not _valid_opaque_id("AAMk/AGI2...==")
+    assert not _valid_opaque_id("AAMk?query=1")
+    assert not _valid_opaque_id("a" * 513)
 
 
 def test_actor_a_cannot_use_actor_b_profile_even_when_account_center_returns_it() -> None:
