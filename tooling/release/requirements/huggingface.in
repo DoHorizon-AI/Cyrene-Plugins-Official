@@ -1,6 +1,6 @@
 # Target: native Ubuntu 24.04, Python 3.12 (x86_64 or aarch64).
 # Internal runtime source: cyrene-plugin-runtime==0.2.2, vendored at src/cyrene_plugin_runtime.
-# Internal account contract source: cyrene-account-center-contracts==0.1.1, vendored at src/cyrene_account_center_contracts.
+# Internal account contract source: cyrene-account-center-contracts==0.1.2, vendored at src/cyrene_account_center_contracts.
 grpcio>=1.62,<1.84
 protobuf>=4.21,<5
 rfc8785==0.1.4

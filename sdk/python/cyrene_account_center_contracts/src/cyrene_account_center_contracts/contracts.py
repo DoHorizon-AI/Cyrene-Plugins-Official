@@ -381,13 +381,76 @@ class AzureDevOpsOperation(StrEnum):
     RELEASE_ENVIRONMENT_GET = "azure_devops.release_environment.get"
 
 
-@dataclass(frozen=True, slots=True)
+@dataclass(frozen=True, slots=True, init=False)
 class BeginMicrosoftGraphLinkRequest:
-    """Start fixed least-privilege Graph consent for selected Planner plans."""
+    """Start either a legacy Planner link or a feature-scoped Office v2 link.
+
+    The Account Center method keeps its v1 wire shape when ``planner_plan_ids``
+    is supplied and uses only ``office_v2_scope`` for v2. 中文：两种请求互斥，
+    Exchange must omit the unset selector before serializing the exact payload.
+    """
 
     profile_ref: str
-    planner_plan_ids: list[str]
+    planner_plan_ids: list[str] | None
     idempotency_key: str
+    office_v2_scope: dict[str, Any] | None
+
+    def __init__(
+        self,
+        profile_ref: str,
+        planner_plan_ids: list[str] | None = None,
+        idempotency_key: str | None = None,
+        office_v2_scope: dict[str, Any] | None = None,
+    ) -> None:
+        """Validate the closed v1/v2 selector while retaining v1 positional calls."""
+
+        if not isinstance(profile_ref, str) or not profile_ref.strip():
+            raise ValueError("profile_ref must be non-empty text")
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise ValueError("idempotency_key must be non-empty text")
+        if (planner_plan_ids is None) == (office_v2_scope is None):
+            raise ValueError("exactly one Graph link scope must be provided")
+        if planner_plan_ids is not None and not isinstance(planner_plan_ids, list):
+            raise ValueError("planner_plan_ids must be a list")
+        if office_v2_scope is not None and not isinstance(office_v2_scope, dict):
+            raise ValueError("office_v2_scope must be an object")
+
+        object.__setattr__(self, "profile_ref", profile_ref)
+        object.__setattr__(self, "planner_plan_ids", planner_plan_ids)
+        object.__setattr__(self, "idempotency_key", idempotency_key)
+        object.__setattr__(self, "office_v2_scope", office_v2_scope)
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateMicrosoftGraphV2ScopeRequest:
+    """CAS-update selected resources without changing Office OAuth grants."""
+
+    profile_ref: str
+    workspace_id: str
+    expected_credential_revision: int
+    target_scope: dict[str, Any]
+    idempotency_key: str
+
+    def __post_init__(self) -> None:
+        """Reject incomplete CAS requests before they cross the service boundary."""
+
+        if not isinstance(self.profile_ref, str) or not self.profile_ref.strip():
+            raise ValueError("profile_ref must be non-empty text")
+        if not isinstance(self.workspace_id, str) or not self.workspace_id.strip():
+            raise ValueError("workspace_id must be non-empty text")
+        if (
+            isinstance(self.expected_credential_revision, bool)
+            or not isinstance(self.expected_credential_revision, int)
+            or self.expected_credential_revision < 0
+        ):
+            raise ValueError("expected_credential_revision must be non-negative")
+        if not isinstance(self.target_scope, dict):
+            raise TypeError("target_scope must be an object")
+        if (
+            not isinstance(self.idempotency_key, str)
+            or not self.idempotency_key.strip()
+        ):
+            raise ValueError("idempotency_key must be non-empty text")
 
 
 @dataclass(frozen=True, slots=True)
@@ -540,7 +603,11 @@ def verify_context(
 ) -> bool:
     """Verify signature, exact body hash, caller, clock skew, and 300s maximum TTL."""
 
-    values = context.as_dict() if isinstance(context, TrustedCallerContext) else dict(context)
+    values = (
+        context.as_dict()
+        if isinstance(context, TrustedCallerContext)
+        else dict(context)
+    )
     expected_fields = {
         "method",
         "caller_id",
@@ -594,7 +661,12 @@ def verify_context(
     workspace = values.get("workspace_id")
     if workspace is not None and not _valid_text_claim(workspace):
         return False
-    if issued > current + 30 or expires <= current or expires <= issued or expires - issued > 300:
+    if (
+        issued > current + 30
+        or expires <= current
+        or expires <= issued
+        or expires - issued > 300
+    ):
         return False
     if values.get("payload_sha256") != payload_sha256(payload):
         return False
