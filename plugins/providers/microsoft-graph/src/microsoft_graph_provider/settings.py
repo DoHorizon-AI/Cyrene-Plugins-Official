@@ -26,6 +26,14 @@ _OPTIONAL_MTLS_REFS = {
     "microsoft-graph/account-center-client-certificate",
     "microsoft-graph/account-center-client-key",
 }
+_OFFICE_V2_FLAGS = {
+    "todo_enabled",
+    "calendar_enabled",
+    "mail_metadata_enabled",
+    "mail_drafts_enabled",
+    "mail_send_enabled",
+    "sharepoint_drive_metadata_enabled",
+}
 _SITE_ID = re.compile(r"[A-Za-z0-9.-]{1,255},[0-9a-fA-F-]{36},[0-9a-fA-F-]{36}\Z")
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
 
@@ -55,6 +63,7 @@ class ProviderSettings:
     max_page_size: int
     sharepoint_site_id: str | None = None
     sharepoint_list_ids: tuple[str, ...] = ()
+    office_v2_flags: Mapping[str, bool] | None = None
 
     @classmethod
     def from_environment(
@@ -80,6 +89,7 @@ class ProviderSettings:
             "timeout_seconds",
             "max_page_size",
             "sharepointTargets",
+            "officeV2",
             "hostSecretRefs",
         }
         if set(config) - allowed:
@@ -168,6 +178,7 @@ class ProviderSettings:
         sharepoint_site_id, sharepoint_list_ids = _sharepoint_targets(
             config.get("sharepointTargets")
         )
+        office_v2_flags = _office_v2_flags(config.get("officeV2"))
 
         def secret(reference: str) -> str:
             environment_name = names.get(reference)
@@ -196,6 +207,7 @@ class ProviderSettings:
             max_page_size=page_size,
             sharepoint_site_id=sharepoint_site_id,
             sharepoint_list_ids=sharepoint_list_ids,
+            office_v2_flags=office_v2_flags,
         )
 
 
@@ -240,6 +252,35 @@ def _sharepoint_targets(value: Any) -> tuple[str | None, tuple[str, ...]]:
     if any(str(UUID(item)) != item for item in list_ids):
         raise ConfigurationError("sharepointTargets list IDs must be canonical lowercase UUIDs")
     return site_id, tuple(list_ids)
+
+
+def _office_v2_flags(value: Any) -> dict[str, bool]:
+    """Validate the host-owned Office v2 feature switches.
+
+    Account Center profiles further restrict each actor and exact target. This
+    activation object only controls which tools this provider may advertise.
+    """
+
+    if value is None:
+        return {key: False for key in sorted(_OFFICE_V2_FLAGS)}
+    if not isinstance(value, Mapping) or set(value) != _OFFICE_V2_FLAGS:
+        raise ConfigurationError("officeV2 must contain the exact feature flag set")
+    if any(not isinstance(flag, bool) for flag in value.values()):
+        raise ConfigurationError("officeV2 feature flags must be boolean")
+    if any(
+        value[key]
+        for key in (
+            "mail_metadata_enabled",
+            "mail_drafts_enabled",
+            "mail_send_enabled",
+        )
+    ):
+        raise ConfigurationError("Microsoft Graph mail features are deferred")
+    if value["mail_send_enabled"] and not value["mail_drafts_enabled"]:
+        raise ConfigurationError("mail send requires the drafts feature")
+    if value["mail_drafts_enabled"] and not value["mail_metadata_enabled"]:
+        raise ConfigurationError("mail drafts require the metadata feature")
+    return {key: value[key] for key in sorted(_OFFICE_V2_FLAGS)}
 
 
 def _positive_timeout(value: Any) -> float:

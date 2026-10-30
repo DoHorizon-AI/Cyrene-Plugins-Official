@@ -51,6 +51,25 @@
       "additionalProperties": false,
       "x-cyrene-host-provided": true
     },
+    "officeV2": {
+      "type": "object",
+      "description": "Host-owned Office v2 feature switches. Per-actor Account Center scopes and Directory target grants remain mandatory.",
+      "required": ["todo_enabled", "calendar_enabled", "mail_metadata_enabled", "mail_drafts_enabled", "mail_send_enabled", "sharepoint_drive_metadata_enabled"],
+      "properties": {
+        "todo_enabled": {"type": "boolean", "default": false},
+        "calendar_enabled": {"type": "boolean", "default": false},
+        "mail_metadata_enabled": {"const": false, "default": false},
+        "mail_drafts_enabled": {"const": false, "default": false},
+        "mail_send_enabled": {"const": false, "default": false},
+        "sharepoint_drive_metadata_enabled": {"type": "boolean", "default": false}
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"if": {"properties": {"mail_send_enabled": {"const": true}}, "required": ["mail_send_enabled"]}, "then": {"properties": {"mail_metadata_enabled": {"const": true}, "mail_drafts_enabled": {"const": true}}}},
+        {"if": {"properties": {"mail_drafts_enabled": {"const": true}}, "required": ["mail_drafts_enabled"]}, "then": {"properties": {"mail_metadata_enabled": {"const": true}}}}
+      ],
+      "x-cyrene-host-provided": true
+    },
     "hostSecretRefs": {
       "type": "object",
       "description": "Maps stable signing and optional mTLS references to host-injected environment names; OAuth tokens stay in Account Center.",

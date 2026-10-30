@@ -42,6 +42,18 @@ request created it. The provider never reports an ambiguous create as confirmed
 and never replays it. Reads and writes use synthetic test fixtures only; no real
 Graph credentials are needed for package tests.
 
+## Office v2 contract
+
+The v2 contract is recorded in [`contracts/office-v2-operations.json`](contracts/office-v2-operations.json) and its exact Account Center target scope is validated by [`contracts/office-v2-target-scope.schema.json`](contracts/office-v2-target-scope.schema.json). Existing v1 Planner and SharePoint scopes remain exact and unchanged. V2 scopes bind the Entra tenant and Cyrene Workspace, with feature flags and resource IDs checked again at the provider. The activation `officeV2` flags only control catalog exposure; they do not replace actor-owned Account Center scope or Directory grants.
+
+The first v2 implementation covers To Do task lists/tasks, calendar metadata/events/free-busy, and selected SharePoint document-library/item metadata. Calendar writes have no attendees and use UTC-normalized timestamps. SharePoint document contents are not read. Mail operations remain reserved in the contract and disabled: this deployment does not request `Mail.*` permissions because the company mailbox is hosted outside Microsoft 365. Refresh and reauthentication state is metadata-only; token material never enters provider results.
+
+### Office v2 合同
+
+v2 合同记录在 [`contracts/office-v2-operations.json`](contracts/office-v2-operations.json)，Account Center 的精确目标范围定义在 [`contracts/office-v2-target-scope.schema.json`](contracts/office-v2-target-scope.schema.json)。既有 v1 Planner 与 SharePoint 范围保持原样。v2 范围绑定 Entra 租户和 Cyrene Workspace，并由 Provider 再次校验功能标志与资源 ID。部署配置中的 `officeV2` 仅决定目录是否发布工具，不能替代用户自己的 Account Center 授权或 Directory 目标授权。
+
+首批 v2 实现覆盖 To Do 任务清单/任务、日历元数据/事件/忙闲查询，以及选定 SharePoint 文档库和项目的元数据。日历写入不含参会者，时间统一转换为 UTC。SharePoint 文件正文不会读取。邮件操作只保留在合同中，本次保持关闭；公司邮箱由 Microsoft 365 以外的平台承载，因此不申请 `Mail.*` 权限。令牌刷新和重新授权状态只公开元数据，不返回令牌内容。
+
 ## Contents
 
 | Path | Responsibility |

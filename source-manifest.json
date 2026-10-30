@@ -3036,15 +3036,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/README.md",
-      "sha256": "62ce225391615eca8c642519195b02bc254d197646ee62132b41777efae6d889",
-      "size_bytes": 5269
+      "sha256": "3b366c032f66ddbfe487763319b0b63d4a421beb3394dd30053cf699e522af3c",
+      "size_bytes": 7459
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/configuration.schema.json",
-      "sha256": "fa32ef531ef7498ad62c6cb063299f8fc1c3a76035423f9d3df1acc869f1ef4c",
-      "size_bytes": 4264
+      "sha256": "3cf585f5c17e5b59a2482056bedaccce0b282590dc5ab8d8e4fade4827252798",
+      "size_bytes": 5554
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/contracts/office-v2-operations.json",
+      "sha256": "68c0e6412e6f182e8260666de6cc76493a54896abc696e532db79aa78dc0c14c",
+      "size_bytes": 9559
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/contracts/office-v2-target-scope.schema.json",
+      "sha256": "038c88544b2c2073a57ea4bad084fdbebaa4fa1658d8b2ff80d26eb7c0ee3af0",
+      "size_bytes": 3481
     },
     {
       "kind": "file",
@@ -3134,8 +3148,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/settings.py",
-      "sha256": "fb6e70a32d74fbc87731c20505b5d3112980a0c79234f04a37c67b2e66fd44b3",
-      "size_bytes": 11470
+      "sha256": "8a8b6f30815f2bbfb89bc6ab47e3223fcb94560191003f97595f489d9e65ecc2",
+      "size_bytes": 13132
     },
     {
       "kind": "file",
