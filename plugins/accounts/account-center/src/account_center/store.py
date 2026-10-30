@@ -36,11 +36,15 @@ class AccountStore:
         self._initialize()
         self._recover_interrupted_operations()
 
-    def _connect(self) -> sqlite3.Connection:
+    def _connect(self, *, foreign_keys: bool = True) -> sqlite3.Connection:
         try:
             connection = sqlite3.connect(self.path, timeout=5, isolation_level=None)
             connection.row_factory = sqlite3.Row
-            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute(
+                "PRAGMA foreign_keys = ON"
+                if foreign_keys
+                else "PRAGMA foreign_keys = OFF"
+            )
             connection.execute("PRAGMA busy_timeout = 5000")
             if str(self.path) != ":memory:":
                 connection.execute("PRAGMA journal_mode = WAL")
@@ -49,10 +53,10 @@ class AccountStore:
             raise AccountCenterError("storage_unavailable") from None
 
     @contextmanager
-    def transaction(self) -> Iterator[sqlite3.Connection]:
+    def transaction(self, *, foreign_keys: bool = True) -> Iterator[sqlite3.Connection]:
         """Run an immediate transaction to serialize one-use lease changes."""
 
-        connection = self._connect()
+        connection = self._connect(foreign_keys=foreign_keys)
         try:
             connection.execute("BEGIN IMMEDIATE")
             yield connection
@@ -68,7 +72,7 @@ class AccountStore:
             connection.close()
 
     def _initialize(self) -> None:
-        with self.transaction() as db:
+        with self.transaction(foreign_keys=False) as db:
             current = int(db.execute("PRAGMA user_version").fetchone()[0])
             if current > SCHEMA_VERSION:
                 raise AccountCenterError("storage_version_unsupported")
@@ -395,9 +399,9 @@ class AccountStore:
                 )
                 db.execute("PRAGMA user_version = 8")
             if 5 <= current < 9:
-                # Rebuild the parent table while deferring references from its
-                # lease and renewal rows until the replacement is in place.
-                db.execute("PRAGMA defer_foreign_keys = ON")
+                # Rebuild the parent with FK enforcement disabled only on this
+                # initialization connection. Child rows remain untouched and
+                # are validated as a whole before the migration commits.
                 db.execute(
                     "CREATE TABLE provider_profiles_new ("
                     "profile_ref TEXT PRIMARY KEY,anchor_issuer TEXT NOT NULL,"
@@ -485,6 +489,15 @@ class AccountStore:
                 "BEGIN SELECT RAISE(ABORT,'external_identity_owned'); END"
             )
             db.execute("PRAGMA user_version = 9")
+            if 0 < current < SCHEMA_VERSION:
+                # FK checks are connection-local and were disabled only to allow
+                # the parent-table rebuild. Check all rows before commit so a
+                # violation rolls the schema and data migration back atomically.
+                violations = db.execute("PRAGMA foreign_key_check").fetchmany(1)
+                if violations:
+                    raise sqlite3.IntegrityError(
+                        "account center schema migration violates foreign keys"
+                    )
 
     def _recover_interrupted_operations(self) -> None:
         """Mark token rotations, callbacks, and revocations interrupted by restart."""
