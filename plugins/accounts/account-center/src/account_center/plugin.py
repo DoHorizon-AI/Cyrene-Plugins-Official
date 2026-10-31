@@ -151,6 +151,14 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "microsoft_graph.calendar.event.update",
         "microsoft_graph.calendar.event.delete",
         "microsoft_graph.calendar.freebusy.get",
+        "microsoft_graph.mail.folders.list",
+        "microsoft_graph.mail.messages.list",
+        "microsoft_graph.mail.message.get",
+        "microsoft_graph.mail.drafts.list",
+        "microsoft_graph.mail.draft.create",
+        "microsoft_graph.mail.draft.update",
+        "microsoft_graph.mail.draft.delete",
+        "microsoft_graph.mail.message.send",
         "microsoft_graph.sharepoint.drives.list",
         "microsoft_graph.sharepoint.drive.items.list",
     },
@@ -1519,7 +1527,7 @@ class AccountCenterPlugin:
         _require_fields(
             request,
             {"profile_ref", "permission"},
-            {"site_id", "list_ids"},
+            {"site_id", "list_ids", "mail_features"},
         )
         profile_ref = _opaque_profile_ref(request["profile_ref"])
         permission = request["permission"]
@@ -1536,22 +1544,30 @@ class AccountCenterPlugin:
         target_scope = _safe_microsoft_graph_profile_scope(
             _json_object(profile["target_scope_json"])
         )
-        if target_scope.get("schema_version") == 2:
-            raise AccountCenterError("office_v2_scope_upgrade_requires_relink")
         current_scopes = _safe_microsoft_graph_oauth_scopes(
             _json_array(profile["oauth_scopes_json"])
         )
+        if current_scopes != _expected_microsoft_graph_scopes(target_scope):
+            raise AccountCenterError("profile_unavailable")
         next_scopes = set(current_scopes)
         if permission == "planner_tasks_write":
-            if "site_id" in request or "list_ids" in request:
+            if "site_id" in request or "list_ids" in request or "mail_features" in request:
                 raise AccountCenterError("invalid_request")
+            if target_scope.get("schema_version") == 2:
+                raise AccountCenterError("office_v2_scope_upgrade_requires_relink")
             if target_scope["planner"]["tasks_write"]:
                 raise AccountCenterError("scope_already_granted")
             target_scope["planner"]["tasks_write"] = True
             next_scopes.add("Tasks.ReadWrite")
         elif permission == "sharepoint_selected":
-            if "site_id" not in request or "list_ids" not in request:
+            if (
+                "site_id" not in request
+                or "list_ids" not in request
+                or "mail_features" in request
+            ):
                 raise AccountCenterError("invalid_request")
+            if target_scope.get("schema_version") == 2:
+                raise AccountCenterError("office_v2_scope_upgrade_requires_relink")
             site_id = _safe_graph_site_id(request["site_id"])
             list_ids = _safe_graph_uuid_list(request["list_ids"])
             if target_scope["sharepoint"]["enabled"]:
@@ -1562,6 +1578,29 @@ class AccountCenterPlugin:
                 "list_ids": list_ids,
             }
             next_scopes.add("Sites.Selected")
+        elif permission == "mail":
+            if "site_id" in request or "list_ids" in request or "mail_features" not in request:
+                raise AccountCenterError("invalid_request")
+            if target_scope.get("schema_version") != 2:
+                raise AccountCenterError("office_v2_scope_upgrade_requires_relink")
+            mail_features = _safe_microsoft_graph_mail_feature_request(request["mail_features"])
+            mail = target_scope["mail"]
+            if not any(
+                requested and not mail[target]
+                for requested, target in (
+                    (mail_features["metadata_read"], "metadata_read"),
+                    (mail_features["drafts_write"], "drafts_write"),
+                    (mail_features["send"], "send_enabled"),
+                )
+            ):
+                raise AccountCenterError("scope_already_granted")
+            mail["metadata_read"] = mail["metadata_read"] or mail_features["metadata_read"]
+            mail["drafts_write"] = mail["drafts_write"] or mail_features["drafts_write"]
+            mail["send_enabled"] = mail["send_enabled"] or mail_features["send"]
+            mail["enabled"] = bool(
+                mail["metadata_read"] or mail["drafts_write"] or mail["send_enabled"]
+            )
+            next_scopes = _expected_microsoft_graph_scopes(target_scope)
         else:
             raise AccountCenterError("invalid_request")
         return self._start_microsoft_graph_oauth_session(
@@ -3764,7 +3803,7 @@ def _safe_microsoft_graph_profile_scope(value: Any) -> dict[str, Any]:
 
 
 def _safe_microsoft_graph_profile_scope_v2(value: Mapping[str, Any]) -> dict[str, Any]:
-    """Validate the closed Office v2 scope while keeping mail and content off."""
+    """Validate the closed Office v2 scope while keeping message bodies and file content off."""
 
     required = {
         "schema_version",
@@ -3904,13 +3943,20 @@ def _safe_microsoft_graph_profile_scope_v2(value: Mapping[str, Any]) -> dict[str
             "send_enabled",
         }:
             raise AccountCenterError("profile_unavailable")
+        metadata_read = mail["metadata_read"]
+        body_read = mail["body_read"]
+        drafts_write = mail["drafts_write"]
+        send_enabled = mail["send_enabled"]
+        if not all(
+            isinstance(item, bool)
+            for item in (mail["enabled"], metadata_read, body_read, drafts_write, send_enabled)
+        ):
+            raise AccountCenterError("profile_unavailable")
+        folder_ids = _safe_graph_opaque_id_list(mail["folder_ids"])
         if (
-            mail["enabled"] is not False
-            or mail["folder_ids"] != []
-            or mail["metadata_read"] is not False
-            or mail["body_read"] is not False
-            or mail["drafts_write"] is not False
-            or mail["send_enabled"] is not False
+            body_read is not False
+            or (not metadata_read and folder_ids)
+            or mail["enabled"] != (metadata_read or drafts_write or send_enabled)
         ):
             raise AccountCenterError("profile_unavailable")
     except AccountCenterError:
@@ -3948,14 +3994,27 @@ def _safe_microsoft_graph_profile_scope_v2(value: Mapping[str, Any]) -> dict[str
             "attendees_write": False,
         },
         "mail": {
-            "enabled": False,
-            "folder_ids": [],
-            "metadata_read": False,
+            "enabled": mail["enabled"],
+            "folder_ids": folder_ids,
+            "metadata_read": metadata_read,
             "body_read": False,
-            "drafts_write": False,
-            "send_enabled": False,
+            "drafts_write": drafts_write,
+            "send_enabled": send_enabled,
         },
     }
+
+
+def _safe_microsoft_graph_mail_feature_request(value: Any) -> dict[str, bool]:
+    """Validate one explicit, additive Mail permission selection."""
+
+    features = require_object(value, code="invalid_request")
+    if set(features) != {"metadata_read", "drafts_write", "send"}:
+        raise AccountCenterError("invalid_request")
+    if any(not isinstance(features[key], bool) for key in features):
+        raise AccountCenterError("invalid_request")
+    if not any(features.values()):
+        raise AccountCenterError("invalid_request")
+    return dict(features)
 
 
 def _expected_microsoft_graph_scopes(scope: Mapping[str, Any]) -> set[str]:
@@ -3979,6 +4038,13 @@ def _expected_microsoft_graph_scopes(scope: Mapping[str, Any]) -> set[str]:
         required.add("Calendars.ReadWrite")
     elif scope["calendar"]["events_read"] or scope["calendar"]["freebusy_read"]:
         required.add("Calendars.ReadBasic")
+    mail = scope["mail"]
+    if mail["drafts_write"]:
+        required.add("Mail.ReadWrite")
+    elif mail["metadata_read"] or mail["send_enabled"]:
+        required.add("Mail.ReadBasic")
+    if mail["send_enabled"]:
+        required.add("Mail.Send")
     return required
 
 
@@ -4008,7 +4074,13 @@ def _microsoft_graph_scope_permissions(scope: Mapping[str, Any]) -> dict[str, An
             "freebusy_read": scope["calendar"]["freebusy_read"],
             "attendees_write": scope["calendar"]["attendees_write"],
         },
-        "mail": dict(scope["mail"]),
+        "mail": {
+            "enabled": scope["mail"]["enabled"],
+            "metadata_read": scope["mail"]["metadata_read"],
+            "body_read": scope["mail"]["body_read"],
+            "drafts_write": scope["mail"]["drafts_write"],
+            "send_enabled": scope["mail"]["send_enabled"],
+        },
     }
 
 
@@ -4433,6 +4505,30 @@ def _safe_provider_target(provider: str, operation_id: str, value: Any) -> dict[
                 "tenant_id",
                 "schedule_ids",
             },
+            "microsoft_graph.mail.folders.list": {"tenant_id"},
+            "microsoft_graph.mail.messages.list": {"tenant_id", "folder_id"},
+            "microsoft_graph.mail.message.get": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
+            "microsoft_graph.mail.drafts.list": {"tenant_id", "folder_id"},
+            "microsoft_graph.mail.draft.create": {"tenant_id", "folder_id"},
+            "microsoft_graph.mail.draft.update": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
+            "microsoft_graph.mail.draft.delete": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
+            "microsoft_graph.mail.message.send": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
             "microsoft_graph.sharepoint.drives.list": {"tenant_id", "site_id"},
             "microsoft_graph.sharepoint.drive.items.list": {
                 "tenant_id",
@@ -4471,6 +4567,21 @@ def _safe_provider_target(provider: str, operation_id: str, value: Any) -> dict[
             normalized["transaction_id"] = _safe_graph_uuid(target["transaction_id"])
         if "schedule_ids" in expected:
             normalized["schedule_ids"] = sorted(_safe_graph_schedule_ids(target["schedule_ids"]))
+        if "folder_id" in expected:
+            if operation_id in {
+                "microsoft_graph.mail.drafts.list",
+                "microsoft_graph.mail.draft.create",
+                "microsoft_graph.mail.draft.update",
+                "microsoft_graph.mail.draft.delete",
+                "microsoft_graph.mail.message.send",
+            }:
+                if target["folder_id"] != "drafts":
+                    raise AccountCenterError("invalid_request")
+                normalized["folder_id"] = "drafts"
+            else:
+                normalized["folder_id"] = _safe_graph_opaque_id(target["folder_id"])
+        if "message_id" in expected:
+            normalized["message_id"] = _safe_graph_opaque_id(target["message_id"])
         if "drive_id" in expected:
             normalized["drive_id"] = _safe_graph_opaque_id(target["drive_id"])
         return normalized
@@ -4615,6 +4726,23 @@ def _provider_target_allowed(
                 and target.get("plan_id") in graph_scope["planner"]["plan_ids"]
             )
         if graph_scope.get("schema_version") == 2:
+            mail = graph_scope["mail"]
+            if operation_id == "microsoft_graph.mail.folders.list":
+                return mail["metadata_read"]
+            if operation_id in {
+                "microsoft_graph.mail.messages.list",
+                "microsoft_graph.mail.message.get",
+            }:
+                return mail["metadata_read"] and target.get("folder_id") in mail["folder_ids"]
+            if operation_id in {
+                "microsoft_graph.mail.drafts.list",
+                "microsoft_graph.mail.draft.create",
+                "microsoft_graph.mail.draft.update",
+                "microsoft_graph.mail.draft.delete",
+            }:
+                return mail["drafts_write"]
+            if operation_id == "microsoft_graph.mail.message.send":
+                return mail["send_enabled"]
             if operation_id == "microsoft_graph.todo.lists.list":
                 return graph_scope["todo"]["enabled"] and graph_scope["todo"]["tasks_read"]
             if operation_id.startswith("microsoft_graph.todo."):
@@ -4745,6 +4873,26 @@ def _microsoft_graph_operation_authorized(operation_id: str, profile: Mapping[st
     if operation_id.startswith("microsoft_graph.sharepoint."):
         return profile_scope["sharepoint"]["enabled"] and "Sites.Selected" in scopes
     if profile_scope.get("schema_version") == 2:
+        mail = profile_scope["mail"]
+        if operation_id in {
+            "microsoft_graph.mail.folders.list",
+            "microsoft_graph.mail.messages.list",
+            "microsoft_graph.mail.message.get",
+        }:
+            return mail["metadata_read"] and bool({"Mail.ReadBasic", "Mail.ReadWrite"} & scopes)
+        if operation_id in {
+            "microsoft_graph.mail.drafts.list",
+            "microsoft_graph.mail.draft.create",
+            "microsoft_graph.mail.draft.update",
+            "microsoft_graph.mail.draft.delete",
+        }:
+            return mail["drafts_write"] and "Mail.ReadWrite" in scopes
+        if operation_id == "microsoft_graph.mail.message.send":
+            return (
+                mail["send_enabled"]
+                and "Mail.Send" in scopes
+                and bool({"Mail.ReadBasic", "Mail.ReadWrite"} & scopes)
+            )
         if operation_id.startswith("microsoft_graph.todo."):
             return profile_scope["todo"]["enabled"] and profile_scope["todo"]["tasks_read"]
         if operation_id.startswith("microsoft_graph.calendar."):

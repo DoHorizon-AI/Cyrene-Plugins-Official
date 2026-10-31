@@ -421,6 +421,9 @@ class FakeMicrosoftEntraOAuth:
                 "Sites.Selected",
                 "Calendars.ReadBasic",
                 "Calendars.ReadWrite",
+                "Mail.ReadBasic",
+                "Mail.ReadWrite",
+                "Mail.Send",
                 AZURE_DEVOPS_RESOURCE_SCOPE,
             }
         )
@@ -3248,6 +3251,365 @@ def test_graph_office_v2_uses_minimum_scopes_discovery_and_revision_checked_sele
             },
             actor=actor,
         )
+
+
+def test_graph_mail_scope_upgrade_is_one_consent_and_preserves_other_office_access(
+    tmp_path: Path,
+) -> None:
+    oauth = FakeMicrosoftEntraOAuth(lambda: 10_000)
+    actor = {**ENTRA_ACTOR, "workspace_id": GRAPH_V2_WORKSPACE_ID}
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        entra_oauth_client=oauth,
+        default_actor=actor,
+    )
+    scope = _graph_office_v2_scope(GRAPH_V2_WORKSPACE_ID)
+    initial = harness.call(
+        "begin_microsoft_graph_link",
+        {"profile_ref": GRAPH_PROFILE_REF, "office_v2_scope": scope},
+    )
+    harness.call(
+        "complete_microsoft_graph_link",
+        {"state": _callback_state(initial), "code": "synthetic-office-v2-code"},
+        caller=GRAPH_CALLBACK,
+        actor=actor,
+    )
+    old_profile = harness.call("list_provider_profiles", {}, actor=actor)["profiles"][0]
+    original_revision = old_profile["credential_revision"]
+    for invalid_features in (
+        {"metadata_read": False, "drafts_write": False, "send": False},
+        {"metadata_read": True, "drafts_write": False},
+        {
+            "metadata_read": True,
+            "drafts_write": False,
+            "send": False,
+            "scopes": ["Mail.Read"],
+        },
+    ):
+        with pytest.raises(AccountCenterError, match="invalid_request"):
+            harness.call(
+                "begin_microsoft_graph_scope_upgrade",
+                {
+                    "profile_ref": GRAPH_PROFILE_REF,
+                    "permission": "mail",
+                    "mail_features": invalid_features,
+                },
+                actor=actor,
+            )
+    assert len(oauth.authorizations) == 1
+
+    task_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.todo.lists.list",
+            "target": {"tenant_id": GRAPH_TENANT_ID},
+            "arguments_sha256": _digest({"page_size": 10}),
+        },
+        actor=actor,
+    )
+    assert task_lease["operation_id"] == "microsoft_graph.todo.lists.list"
+
+    upgrade = harness.call(
+        "begin_microsoft_graph_scope_upgrade",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "permission": "mail",
+            "mail_features": {"metadata_read": True, "drafts_write": True, "send": True},
+        },
+        actor=actor,
+    )
+    upgrade_scopes = set(oauth.authorizations[-1]["scope"].split())
+    assert oauth.authorizations[-1]["prompt"] == "consent"
+    assert {"Mail.ReadWrite", "Mail.Send"} <= upgrade_scopes
+    assert "Mail.ReadBasic" not in upgrade_scopes
+    assert "Mail.Read" not in upgrade_scopes
+
+    pending_profile = harness.call("list_provider_profiles", {}, actor=actor)["profiles"][0]
+    assert pending_profile["credential_revision"] == original_revision
+    assert pending_profile["target_scope"]["mail"] == scope["mail"]
+    pending_task_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.todo.lists.list",
+            "target": {"tenant_id": GRAPH_TENANT_ID},
+            "arguments_sha256": _digest({"page_size": 5}),
+        },
+        actor=actor,
+    )
+    assert pending_task_lease["profile_scope_sha256"] == task_lease["profile_scope_sha256"]
+
+    completed = harness.call(
+        "complete_microsoft_graph_scope_upgrade",
+        {"state": _callback_state(upgrade), "code": "synthetic-mail-consent"},
+        caller=GRAPH_CALLBACK,
+        actor=actor,
+    )
+    assert completed["credential_revision"] == original_revision + 1
+    profile = harness.call("list_provider_profiles", {}, actor=actor)["profiles"][0]
+    assert profile["oauth_scopes"] == [
+        "Calendars.ReadWrite",
+        "Mail.ReadWrite",
+        "Mail.Send",
+        "Sites.Selected",
+        "Tasks.ReadWrite",
+        "User.Read",
+    ]
+    assert profile["target_scope"]["mail"] == {
+        "enabled": True,
+        "folder_ids": [],
+        "metadata_read": True,
+        "body_read": False,
+        "drafts_write": True,
+        "send_enabled": True,
+    }
+    with pytest.raises(AccountCenterError, match="lease_rejected"):
+        harness.call(
+            "redeem_provider_credential_lease",
+            {
+                "lease_ref": task_lease["lease_ref"],
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": "microsoft_graph.todo.lists.list",
+                "target": {"tenant_id": GRAPH_TENANT_ID},
+                "arguments_sha256": _digest({"page_size": 10}),
+            },
+            caller=GRAPH_PROVIDER,
+            actor=actor,
+        )
+
+    folder_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.mail.folders.list",
+            "target": {"tenant_id": GRAPH_TENANT_ID},
+            "arguments_sha256": _digest({"page_size": 10}),
+        },
+        actor=actor,
+    )
+    assert folder_lease["operation_id"] == "microsoft_graph.mail.folders.list"
+    with pytest.raises(AccountCenterError, match="authorization_denied"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": "microsoft_graph.mail.messages.list",
+                "target": {"tenant_id": GRAPH_TENANT_ID, "folder_id": "unselected-folder"},
+                "arguments_sha256": _digest({"page_size": 10}),
+            },
+            actor=actor,
+        )
+
+    selected_scope = json.loads(json.dumps(profile["target_scope"]))
+    selected_scope["mail"]["folder_ids"] = ["AAMkFolder_opaque=="]
+    selected = harness.call(
+        "update_microsoft_graph_v2_scope",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "workspace_id": GRAPH_V2_WORKSPACE_ID,
+            "expected_credential_revision": profile["credential_revision"],
+            "target_scope": selected_scope,
+        },
+        actor=actor,
+    )
+    assert selected["credential_revision"] == original_revision + 2
+    assert selected["oauth_scopes"] == profile["oauth_scopes"]
+    message_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.mail.messages.list",
+            "target": {"tenant_id": GRAPH_TENANT_ID, "folder_id": "AAMkFolder_opaque=="},
+            "arguments_sha256": _digest({"page_size": 10}),
+        },
+        actor=actor,
+    )
+    assert message_lease["operation_id"] == "microsoft_graph.mail.messages.list"
+    draft_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.mail.draft.create",
+            "target": {"tenant_id": GRAPH_TENANT_ID, "folder_id": "drafts"},
+            "arguments_sha256": _digest({"subject": "Synthetic", "body_text": "local"}),
+        },
+        actor=actor,
+    )
+    assert draft_lease["operation_id"] == "microsoft_graph.mail.draft.create"
+    send_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.mail.message.send",
+            "target": {
+                "tenant_id": GRAPH_TENANT_ID,
+                "folder_id": "drafts",
+                "message_id": "AAMkDraft_opaque==",
+            },
+            "arguments_sha256": _digest({}),
+        },
+        actor=actor,
+    )
+    assert send_lease["operation_id"] == "microsoft_graph.mail.message.send"
+
+
+def test_graph_mail_upgrade_failure_keeps_the_existing_v2_profile_healthy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    oauth = FakeMicrosoftEntraOAuth(lambda: 10_000)
+    actor = {**ENTRA_ACTOR, "workspace_id": GRAPH_V2_WORKSPACE_ID}
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        entra_oauth_client=oauth,
+        default_actor=actor,
+    )
+    scope = _graph_office_v2_scope(GRAPH_V2_WORKSPACE_ID)
+    initial = harness.call(
+        "begin_microsoft_graph_link",
+        {"profile_ref": GRAPH_PROFILE_REF, "office_v2_scope": scope},
+    )
+    harness.call(
+        "complete_microsoft_graph_link",
+        {"state": _callback_state(initial), "code": "synthetic-office-v2-code"},
+        caller=GRAPH_CALLBACK,
+        actor=actor,
+    )
+    before = harness.call("list_provider_profiles", {}, actor=actor)["profiles"][0]
+    upgrade = harness.call(
+        "begin_microsoft_graph_scope_upgrade",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "permission": "mail",
+            "mail_features": {"metadata_read": False, "drafts_write": False, "send": True},
+        },
+        actor=actor,
+    )
+
+    def fail_upgrade(**_: Any) -> tuple[MicrosoftGraphToken, MicrosoftGraphIdentity]:
+        raise MicrosoftGraphOAuthError("identity_verification_failed")
+
+    monkeypatch.setattr(oauth, "exchange_code", fail_upgrade)
+    with pytest.raises(AccountCenterError, match="identity_verification_failed"):
+        harness.call(
+            "complete_microsoft_graph_scope_upgrade",
+            {"state": _callback_state(upgrade), "code": "synthetic-denied-consent"},
+            caller=GRAPH_CALLBACK,
+            actor=actor,
+        )
+
+    after = harness.call("list_provider_profiles", {}, actor=actor)["profiles"][0]
+    assert after["auth_status"] == "healthy"
+    assert after["credential_revision"] == before["credential_revision"]
+    assert after["oauth_scopes"] == before["oauth_scopes"]
+    assert after["target_scope"] == before["target_scope"]
+    with pytest.raises(AccountCenterError, match="authorization_denied"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": GRAPH_PROFILE_REF,
+                "operation_id": "microsoft_graph.mail.message.send",
+                "target": {
+                    "tenant_id": GRAPH_TENANT_ID,
+                    "folder_id": "drafts",
+                    "message_id": "AAMkDraft_opaque==",
+                },
+                "arguments_sha256": _digest({}),
+            },
+            actor=actor,
+        )
+    legacy_lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.todo.lists.list",
+            "target": {"tenant_id": GRAPH_TENANT_ID},
+            "arguments_sha256": _digest({"page_size": 10}),
+        },
+        actor=actor,
+    )
+    assert legacy_lease["operation_id"] == "microsoft_graph.todo.lists.list"
+
+
+def test_graph_send_only_uses_readbasic_for_preflight_without_enabling_draft_tools(
+    tmp_path: Path,
+) -> None:
+    oauth = FakeMicrosoftEntraOAuth(lambda: 10_000)
+    actor = {**ENTRA_ACTOR, "workspace_id": GRAPH_V2_WORKSPACE_ID}
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3",
+        entra_oauth_client=oauth,
+        default_actor=actor,
+    )
+    scope = _graph_office_v2_scope(GRAPH_V2_WORKSPACE_ID)
+    initial = harness.call(
+        "begin_microsoft_graph_link",
+        {"profile_ref": GRAPH_PROFILE_REF, "office_v2_scope": scope},
+    )
+    harness.call(
+        "complete_microsoft_graph_link",
+        {"state": _callback_state(initial), "code": "synthetic-office-v2-code"},
+        caller=GRAPH_CALLBACK,
+        actor=actor,
+    )
+    upgrade = harness.call(
+        "begin_microsoft_graph_scope_upgrade",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "permission": "mail",
+            "mail_features": {"metadata_read": False, "drafts_write": False, "send": True},
+        },
+        actor=actor,
+    )
+    requested = set(oauth.authorizations[-1]["scope"].split())
+    assert "Mail.ReadBasic" in requested
+    assert "Mail.Send" in requested
+    assert "Mail.ReadWrite" not in requested
+    assert "Mail.Read" not in requested
+    harness.call(
+        "complete_microsoft_graph_scope_upgrade",
+        {"state": _callback_state(upgrade), "code": "synthetic-send-only-code"},
+        caller=GRAPH_CALLBACK,
+        actor=actor,
+    )
+
+    send_target = {
+        "tenant_id": GRAPH_TENANT_ID,
+        "folder_id": "drafts",
+        "message_id": "AAMkDraft_opaque==",
+    }
+    lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": GRAPH_PROFILE_REF,
+            "operation_id": "microsoft_graph.mail.message.send",
+            "target": send_target,
+            "arguments_sha256": _digest({}),
+        },
+        actor=actor,
+    )
+    assert lease["operation_id"] == "microsoft_graph.mail.message.send"
+    for operation_id in (
+        "microsoft_graph.mail.folders.list",
+        "microsoft_graph.mail.drafts.list",
+    ):
+        target = (
+            {"tenant_id": GRAPH_TENANT_ID}
+            if operation_id.endswith("folders.list")
+            else {"tenant_id": GRAPH_TENANT_ID, "folder_id": "drafts"}
+        )
+        with pytest.raises(AccountCenterError, match="authorization_denied"):
+            harness.call(
+                "create_provider_credential_lease",
+                {
+                    "profile_ref": GRAPH_PROFILE_REF,
+                    "operation_id": operation_id,
+                    "target": target,
+                    "arguments_sha256": _digest({}),
+                },
+                actor=actor,
+            )
 
 
 def test_graph_callback_configuration_is_loopback_only_and_fixed_path() -> None:

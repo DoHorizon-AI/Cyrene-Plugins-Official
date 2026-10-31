@@ -16,6 +16,7 @@ from cyrene_account_center_contracts import (
     CompleteMicrosoftGraphLinkRequest,
     CompleteMicrosoftGraphScopeUpgradeRequest,
     HuggingFaceRenewalSession,
+    MicrosoftGraphMailFeatures,
     MicrosoftGraphOperation,
     MicrosoftGraphPermissionUpgrade,
     PollHuggingFaceRenewalRequest,
@@ -319,7 +320,9 @@ def test_provider_oauth_dtos_keep_scopes_and_credentials_out_of_requests() -> No
         "idempotency_key",
         "site_id",
         "list_ids",
+        "mail_features",
     }
+    assert asdict(graph_upgrade)["mail_features"] is None
     assert set(asdict(ado)) == {
         "profile_ref",
         "tenant_id",
@@ -336,9 +339,44 @@ def test_provider_oauth_dtos_keep_scopes_and_credentials_out_of_requests() -> No
     assert MicrosoftGraphOperation.PLANNER_TASK_CREATE == (
         "microsoft_graph.planner.task.create"
     )
+    assert MicrosoftGraphOperation.MAIL_MESSAGE_SEND == "microsoft_graph.mail.message.send"
     assert AzureDevOpsOperation.RELEASE_ENVIRONMENT_GET == (
         "azure_devops.release_environment.get"
     )
+
+
+def test_mail_scope_upgrade_dto_is_one_closed_feature_selection() -> None:
+    """Serialize one combined Mail consent without exposing raw scopes."""
+
+    features = MicrosoftGraphMailFeatures(
+        metadata_read=True,
+        drafts_write=False,
+        send=True,
+    )
+    request = BeginMicrosoftGraphScopeUpgradeRequest(
+        profile_ref="00000000-0000-4000-8000-000000000401",
+        permission=MicrosoftGraphPermissionUpgrade.MAIL,
+        idempotency_key="graph-mail-upgrade-1",
+        mail_features=features,
+    )
+
+    payload = asdict(request)
+    assert payload["permission"] == "mail"
+    assert payload["mail_features"] == {
+        "metadata_read": True,
+        "drafts_write": False,
+        "send": True,
+    }
+    assert "scopes" not in payload
+    with pytest.raises(ValueError, match="at least one Mail feature"):
+        MicrosoftGraphMailFeatures(False, False, False)
+    with pytest.raises(ValueError, match="mail_features is valid only"):
+        BeginMicrosoftGraphScopeUpgradeRequest(
+            profile_ref="00000000-0000-4000-8000-000000000401",
+            permission=MicrosoftGraphPermissionUpgrade.PLANNER_TASKS_WRITE,
+            idempotency_key="graph-write-upgrade-1",
+            mail_features=features,
+        )
 
 
 def test_microsoft_graph_link_dto_preserves_v1_and_v2_wire_selectors() -> None:

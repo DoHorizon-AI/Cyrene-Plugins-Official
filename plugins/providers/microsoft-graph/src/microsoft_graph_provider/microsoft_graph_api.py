@@ -40,6 +40,13 @@ _TODO_TASK_SELECT = (
     "id,title,status,dueDateTime,completedDateTime,importance,createdDateTime,lastModifiedDateTime"
 )
 _CALENDAR_SELECT = "id,name,owner,canEdit,hexColor"
+_MAIL_FOLDER_SELECT = (
+    "id,displayName,parentFolderId,childFolderCount,totalItemCount,unreadItemCount,isHidden"
+)
+_MAIL_MESSAGE_SELECT = (
+    "id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,isRead,"
+    "importance,parentFolderId,isDraft"
+)
 _EVENT_SELECT = "id,subject,start,end,isAllDay,showAs,location,webLink,transactionId,attendees"
 _DRIVE_SELECT = "id,name,driveType,webUrl,createdDateTime,lastModifiedDateTime,owner"
 _DRIVE_ITEM_SELECT = (
@@ -1120,6 +1127,224 @@ class MicrosoftGraphSession:
             "calendar_event", calendar_id, event_id, "delete_readback_still_exists"
         )
 
+    def list_mail_folders(
+        self, *, page_size: int = 50, page_cursor: str | None = None
+    ) -> dict[str, Any]:
+        """Read one bounded page of mail-folder metadata for the signed-in user."""
+
+        return self._list_metadata(
+            f"{GRAPH_ROOT}/me/mailFolders",
+            kind="mail_folders",
+            target={},
+            select=_MAIL_FOLDER_SELECT,
+            page_size=page_size,
+            page_cursor=page_cursor,
+            projection=_mail_folder_projection,
+        )
+
+    def list_mail_messages(
+        self,
+        folder_id: str,
+        *,
+        page_size: int = 50,
+        page_cursor: str | None = None,
+    ) -> dict[str, Any]:
+        """Read metadata-only messages from one exact folder route."""
+
+        folder = _graph_opaque_id(folder_id, "folder_id")
+        path = f"{GRAPH_ROOT}/me/mailFolders/{quote(folder, safe='')}/messages"
+        return self._list_metadata(
+            path,
+            kind="mail_messages",
+            target={"folder_id": folder},
+            select=_MAIL_MESSAGE_SELECT,
+            page_size=page_size,
+            page_cursor=page_cursor,
+            projection=lambda row: _mail_message_projection(row, expected_folder_id=folder),
+        )
+
+    def get_mail_message(self, folder_id: str, message_id: str) -> dict[str, Any]:
+        """Read one metadata-only message and verify its folder membership."""
+
+        folder = _graph_opaque_id(folder_id, "folder_id")
+        message = _graph_opaque_id(message_id, "message_id")
+        path = (
+            f"{GRAPH_ROOT}/me/mailFolders/{quote(folder, safe='')}/messages/"
+            f"{quote(message, safe='')}?{urlencode({'$select': _MAIL_MESSAGE_SELECT})}"
+        )
+        raw = _json_object(self._api._request("GET", path, self._token))
+        return _mail_message_projection(
+            raw,
+            expected_folder_id=folder,
+            expected_message_id=message,
+        )
+
+    def list_mail_drafts(
+        self, *, page_size: int = 50, page_cursor: str | None = None
+    ) -> dict[str, Any]:
+        """Read draft metadata only from the current user's fixed Drafts folder."""
+
+        path = f"{GRAPH_ROOT}/me/mailFolders/drafts/messages"
+        return self._list_metadata(
+            path,
+            kind="mail_drafts",
+            target={"folder_id": "drafts"},
+            select=_MAIL_MESSAGE_SELECT,
+            page_size=page_size,
+            page_cursor=page_cursor,
+            projection=lambda row: _mail_message_projection(row, require_draft=True),
+        )
+
+    def create_mail_draft(
+        self,
+        subject: str,
+        body_text: str,
+        *,
+        to_recipients: list[str] | None = None,
+        cc_recipients: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Create one plain-text draft in the signed-in user's Drafts folder once."""
+
+        payload: dict[str, Any] = {
+            "subject": _mail_plain_text(subject, "subject", 255),
+            "body": {"contentType": "text", "content": _mail_body_text(body_text)},
+        }
+        if to_recipients is not None:
+            payload["toRecipients"] = _mail_graph_recipients(to_recipients)
+        if cc_recipients is not None:
+            payload["ccRecipients"] = _mail_graph_recipients(cc_recipients)
+        path = f"{GRAPH_ROOT}/me/mailFolders/drafts/messages"
+        try:
+            response = self._api._request("POST", path, self._token, body=payload, write=True)
+            if response.status != 201:
+                raise GraphApiFailure("GRAPH_OUTCOME_UNKNOWN", uncertain=True)
+            created = _json_object(response, uncertain=True)
+            try:
+                projected = _mail_message_projection(created, require_draft=True)
+            except GraphApiFailure:
+                raise GraphApiFailure("GRAPH_OUTCOME_UNKNOWN", uncertain=True) from None
+            return {"status": "CONFIRMED", "message": projected}
+        except GraphApiFailure as error:
+            if not error.uncertain:
+                raise
+            return {
+                "status": "UNKNOWN",
+                "message": None,
+                "reconciliation": "draft_create_response_uncertain",
+            }
+
+    def update_mail_draft(
+        self,
+        message_id: str,
+        if_match: str,
+        changes: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Update a verified Drafts-folder message with its current ETag once."""
+
+        message = _graph_opaque_id(message_id, "message_id")
+        before = self._get_mail_draft_raw(message)
+        etag = _etag(if_match)
+        if before.get("@odata.etag") != etag:
+            raise GraphApiFailure("CONCURRENCY_CONFLICT")
+        payload = _mail_draft_changes(changes)
+        path = f"{GRAPH_ROOT}/me/messages/{quote(message, safe='')}"
+        try:
+            response = self._api._request(
+                "PATCH",
+                path,
+                self._token,
+                body=payload,
+                headers={"If-Match": etag},
+                write=True,
+            )
+            if response.status != 200:
+                raise GraphApiFailure("GRAPH_OUTCOME_UNKNOWN", uncertain=True)
+            updated = _json_object(response, uncertain=True)
+            try:
+                projected = _mail_message_projection(
+                    updated,
+                    expected_message_id=message,
+                    require_draft=True,
+                )
+            except GraphApiFailure:
+                raise GraphApiFailure("GRAPH_OUTCOME_UNKNOWN", uncertain=True) from None
+            return {"status": "CONFIRMED", "message": projected}
+        except GraphApiFailure as error:
+            if not error.uncertain:
+                raise
+            return {
+                "status": "UNKNOWN",
+                "message_id": message,
+                "reconciliation": "draft_update_response_uncertain",
+            }
+
+    def delete_mail_draft(self, message_id: str, if_match: str) -> dict[str, Any]:
+        """Delete one verified Drafts-folder message with its current ETag once."""
+
+        message = _graph_opaque_id(message_id, "message_id")
+        before = self._get_mail_draft_raw(message)
+        etag = _etag(if_match)
+        if before.get("@odata.etag") != etag:
+            raise GraphApiFailure("CONCURRENCY_CONFLICT")
+        path = f"{GRAPH_ROOT}/me/messages/{quote(message, safe='')}"
+        try:
+            response = self._api._request(
+                "DELETE",
+                path,
+                self._token,
+                headers={"If-Match": etag},
+                write=True,
+            )
+            if response.status != 204:
+                raise GraphApiFailure("GRAPH_OUTCOME_UNKNOWN", uncertain=True)
+            return {"status": "CONFIRMED", "message_id": message}
+        except GraphApiFailure as error:
+            if not error.uncertain:
+                raise
+            return {
+                "status": "UNKNOWN",
+                "message_id": message,
+                "reconciliation": "draft_delete_response_uncertain",
+            }
+
+    def send_mail_draft(self, message_id: str) -> dict[str, Any]:
+        """Send only a preflight-verified existing draft; acceptance is not delivery."""
+
+        message = _graph_opaque_id(message_id, "message_id")
+        self._get_mail_draft_raw(message)
+        path = f"{GRAPH_ROOT}/me/messages/{quote(message, safe='')}/send"
+        try:
+            response = self._api._request("POST", path, self._token, write=True)
+            if response.status != 202:
+                raise GraphApiFailure("GRAPH_OUTCOME_UNKNOWN", uncertain=True)
+            return {"status": "ACCEPTED", "message_id": message}
+        except GraphApiFailure as error:
+            if not error.uncertain:
+                raise
+            return {
+                "status": "UNKNOWN",
+                "message_id": message,
+                "reconciliation": "send_response_uncertain",
+            }
+
+    def _get_mail_draft_raw(self, message_id: str) -> dict[str, Any]:
+        """Read one message through the fixed Drafts route and require isDraft."""
+
+        message = _graph_opaque_id(message_id, "message_id")
+        path = (
+            f"{GRAPH_ROOT}/me/mailFolders/drafts/messages/{quote(message, safe='')}?"
+            f"{urlencode({'$select': _MAIL_MESSAGE_SELECT})}"
+        )
+        raw = _json_object(self._api._request("GET", path, self._token))
+        projected = _mail_message_projection(
+            raw,
+            expected_message_id=message,
+            require_draft=True,
+        )
+        if projected["message_id"] != message:
+            raise GraphApiFailure("RESOURCE_IDENTITY_MISMATCH")
+        return raw
+
     def list_sharepoint_drives(
         self,
         site_id: str,
@@ -1652,6 +1877,162 @@ def _plan_list_projection(value: Mapping[str, Any]) -> dict[str, Any]:
         "created_date_time": _bounded_text(value.get("createdDateTime"), 64),
         "etag": _bounded_text(value.get("@odata.etag"), 1024),
     }
+
+
+def _mail_folder_projection(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Project folder identity and counts without custom or message content."""
+
+    folder_id = _graph_opaque_id(value.get("id"), "folder_id")
+    hidden = value.get("isHidden")
+    if hidden is not None and not isinstance(hidden, bool):
+        raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+    return {
+        "folder_id": folder_id,
+        "display_name": _bounded_text(value.get("displayName"), 255),
+        "parent_folder_id": _bounded_text(value.get("parentFolderId"), 512),
+        "child_folder_count": _bounded_int(value.get("childFolderCount"), 0, 100_000),
+        "total_item_count": _bounded_int(value.get("totalItemCount"), 0, 2_147_483_647),
+        "unread_item_count": _bounded_int(value.get("unreadItemCount"), 0, 2_147_483_647),
+        "is_hidden": hidden,
+    }
+
+
+def _mail_message_projection(
+    value: Mapping[str, Any],
+    *,
+    expected_folder_id: str | None = None,
+    expected_message_id: str | None = None,
+    require_draft: bool = False,
+) -> dict[str, Any]:
+    """Retain only selected metadata; body, preview, and attachments never escape."""
+
+    message_id = _graph_opaque_id(value.get("id"), "message_id")
+    folder_id = _graph_opaque_id(value.get("parentFolderId"), "folder_id")
+    is_draft = value.get("isDraft")
+    is_read = value.get("isRead")
+    if not isinstance(is_draft, bool) or (is_read is not None and not isinstance(is_read, bool)):
+        raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+    if expected_message_id is not None and message_id != expected_message_id:
+        raise GraphApiFailure("RESOURCE_IDENTITY_MISMATCH")
+    if expected_folder_id is not None and folder_id != expected_folder_id:
+        raise GraphApiFailure("RESOURCE_IDENTITY_MISMATCH")
+    if require_draft and not is_draft:
+        raise GraphApiFailure("MESSAGE_NOT_DRAFT")
+    importance = value.get("importance")
+    if importance is not None and importance not in {"low", "normal", "high"}:
+        raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+    return {
+        "message_id": message_id,
+        "folder_id": folder_id,
+        "subject": _bounded_text(value.get("subject"), 255),
+        "from": _mail_recipient_projection(value.get("from")),
+        "to_recipients": _mail_recipients_projection(value.get("toRecipients")),
+        "cc_recipients": _mail_recipients_projection(value.get("ccRecipients")),
+        "received_date_time": _bounded_text(value.get("receivedDateTime"), 64),
+        "sent_date_time": _bounded_text(value.get("sentDateTime"), 64),
+        "is_read": is_read,
+        "importance": importance,
+        "is_draft": is_draft,
+        "etag": _bounded_text(value.get("@odata.etag"), 1024),
+    }
+
+
+def _mail_recipient_projection(value: Any) -> dict[str, str | None] | None:
+    """Project one sender or recipient without exposing extra Graph fields."""
+
+    if value is None:
+        return None
+    if not isinstance(value, Mapping) or not isinstance(value.get("emailAddress"), Mapping):
+        raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+    address = value["emailAddress"].get("address")
+    name = value["emailAddress"].get("name")
+    if address is not None and (
+        not isinstance(address, str)
+        or len(address) > 320
+        or any(ord(char) < 32 for char in address)
+    ):
+        raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+    return {
+        "name": _bounded_text(name, 255),
+        "address": _bounded_text(address, 320),
+    }
+
+
+def _mail_recipients_projection(value: Any) -> list[dict[str, str | None]]:
+    """Project at most fifty address/name pairs from a Graph recipient array."""
+
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > 50:
+        raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+    recipients = [_mail_recipient_projection(item) for item in value]
+    if any(item is None for item in recipients):
+        raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+    return [item for item in recipients if item is not None]
+
+
+def _mail_plain_text(value: Any, field: str, maximum: int) -> str:
+    """Validate bounded nonempty single-line draft text."""
+
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= maximum
+        or not value.strip()
+        or any(ord(char) < 32 for char in value)
+    ):
+        raise GraphApiFailure("INVALID_ARGUMENTS")
+    return value
+
+
+def _mail_body_text(value: Any) -> str:
+    """Validate bounded plain text while allowing normal line breaks and tabs."""
+
+    if (
+        not isinstance(value, str)
+        or len(value) > 65_536
+        or any(ord(char) < 32 and char not in "\r\n\t" for char in value)
+    ):
+        raise GraphApiFailure("INVALID_ARGUMENTS")
+    return value
+
+
+def _mail_graph_recipients(value: Any) -> list[dict[str, dict[str, str]]]:
+    """Convert bounded plain addresses to Graph recipient objects."""
+
+    if not isinstance(value, list) or not 1 <= len(value) <= 50:
+        raise GraphApiFailure("INVALID_ARGUMENTS")
+    if any(
+        not isinstance(address, str)
+        or not 3 <= len(address) <= 320
+        or address.count("@") != 1
+        or re.fullmatch(r"[^@\s<>]+@[^@\s<>]+", address) is None
+        or any(ord(char) < 32 for char in address)
+        for address in value
+    ) or len({address.casefold() for address in value}) != len(value):
+        raise GraphApiFailure("INVALID_ARGUMENTS")
+    return [{"emailAddress": {"address": address}} for address in value]
+
+
+def _mail_draft_changes(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Convert only approved draft edits into Graph message properties."""
+
+    if not isinstance(value, Mapping) or not value or set(value) - {
+        "subject",
+        "body_text",
+        "to_recipients",
+        "cc_recipients",
+    }:
+        raise GraphApiFailure("INVALID_ARGUMENTS")
+    result: dict[str, Any] = {}
+    if "subject" in value:
+        result["subject"] = _mail_plain_text(value["subject"], "subject", 255)
+    if "body_text" in value:
+        result["body"] = {"contentType": "text", "content": _mail_body_text(value["body_text"])}
+    if "to_recipients" in value:
+        result["toRecipients"] = _mail_graph_recipients(value["to_recipients"])
+    if "cc_recipients" in value:
+        result["ccRecipients"] = _mail_graph_recipients(value["cc_recipients"])
+    return result
 
 
 def _sharepoint_item_projection(value: Mapping[str, Any]) -> dict[str, Any]:

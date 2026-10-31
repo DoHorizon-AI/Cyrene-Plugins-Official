@@ -11,6 +11,7 @@ import json
 import time
 import uuid
 from typing import Any
+from urllib.parse import urlsplit
 
 import pytest
 from cyrene_account_center_contracts import (
@@ -36,7 +37,6 @@ from microsoft_graph_provider.plugin import (
 )
 from microsoft_graph_provider.settings import (
     PROVIDER_CALLER_ID,
-    ConfigurationError,
     ProviderSettings,
     _office_v2_flags,
 )
@@ -85,6 +85,54 @@ def _scope(
     }
 
 
+def _office_v2_scope(
+    *,
+    mail_metadata: bool = False,
+    mail_drafts: bool = False,
+    mail_send: bool = False,
+    mail_folders: list[str] | None = None,
+) -> dict[str, Any]:
+    """Build a synthetic closed v2 profile scope for the Mail lease tests."""
+
+    return {
+        "schema_version": 2,
+        "tenant_id": TENANT_ID,
+        "workspace_id": "66666666-6666-4666-8666-666666666666",
+        "planner": {"plan_ids": [], "tasks_read": False, "tasks_write": False},
+        "sharepoint": {
+            "enabled": False,
+            "site_id": None,
+            "list_ids": [],
+            "drive_ids": [],
+            "metadata_read": False,
+            "content_read": False,
+        },
+        "todo": {
+            "enabled": False,
+            "task_list_ids": [],
+            "tasks_read": False,
+            "tasks_write": False,
+        },
+        "calendar": {
+            "enabled": False,
+            "calendar_ids": [],
+            "events_read": False,
+            "events_write": False,
+            "freebusy_read": False,
+            "freebusy_subjects": [],
+            "attendees_write": False,
+        },
+        "mail": {
+            "enabled": mail_metadata or mail_drafts or mail_send,
+            "folder_ids": [] if mail_folders is None else mail_folders,
+            "metadata_read": mail_metadata,
+            "body_read": False,
+            "drafts_write": mail_drafts,
+            "send_enabled": mail_send,
+        },
+    }
+
+
 def _profile(
     scope: dict[str, Any],
     *,
@@ -96,10 +144,32 @@ def _profile(
 ) -> ProviderProfile:
     external_subject = external_subject or f"{TENANT_ID}:{ACTOR_ID}"
     expected_scopes = ["User.Read", "Tasks.Read"]
-    if scope["planner"]["tasks_write"]:
-        expected_scopes.append("Tasks.ReadWrite")
-    if scope["sharepoint"]["enabled"]:
-        expected_scopes.append("Sites.Selected")
+    if scope.get("schema_version") == 2:
+        expected_scopes = ["User.Read"]
+        planner = scope["planner"]
+        todo = scope["todo"]
+        if planner["tasks_write"] or todo["tasks_write"]:
+            expected_scopes.append("Tasks.ReadWrite")
+        elif planner["tasks_read"] or todo["tasks_read"]:
+            expected_scopes.append("Tasks.Read")
+        if scope["sharepoint"]["enabled"]:
+            expected_scopes.append("Sites.Selected")
+        if scope["calendar"]["events_write"]:
+            expected_scopes.append("Calendars.ReadWrite")
+        elif scope["calendar"]["events_read"] or scope["calendar"]["freebusy_read"]:
+            expected_scopes.append("Calendars.ReadBasic")
+        mail = scope["mail"]
+        if mail["drafts_write"]:
+            expected_scopes.append("Mail.ReadWrite")
+        elif mail["metadata_read"] or mail["send_enabled"]:
+            expected_scopes.append("Mail.ReadBasic")
+        if mail["send_enabled"]:
+            expected_scopes.append("Mail.Send")
+    else:
+        if scope["planner"]["tasks_write"]:
+            expected_scopes.append("Tasks.ReadWrite")
+        if scope["sharepoint"]["enabled"]:
+            expected_scopes.append("Sites.Selected")
     return ProviderProfile(
         profile_ref=PROFILE_REF,
         provider="microsoft_graph",
@@ -205,10 +275,16 @@ def _trusted_call(
     issuer: str = CYRENE_ACTOR["issuer"],
     subject: str = CYRENE_ACTOR["subject"],
     scope: dict[str, Any] | None = None,
+    workspace_id: str | None = None,
 ) -> bytes:
     profile_ref = PROFILE_REF
     lease_ref = LEASE_REF
     selected_scope = _scope() if scope is None else scope
+    trusted_workspace_id = workspace_id or (
+        selected_scope["workspace_id"]
+        if selected_scope.get("schema_version") == 2
+        else CYRENE_ACTOR["workspace_id"]
+    )
     signed_payload = {
         "payload": arguments,
         "profile_ref": profile_ref,
@@ -225,7 +301,7 @@ def _trusted_call(
         issuer=issuer,
         subject=subject,
         organization_id=CYRENE_ACTOR["organization_id"],
-        workspace_id=CYRENE_ACTOR["workspace_id"],
+        workspace_id=trusted_workspace_id,
         binding_id=CYRENE_ACTOR["binding_id"],
         request_id=str(uuid.uuid4()),
         operation_id=tool_id,
@@ -727,7 +803,175 @@ def test_office_v2_profile_empty_targets_allow_discovery_only_and_bind_workspace
         )
 
 
-def test_office_v2_host_flags_hide_disabled_tools_and_forbid_mail() -> None:
+def test_mail_read_requires_selected_folder_and_projects_no_message_content() -> None:
+    scope = _office_v2_scope(mail_metadata=True, mail_folders=["selected-folder"])
+    profile = _profile(scope)
+    account_center = FakeAccountCenter(profile)
+    transport = FakeTransport(
+        [
+            _response({"id": ACTOR_ID}),
+            _response(
+                {
+                    "value": [
+                        {
+                            "id": "message-1",
+                            "parentFolderId": "selected-folder",
+                            "subject": "Synthetic subject",
+                            "from": {
+                                "emailAddress": {
+                                    "name": "Sender",
+                                    "address": "sender@example.test",
+                                }
+                            },
+                            "toRecipients": [],
+                            "ccRecipients": [],
+                            "receivedDateTime": "2026-10-31T12:00:00Z",
+                            "sentDateTime": None,
+                            "isRead": False,
+                            "importance": "normal",
+                            "isDraft": False,
+                            "@odata.etag": 'W/"message-etag"',
+                            "body": "must-not-escape",
+                            "bodyPreview": "must-not-escape",
+                            "attachments": ["must-not-escape"],
+                        }
+                    ]
+                }
+            ),
+        ]
+    )
+    settings = _settings(
+        office_v2_flags={
+            "planner_enabled": False,
+            "todo_enabled": False,
+            "calendar_enabled": False,
+            "mail_metadata_enabled": True,
+            "mail_drafts_enabled": False,
+            "mail_send_enabled": False,
+            "sharepoint_drive_metadata_enabled": False,
+        }
+    )
+    provider = MicrosoftGraphProvider(
+        settings=settings,
+        account_center=account_center,
+        graph_api=MicrosoftGraphApi(cursor_key=b"p" * 32, transport=transport),
+    )
+
+    denied = _tool_result(
+        provider._call_tool(
+            _trusted_call(
+                "microsoft_graph.mail.messages.list",
+                {"folder_id": "other-folder", "page_size": 10},
+                scope=scope,
+            )
+        )
+    )
+    assert denied["error"]["code"] == "AUTHORIZATION_DENIED"
+    assert account_center.redeem_payloads == []
+    assert transport.calls == []
+
+    result = _tool_result(
+        provider._call_tool(
+            _trusted_call(
+                "microsoft_graph.mail.messages.list",
+                {"folder_id": "selected-folder", "page_size": 10},
+                scope=scope,
+            )
+        )
+    )
+    assert result["items"][0]["message_id"] == "message-1"
+    assert result["items"][0]["etag"] == 'W/"message-etag"'
+    assert "must-not-escape" not in json.dumps(result)
+    assert account_center.redeem_payloads[0]["target"] == {
+        "tenant_id": TENANT_ID,
+        "folder_id": "selected-folder",
+    }
+    assert account_center.redeem_payloads[0]["arguments_sha256"] == payload_sha256(
+        {"page_size": 10}
+    )
+    assert urlsplit(transport.calls[1][2]).path.endswith(
+        "/me/mailFolders/selected-folder/messages"
+    )
+
+
+def test_mail_send_only_profile_requires_send_and_preflight_read_scopes() -> None:
+    scope = _office_v2_scope(mail_send=True)
+    profile = _profile(scope)
+    settings = _settings(
+        office_v2_flags={
+            "planner_enabled": False,
+            "todo_enabled": False,
+            "calendar_enabled": False,
+            "mail_metadata_enabled": False,
+            "mail_drafts_enabled": False,
+            "mail_send_enabled": True,
+            "sharepoint_drive_metadata_enabled": False,
+        }
+    )
+    _authorize_profile(
+        _profile_scope(profile),
+        "microsoft_graph.mail.message.send",
+        {"message_id": "draft-message"},
+        profile,
+        settings=settings,
+        expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+        expected_workspace_id=scope["workspace_id"],
+    )
+    with pytest.raises(ProfileAuthorizationDenied, match="draft permission"):
+        _authorize_profile(
+            _profile_scope(profile),
+            "microsoft_graph.mail.drafts.list",
+            {},
+            profile,
+            settings=settings,
+            expected_external_subject=f"{TENANT_ID}:{ACTOR_ID}",
+            expected_workspace_id=scope["workspace_id"],
+        )
+    assert profile.oauth_scopes == ["User.Read", "Mail.ReadBasic", "Mail.Send"]
+    assert _target(scope, "microsoft_graph.mail.message.send", {"message_id": "draft-message"}) == {
+        "tenant_id": TENANT_ID,
+        "folder_id": "drafts",
+        "message_id": "draft-message",
+    }
+
+
+def test_mail_operations_are_disabled_before_profile_listing_or_http_by_default() -> None:
+    scope = _office_v2_scope()
+    account_center = FakeAccountCenter(_profile(scope))
+    transport = FakeTransport([])
+    provider = MicrosoftGraphProvider(
+        settings=_settings(
+            office_v2_flags={
+                "planner_enabled": False,
+                "todo_enabled": False,
+                "calendar_enabled": False,
+                "mail_metadata_enabled": False,
+                "mail_drafts_enabled": False,
+                "mail_send_enabled": False,
+                "sharepoint_drive_metadata_enabled": False,
+            }
+        ),
+        account_center=account_center,
+        graph_api=MicrosoftGraphApi(cursor_key=b"p" * 32, transport=transport),
+    )
+
+    result = _tool_result(
+        provider._call_tool(
+            _trusted_call(
+                "microsoft_graph.mail.folders.list",
+                {"page_size": 10},
+                scope=scope,
+            )
+        )
+    )
+
+    assert result == {"error": {"code": "FEATURE_DISABLED", "retryable": False}}
+    assert account_center.list_actors == []
+    assert account_center.redeem_payloads == []
+    assert transport.calls == []
+
+
+def test_office_v2_host_flags_keep_mail_opt_in_and_allow_scope_specific_flags() -> None:
     flags = {
         "planner_enabled": True,
         "todo_enabled": True,
@@ -770,8 +1014,39 @@ def test_office_v2_host_flags_hide_disabled_tools_and_forbid_mail() -> None:
     assert "microsoft_graph.calendar.calendars.list" not in tool_ids
     assert "microsoft_graph.sharepoint.drives.list" not in tool_ids
     assert not any(tool_id.startswith("microsoft_graph.mail.") for tool_id in tool_ids)
-    with pytest.raises(ConfigurationError, match="mail features are deferred"):
-        _office_v2_flags({**flags, "mail_metadata_enabled": True})
+
+    mail_flags = _office_v2_flags(
+        {
+            **flags,
+            "mail_metadata_enabled": True,
+            "mail_drafts_enabled": True,
+            "mail_send_enabled": True,
+        }
+    )
+    mail_provider = MicrosoftGraphProvider(
+        settings=_settings(office_v2_flags=mail_flags),
+        account_center=FakeAccountCenter(_profile(_scope())),
+        graph_api=MicrosoftGraphApi(cursor_key=b"p" * 32, transport=FakeTransport([])),
+    )
+    ok, payload = mail_provider._list_tools(request.SerializeToString())
+    assert ok is True
+    mail_tool_ids = {
+        tool.provider_tool_id
+        for tool in wire.ListToolsResponse.FromString(payload.value).catalog.tools
+        if tool.provider_tool_id.startswith("microsoft_graph.mail.")
+    }
+    assert mail_tool_ids == {
+        "microsoft_graph.mail.folders.list",
+        "microsoft_graph.mail.messages.list",
+        "microsoft_graph.mail.message.get",
+        "microsoft_graph.mail.drafts.list",
+        "microsoft_graph.mail.draft.create",
+        "microsoft_graph.mail.draft.update",
+        "microsoft_graph.mail.draft.delete",
+        "microsoft_graph.mail.message.send",
+    }
+    send_only = _office_v2_flags({**flags, "mail_send_enabled": True})
+    assert send_only["mail_send_enabled"] is True
 
 
 def test_account_center_channel_failure_is_sanitized_and_retryable() -> None:

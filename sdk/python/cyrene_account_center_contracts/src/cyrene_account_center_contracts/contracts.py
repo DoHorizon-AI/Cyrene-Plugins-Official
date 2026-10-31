@@ -361,6 +361,14 @@ class MicrosoftGraphOperation(StrEnum):
     SHAREPOINT_SITE_GET = "microsoft_graph.sharepoint.site.get"
     SHAREPOINT_LIST_GET = "microsoft_graph.sharepoint.list.get"
     SHAREPOINT_LIST_ITEMS_DELTA = "microsoft_graph.sharepoint.list.items.delta"
+    MAIL_FOLDERS_LIST = "microsoft_graph.mail.folders.list"
+    MAIL_MESSAGES_LIST = "microsoft_graph.mail.messages.list"
+    MAIL_MESSAGE_GET = "microsoft_graph.mail.message.get"
+    MAIL_DRAFTS_LIST = "microsoft_graph.mail.drafts.list"
+    MAIL_DRAFT_CREATE = "microsoft_graph.mail.draft.create"
+    MAIL_DRAFT_UPDATE = "microsoft_graph.mail.draft.update"
+    MAIL_DRAFT_DELETE = "microsoft_graph.mail.draft.delete"
+    MAIL_MESSAGE_SEND = "microsoft_graph.mail.message.send"
 
 
 class MicrosoftGraphPermissionUpgrade(StrEnum):
@@ -368,6 +376,7 @@ class MicrosoftGraphPermissionUpgrade(StrEnum):
 
     PLANNER_TASKS_WRITE = "planner_tasks_write"
     SHAREPOINT_SELECTED = "sharepoint_selected"
+    MAIL = "mail"
 
 
 class AzureDevOpsOperation(StrEnum):
@@ -454,6 +463,26 @@ class UpdateMicrosoftGraphV2ScopeRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class MicrosoftGraphMailFeatures:
+    """Closed additive Mail feature request; raw OAuth scopes are never accepted."""
+
+    metadata_read: bool
+    drafts_write: bool
+    send: bool
+
+    def __post_init__(self) -> None:
+        """Require an explicit nonempty Mail selection before consent is started."""
+
+        if any(
+            not isinstance(value, bool)
+            for value in (self.metadata_read, self.drafts_write, self.send)
+        ):
+            raise TypeError("Mail feature selections must be booleans")
+        if not (self.metadata_read or self.drafts_write or self.send):
+            raise ValueError("at least one Mail feature must be selected")
+
+
+@dataclass(frozen=True, slots=True)
 class BeginMicrosoftGraphScopeUpgradeRequest:
     """Start one explicitly selected permission upgrade without caller scopes."""
 
@@ -462,6 +491,16 @@ class BeginMicrosoftGraphScopeUpgradeRequest:
     idempotency_key: str
     site_id: str | None = None
     list_ids: list[str] | None = None
+    mail_features: MicrosoftGraphMailFeatures | None = None
+
+    def __post_init__(self) -> None:
+        """Keep Mail's combined consent payload exclusive to the Mail enum."""
+
+        if self.permission == MicrosoftGraphPermissionUpgrade.MAIL:
+            if self.mail_features is None or self.site_id is not None or self.list_ids is not None:
+                raise ValueError("Mail upgrades require only a nonempty mail_features selection")
+        elif self.mail_features is not None:
+            raise ValueError("mail_features is valid only for a Mail scope upgrade")
 
 
 @dataclass(frozen=True, slots=True)

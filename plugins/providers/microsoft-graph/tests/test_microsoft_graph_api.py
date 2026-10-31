@@ -36,6 +36,9 @@ SITE_ID = (
 )
 LIST_ID = "77777777-7777-4777-8777-777777777777"
 SYNTHETIC_TOKEN = "synthetic-delegated-token"
+MAIL_FOLDER_ID = "AAMkFolder_opaque=="
+MAIL_MESSAGE_ID = "AAMkMessage_opaque=="
+MAIL_ETAG = 'W/"mail-etag-1"'
 
 
 class FakeTransport:
@@ -109,6 +112,34 @@ def _task(
         "lastModifiedDateTime": created_at,
         "@odata.etag": etag,
         "createdBy": {"user": {"id": created_by}},
+    }
+
+
+def _mail_message(
+    *,
+    message_id: str = MAIL_MESSAGE_ID,
+    folder_id: str = MAIL_FOLDER_ID,
+    is_draft: bool = False,
+    etag: str = MAIL_ETAG,
+) -> dict[str, object]:
+    return {
+        "id": message_id,
+        "parentFolderId": folder_id,
+        "subject": "Synthetic status update",
+        "from": {"emailAddress": {"name": "Automation", "address": "auto@example.test"}},
+        "toRecipients": [
+            {"emailAddress": {"name": "Owner", "address": "owner@example.test"}}
+        ],
+        "ccRecipients": [],
+        "receivedDateTime": "2026-10-31T12:00:00Z",
+        "sentDateTime": None,
+        "isRead": False,
+        "importance": "normal",
+        "isDraft": is_draft,
+        "@odata.etag": etag,
+        "body": {"contentType": "text", "content": "MUST_NOT_ESCAPE"},
+        "bodyPreview": "MUST_NOT_ESCAPE",
+        "attachments": [{"name": "MUST_NOT_ESCAPE"}],
     }
 
 
@@ -717,3 +748,251 @@ def test_sharepoint_drive_items_never_request_file_bytes_or_download_urls() -> N
     assert urlsplit(transport.calls[1][2]).path == (
         f"/v1.0/sites/{SITE_ID}/drives/drive%21opaque-1/root/children"
     )
+
+
+def test_mail_message_pages_are_selected_folder_bound_and_metadata_only() -> None:
+    path = (
+        "https://graph.microsoft.com/v1.0/me/mailFolders/"
+        "AAMkFolder_opaque%3D%3D/messages"
+    )
+    select = (
+        "id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,isRead,"
+        "importance,parentFolderId,isDraft"
+    )
+    next_link = f"{path}?$skiptoken=opaque-next&$top=2&$select={select}"
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(
+                {"value": [_mail_message()], "@odata.nextLink": next_link}
+            ),
+            _json_response({"value": [_mail_message(message_id="AAMkMessage_2==")]}),
+        ]
+    )
+    session = _open(transport)
+
+    first = session.list_mail_messages(MAIL_FOLDER_ID, page_size=2)
+    second = session.list_mail_messages(
+        MAIL_FOLDER_ID,
+        page_size=2,
+        page_cursor=first["next_cursor"],
+    )
+
+    assert first["complete"] is False
+    assert second["complete"] is True
+    assert first["items"][0]["message_id"] == MAIL_MESSAGE_ID
+    assert first["items"][0]["etag"] == MAIL_ETAG
+    serialized = json.dumps(first)
+    assert "MUST_NOT_ESCAPE" not in serialized
+    assert "bodyPreview" not in serialized
+    first_query = parse_qs(urlsplit(transport.calls[1][2]).query)
+    assert first_query["$top"] == ["2"]
+    assert "body" not in first_query["$select"][0]
+    assert "attachments" not in first_query["$select"][0]
+    second_query = parse_qs(urlsplit(transport.calls[2][2]).query)
+    assert second_query["$skiptoken"] == ["opaque-next"]
+    assert urlsplit(transport.calls[2][2]).path.endswith(
+        "/mailFolders/AAMkFolder_opaque%3D%3D/messages"
+    )
+
+
+def test_mail_folder_discovery_and_draft_listing_use_fixed_metadata_routes() -> None:
+    draft_path = "https://graph.microsoft.com/v1.0/me/mailFolders/drafts/messages"
+    select = (
+        "id,subject,from,toRecipients,ccRecipients,receivedDateTime,sentDateTime,isRead,"
+        "importance,parentFolderId,isDraft"
+    )
+    next_link = (
+        f"{draft_path}?$skiptoken=draft-next&$top=3&$select={select}"
+    )
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(
+                {
+                    "value": [
+                        {
+                            "id": MAIL_FOLDER_ID,
+                            "displayName": "Inbox",
+                            "parentFolderId": "root-id",
+                            "childFolderCount": 1,
+                            "totalItemCount": 8,
+                            "unreadItemCount": 2,
+                            "isHidden": False,
+                            "sensitiveMetadata": "must-not-escape",
+                        }
+                    ]
+                }
+            ),
+            _json_response(
+                {
+                    "value": [_mail_message(is_draft=True)],
+                    "@odata.nextLink": next_link,
+                }
+            ),
+            _json_response({"value": [_mail_message(message_id="AAMkDraft_2==", is_draft=True)]}),
+        ]
+    )
+    session = _open(transport)
+
+    folders = session.list_mail_folders()
+    drafts = session.list_mail_drafts(page_size=3)
+    next_drafts = session.list_mail_drafts(page_size=3, page_cursor=drafts["next_cursor"])
+
+    assert folders["items"][0]["display_name"] == "Inbox"
+    assert "sensitiveMetadata" not in json.dumps(folders)
+    assert drafts["items"][0]["is_draft"] is True
+    assert drafts["items"][0]["folder_id"] == MAIL_FOLDER_ID
+    assert drafts["items"][0]["folder_id"] != "drafts"
+    draft_query = parse_qs(urlsplit(transport.calls[2][2]).query)
+    assert draft_query["$select"] == [select]
+    assert urlsplit(transport.calls[2][2]).path == "/v1.0/me/mailFolders/drafts/messages"
+    next_query = parse_qs(urlsplit(transport.calls[3][2]).query)
+    assert next_query["$skiptoken"] == ["draft-next"]
+    assert next_query["$select"] == [select]
+    assert next_drafts["items"][0]["is_draft"] is True
+
+
+def test_mail_draft_create_is_plain_text_and_ambiguous_create_is_not_replayed() -> None:
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(
+                _mail_message(is_draft=True, etag='W/"created-etag"'),
+                status=201,
+            ),
+        ]
+    )
+    result = _open(transport).create_mail_draft(
+        "Synthetic draft",
+        "first line\nsecond line",
+        to_recipients=["owner@example.test"],
+    )
+
+    assert result["status"] == "CONFIRMED"
+    assert result["message"]["is_draft"] is True
+    assert result["message"]["folder_id"] == MAIL_FOLDER_ID
+    assert "MUST_NOT_ESCAPE" not in json.dumps(result)
+    method, _, path, headers, body = transport.calls[1]
+    assert method == "POST"
+    assert path == "/v1.0/me/mailFolders/drafts/messages"
+    assert "bodyPreview" not in path
+    payload = json.loads(body or b"{}")
+    assert payload["body"] == {"contentType": "text", "content": "first line\nsecond line"}
+    assert payload["toRecipients"] == [
+        {"emailAddress": {"address": "owner@example.test"}}
+    ]
+    assert "attachments" not in payload
+    assert headers["Content-Type"] == "application/json"
+
+    ambiguous_transport = FakeTransport([_me(), TimeoutError("synthetic timeout")])
+    ambiguous = _open(ambiguous_transport).create_mail_draft("No replay", "body")
+    assert ambiguous["status"] == "UNKNOWN"
+    assert ambiguous_transport.responses == []
+    assert len(ambiguous_transport.calls) == 2
+
+
+def test_mail_draft_update_and_delete_require_the_current_etag() -> None:
+    updated_message = _mail_message(is_draft=True, etag='W/"mail-etag-2"')
+    updated_message["subject"] = "Updated subject"
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(_mail_message(is_draft=True)),
+            _json_response(updated_message, status=200),
+            _json_response(_mail_message(is_draft=True, etag='W/"mail-etag-2"')),
+            _empty_response(status=204),
+        ]
+    )
+    session = _open(transport)
+
+    update = session.update_mail_draft(
+        MAIL_MESSAGE_ID,
+        MAIL_ETAG,
+        {"subject": "Updated subject", "body_text": "plain body"},
+    )
+    delete = session.delete_mail_draft(MAIL_MESSAGE_ID, 'W/"mail-etag-2"')
+
+    assert update["status"] == "CONFIRMED"
+    assert update["message"]["subject"] == "Updated subject"
+    assert delete == {"status": "CONFIRMED", "message_id": MAIL_MESSAGE_ID}
+    patch_call = transport.calls[2]
+    assert patch_call[0] == "PATCH"
+    assert patch_call[2] == "/v1.0/me/messages/AAMkMessage_opaque%3D%3D"
+    assert patch_call[3]["If-Match"] == MAIL_ETAG
+    assert json.loads(patch_call[4] or b"{}")["body"] == {
+        "contentType": "text",
+        "content": "plain body",
+    }
+    delete_call = transport.calls[4]
+    assert delete_call[0] == "DELETE"
+    assert delete_call[3]["If-Match"] == 'W/"mail-etag-2"'
+
+
+def test_mail_send_preflights_draft_and_returns_accepted_or_unknown_without_retry() -> None:
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(_mail_message(is_draft=True)),
+            _empty_response(status=202),
+        ]
+    )
+    sent = _open(transport).send_mail_draft(MAIL_MESSAGE_ID)
+
+    assert sent == {"status": "ACCEPTED", "message_id": MAIL_MESSAGE_ID}
+    assert transport.calls[1][2].startswith("/v1.0/me/mailFolders/drafts/messages/")
+    assert transport.calls[2][0] == "POST"
+    assert transport.calls[2][2] == "/v1.0/me/messages/AAMkMessage_opaque%3D%3D/send"
+
+    not_draft = dict(_mail_message(is_draft=False))
+    rejected_transport = FakeTransport([_me(), _json_response(not_draft)])
+    with pytest.raises(GraphApiFailure, match="MESSAGE_NOT_DRAFT"):
+        _open(rejected_transport).send_mail_draft(MAIL_MESSAGE_ID)
+    assert len(rejected_transport.calls) == 2
+
+    unknown_transport = FakeTransport(
+        [_me(), _json_response(_mail_message(is_draft=True)), TimeoutError("synthetic timeout")]
+    )
+    unknown = _open(unknown_transport).send_mail_draft(MAIL_MESSAGE_ID)
+    assert unknown["status"] == "UNKNOWN"
+    assert len(unknown_transport.calls) == 3
+
+
+def test_mail_mutation_5xx_and_malformed_create_responses_are_unknown_without_replay() -> None:
+    server_error = HttpResponse(503, {"content-type": "application/json"}, b"{}")
+    create_transport = FakeTransport([_me(), server_error])
+    created = _open(create_transport).create_mail_draft("Synthetic", "body")
+    assert created["status"] == "UNKNOWN"
+    assert len(create_transport.calls) == 2
+
+    malformed_create_transport = FakeTransport(
+        [_me(), HttpResponse(201, {"content-type": "application/json"}, b"not-json")]
+    )
+    malformed = _open(malformed_create_transport).create_mail_draft("Synthetic", "body")
+    assert malformed["status"] == "UNKNOWN"
+    assert len(malformed_create_transport.calls) == 2
+
+    update_transport = FakeTransport(
+        [_me(), _json_response(_mail_message(is_draft=True)), server_error]
+    )
+    updated = _open(update_transport).update_mail_draft(
+        MAIL_MESSAGE_ID,
+        MAIL_ETAG,
+        {"subject": "Changed"},
+    )
+    assert updated["status"] == "UNKNOWN"
+    assert len(update_transport.calls) == 3
+
+    delete_transport = FakeTransport(
+        [_me(), _json_response(_mail_message(is_draft=True)), server_error]
+    )
+    deleted = _open(delete_transport).delete_mail_draft(MAIL_MESSAGE_ID, MAIL_ETAG)
+    assert deleted["status"] == "UNKNOWN"
+    assert len(delete_transport.calls) == 3
+
+    send_transport = FakeTransport(
+        [_me(), _json_response(_mail_message(is_draft=True)), server_error]
+    )
+    sent = _open(send_transport).send_mail_draft(MAIL_MESSAGE_ID)
+    assert sent["status"] == "UNKNOWN"
+    assert len(send_transport.calls) == 3

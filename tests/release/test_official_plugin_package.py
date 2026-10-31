@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 import zipfile
 from copy import deepcopy
@@ -19,7 +20,6 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
-import tomllib
 from packaging.requirements import Requirement
 
 from tooling.release import official_plugin_package as release
@@ -242,7 +242,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 }
                 self.assertEqual(names, external)
                 self.assertIn("cyrene-plugin-runtime==0.2.2", requirements)
-                self.assertIn("cyrene-account-center-contracts==0.1.2", requirements)
+                self.assertIn("cyrene-account-center-contracts==0.1.3", requirements)
                 release._verify_lock_inputs(spec, source_files)
 
     def test_office_docker_locks_hash_every_exact_package_lock_pin(self) -> None:
