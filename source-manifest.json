@@ -7089,7 +7089,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "8a834598cef3a1c495b86b0a6901a537ea50c9d306f7d75f55fcfcaa3371229e",
+      "sha256": "cddbbca936b4d8a222de60df35486a5c4184baed266b6cfa0ebc7750ccebddf4",
       "size_bytes": 85582
     },
     {

@@ -12,6 +12,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 import zipfile
 from copy import deepcopy
@@ -19,7 +20,6 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
 
-import tomllib
 from packaging.requirements import Requirement
 
 from tooling.release import official_plugin_package as release
