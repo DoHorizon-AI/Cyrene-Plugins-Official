@@ -25,15 +25,15 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/data-tools-package-release.yml",
-      "sha256": "0e4591c1b171e897eb0914c47b32d0e1d1318066798d9e7656038c7fa4a93ae5",
-      "size_bytes": 27149
+      "sha256": "9f71dd4cf45b428d7b89de10d99602ec8ddbf68aea15bdb7880e559f42d89970",
+      "size_bytes": 27616
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "7a4e9c7191bf1724864382bd4266457b6e222009579bfbe18a6011fb0b94e169",
-      "size_bytes": 41162
+      "sha256": "f5a531d3f4ed9320dcc672c484f9eb1aad1c30fd981ccb505e1aa9b3e7ba16f7",
+      "size_bytes": 42761
     },
     {
       "kind": "file",
@@ -67,8 +67,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "CONTRIBUTING.md",
-      "sha256": "ade60c06cd95ffefecfca20e44c24c8a9f64e0304a7ea8027c4f5286b70b3860",
-      "size_bytes": 5541
+      "sha256": "2589543004bd71f7bca958f956f669976deed692cdb7426c7282f4a4933e1db4",
+      "size_bytes": 5669
     },
     {
       "kind": "file",
@@ -81,8 +81,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "LICENSING.md",
-      "sha256": "857183ea4f416387aa13ce18eefdf69732098acec297b6f440050cca10c93498",
-      "size_bytes": 4608
+      "sha256": "f73dfe61b1c6c953aa91534e544c0656c3707719980fb4c89dd7d7192783ddea",
+      "size_bytes": 5156
     },
     {
       "kind": "file",
@@ -97,6 +97,13 @@
       "path": "SECURITY.md",
       "sha256": "73d4d1fc26dae28b8353bdf62a01b9011b4a3a3f3c7e45587d08ec38f9e9ccf1",
       "size_bytes": 1678
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "THIRD_PARTY_NOTICES.md",
+      "sha256": "227b8eb08a26055bede31a3cc5e6fd51f1531dc6c378c8b0acd944861e54c9d2",
+      "size_bytes": 1702
     },
     {
       "kind": "file",
@@ -173,15 +180,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "6dd6edbcd2c073e61b490a9e40512e0946af68c7854788aee785df4ca3f24f11",
-      "size_bytes": 26030
+      "sha256": "40a9f3f9a9e068ee12c0969dc3d6399251751d362b1735b4b5f78e10c952de5d",
+      "size_bytes": 28058
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "ca7ee2edc5c31d376ef371327968602316d2f4f1b48a388def8317dcb603c566",
-      "size_bytes": 36974
+      "sha256": "61fc4e64139e90669a76287eabbc109b6517f6da46fccd1d514798466c82d530",
+      "size_bytes": 39524
     },
     {
       "kind": "file",
@@ -866,8 +873,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "docs/component-releases.md",
-      "sha256": "2267d7a8b335b013ef8b8b4a5096b11fe3e396ec9068221e213774c9d2591ba5",
-      "size_bytes": 6482
+      "sha256": "17220f859dcc9fde221467877711b449f9d70652e234ced1e4663b44866d5583",
+      "size_bytes": 7194
     },
     {
       "kind": "file",
@@ -901,28 +908,28 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/README.md",
-      "sha256": "6bddcec20bf5084e602be7931d208e9a4d1fe5b00f8d3caf54e733f05686c753",
-      "size_bytes": 9378
+      "sha256": "9e2dbf43b63d0bbe107dca226190318929269348844248b87bd4af118c484b50",
+      "size_bytes": 17736
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/contracts/v1/schema.json",
-      "sha256": "db32eab2107ce690565697532382633ce431dfe26a0bcb81f2ac798327cb4ea7",
-      "size_bytes": 17888
+      "sha256": "81051e07ca446bc0fd7b761e8930f8c9fd7c9e3928f683752846dc5a3e212be2",
+      "size_bytes": 29955
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/plugin.manifest.json",
-      "sha256": "7be6e453a8da9704831bea492d8705dd7150c59c286bb62a41110a90c6e9b93d",
-      "size_bytes": 5973
+      "sha256": "efc27606ba02d5706ca331eb1a6247bf01c17c95e8f04dedf6ee3c4312cf9db4",
+      "size_bytes": 8564
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/pyproject.toml",
-      "sha256": "e7a426cf0e2616854159f8cd94bc8c73124076f7f6f3749d8d6aaa5fc326ee1b",
+      "sha256": "cbc9f0e1773852fe2846f2e734b088f60dc6140faae3ad78bc04f0a2ceb33cec",
       "size_bytes": 923
     },
     {
@@ -971,8 +978,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/huggingface_oauth.py",
-      "sha256": "fc1d19b237c8d055607496434315253298f751fd1791369d4baf3b8757cff9b1",
-      "size_bytes": 11691
+      "sha256": "947faa52b29c38458f350de9866bde16c3e9db454ae3adb85cdd1b76218a23f7",
+      "size_bytes": 17829
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/src/account_center/microsoft_graph_oauth.py",
+      "sha256": "235cdda317009fb5a74c8d93de57e5634873fa9852973fdc1991d35598366680",
+      "size_bytes": 25231
     },
     {
       "kind": "file",
@@ -985,8 +999,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/plugin.py",
-      "sha256": "9ff470b76d28d4e190712cba2880aa42f4c23905f413e06eb2899df44a9d7e13",
-      "size_bytes": 119371
+      "sha256": "892538da74b55ce66cf018d590716d6ec9f65b37b20d591597a5ae132249ac33",
+      "size_bytes": 237741
     },
     {
       "kind": "file",
@@ -999,15 +1013,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/store.py",
-      "sha256": "ca38c5c2b0e0423538dc3bf41a5c51d1bd4ea676912933c6141f9765fa455c33",
-      "size_bytes": 87642
+      "sha256": "e973d08e650302d9bded30582e4058e526822128974faa4c606e03621fd9ed91",
+      "size_bytes": 132517
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_account_center.py",
-      "sha256": "8cc274fffce1278d00aeee2a986955027db28b6850ba8f178336928951c0e6ca",
-      "size_bytes": 52932
+      "sha256": "0f645f4bce5e0f857363db29fc54e6eb934874a4e54463667e0803f5361aface",
+      "size_bytes": 53110
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/tests/test_contract_schema.py",
+      "sha256": "1626d06f929ac3e0b17a6e6b50f44d786d27cb9e567f887706ee6423b27d3ee2",
+      "size_bytes": 2285
     },
     {
       "kind": "file",
@@ -1026,9 +1047,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/accounts/account-center/tests/test_microsoft_graph_oauth.py",
+      "sha256": "ab178f277d4c6b3748b75b27d4cce054be7a9f87d586c0c26d90bc1cd435da96",
+      "size_bytes": 21521
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "8eb1f5466b92dc58749de7167508eba7d79857f7e2100ae54812dfca8b751c01",
-      "size_bytes": 56084
+      "sha256": "96f665da54d17b6e2ff9ed77990d1cf0ca1b50215534cefe7b0e78521f19a36e",
+      "size_bytes": 146301
     },
     {
       "kind": "file",
@@ -1643,22 +1671,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/README.md",
-      "sha256": "c9eb28641353330b37aa5fbe9b4ee01c5ecf7514b47520681dd7310cda552e6a",
-      "size_bytes": 8012
+      "sha256": "57cc495a02ff0e9648544c2ee8a450cfcca0e709d7b5023b44695ad5acba9444",
+      "size_bytes": 18887
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/activation.example.json",
-      "sha256": "7573bb9ed92b153183c0526ef7cc0a9a49fe1d2ffddd3ffbf97631ddf4f18251",
-      "size_bytes": 260
+      "sha256": "d7fde8ee923480f3f5075ac1c9c818ef997ffaca685ef131a6645b9a65574e88",
+      "size_bytes": 294
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/configuration.schema.json",
-      "sha256": "031f2b04458e09601c3d07327f68685ca65126cea77060429df56c583d85b4d7",
-      "size_bytes": 1850
+      "sha256": "96feffe2d3051e1c4841a8f83c7b9ad99bb56ef132a5ce8a57ae089b12d0d814",
+      "size_bytes": 2156
     },
     {
       "kind": "file",
@@ -1671,8 +1699,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/plugin.manifest.json",
-      "sha256": "9b1f21d513b43b6a66d9c7022c0f3087b24889124ac3c7d089ce0409bd5a275b",
-      "size_bytes": 1739
+      "sha256": "b3473228550bfe72f1309c22053c35958dab4ad660c571c0bcc38be1451ca171",
+      "size_bytes": 1745
     },
     {
       "kind": "file",
@@ -1699,8 +1727,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/README.md",
-      "sha256": "72ed597a95541be401c25070484a6827fa0dbb925cc06396fd51d737c907e222",
-      "size_bytes": 1059
+      "sha256": "6a11e306c5eb780a20e7a548d3448306da29ec6df81d7aa2fd9b4c23700486e1",
+      "size_bytes": 3462
     },
     {
       "kind": "file",
@@ -1734,29 +1762,36 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/activity.py",
-      "sha256": "6c86a250de40ef5c1572117be4b2ded85ee1d05f387ba54d6e57475df5a131e8",
-      "size_bytes": 14551
+      "sha256": "c38801d726f7f308b9a1a4a1dd01020279e9c700e186877866e2a3ac6a61c6a5",
+      "size_bytes": 23783
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/config.py",
-      "sha256": "f8c3a8da039e9a48bb5171651e0e0641d0e8771cd71d7fac0365aa9a78f3183e",
-      "size_bytes": 7981
+      "sha256": "53f3940aa0e632fb2a97aea259ec720f8254dd5094e4d0c29ff361f7e87c16a3",
+      "size_bytes": 11747
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/connector.py",
-      "sha256": "44766a320377fe04c0aed38db0d500262119cf2d6dc19a99bbbbc8c0d869c16e",
-      "size_bytes": 22099
+      "sha256": "19dcbbdd0f4d9fa830973e69bb6ed1cd58b79ce3f609e86073297885189b26f0",
+      "size_bytes": 25544
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/teams/src/teams_connector/delivery_spool.py",
+      "sha256": "034e236ce25dc5a36221d5b00e2eb04c44e15232c084809bc2d81fa87cd03981",
+      "size_bytes": 47836
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/ingress.py",
-      "sha256": "dabc719ba1d1e65e074e6864e75059ee35c0e663a5db53ed2861a73a79b03608",
-      "size_bytes": 6590
+      "sha256": "2eb416243355fc3d953e6b2c4f5db1912e450b9492209c3ed1856e9f4997678b",
+      "size_bytes": 16548
     },
     {
       "kind": "file",
@@ -1769,8 +1804,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/src/teams_connector/navigator.py",
-      "sha256": "bdb7555794395a9b629a5c80de50c4619a1c309e19194486c7e93018da43703e",
-      "size_bytes": 6351
+      "sha256": "75239e0b5826f88c8bee6c58e54c496d7c295bed8f1cef5bfb215d5b17330396",
+      "size_bytes": 9258
     },
     {
       "kind": "file",
@@ -1790,15 +1825,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/teams-app-manifest.template.json",
-      "sha256": "7e5433b095c546907351359033b2938c161da044465e403ff245fd138d1448ca",
-      "size_bytes": 1343
+      "sha256": "84ef43640378d205a2936e4a0b8a334be4e7bd0f5e5ad8e75b5c4a8788f2577c",
+      "size_bytes": 1467
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_activity.py",
-      "sha256": "b4f7d47d7667161aeaef458252f92b07520e0134f24dca20b24335543b9ea02e",
-      "size_bytes": 10262
+      "sha256": "af976a4c4b88b3bc83cc8f706d5c637470361d0d545d6376157c4dc0b34148e3",
+      "size_bytes": 26525
     },
     {
       "kind": "file",
@@ -1811,22 +1846,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_config.py",
-      "sha256": "7d7fec43147311e60dc4d2a89c00d1ec5e1526b5e1643b61d0548dea26242a8a",
-      "size_bytes": 3769
+      "sha256": "ecab16a9fd569a5c77af78646fc7a98e97465e87943ddceb6cab91e14e9ae3d1",
+      "size_bytes": 8955
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_connector.py",
-      "sha256": "91dcff4bd371358d1922c431ac1c8666d33536fa2875a2781dd61d60ac8dd2c2",
-      "size_bytes": 9540
+      "sha256": "3bc54e07bc3c3c3536ecfd9780fdc973eb6d570d154152dd731fcae2b849e0fb",
+      "size_bytes": 18122
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/teams/tests/test_delivery_spool.py",
+      "sha256": "9519bb1ad92ef547b44d5e8d53a2f56ecdee34b735c5d9cbb36d1c491a97c18e",
+      "size_bytes": 31678
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_ingress.py",
-      "sha256": "44c5fb9d40076e84d59e4ad3fdb047eaf4ba3e9f8d2ff344a5ed94338baa5b37",
-      "size_bytes": 10017
+      "sha256": "9a9a56551ab5bba73dda363c3986ccf6cde9da98bd1c3151b8548816f363060b",
+      "size_bytes": 40858
     },
     {
       "kind": "file",
@@ -1839,8 +1881,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/teams/tests/test_navigator.py",
-      "sha256": "289151b9da5ecc2ff3437b0a4cfdfea68b023fb813ce72911ebd2ae0b77fa60e",
-      "size_bytes": 7332
+      "sha256": "786745014eafed3077f92ee04be1a6f96decb9a34c0f7a4382e65cf76be21a9f",
+      "size_bytes": 12075
     },
     {
       "kind": "file",
@@ -2286,16 +2328,149 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/README.md",
+      "sha256": "e249c5857d15324710c60412c999b4ab2e7e79b4e33688b89a6a9861a9aba640",
+      "size_bytes": 5941
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/configuration.schema.json",
+      "sha256": "5da25189ec82ba7b33426d5483d4046c6ab77fc00a1b48b9e37fe2157bb8f5bb",
+      "size_bytes": 6683
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/docker-requirements.lock",
+      "sha256": "84736a7d27e3b4a67a3a0d062fad317a73302348c14f31e802a68c05c84a3b13",
+      "size_bytes": 7045
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/plugin.manifest.json",
+      "sha256": "cac39ec59021bb1f07b409130bf4c2033b646dd2a79520ad7e2bc19c7eded507",
+      "size_bytes": 1764
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/pyproject.toml",
+      "sha256": "a097efd98ab09fce0af5313f5eaa2a5ff964386beaf80b1bcef1d024e562f335",
+      "size_bytes": 1297
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/requirements.lock",
+      "sha256": "697bec5d23b67d03f23f1283f24947c65514a3370d3b169c5d045d5c1bfb61fc",
+      "size_bytes": 160
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/README.md",
+      "sha256": "35c270edca7511dc098c224eef2400f0be2907ad0ef21256989de59315cbff5c",
+      "size_bytes": 445
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/README.md",
+      "sha256": "dc2e9a6c6bf9fed123040154f7d916aa76d447a79dee6f025d5bb4283a662bce",
+      "size_bytes": 779
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/__init__.py",
+      "sha256": "1a6b428d1f0c609f5da82b2d812cf150a185c63c0a6cc6050f7f2a2d3dc06471",
+      "size_bytes": 168
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/_generated/README.md",
+      "sha256": "d0db876037292e4d88f8c62164f17b9098bd930c09a83fd91e38ee0b90a1962c",
+      "size_bytes": 483
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/_generated/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/_generated/tool_provider_pb2.py",
+      "sha256": "98d281fd7dc583557a7f6ca198b84c7dd68f059155b9e143bfd5fc89a17f6e88",
+      "size_bytes": 4944
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/account_center.py",
+      "sha256": "0f5f81d4d3f6d1b4e01590c2ad79fb33abef8ad54def03a6fd24816295e23411",
+      "size_bytes": 11364
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/azure_devops_api.py",
+      "sha256": "f9c3021ac37d83488dd745edb143430f40844469f47ba07428bab8caf941e611",
+      "size_bytes": 30469
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/cursors.py",
+      "sha256": "b2a561428e03e679bd020e82fb65f2f35ca08263731844717284e1e628f54584",
+      "size_bytes": 2272
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/plugin.py",
+      "sha256": "b8dc783299ada4640c9db6c8066557d1cbb9477364c80ec9976c03a25663ad40",
+      "size_bytes": 39320
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/settings.py",
+      "sha256": "ba52b0451b3bb478ba2d1d8113d3f78a404070402d4fbef08fdd7343990c2e68",
+      "size_bytes": 14681
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/src/azure_devops_observation_provider/trust.py",
+      "sha256": "1b52f523a0f911af2d4f83351f0510fdb189927ad2ee41e48f83414bfffadba0",
+      "size_bytes": 3917
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/azure-devops-observation/tests/test_provider.py",
+      "sha256": "b7816171fdea725169c26819a2953e1caff2097e10d4ef77869b7db67b745268",
+      "size_bytes": 33752
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/providers/cloud-management/README.md",
-      "sha256": "067402bb2040b556a9ba3d2649492954d175de7ce721bdc8d83b8488e625ff3f",
-      "size_bytes": 11197
+      "sha256": "076a2cbeaaea1905ff5f5dbb98f25978ce26dd33003492c190a7efc6c08922ff",
+      "size_bytes": 13582
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/configuration.schema.json",
-      "sha256": "3cf1a2333c79c618160014d0bf1ed934e68e4087c4136686035bfb571d422797",
-      "size_bytes": 10219
+      "sha256": "1914c524538e4a02f1a7649e09d0604201bc432af0c8faf0f071f40719730062",
+      "size_bytes": 10279
     },
     {
       "kind": "file",
@@ -2385,8 +2560,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/plugin.py",
-      "sha256": "7bcc09025166189e1bc9c7950eb845c1e6eccf73e98a89f8f1cd74dc16c9a417",
-      "size_bytes": 11463
+      "sha256": "71aceedc0f334338655ac720f40a05a8721b3ed8e9268ed64c4e0d7ff6bc06f0",
+      "size_bytes": 11816
     },
     {
       "kind": "file",
@@ -2399,22 +2574,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/providers.py",
-      "sha256": "9c7f9886acceb0136fc8b70a2a95a01eef74ed10e1b36854809cfbe750d3b9a6",
-      "size_bytes": 179089
+      "sha256": "c84c37d97b6b03f9b8afb0acf11b3ea89beaf658c76a9ee659a73a8d81bd9e7a",
+      "size_bytes": 193421
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/settings.py",
-      "sha256": "021e6ea48c06e88dcc144313dd3a79d673c78a61ba00f4a325708de0a151c8c4",
-      "size_bytes": 27411
+      "sha256": "c639439df0d974934be28e4b2e3716e7fa6f0a24080ab5302a20a6306c2b825e",
+      "size_bytes": 27664
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/src/cloud_management_provider/tool_catalog.py",
-      "sha256": "cee381b43b7c85813e365cd99293f91d56e7decbf3419403e21393e4425702fc",
-      "size_bytes": 9062
+      "sha256": "f21dd10ee98c13af45ba70aab909bf12d68968f07b21f86fbfa3ff0df6b46687",
+      "size_bytes": 9403
     },
     {
       "kind": "file",
@@ -2441,15 +2616,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-management/tests/test_provider.py",
-      "sha256": "50fc41ea4317066dfa94ccddd57780ec7054d20c571ae0928f87faf49ae54007",
-      "size_bytes": 101845
+      "sha256": "0f850f5b23a8ca35b2ee59a113b448e48e3a74b341e9bce69a9a78479b71192e",
+      "size_bytes": 141638
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-resources/README.md",
-      "sha256": "9dd8f8cec37b22d53324c150c58885c6d3180d8220e027f8b16bfe6fcb64eec2",
-      "size_bytes": 7331
+      "sha256": "213746262baa36b690d4ed4e1ddc0454336798d1cdf1f1cbf6f8d1360bd723cb",
+      "size_bytes": 8026
     },
     {
       "kind": "file",
@@ -2532,8 +2707,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-resources/src/cloud_resources_provider/plugin.py",
-      "sha256": "0ab09729c8c416b77ebe686ade1be1964c0ae722c4c42ef766a1c6065873347a",
-      "size_bytes": 18901
+      "sha256": "13652ba8a093e83d4c41a6e56a9bba47174d5447cfad56fec90f5b487844d35f",
+      "size_bytes": 18863
     },
     {
       "kind": "file",
@@ -2567,8 +2742,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/cloud-resources/tests/test_hf_auth_health.py",
-      "sha256": "30cfa2f4d7198edb805a53bac19d73da11d2626a13168e78f4ad78d9f3e88e59",
-      "size_bytes": 7112
+      "sha256": "c27376d4145d4f9bd4d997f4ff31c337578b86e8682e380122adec425123f2e5",
+      "size_bytes": 7990
     },
     {
       "kind": "file",
@@ -2595,15 +2770,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/README.md",
-      "sha256": "fdedaa4e2397f1852760e65398af25befd42af076f9089dd06399fec1ca73127",
-      "size_bytes": 3110
+      "sha256": "c1054854b93b1f36e47370e156a57e85afb6f06607474907bf551e15bdf8b6db",
+      "size_bytes": 10257
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/configuration.schema.json",
-      "sha256": "ccb0cc381c6501296184c23b51ceaadfb6ba071697803046e567d84468db9947",
-      "size_bytes": 5709
+      "sha256": "700918c28896c9b95a8109717e4bb57de9774068eec21ce3e93d4f50f6c61b84",
+      "size_bytes": 6176
     },
     {
       "kind": "file",
@@ -2616,15 +2791,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/plugin.manifest.json",
-      "sha256": "582ef7da884e24d32779e4e3659020836b6eeb9b508fc57c305d273a4e445adf",
-      "size_bytes": 1981
+      "sha256": "cc865212b8d3bd72f4c50bcb94aa9cb514f71d9f92b46887dbacef7acb994432",
+      "size_bytes": 2026
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/pyproject.toml",
-      "sha256": "d60dcbefdeeee2aa18385e886a5d0e7e30da1a4e53022338e0ba8cea53febc6e",
-      "size_bytes": 1143
+      "sha256": "8cfeb630b2a7a6d9db4eca8e3fd6282f217ff43dd051b6c58daf893a02ed9e30",
+      "size_bytes": 1173
     },
     {
       "kind": "file",
@@ -2637,8 +2812,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/README.md",
-      "sha256": "e378f5359ebe6e19f19e6394281f519bc71210927f8292a7cfb37adc7f876df9",
-      "size_bytes": 2714
+      "sha256": "1a682b7ee85c66cfaefca442a51a4c399a4aefd8f7fe676fd0fbbb0163d13b36",
+      "size_bytes": 4184
     },
     {
       "kind": "file",
@@ -2672,36 +2847,36 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/account_center.py",
-      "sha256": "d9072afcced112ddc72892cd4c8091862aebd8ed317da6f9ac230ded89381b7d",
-      "size_bytes": 15877
+      "sha256": "2f6ad2203f158373619c2993cdec3d879e540ac7ddcc995defdbcdf127f4ae9b",
+      "size_bytes": 15937
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/github_api.py",
-      "sha256": "c56c96fb108b86ff834eb5d9d7d6b071ede4c2f3fcac6875f2206fe7d5a2ca04",
-      "size_bytes": 23281
+      "sha256": "75e2a705aebb49b39a1d3a8068a00c97f223caeecc89c2c4e3360d5b03d6bc3b",
+      "size_bytes": 79333
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/plugin.py",
-      "sha256": "051711a7572296ef2e1baa30503c00144feef1c1f376935b89a354f89d840e53",
-      "size_bytes": 36994
+      "sha256": "1adc93be318efa51add6223a6f843104798f37dc10a562a0327e275679dfbca7",
+      "size_bytes": 60729
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/settings.py",
-      "sha256": "8ae7c6fd99a4b56073a703b9417585e1224bdc8aefc7300e390a4a57977dc587",
-      "size_bytes": 13758
+      "sha256": "65dfa6bb0f9ab9733b677c1b3eb534ebff13c5bbf8690df6f595011c7eba129c",
+      "size_bytes": 15131
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/trust.py",
-      "sha256": "c53433520977932f6e26e9e75c30e552573ac2652b940e2c7ff4069e9ef7691d",
-      "size_bytes": 4094
+      "sha256": "3b55aac1bf7fb18d6c351c82df961f6ea6b5b43ad411bba34466935401cddee8",
+      "size_bytes": 4477
     },
     {
       "kind": "file",
@@ -2714,29 +2889,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/tests/test_github_issues_direct_runtime.py",
-      "sha256": "4b40ff470c24572c7ab33da338a3dc609f94c171abb224c5e657c6a89b153bc6",
-      "size_bytes": 8459
+      "sha256": "821e59dbe25dd1bb711fb91c9ecfbbd7b6ff26ca40e16d30364aad8bac0b64d3",
+      "size_bytes": 10619
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/tests/test_provider.py",
-      "sha256": "3968a928e811e1237f2ddbe1d9daa6c9cfc0f4d95f4a6c3781471e840f6745ba",
-      "size_bytes": 31496
+      "sha256": "fa3f8354c88bfe18a2f5c124f8d8bd3997dbdffdadf8640ee49e54d322bb3c69",
+      "size_bytes": 96528
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/README.md",
-      "sha256": "b01db940b769749607786b28f7ac60ce5fda3930581fd2bfe13baa81f3ae19f1",
-      "size_bytes": 2810
+      "sha256": "64007aaf42995f1d8da3c983eb4e0c923b9081c3d48f47d925503c77dbf7ea01",
+      "size_bytes": 4012
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/configuration.schema.json",
-      "sha256": "c2b5822af30f33095434276628d1cb400397925fde4746fa7730ffdfd83cee0a",
-      "size_bytes": 4186
+      "sha256": "c5628f2adecb94a5f455f8b04583ac2d85abda8cc5aeee9de63893d13b9ff687",
+      "size_bytes": 4596
     },
     {
       "kind": "file",
@@ -2763,8 +2938,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/README.md",
-      "sha256": "7ccf697696722bf7801d764635536bec00e74a83b27720a71525c67a7788ba19",
-      "size_bytes": 3045
+      "sha256": "d537e378a8b9b3029eb9792e3dc5216b65e7bae3dca59d12969673ac224e5517",
+      "size_bytes": 3097
     },
     {
       "kind": "file",
@@ -2798,29 +2973,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/account_center.py",
-      "sha256": "1ef497d9733e905c8c050c6412d3bf15fa729b29f11da2b674391a4b80a5f90f",
-      "size_bytes": 11331
+      "sha256": "1e385b71c3ed6039f856a006adf009e4f96713e23a143195b5ece4664e831954",
+      "size_bytes": 11347
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/huggingface_api.py",
-      "sha256": "94084d60a46c12f5e043b54f62f584a5c083b199a47d58d5a5125654d37cce23",
-      "size_bytes": 17244
+      "sha256": "35d33a4f6c309110433983cc12fe215f68cf312309245aa38537f37158664da3",
+      "size_bytes": 18744
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/plugin.py",
-      "sha256": "6b900a93bc5e1fa9ccac80db01d647e0f4e6981484880a83969013830629c64c",
-      "size_bytes": 26184
+      "sha256": "7e982f2bd102e5d8afab208dbeb32ffc9ff1c23b84089cd92f566ffd7c6d8c35",
+      "size_bytes": 26756
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/src/huggingface_provider/settings.py",
-      "sha256": "566eb3c902d58960692e72e9733a8fad1d426ba7d54a6374d101e692eaacc813",
-      "size_bytes": 11529
+      "sha256": "1228d7d6c978661ca320c9536abba7a28ed9f891b4f868568748956911dd37fd",
+      "size_bytes": 12383
     },
     {
       "kind": "file",
@@ -2839,23 +3014,191 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/providers/huggingface/tests/fixtures/qwen_repository_response.json",
+      "sha256": "1ff5303c36be28ea5b14642a11982d2c3f92c652b3c271859dea56be7d54226f",
+      "size_bytes": 794
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_huggingface_api.py",
-      "sha256": "6fa840c83e666239ba4c549c297389f30fdb26fac6b8dd4d938061b7573202b6",
-      "size_bytes": 7581
+      "sha256": "7881e58fa060037eb5c6b4ff3b1d0009d754041e722b9342b73663cb47fa7958",
+      "size_bytes": 14479
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_provider.py",
-      "sha256": "ac5051991e34aaf02b2087e65ff787630d936cc4950d0823f274f4503c78c8bd",
-      "size_bytes": 20078
+      "sha256": "59b72079e6b867091427d6236be7e20b747839de364831bf6fa36965d05dfeaa",
+      "size_bytes": 24856
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/huggingface/tests/test_settings.py",
-      "sha256": "a8ec8765d3c84be0dd85a75382661beddf7fd1bba27136c47974f023bb39d85d",
-      "size_bytes": 3556
+      "sha256": "799c1987e3da1b36769a9017aa106531d6845bee224ed005e438c7ea28a6e817",
+      "size_bytes": 5210
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/README.md",
+      "sha256": "80d4653e7fa3a61d7aeca8a1eafd4159839e80ef94a66792cd195b29da61db2d",
+      "size_bytes": 9667
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/configuration.schema.json",
+      "sha256": "50ef33f014a58af1d5c1313282c5b6dbbd9702b650813a7e66736ba4a0c6091a",
+      "size_bytes": 5326
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/contracts/office-v2-operations.json",
+      "sha256": "41c7eeaaa3cf1a6d7e8ab08205fc9d13e67ce6ce85ed6f8ccb69a15a8e000b08",
+      "size_bytes": 12891
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/contracts/office-v2-target-scope.schema.json",
+      "sha256": "a7097217ac809c723cf96567c0828fa826c2a90ceb6eaae1fb7e3a2cb398ef4b",
+      "size_bytes": 4334
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/docker-requirements.lock",
+      "sha256": "badc49884ca110f43520d932158c2f387b2f381030f478e79e1e842a5308c927",
+      "size_bytes": 5742
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/plugin.manifest.json",
+      "sha256": "e67f78159148001aa866199081756b6fd286592c4bda11ef3e202a64d768da46",
+      "size_bytes": 1695
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/pyproject.toml",
+      "sha256": "74f315d4410e851086d7b72260bdf4150261318b3bcfeb0e3f9c6493c179176b",
+      "size_bytes": 1351
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/requirements.lock",
+      "sha256": "1ed7440b55adb046fcf61a205c3a3b5d97bbc4f644fdc72e77e0a5fd19f98c0d",
+      "size_bytes": 47
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/README.md",
+      "sha256": "8ed9ce52716097999e1830aca62b6a5b0acf821084ba3a7616f21f379149f677",
+      "size_bytes": 2155
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/__init__.py",
+      "sha256": "937b3486ee72b410daef4171d46d84afbe3cf3140978a3720914433c8793c86e",
+      "size_bytes": 96
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/_generated/README.md",
+      "sha256": "85071f0d4d30554efcf232dcc0281e62959e79e536f48eb87a7ad0f7e8046864",
+      "size_bytes": 413
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/_generated/__init__.py",
+      "sha256": "b5c14a7c850e79aff21d6df101afff775acfad1d175987edfb50cab805ef44c8",
+      "size_bytes": 105
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/_generated/tool_provider_pb2.py",
+      "sha256": "e262cd5775d0b4d0421d1a15fdada5878edfb786afa4b4802c1a5763a3461fb9",
+      "size_bytes": 4921
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/account_center.py",
+      "sha256": "30872f592c3f64cd6888d809d268be14cbafec46e419c0a254524b7f9e256cbb",
+      "size_bytes": 17737
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/microsoft_graph_api.py",
+      "sha256": "0afa6129ecc4f53ab621af7daf76da62e0cdf7ec777b145c556c0fb52201d02c",
+      "size_bytes": 107361
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/plugin.py",
+      "sha256": "28c9de32b70a369df5815ec898e9e8f5df138b327a9019fb476e1d59bb9ed6c2",
+      "size_bytes": 91164
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/settings.py",
+      "sha256": "9737e7b3bc5cf503679bc6bc3bc4907fcc203c0fff749bcc78ba2412a0ad3585",
+      "size_bytes": 12603
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/trust.py",
+      "sha256": "3a25f65dc95625c0ec5b4c7f363c831248b2599e7ee6d7b88fe81194486c4b2f",
+      "size_bytes": 5771
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/tests/README.md",
+      "sha256": "d427c9de7cd55d659c5672f6f4668b76e6ae33371e17d0246f15b37d74534c26",
+      "size_bytes": 751
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/tests/test_lease_projection.py",
+      "sha256": "c252173b2701e7f8ac9c75f2cf69effea3aacd89aae9c3725ea24ae655ef0b94",
+      "size_bytes": 5653
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/tests/test_microsoft_graph_api.py",
+      "sha256": "cbf05719707952895641a8e722a3a41795e9c9e91eb91c929104ebf68437e369",
+      "size_bytes": 36258
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/tests/test_package_metadata.py",
+      "sha256": "0031c7689d65ece292ff42043e9bd7264bb0af39811141d0fabac42de34b4070",
+      "size_bytes": 10702
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/microsoft-graph/tests/test_provider.py",
+      "sha256": "b91e76c5e8dbfa72e8823e25d667dc77f7621a67e52c7efc2c1c48fc748d4d6b",
+      "size_bytes": 38131
     },
     {
       "kind": "file",
@@ -3007,9 +3350,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/tools/computer-runtime/README.md",
+      "sha256": "73c9023194d8731c6d979c6791d8af7fb42a5a612ea6eac7658158db2d575810",
+      "size_bytes": 14498
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/tools/computer-runtime/plugin.manifest.json",
-      "sha256": "ac6ae7d6979470042026c8e267baa0d596b2af88a3ced3487d5a7cc38d74076f",
-      "size_bytes": 1733
+      "sha256": "f5625ec809dd61db6075ff586024fa128a8f94eb6806a60dfe08c1e566d722a0",
+      "size_bytes": 2379
     },
     {
       "kind": "file",
@@ -4065,29 +4415,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/Cargo.lock",
-      "sha256": "8e6731362bd867cdf636309619dd36d0ab663d10c7db17c5f118477ea96ff5b1",
-      "size_bytes": 17533
+      "sha256": "c0a6d867d40d65d148513e035b45eeabc129c6ee829a75c71dc18d11fd9d6757",
+      "size_bytes": 46324
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/Cargo.toml",
-      "sha256": "9a3328c07469b270f008ea6a740cfc48ab9b02aa3470b822cd816346a81387aa",
-      "size_bytes": 489
+      "sha256": "c91a5efc0c017e6d9c3428c0434cb7a11ad7f8a6a40284b51c8b8003029693d4",
+      "size_bytes": 819
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/artifact/artifact_store.rs",
-      "sha256": "f5d37762fe0d8c0bb2b30f0eea37bb7b4cf38abde20230437c7fb4d26247173f",
-      "size_bytes": 10068
+      "sha256": "029aeca5db3bac705caed20f40d0b692c304215f011412de4b2b701d63058efa",
+      "size_bytes": 18053
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/artifact/mod.rs",
-      "sha256": "532c99dcb0608d9de32371e57859a5164071b3430251586a69d3af70c0cd5ab2",
-      "size_bytes": 64
+      "sha256": "0758e7f004fc84c43035aa7232508689dbd012908eea1655ed5ede3eb682c12c",
+      "size_bytes": 92
     },
     {
       "kind": "file",
@@ -4107,8 +4457,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/filesystem/fs_service.rs",
-      "sha256": "3790959b091b894bed8c9231b964857f3a160f16f6c7442d6da972170753aade",
-      "size_bytes": 8458
+      "sha256": "3225c1b890c28429e2b238eec6e5c92606bc2552a48103e2b2e954b72e423917",
+      "size_bytes": 14720
     },
     {
       "kind": "file",
@@ -4121,50 +4471,71 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/lib.rs",
-      "sha256": "fde5fdad9dbab0385778da6396effe3f622e12907deea4fff470b7fcbfb4e0d2",
-      "size_bytes": 6320
+      "sha256": "d9d38d5c0ae2ee581ccd8ebf94b5293d3880d380c1987ae8bd26d7c5572fae29",
+      "size_bytes": 13171
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/mxc_exec.rs",
+      "sha256": "f4555a3794c8d3af77d1e261f665e216e8072006d0d662f75df58c88fc86dc19",
+      "size_bytes": 45779
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/mod.rs",
-      "sha256": "67408a37dd4e1fd53a533643b91883480d0e2fbb3e55b17617b955f6fba5087a",
-      "size_bytes": 127
+      "sha256": "26372fdbf7c0049cc7057085beb3bf1a36bbd6c09819972eba66bcbc237b4f55",
+      "size_bytes": 379
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/mxc.rs",
+      "sha256": "07477e911951470f7ed5bbd06f8ef21649b9989ee3d71876f565be52edc33be3",
+      "size_bytes": 31698
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/mxc_protocol.rs",
+      "sha256": "3b84e1b7264e524d1c6dbf09c742d5342c7f0767a9e9c6f3ce3c14bee187c0f1",
+      "size_bytes": 6814
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/sandbox/provider.rs",
-      "sha256": "295c8d4457a3ad98e614982e4756e06861b4f4b90f64696e0c8910636fd5740c",
-      "size_bytes": 2480
+      "sha256": "5d9d5f55ffc890aff135a023d8547a3e4b023a7d5b62a2c0d956415fbbb4b50a",
+      "size_bytes": 7430
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/security/env_filter.rs",
-      "sha256": "739fef219b693de0a37561df1840afa4a825f8ff81e92fc88241e1d25a8b6b1d",
-      "size_bytes": 3430
+      "sha256": "6a5c8bdc7c35e2b3a02e177323bb7d670f5ef8bfee808e66be77f34291e3bc78",
+      "size_bytes": 4293
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/security/mod.rs",
-      "sha256": "4f23451f5ece855cde162ca77405241165ad947038d50e41f4e04ba5c141a6a0",
-      "size_bytes": 243
+      "sha256": "807b31723cd67897dbd277b1e608d2e6dab86ea31bbb696008b249a243319107",
+      "size_bytes": 296
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/security/output_limiter.rs",
-      "sha256": "9c7505a6066c23e1617cdcfc785ac36e21f6345cd023267dd7156589cca6422d",
-      "size_bytes": 2592
+      "sha256": "2b22e52f3e8819d447bdad2b3effc55a54ab29ffb2eb5d76751c096c6367767a",
+      "size_bytes": 6304
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/security/path_validator.rs",
-      "sha256": "6cbeffe0c29f8a5255c349cd2ffdabb8833f02c7091e04e9498cef16ad94e2aa",
-      "size_bytes": 6495
+      "sha256": "7b35feafb3fee00abd4b2bd34e43e1db2747f02235d97e5248a1af7989e7cc3a",
+      "size_bytes": 7405
     },
     {
       "kind": "file",
@@ -4177,15 +4548,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/src/shell/process_runner.rs",
-      "sha256": "fb9095179b05cc6c138a13b5fcd33e14b8bf4242973be08df50c70fd31168de4",
-      "size_bytes": 17861
+      "sha256": "2756338800d2f967c753d598a1e4971ec7989704fd1ce02d8a0a7d7b914dc7a3",
+      "size_bytes": 30288
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-computer-runtime/tests/computer_runtime_tests.rs",
-      "sha256": "738ee68d7737380f32114768ffe7e58bccc7ae88cda26445e8205047fb7249f4",
-      "size_bytes": 29747
+      "sha256": "eb978f8b3b47113fc8fe12caa6e40271d50976a09d8fa51d8ad01eaa78c0075f",
+      "size_bytes": 39956
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "runtime/rust/cyrene-computer-runtime/tests/mxc_backend_tests.rs",
+      "sha256": "52dcd4bcd80fc3e30f217e04d7f3194c4b4251198ca0c07603f244a9ceecc07b",
+      "size_bytes": 30389
     },
     {
       "kind": "file",
@@ -4408,15 +4786,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.lock",
-      "sha256": "74b3365f289cf3c753a89adb419181fdcc3b82ad96086a22bc7de11e5d1f9800",
-      "size_bytes": 60818
+      "sha256": "64c1b7038429909aadc96c9f1351d9d17e339606a8caf8c483055fdecd80e3ee",
+      "size_bytes": 70720
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/Cargo.toml",
-      "sha256": "9b9ddb6bd259d9c5a9c259dab72bb196509580d169dee1e81c3211dd156f4b9c",
-      "size_bytes": 1048
+      "sha256": "13854f3fdac7e41030eeaf4eef92ee7cafa7b0e988a7e3044c082a1e5dad5a4e",
+      "size_bytes": 1127
     },
     {
       "kind": "file",
@@ -4428,30 +4806,37 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "runtime/rust/cyrene-plugin-server/src/computer_tools.rs",
+      "sha256": "193d243e783670bb85a84944ce8854efcbfdf5edfe2b41963f4bf256de305f91",
+      "size_bytes": 38637
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/main.rs",
-      "sha256": "bf9a78e3e4e210ee776bc7f6d5ae4853d47b00d84e83679084243bdf4542877a",
-      "size_bytes": 2387
+      "sha256": "ceecaec8aa6ad765dea2577d9510c4ca670ab88dabe7eececf93a1cf227e640d",
+      "size_bytes": 4382
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/src/service.rs",
-      "sha256": "d376c911c49b954af45d5ca445c0310b429a0010cd9a1c2ee9d111d3c56f82b1",
-      "size_bytes": 48375
+      "sha256": "0d4a945716a3600f7d22358730d6597d8fa39d818fcd035f2481796f8b865bd9",
+      "size_bytes": 65962
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/packaged_runtime_acceptance.rs",
-      "sha256": "f66c36f6bd6ee35aa22bad09e46770448d07fc0b8e995e522dd84fcc75d0faf7",
-      "size_bytes": 14993
+      "sha256": "b3a209d4630517fd9211a91ce2a1ec3dad10e9df3fcfa9e0ec4f8c5f6945b827",
+      "size_bytes": 16298
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-plugin-server/tests/server_integration_tests.rs",
-      "sha256": "1b5b49b86e57075cba1e0674799853c4688b4264c640d8fc46b89e18fb2eaee3",
-      "size_bytes": 38752
+      "sha256": "9ef35cf25fd07779b761d31a7336e70c0bbd5ecd48ca34a4a9f23c46b26d3fac",
+      "size_bytes": 50633
     },
     {
       "kind": "file",
@@ -4800,8 +5185,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/java/cyrene-plugin-client-java/src/test/java/io/cyrene/plugin/client/VerticalIntegrationTest.java",
-      "sha256": "ab8275e53e071edbb5853b9a09a0ed3eb56f453ba14178bf5129b23565759b3c",
-      "size_bytes": 17058
+      "sha256": "2e42eb8981d533c177e7d8a879b37a3742c42997081e5659b7a07e2c2e5de7e4",
+      "size_bytes": 18072
     },
     {
       "kind": "file",
@@ -6347,14 +6732,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/README.md",
-      "sha256": "4c7af1b5f7765628a50e179734e8b1b14cce46f7c605121c0904553e13578fb8",
-      "size_bytes": 2822
+      "sha256": "e0d84576c04a3e32eb813fa3a1dd06abef2e592ca8dfc8672915f0ed18ee89dd",
+      "size_bytes": 4954
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/pyproject.toml",
-      "sha256": "885050c237215da55b4157f2150a2bb3d8d76b7b3bd5bfcc6a7447007213fc82",
+      "sha256": "15253f1325725b3182d3b2543b3c427ac685da178e353696a059b49d6d12b5df",
       "size_bytes": 479
     },
     {
@@ -6368,15 +6753,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/__init__.py",
-      "sha256": "6882bd5b29b3a215ccb004a016f1dd9d76bbdd820bb92c4e9c9a49eae5bc7052",
-      "size_bytes": 1969
+      "sha256": "4e75fb071d3ec985fede6250c533ddff24e0fa9c684b326e7f809e6d94e0ef23",
+      "size_bytes": 3065
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/contracts.py",
-      "sha256": "180482c7e7a45b89ba89375c805d00bd62f02cd2f25b15c4d3152da355b56a8b",
-      "size_bytes": 12233
+      "sha256": "6b171479cf5c223ef62cb9841f36c4e371be45912616f5c2e86db0b219031316",
+      "size_bytes": 21327
     },
     {
       "kind": "file",
@@ -6389,8 +6774,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/tests/test_signing.py",
-      "sha256": "89ca3f05974c5433e23728b3f8bfa5cf89ddb87a00597f3754c55cfcdeb5b53d",
-      "size_bytes": 7285
+      "sha256": "bdf265252df099243b0b536b475a211dcacf16ec65c74bebed22deea44295540",
+      "size_bytes": 18002
     },
     {
       "kind": "file",
@@ -6704,15 +7089,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "20f76e9f7df8b1079fe1c8d5e47258d7c035c321ca40fc7f908105c6aa019b22",
-      "size_bytes": 70813
+      "sha256": "cddbbca936b4d8a222de60df35486a5c4184baed266b6cfa0ebc7750ccebddf4",
+      "size_bytes": 85582
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_select_official_plugin_packages.py",
-      "sha256": "131562d22756127a90db6ef41d481ceca9d40404a9d5adcde846d65dba35031e",
-      "size_bytes": 5857
+      "sha256": "eef6252b06a625376222dadf85799b009f6f913e7658ab2d5b859f871d38a3f5",
+      "size_bytes": 7848
     },
     {
       "kind": "file",
@@ -6739,15 +7124,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "a6df467887eace57745686042934825d3f7975d5ea63fd7bdac89486ec540026",
-      "size_bytes": 19100
+      "sha256": "71212954c2747760c54aa9e6f245569f15510070597852d1567ea8f0a728625c",
+      "size_bytes": 20828
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "68db99d507e46f174ccabfed7657a4720fa2344fa213db2b3310d675928d673a",
-      "size_bytes": 28334
+      "sha256": "b5ab6a9579707bc9ecf972255d3276b22dc3936c0f59d3f5c8f34347e72c3d8c",
+      "size_bytes": 28575
     },
     {
       "kind": "file",
@@ -6781,15 +7166,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/official_plugin_package.py",
-      "sha256": "5d134ff0524e68472793cae91f7ee37fc398de68d79110940bbe0f6626d3b3d5",
-      "size_bytes": 112927
+      "sha256": "463524e5d2e238f5df4943d11a8af3ca4097143e96fcb476301587a0173c928e",
+      "size_bytes": 113862
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/account-center.in",
-      "sha256": "994a4f4db201a6b03e3d5c0c80b2f4b98ccff8bb4809a75d0adcfd118020b421",
+      "sha256": "3cfdd300d0edc30d252dbcab88240f3a3369305d30eaf28233072622aa1fccc4",
       "size_bytes": 337
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/azure-devops-observation.in",
+      "sha256": "2b734bebc51f86ed5418df2b0fb1121fd862102b8be6ae08cad8fb2d6f631f93",
+      "size_bytes": 334
     },
     {
       "kind": "file",
@@ -6844,14 +7236,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/github-issues.in",
-      "sha256": "0c16f3cfc3207b526080091160a243675539403d00f3af2d06ac4563c55d0f39",
+      "sha256": "d884380ba32b84a2f524e49a21980d38ec2bb43663a50c4a28133f0af8625c06",
       "size_bytes": 316
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/huggingface.in",
-      "sha256": "b9ce025a432744c3fc41473d450827417d933d734d00ed31b08510a3d7d70dab",
+      "sha256": "8b98eb024151bfde2daa03c4ae43d2a31119b9d747bb4afabfa5bda1fdd41378",
       "size_bytes": 337
     },
     {
@@ -6860,6 +7252,13 @@
       "path": "tooling/release/requirements/knowledge-preparation.in",
       "sha256": "f438fc14f8c25de0fd246f75e6f678a94dbc44d81223bf64e31e4a1f061e1844",
       "size_bytes": 176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/microsoft-graph.in",
+      "sha256": "d884380ba32b84a2f524e49a21980d38ec2bb43663a50c4a28133f0af8625c06",
+      "size_bytes": 316
     },
     {
       "kind": "file",
@@ -6879,8 +7278,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/select_official_plugin_packages.py",
-      "sha256": "bb35740790c4772aa7f1f42bb46c9b742420bb6cce9b285274cabc272e16d9c1",
-      "size_bytes": 5543
+      "sha256": "3eb557c46e7d6292584e325490fd6946f66e5923bc8721abde5afbd56b79cf8c",
+      "size_bytes": 5978
     },
     {
       "kind": "file",

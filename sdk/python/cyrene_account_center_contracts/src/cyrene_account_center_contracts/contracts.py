@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import time
 from dataclasses import asdict, dataclass
+from enum import StrEnum
 from typing import Any
 
 import rfc8785
@@ -174,6 +175,10 @@ class ProviderProfile:
     access_mode: str | None = None
     external_subject: str | None = None
     expires_at: int | None = None
+    refresh_expires_at: int | None = None
+    credential_revision: int | None = None
+    scope_schema_version: int | None = None
+    reauth_required: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -187,6 +192,12 @@ class LinkedProviderProfileResponse:
     expires_at: int | None
     auth_mode: str | None = None
     access_mode: str | None = None
+    refresh_expires_at: int | None = None
+    workspace_id: str | None = None
+    scope_schema_version: int | None = None
+    oauth_scopes: list[str] | None = None
+    credential_revision: int | None = None
+    reauth_required: bool | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -205,6 +216,7 @@ class RedeemProviderCredentialLeaseRequest:
     """One-time redemption fields that must match the original lease exactly."""
 
     lease_ref: str
+    profile_ref: str
     operation_id: str
     target: dict[str, Any]
     arguments_sha256: str
@@ -221,6 +233,7 @@ class ProviderCredentialLease:
     target: dict[str, Any]
     arguments_sha256: str
     expires_at: int
+    profile_scope_sha256: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +289,37 @@ class RotateHuggingFaceProfileRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class BeginHuggingFaceRenewalRequest:
+    """Create one durable HF device-code renewal session for an owned profile."""
+
+    profile_ref: str
+    session_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class PollHuggingFaceRenewalRequest:
+    """Poll one durable HF device-code session without returning credential material."""
+
+    profile_ref: str
+    session_ref: str
+
+
+@dataclass(frozen=True, slots=True)
+class HuggingFaceRenewalSession:
+    """Owner-safe device authorization state; device and bearer codes are omitted."""
+
+    profile_ref: str
+    session_ref: str
+    state: str
+    user_code: str | None
+    verification_uri: str | None
+    expires_at: int | None
+    interval_seconds: int | None
+    generation: int
+    reason_code: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class RegisterHostIdentityProfileRequest:
     """Register non-secret Azure, GCP, or RunPod host identity metadata."""
 
@@ -304,6 +348,208 @@ class UnlinkProviderProfileRequest:
 
     profile_ref: str
     idempotency_key: str
+
+
+class MicrosoftGraphOperation(StrEnum):
+    """Closed Microsoft Graph operation names accepted by Account Center."""
+
+    PLANNER_PLAN_GET = "microsoft_graph.planner.plan.get"
+    PLANNER_TASKS_LIST = "microsoft_graph.planner.tasks.list"
+    PLANNER_TASK_GET = "microsoft_graph.planner.task.get"
+    PLANNER_TASK_CREATE = "microsoft_graph.planner.task.create"
+    PLANNER_TASK_UPDATE = "microsoft_graph.planner.task.update"
+    SHAREPOINT_SITE_GET = "microsoft_graph.sharepoint.site.get"
+    SHAREPOINT_LIST_GET = "microsoft_graph.sharepoint.list.get"
+    SHAREPOINT_LIST_ITEMS_DELTA = "microsoft_graph.sharepoint.list.items.delta"
+    MAIL_FOLDERS_LIST = "microsoft_graph.mail.folders.list"
+    MAIL_MESSAGES_LIST = "microsoft_graph.mail.messages.list"
+    MAIL_MESSAGE_GET = "microsoft_graph.mail.message.get"
+    MAIL_DRAFTS_LIST = "microsoft_graph.mail.drafts.list"
+    MAIL_DRAFT_CREATE = "microsoft_graph.mail.draft.create"
+    MAIL_DRAFT_UPDATE = "microsoft_graph.mail.draft.update"
+    MAIL_DRAFT_DELETE = "microsoft_graph.mail.draft.delete"
+    MAIL_MESSAGE_SEND = "microsoft_graph.mail.message.send"
+
+
+class MicrosoftGraphPermissionUpgrade(StrEnum):
+    """Explicit user-approved Graph permission upgrades; never raw scopes."""
+
+    PLANNER_TASKS_WRITE = "planner_tasks_write"
+    SHAREPOINT_SELECTED = "sharepoint_selected"
+    MAIL = "mail"
+
+
+class AzureDevOpsOperation(StrEnum):
+    """Closed read-only Azure DevOps operations accepted by Account Center."""
+
+    OBSERVATIONS_POLL = "azure_devops.observations.poll"
+    PIPELINES_LIST = "azure_devops.pipelines.list"
+    PIPELINE_RUNS_LIST = "azure_devops.pipeline_runs.list"
+    PIPELINE_RUN_GET = "azure_devops.pipeline_run.get"
+    DEPLOYMENTS_LIST = "azure_devops.deployments.list"
+    RELEASE_ENVIRONMENT_GET = "azure_devops.release_environment.get"
+
+
+@dataclass(frozen=True, slots=True, init=False)
+class BeginMicrosoftGraphLinkRequest:
+    """Start either a legacy Planner link or a feature-scoped Office v2 link.
+
+    The Account Center method keeps its v1 wire shape when ``planner_plan_ids``
+    is supplied and uses only ``office_v2_scope`` for v2. 中文：两种请求互斥，
+    Exchange must omit the unset selector before serializing the exact payload.
+    """
+
+    profile_ref: str
+    planner_plan_ids: list[str] | None
+    idempotency_key: str
+    office_v2_scope: dict[str, Any] | None
+
+    def __init__(
+        self,
+        profile_ref: str,
+        planner_plan_ids: list[str] | None = None,
+        idempotency_key: str | None = None,
+        office_v2_scope: dict[str, Any] | None = None,
+    ) -> None:
+        """Validate the closed v1/v2 selector while retaining v1 positional calls."""
+
+        if not isinstance(profile_ref, str) or not profile_ref.strip():
+            raise ValueError("profile_ref must be non-empty text")
+        if not isinstance(idempotency_key, str) or not idempotency_key.strip():
+            raise ValueError("idempotency_key must be non-empty text")
+        if (planner_plan_ids is None) == (office_v2_scope is None):
+            raise ValueError("exactly one Graph link scope must be provided")
+        if planner_plan_ids is not None and not isinstance(planner_plan_ids, list):
+            raise ValueError("planner_plan_ids must be a list")
+        if office_v2_scope is not None and not isinstance(office_v2_scope, dict):
+            raise ValueError("office_v2_scope must be an object")
+
+        object.__setattr__(self, "profile_ref", profile_ref)
+        object.__setattr__(self, "planner_plan_ids", planner_plan_ids)
+        object.__setattr__(self, "idempotency_key", idempotency_key)
+        object.__setattr__(self, "office_v2_scope", office_v2_scope)
+
+
+@dataclass(frozen=True, slots=True)
+class UpdateMicrosoftGraphV2ScopeRequest:
+    """CAS-update selected resources without changing Office OAuth grants."""
+
+    profile_ref: str
+    workspace_id: str
+    expected_credential_revision: int
+    target_scope: dict[str, Any]
+    idempotency_key: str
+
+    def __post_init__(self) -> None:
+        """Reject incomplete CAS requests before they cross the service boundary."""
+
+        if not isinstance(self.profile_ref, str) or not self.profile_ref.strip():
+            raise ValueError("profile_ref must be non-empty text")
+        if not isinstance(self.workspace_id, str) or not self.workspace_id.strip():
+            raise ValueError("workspace_id must be non-empty text")
+        if (
+            isinstance(self.expected_credential_revision, bool)
+            or not isinstance(self.expected_credential_revision, int)
+            or self.expected_credential_revision < 0
+        ):
+            raise ValueError("expected_credential_revision must be non-negative")
+        if not isinstance(self.target_scope, dict):
+            raise TypeError("target_scope must be an object")
+        if (
+            not isinstance(self.idempotency_key, str)
+            or not self.idempotency_key.strip()
+        ):
+            raise ValueError("idempotency_key must be non-empty text")
+
+
+@dataclass(frozen=True, slots=True)
+class MicrosoftGraphMailFeatures:
+    """Closed additive Mail feature request; raw OAuth scopes are never accepted."""
+
+    metadata_read: bool
+    drafts_write: bool
+    send: bool
+
+    def __post_init__(self) -> None:
+        """Require an explicit nonempty Mail selection before consent is started."""
+
+        if any(
+            not isinstance(value, bool)
+            for value in (self.metadata_read, self.drafts_write, self.send)
+        ):
+            raise TypeError("Mail feature selections must be booleans")
+        if not (self.metadata_read or self.drafts_write or self.send):
+            raise ValueError("at least one Mail feature must be selected")
+
+
+@dataclass(frozen=True, slots=True)
+class BeginMicrosoftGraphScopeUpgradeRequest:
+    """Start one explicitly selected permission upgrade without caller scopes."""
+
+    profile_ref: str
+    permission: MicrosoftGraphPermissionUpgrade
+    idempotency_key: str
+    site_id: str | None = None
+    list_ids: list[str] | None = None
+    mail_features: MicrosoftGraphMailFeatures | None = None
+
+    def __post_init__(self) -> None:
+        """Keep Mail's combined consent payload exclusive to the Mail enum."""
+
+        if self.permission == MicrosoftGraphPermissionUpgrade.MAIL:
+            if self.mail_features is None or self.site_id is not None or self.list_ids is not None:
+                raise ValueError("Mail upgrades require only a nonempty mail_features selection")
+        elif self.mail_features is not None:
+            raise ValueError("mail_features is valid only for a Mail scope upgrade")
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteMicrosoftGraphLinkRequest:
+    """Complete one PKCE callback using state and code only."""
+
+    state: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteMicrosoftGraphScopeUpgradeRequest:
+    """Complete one consent upgrade using only callback state and code."""
+
+    state: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True)
+class BeginAzureDevOpsLinkRequest:
+    """Start Entra consent for one host-selected Azure DevOps source."""
+
+    profile_ref: str
+    tenant_id: str
+    organization: str
+    project_id: str
+    source_id: str
+    source_kind: str
+    idempotency_key: str
+    pipeline_id: int | None = None
+    definition_id: int | None = None
+    definition_environment_id: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteAzureDevOpsLinkRequest:
+    """Complete one Entra PKCE callback using state and code only."""
+
+    state: str
+    code: str
+
+
+@dataclass(frozen=True, slots=True)
+class MicrosoftGraphOAuthSession:
+    """Browser redirect metadata; never contains an OAuth credential."""
+
+    link_session_ref: str
+    authorization_url: str
+    expires_at: int
 
 
 def sign_context(

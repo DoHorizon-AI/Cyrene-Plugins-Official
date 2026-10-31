@@ -10,6 +10,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import hmac
 import json
@@ -23,7 +24,11 @@ import httpx
 
 EVENT_ROUTE = "/internal/v1/connectors/teams/events"
 TERMINAL_BUSINESS_REJECTIONS = frozenset(
-    {"TEAMS_TENANT_NOT_ALLOWED", "TEAMS_TEAM_NOT_ALLOWED"}
+    {
+        "TEAMS_TENANT_NOT_ALLOWED",
+        "TEAMS_TEAM_NOT_ALLOWED",
+        "WORK_TEAMS_PRIVATE_INSTALLATION_FORBIDDEN",
+    }
 )
 
 
@@ -32,6 +37,21 @@ class NavigatorAdmissionUnavailable(RuntimeError):
 
     中文：Navigator 未能确认此事件已持久接纳。
     """
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        retryable: bool = True,
+        status_code: int | None = None,
+        code: str | None = None,
+        retry_after_seconds: float | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.retryable = retryable
+        self.status_code = status_code
+        self.code = code
+        self.retry_after_seconds = retry_after_seconds
 
 
 @dataclass(frozen=True)
@@ -85,12 +105,21 @@ class NavigatorEventClient:
         因而可安全重发相同 Teams message ID，持久去重由主机负责。
         """
 
-        raw_body = json.dumps(
-            event,
-            ensure_ascii=False,
-            sort_keys=True,
-            separators=(",", ":"),
-        ).encode("utf-8")
+        return await self.submit_body(canonical_event_body(event))
+
+    async def submit_body(self, raw_body: bytes) -> AdmissionResult:
+        """Sign and submit exact persisted bytes with a fresh timestamp.
+
+        The spool passes the same body on every retry. Only the timestamp and
+        HMAC request headers are regenerated; no authorization headers enter
+        the durable queue.
+
+        中文：对持久化的精确字节签名并提交新 timestamp。每次重试使用相同 body，只重新
+        生成 timestamp 与 HMAC headers；Authorization 不进入持久队列。
+        """
+
+        if not isinstance(raw_body, bytes) or not raw_body:
+            raise ValueError("Navigator event body must be non-empty bytes")
         timestamp = str(int(self._clock()))
         signature = hmac.new(
             self._hmac_key,
@@ -105,16 +134,24 @@ class NavigatorEventClient:
         }
         url = urljoin(self._base_url + "/", EVENT_ROUTE.lstrip("/"))
         try:
-            response = await self._client.post(
-                url,
-                content=raw_body,
-                headers=headers,
-                timeout=self._timeout_seconds,
-            )
+            async with asyncio.timeout(self._timeout_seconds):
+                response = await self._client.post(
+                    url,
+                    content=raw_body,
+                    headers=headers,
+                    timeout=self._timeout_seconds,
+                )
+        except TimeoutError:
+            # HTTPX read timeouts are per idle interval; enforce a lease-safe total.
+            raise NavigatorAdmissionUnavailable(
+                "Navigator event admission exceeded its total deadline",
+                retryable=True,
+            ) from None
         except httpx.HTTPError:
             # Do not propagate HTTPX's exception text; it may include an internal URL.
             raise NavigatorAdmissionUnavailable(
-                "Navigator event admission could not be confirmed"
+                "Navigator event admission could not be confirmed",
+                retryable=True,
             ) from None
 
         if 200 <= response.status_code < 300:
@@ -135,7 +172,7 @@ class NavigatorEventClient:
             else "UNKNOWN"
         )
         if (
-            400 <= response.status_code < 500
+            response.status_code == 403
             and body.get("terminal") is True
             and body.get("sourceAuthenticated") is True
             and safe_code in TERMINAL_BUSINESS_REJECTIONS
@@ -147,9 +184,23 @@ class NavigatorEventClient:
                 terminal_rejection=True,
                 code=safe_code,
             )
+        source_auth_retry = response.status_code == 401 or (
+            response.status_code == 403 and body.get("sourceAuthenticated") is not True
+        )
+        retryable = (
+            source_auth_retry
+            or 300 <= response.status_code < 400
+            or response.status_code in {408, 425, 429}
+            or response.status_code >= 500
+        )
+        retry_after_seconds = _retry_after_seconds(response.headers.get("Retry-After"))
         raise NavigatorAdmissionUnavailable(
             "Navigator event admission was not durable "
-            f"(status={response.status_code}, code={safe_code})"
+            f"(status={response.status_code}, code={safe_code})",
+            retryable=retryable,
+            status_code=response.status_code,
+            code=safe_code,
+            retry_after_seconds=retry_after_seconds,
         )
 
     async def aclose(self) -> None:
@@ -179,3 +230,34 @@ def _response_error_facts(response: httpx.Response) -> dict[str, Any]:
         "terminal": decoded.get("terminal"),
         "sourceAuthenticated": decoded.get("sourceAuthenticated"),
     }
+
+
+def canonical_event_body(event: dict[str, Any]) -> bytes:
+    """Serialize one normalized Navigator event into its stable wire body.
+
+    中文：将规范 Navigator event 序列化为稳定的 wire body。
+    """
+
+    return json.dumps(
+        event,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    """Parse only bounded numeric Retry-After values; ignore unsafe text.
+
+    中文：只解析有界数值 Retry-After，忽略其他响应文本。
+    """
+
+    if value is None:
+        return None
+    try:
+        seconds = float(value)
+    except ValueError:
+        return None
+    if seconds < 0 or seconds > 24 * 60 * 60:
+        return None
+    return seconds

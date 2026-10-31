@@ -36,11 +36,16 @@ TEAMS_CLOUD_V1_PACKAGE_IDS = (
     "cyrene.accounts.account-center",
     "cyrene.providers.github-issues",
 )
+OFFICE_PILOT_PACKAGE_IDS = (
+    "cyrene.providers.microsoft-graph",
+    "cyrene.providers.azure-devops-observation",
+)
 ALL_PACKAGE_IDS = LEGACY_PACKAGE_IDS + tuple(
     dict.fromkeys(
         INTEGRATION_V1_PACKAGE_IDS
         + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
         + TEAMS_CLOUD_V1_PACKAGE_IDS
+        + OFFICE_PILOT_PACKAGE_IDS
     )
 )
 PACKAGE_NAMES = {
@@ -57,12 +62,15 @@ PACKAGE_NAMES = {
     "cyrene.providers.cloud-management": "cloud-management",
     "cyrene.providers.huggingface": "huggingface-provider",
     "cyrene.connectors.email-notification": "email-notification",
+    "cyrene.providers.microsoft-graph": "microsoft-graph-provider",
+    "cyrene.providers.azure-devops-observation": "azure-devops-observation",
 }
 PACKAGE_SET_CHOICES = (
     "legacy5",
     "integration-v1",
     "authorization-cloud-v1",
     "teams-cloud-v1",
+    "office-pilot",
     *ALL_PACKAGE_IDS,
 )
 
@@ -74,10 +82,9 @@ def select_package_release(
     """Return a static package matrix and publication mode for one event.
 
     Pushes retain the pre-existing five-package draft publication. Pull
-    pull requests validate all registered package producers without publishing.
+    requests validate all registered package producers without publishing.
     Manual dispatch accepts only named sets or package IDs in the fixed
-    allowlist; named integration, cloud, and Teams sets publish
-    their approved packages as immutable releases.
+    allowlist; approved named sets publish immutable releases.
     中文：push 保持旧五包 draft 行为，PR 验证全部包而不发布；手动 dispatch
     只接受固定集合或 allowlist 中的单个 package ID。
     """
@@ -102,6 +109,9 @@ def select_package_release(
         elif selection == "teams-cloud-v1":
             selected = TEAMS_CLOUD_V1_PACKAGE_IDS
             publish_mode = "immutable"
+        elif selection == "office-pilot":
+            selected = OFFICE_PILOT_PACKAGE_IDS
+            publish_mode = "immutable"
         elif selection in PACKAGE_NAMES:
             selected = (selection,)
             publish_mode = (
@@ -110,6 +120,7 @@ def select_package_release(
                 in INTEGRATION_V1_PACKAGE_IDS
                 + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
                 + TEAMS_CLOUD_V1_PACKAGE_IDS
+                + OFFICE_PILOT_PACKAGE_IDS
                 else "draft"
             )
         else:

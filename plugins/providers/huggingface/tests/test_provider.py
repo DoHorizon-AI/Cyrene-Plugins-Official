@@ -17,10 +17,15 @@ from typing import Any
 
 import pytest
 from cyrene_account_center_contracts import canonical_json
+from cyrene_plugin_runtime import DirectPayload
 from cyrene_plugin_runtime.vendor_cli import VendorCliResult
 
 from huggingface_provider._generated import tool_provider_pb2 as wire
-from huggingface_provider.account_center import AccountCenterUnavailable, _auth_material
+from huggingface_provider.account_center import (
+    AccountCenterDirectLeaseClient,
+    AccountCenterUnavailable,
+    _auth_material,
+)
 from huggingface_provider.huggingface_api import HuggingFaceApiFailure
 from huggingface_provider.plugin import (
     CALL_TOOL_RESPONSE_TYPE_URL,
@@ -43,9 +48,10 @@ ACTOR = {
 }
 
 
-def make_settings() -> ProviderSettings:
+def make_settings(*, read_only: bool = False) -> ProviderSettings:
     """Build one Hub binding with explicit read and write scopes."""
 
+    model_permissions = {"read"} if read_only else {"read", "write"}
     return ProviderSettings(
         binding_id="hf.binding.test",
         account_center_binding_id="account-center.binding.test",
@@ -56,7 +62,7 @@ def make_settings() -> ProviderSettings:
         account_center_client_key_ref=None,
         host_secret_names={},
         repositories=(
-            RepositoryScope("model", "owner/model", frozenset({"read", "write"})),
+            RepositoryScope("model", "owner/model", frozenset(model_permissions)),
             RepositoryScope("dataset", "owner/data", frozenset({"read"})),
             RepositoryScope("space", "owner/demo", frozenset({"read"})),
         ),
@@ -64,7 +70,57 @@ def make_settings() -> ProviderSettings:
         exchange_caller_id="exchange",
         exchange_verification_key=EXCHANGE_KEY,
         provider_signing_key=PROVIDER_KEY,
+        read_only=read_only,
     )
+
+
+def test_account_center_direct_lease_rpc_preserves_profile_reference() -> None:
+    settings = make_settings()
+
+    class DirectClient:
+        def __init__(self) -> None:
+            self.call: dict[str, Any] | None = None
+
+        def invoke(self, **kwargs: Any) -> DirectPayload:
+            self.call = kwargs
+            return DirectPayload(
+                type_url=(
+                    "type.googleapis.com/cyrene.account.center.v1."
+                    "RedeemProviderCredentialLeaseResponse"
+                ),
+                value=json.dumps(
+                    {
+                        "access_token": "synthetic-provider-token",
+                        "token_type": "Bearer",
+                        "external_subject": "hf-owner",
+                        "expires_at": 2_000_000_000,
+                    },
+                    separators=(",", ":"),
+                ).encode(),
+            )
+
+    transport = DirectClient()
+    client = AccountCenterDirectLeaseClient(settings, client=transport)
+    payload = {
+        "lease_ref": "00000000-0000-4000-8000-000000000002",
+        "profile_ref": "00000000-0000-4000-8000-000000000001",
+        "operation_id": "huggingface.repo.get",
+        "target": {"repo_type": "model", "repo_id": "owner/model"},
+        "arguments_sha256": "b" * 64,
+    }
+    actor = {
+        **ACTOR,
+        "binding_id": settings.account_center_binding_id,
+    }
+
+    material = client.redeem_provider_credential_lease(payload, actor)
+
+    assert material.external_subject == "hf-owner"
+    assert transport.call is not None
+    assert transport.call["method"] == "redeem_provider_credential_lease"
+    envelope = json.loads(transport.call["request"].value)
+    assert envelope["payload"] == payload
+    assert envelope["trusted_context"]["binding_id"] == settings.account_center_binding_id
 
 
 class FakeAccountCenter:
@@ -118,7 +174,7 @@ class FakeHubApi:
 
     def get_repository(self, *args: Any) -> dict[str, Any]:
         self.calls.append(("repo", args, {}))
-        return {"repo_id": args[1], "private": True, "gated": False}
+        return {"repo_id": args[1], "private": True, "gated": False, "file_count": 10}
 
     def download_file(self, *args: Any) -> dict[str, Any]:
         self.calls.append(("download", args, {}))
@@ -260,6 +316,12 @@ def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
         "huggingface.file.upload",
         "hf_vendor_cli",
     ]
+    repository_tool = next(
+        item for item in catalog.tools if item.provider_tool_id == "huggingface.repo.get"
+    )
+    assert (
+        repository_tool.description == "Read metadata for one configured model, dataset, or Space."
+    )
 
     arguments = {"search": "bert", "limit": 5}
     is_error, response = invoke_tool(provider, settings, "huggingface.models.list", arguments)
@@ -277,6 +339,81 @@ def test_catalog_and_signed_model_search_keep_token_out_of_result() -> None:
     assert account_context["method"] == "redeem_provider_credential_lease"
     assert account_context["binding_id"] == settings.account_center_binding_id
     assert api.calls[0][1][1] == "hf_private_test_token"
+
+
+def test_repo_get_forwards_file_count_from_hub_projection() -> None:
+    """Expose the Hub projection through the signed provider tool response."""
+    settings = make_settings()
+    account_center = FakeAccountCenter()
+    api = FakeHubApi()
+    provider = HuggingFaceProvider(settings=settings, account_center=account_center, hub_api=api)
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "huggingface.repo.get",
+        {"repo_type": "model", "repo_id": "owner/model"},
+    )
+
+    assert is_error is False
+    assert result["file_count"] == 10
+    assert api.calls == [("repo", ("model", "owner/model", "hf_private_test_token"), {})]
+
+
+def test_read_only_binding_hides_and_rejects_upload_and_native_cli() -> None:
+    """A host read-only flag filters the catalog and blocks direct signed mutations."""
+
+    settings = make_settings(read_only=True)
+    account_center = FakeAccountCenter()
+    api = FakeHubApi()
+    cli = FakeCliRunner()
+    provider = HuggingFaceProvider(
+        settings=settings,
+        account_center=account_center,
+        hub_api=api,
+        cli_runner=cli,
+    )
+    request = wire.ListToolsRequest(binding_id=settings.binding_id)
+
+    ok, result = provider.on_invoke("tool.provider.v1", "list_tools", request.SerializeToString())
+    catalog = wire.ListToolsResponse.FromString(result.value).catalog
+
+    assert ok is True
+    assert {item.provider_tool_id for item in catalog.tools} == {
+        "huggingface.models.list",
+        "huggingface.datasets.list",
+        "huggingface.spaces.list",
+        "huggingface.repo.get",
+        "huggingface.file.download",
+    }
+
+    upload_error, upload_result = invoke_tool(
+        provider,
+        settings,
+        "huggingface.file.upload",
+        {
+            "repo_type": "model",
+            "repo_id": "owner/model",
+            "revision": "main",
+            "path": "weights.bin",
+            "content_base64": base64.b64encode(b"fixture").decode("ascii"),
+            "read_only": False,
+        },
+    )
+    cli_error, cli_result = invoke_tool(
+        provider,
+        settings,
+        "hf_vendor_cli",
+        {"argv": ["models", "list"]},
+    )
+
+    assert upload_error is True
+    assert upload_result["error"]["code"] == "READ_ONLY_PROFILE"
+    assert cli_error is True
+    assert cli_result["error"]["code"] == "READ_ONLY_PROFILE"
+    assert account_center.calls == []
+    assert api.calls == []
+    assert cli.calls == []
 
 
 def test_account_center_profile_scope_digest_is_validated_before_provider_use() -> None:

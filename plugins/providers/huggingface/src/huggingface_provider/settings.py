@@ -46,8 +46,17 @@ class ProviderSettings:
     exchange_caller_id: str
     exchange_verification_key: bytes
     provider_signing_key: bytes
+    read_only: bool = False
     timeout_seconds: float = 15.0
     max_artifact_bytes: int = 1_048_576
+
+    def __post_init__(self) -> None:
+        """Keep read-only bindings consistent with their repository grants."""
+
+        if not isinstance(self.read_only, bool):
+            raise ConfigurationError("read_only must be boolean")
+        if self.read_only and any("write" in item.permissions for item in self.repositories):
+            raise ConfigurationError("read-only bindings cannot include write repository grants")
 
     def repository(self, repo_type: str, repo_id: str, permission: str) -> RepositoryScope:
         """Resolve an exact configured Hub repository and permission."""
@@ -84,6 +93,7 @@ class ProviderSettings:
             "exchange_verification_key_ref",
             "account_center",
             "repositories",
+            "read_only",
             "timeout_seconds",
             "max_artifact_bytes",
             "hostSecretRefs",
@@ -112,6 +122,9 @@ class ProviderSettings:
 
         exchange_caller_id = _required_text(config, "exchange_caller_id")
         exchange_key_ref = _required_text(config, "exchange_verification_key_ref")
+        read_only = config.get("read_only", False)
+        if not isinstance(read_only, bool):
+            raise ConfigurationError("read_only must be boolean")
         account_center = config.get("account_center")
         if not isinstance(account_center, Mapping):
             raise ConfigurationError("resolved Account Center connection is required")
@@ -152,6 +165,8 @@ class ProviderSettings:
         if set(host_secret_names) != required_refs:
             raise ConfigurationError("hostSecretRefs must match the configured secret refs")
         repositories = _repository_scopes(config.get("repositories"))
+        if read_only and any("write" in item.permissions for item in repositories):
+            raise ConfigurationError("read-only bindings cannot include write repository grants")
         timeout = _positive_timeout(config.get("timeout_seconds", 15))
         maximum = config.get("max_artifact_bytes", 1_048_576)
         if (
@@ -180,6 +195,7 @@ class ProviderSettings:
             exchange_caller_id=exchange_caller_id,
             exchange_verification_key=_hmac_secret(secret(exchange_key_ref)),
             provider_signing_key=_hmac_secret(secret(provider_key_ref)),
+            read_only=read_only,
             timeout_seconds=timeout,
             max_artifact_bytes=maximum,
         )

@@ -10,6 +10,7 @@ import sqlite3
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -28,6 +29,8 @@ from cloud_management_provider.tool_catalog import (
     CALL_TOOL_METHOD,
     CALL_TOOL_RESPONSE_TYPE_URL,
     CAPABILITY_ID,
+    LIST_TOOLS_METHOD,
+    READ_ONLY_TOOL_IDS,
     TOOL_BY_ID,
 )
 
@@ -46,7 +49,9 @@ class _PartialThenTimeoutStream(httpx.SyncByteStream):
         pass
 
 
-def _configuration(tmp_path: Any, *, cli_enabled: bool = False) -> dict[str, Any]:
+def _configuration(
+    tmp_path: Any, *, cli_enabled: bool = False, read_only: bool = False
+) -> dict[str, Any]:
     """Build one host-only Runpod profile with explicit resource limits."""
 
     profile = {
@@ -74,6 +79,8 @@ def _configuration(tmp_path: Any, *, cli_enabled: bool = False) -> dict[str, Any
             "executable": "/usr/bin/runpodctl",
             "timeout_seconds": 5,
         }
+    if read_only:
+        profile["read_only"] = True
     return {
         "trusted_callers": [
             {
@@ -94,13 +101,15 @@ def _configuration(tmp_path: Any, *, cli_enabled: bool = False) -> dict[str, Any
     }
 
 
-def _settings(tmp_path: Any, *, cli_enabled: bool = False) -> ProviderSettings:
+def _settings(
+    tmp_path: Any, *, cli_enabled: bool = False, read_only: bool = False
+) -> ProviderSettings:
     """Create validated test settings from temporary host secret values."""
 
     environment = {
         "CYRENE_CAPABILITY_BINDING_ID": "binding-cloud-test",
         "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(
-            _configuration(tmp_path, cli_enabled=cli_enabled)
+            _configuration(tmp_path, cli_enabled=cli_enabled, read_only=read_only)
         ),
         "EXCHANGE_KEY": _EXCHANGE_KEY.hex(),
         "STATE_DIR": str(tmp_path),
@@ -113,6 +122,8 @@ def _multi_provider_settings(
     tmp_path: Any,
     *,
     azure_resource_api_versions: dict[str, str] | None = None,
+    azure_resource_groups: list[str] | None = None,
+    azure_subscription_id: str | None = None,
     gcp_disk_scope: bool = False,
 ) -> ProviderSettings:
     """Create Azure, GCP WIF, and Runpod profiles without contacting providers."""
@@ -140,8 +151,14 @@ def _multi_provider_settings(
             "provider": "azure",
             "identity_ref": "managed-identities/azure/test",
             "scope": {
-                "subscription_id": "11111111-2222-3333-4444-555555555555",
-                "resource_groups": ["rg-test"],
+                "subscription_id": (
+                    "11111111-2222-3333-4444-555555555555"
+                    if azure_subscription_id is None
+                    else azure_subscription_id
+                ),
+                "resource_groups": (
+                    ["rg-test"] if azure_resource_groups is None else azure_resource_groups
+                ),
                 "resource_api_versions": azure_api_versions,
             },
             "auth": {"mode": "managed_identity"},
@@ -201,6 +218,7 @@ def _pod_response(
     }
 
 
+
 def _gcp_disk_response(
     name: str = "cyrene-test-boot",
     status: str = "READY",
@@ -219,7 +237,6 @@ def _gcp_disk_response(
         "labels": labels or {},
         "diskEncryptionKey": {"kmsKeyName": "must-not-be-returned"},
     }
-
 
 def _gcp_operation_response(
     name: str,
@@ -246,6 +263,883 @@ def _gcp_operation_response(
         "status": "DONE",
         "insertTime": insert_time,
     }
+
+def test_cloud_provider_health_reports_managed_identity_and_wif_expiry(
+    tmp_path: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Azure and GCP health checks expose only short-lived token expiry metadata."""
+
+    settings = _multi_provider_settings(tmp_path)
+    subscription_path = "/subscriptions/11111111-2222-3333-4444-555555555555"
+
+    def health_response(request: httpx.Request) -> httpx.Response:
+        if request.url.host == provider_impl.AZURE_HOST:
+            assert request.method == "GET"
+            assert request.url.path == f"{subscription_path}/resourceGroups/rg-test"
+            assert request.url.params["api-version"] == provider_impl.AZURE_RESOURCE_API_VERSION
+            return httpx.Response(
+                200,
+                json={
+                    "id": f"{subscription_path}/resourceGroups/RG-TEST",
+                    "name": "RG-TEST",
+                },
+            )
+        return httpx.Response(200, json={"items": []})
+
+    client = httpx.Client(transport=httpx.MockTransport(health_response))
+    executor = CloudManagementExecutor(settings, http_client=client)
+    azure_expiry_epoch = datetime(2026, 10, 26, 22, 0, tzinfo=UTC).timestamp()
+    gcp_expiry = datetime(2026, 10, 26, 22, 5, tzinfo=UTC)
+
+    class _AzureCredential:
+        def get_token(self, scope: str) -> SimpleNamespace:
+            assert scope == "https://management.azure.com/.default"
+            return SimpleNamespace(token="fixture-azure-token", expires_on=azure_expiry_epoch)
+
+    class _GcpCredential:
+        valid = False
+        token: str | None = None
+        expiry: datetime | None = None
+
+        def refresh(self, _request: Any) -> None:
+            self.valid = True
+            self.token = "fixture-gcp-token"
+            self.expiry = gcp_expiry
+
+    monkeypatch.setitem(executor._credentials, "azure/test", _AzureCredential())  # noqa: SLF001
+    monkeypatch.setitem(executor._credentials, "gcp/test", _GcpCredential())  # noqa: SLF001
+
+    azure = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id="request-azure-health",
+    )
+    gcp = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id="request-gcp-health",
+    )
+
+    expected_fields = {
+        "profile_ref",
+        "provider",
+        "identity_ref",
+        "authentication_state",
+        "authorization_state",
+        "scope_refs",
+        "checked_at",
+        "expires_at",
+        "reason_code",
+    }
+    assert set(azure) == expected_fields
+    assert set(gcp) == expected_fields
+    assert azure["authentication_state"] == "VALID"
+    assert azure["authorization_state"] == "VALID"
+    assert azure["expires_at"] == "2026-10-26T22:00:00Z"
+    assert gcp["authentication_state"] == "VALID"
+    assert gcp["authorization_state"] == "VALID"
+    assert gcp["expires_at"] == "2026-10-26T22:05:00Z"
+    executor.close()
+
+
+def test_azure_health_checks_every_bound_resource_group_without_subscription_get(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Azure health proves every configured group and never probes subscription scope."""
+
+    subscription_id = "a1111111-b222-c333-d444-e55555555555"
+    resource_groups = ["Rg-One", "Rg-Two"]
+    settings = _multi_provider_settings(
+        tmp_path,
+        azure_resource_groups=resource_groups,
+        azure_subscription_id=subscription_id,
+    )
+    requests: list[httpx.Request] = []
+
+    def health_response(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        expected_prefix = f"/subscriptions/{subscription_id}/resourceGroups/"
+        assert request.method == "GET"
+        assert request.url.host == provider_impl.AZURE_HOST
+        assert request.url.path.startswith(expected_prefix)
+        group = request.url.path.removeprefix(expected_prefix)
+        assert group in resource_groups
+        assert request.url.params["api-version"] == provider_impl.AZURE_RESOURCE_API_VERSION
+        return httpx.Response(
+            200,
+            json={
+                "id": f"/subscriptions/{subscription_id}/resourceGroups/{group.lower()}".upper(),
+                "name": group.lower(),
+            },
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(health_response))
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(
+        executor,
+        "_azure_token",
+        lambda _profile: ("fixture-azure-token", "2026-10-26T22:00:00Z"),
+    )
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id="request-azure-health-rgs",
+    )
+
+    assert [request.url.path for request in requests] == [
+        f"/subscriptions/{subscription_id}/resourceGroups/Rg-One",
+        f"/subscriptions/{subscription_id}/resourceGroups/Rg-Two",
+    ]
+    assert all("/resourceGroups/" in request.url.path for request in requests)
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "VALID"
+    assert health["scope_refs"] == [
+        f"azure:{subscription_id}/Rg-One",
+        f"azure:{subscription_id}/Rg-Two",
+    ]
+    executor.close()
+
+
+def test_azure_health_reports_resource_group_403_as_permission_denied(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A denial at the bound resource-group scope stays a permission failure."""
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(403, json={"detail": "private body"})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id="request-azure-health-rg-denied",
+    )
+
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "PERMISSION_DENIED"
+    assert health["reason_code"] == "SCOPE_DENIED"
+    assert "private body" not in json.dumps(health)
+    executor.close()
+
+
+def test_cloud_profile_read_only_defaults_false_and_parses_true(tmp_path: Any) -> None:
+    """The host profile flag is optional for compatibility and parsed as a boolean."""
+
+    assert _settings(tmp_path / "default").profile("runpod/test").read_only is False
+    assert _settings(tmp_path / "readonly", read_only=True).profile("runpod/test").read_only is True
+    schema = json.loads(
+        (Path(__file__).parents[1] / "configuration.schema.json").read_text(encoding="utf-8")
+    )
+    Draft202012Validator(schema).validate(_configuration(tmp_path, read_only=True))
+
+    invalid_config = _configuration(tmp_path, read_only=True)
+    invalid_config["profiles"][0]["read_only"] = "true"
+    invalid_environment = {
+        "CYRENE_CAPABILITY_BINDING_ID": "binding-cloud-test",
+        "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(invalid_config),
+        "EXCHANGE_KEY": _EXCHANGE_KEY.hex(),
+        "STATE_DIR": str(tmp_path / "invalid"),
+        "RUNPOD_API_KEY": _API_KEY,
+    }
+    with pytest.raises(ConfigurationError, match="profile read_only must be boolean"):
+        ProviderSettings.from_environment(invalid_environment)
+
+
+def test_cloud_provider_health_runpod_key_has_unknown_expiry(
+    tmp_path: Any,
+) -> None:
+    """A working static Runpod key is valid now but has no asserted expiry date."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={"pods": [], "pagination": {"nextCursor": None, "hasNextPage": False}},
+            )
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id="request-runpod-health",
+    )
+
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "VALID"
+    assert health["expires_at"] is None
+    assert health["reason_code"] is None
+    executor.close()
+
+
+def test_cloud_provider_health_missing_runpod_key_requests_reauthorization(
+    tmp_path: Any,
+) -> None:
+    """A missing host key is actionable and distinct from an unknown network result."""
+
+    settings = ProviderSettings.from_environment(
+        {
+            "CYRENE_CAPABILITY_BINDING_ID": "binding-cloud-test",
+            "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(_configuration(tmp_path)),
+            "EXCHANGE_KEY": _EXCHANGE_KEY.hex(),
+            "STATE_DIR": str(tmp_path),
+            "RUNPOD_API_KEY": "",
+        }
+    )
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(
+                lambda _request: httpx.Response(
+                    200,
+                    json={"pods": [], "pagination": {"nextCursor": None, "hasNextPage": False}},
+                )
+            )
+        ),
+    )
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id="request-runpod-health-missing",
+    )
+
+    assert health["authentication_state"] == "MISSING"
+    assert health["authorization_state"] == "REAUTHORIZATION_REQUIRED"
+    assert health["expires_at"] is None
+    assert health["reason_code"] == "CREDENTIAL_MISSING"
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_authentication", "expected_authorization", "reason_code"),
+    [
+        (401, "INVALID", "REAUTHORIZATION_REQUIRED", "AUTHENTICATION_FAILED"),
+        (403, "VALID", "PERMISSION_DENIED", "SCOPE_DENIED"),
+        (302, "UNKNOWN", "UNKNOWN", "PROVIDER_REDIRECT_REJECTED"),
+        (503, "UNKNOWN", "UNKNOWN", "PROVIDER_ERROR"),
+    ],
+)
+def test_cloud_provider_health_distinguishes_auth_scope_and_upstream_failures(
+    tmp_path: Any,
+    status_code: int,
+    expected_authentication: str,
+    expected_authorization: str,
+    reason_code: str,
+) -> None:
+    """401, 403, and provider failure keep distinct safe health outcomes."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(status_code, json={"detail": "private body"})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id=f"request-runpod-health-{status_code}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == reason_code
+    assert "private body" not in json.dumps(health)
+    executor.close()
+
+
+def test_cloud_provider_health_network_failure_is_unknown_not_invalid(
+    tmp_path: Any,
+) -> None:
+    """A network failure cannot be reported as an invalid Runpod API key."""
+
+    settings = _settings(tmp_path)
+
+    def fail(_request: httpx.Request) -> httpx.Response:
+        raise httpx.ConnectError("private network detail")
+
+    client = httpx.Client(transport=httpx.MockTransport(fail))
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "runpod/test"},
+        request_id="request-runpod-health-network",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == "PROVIDER_UNAVAILABLE"
+    assert "private network detail" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("profile_ref", "response"),
+    [
+        ("azure/test", {"error": {"code": "Denied"}}),
+        ("azure/test", {}),
+        (
+            "azure/test",
+            {
+                "id": "/subscriptions/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee/resourceGroups/rg-test",
+                "name": "rg-test",
+            },
+        ),
+        (
+            "azure/test",
+            {
+                "id": "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-other",
+                "name": "rg-test",
+            },
+        ),
+        (
+            "azure/test",
+            {
+                "id": "/subscriptions/11111111-2222-3333-4444-555555555555/resourceGroups/rg-test",
+                "name": "rg-other",
+            },
+        ),
+        ("gcp/test", {"items": [{}]}),
+        (
+            "runpod/test",
+            {"pods": [{}], "pagination": {"nextCursor": None, "hasNextPage": False}},
+        ),
+    ],
+)
+def test_cloud_provider_health_does_not_accept_malformed_success_bodies(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_ref: str,
+    response: dict[str, Any],
+) -> None:
+    """A 2xx with an invalid provider shape remains UNKNOWN, never VALID."""
+
+    settings = (
+        _multi_provider_settings(tmp_path)
+        if profile_ref != "runpod/test"
+        else _settings(tmp_path)
+    )
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", None))
+
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": profile_ref},
+        request_id=f"request-health-malformed-{profile_ref}",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == "INVALID_PROVIDER_RESPONSE"
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("failure_type", "expected_authentication", "expected_authorization", "expected_reason"),
+    [
+        ("transport", "UNKNOWN", "UNKNOWN", "PROVIDER_UNAVAILABLE"),
+        ("auth", "INVALID", "REAUTHORIZATION_REQUIRED", "AUTHENTICATION_FAILED"),
+        ("permission", "VALID", "PERMISSION_DENIED", "SCOPE_DENIED"),
+    ],
+)
+def test_azure_managed_identity_health_does_not_misreport_token_transport_errors(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_type: str,
+    expected_authentication: str,
+    expected_authorization: str,
+    expected_reason: str,
+) -> None:
+    """Managed identity token transport and authentication failures remain distinct."""
+
+    from azure.core.exceptions import ClientAuthenticationError, ServiceRequestError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    if failure_type == "transport":
+        error: Exception = ServiceRequestError("private transport detail")
+    elif failure_type == "permission":
+        error = ClientAuthenticationError(
+            "private identity detail",
+            response=SimpleNamespace(status_code=403, reason="Forbidden", headers={}),
+        )
+    else:
+        error = ClientAuthenticationError("private identity detail")
+
+    class _Credential:
+        def get_token(self, _scope: str) -> Any:
+            raise error
+
+    monkeypatch.setitem(executor._credentials, "azure/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "azure/test"},
+        request_id=f"request-azure-token-{failure_type}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == expected_reason
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("retryable", "expected_authentication", "expected_authorization", "expected_reason"),
+    [
+        (True, "UNKNOWN", "UNKNOWN", "PROVIDER_UNAVAILABLE"),
+        (False, "INVALID", "REAUTHORIZATION_REQUIRED", "AUTHENTICATION_FAILED"),
+    ],
+)
+def test_gcp_wif_health_treats_retryable_refresh_errors_as_unknown(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    retryable: bool,
+    expected_authentication: str,
+    expected_authorization: str,
+    expected_reason: str,
+) -> None:
+    """WIF refresh retries are not mistaken for an invalid long-lived identity."""
+
+    from google.auth.exceptions import RefreshError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise RefreshError("private refresh detail", retryable=retryable)
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id=f"request-gcp-refresh-{retryable}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == expected_reason
+    assert "private refresh detail" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    (
+        "response_body",
+        "exception_message",
+        "expected_authentication",
+        "expected_authorization",
+        "expected_reason",
+    ),
+    [
+        (
+            '{"error":"invalid_target","error_description":"private detail"}',
+            "private OAuth message",
+            "INVALID",
+            "REAUTHORIZATION_REQUIRED",
+            "AUTHENTICATION_FAILED",
+        ),
+        (
+            '{"error":"temporarily_unavailable","error_description":"private detail"}',
+            "private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_UNAVAILABLE",
+        ),
+        (
+            '{"error":"server_error","error_description":"private detail"}',
+            "private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_UNAVAILABLE",
+        ),
+        (
+            "not-json",
+            "invalid_target private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_ERROR",
+        ),
+        (
+            '{"error":"unrecognized_code","error_description":"private detail"}',
+            "private OAuth message",
+            "UNKNOWN",
+            "UNKNOWN",
+            "PROVIDER_ERROR",
+        ),
+    ],
+)
+def test_gcp_wif_health_classifies_only_known_structured_oauth_errors(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    response_body: str,
+    exception_message: str,
+    expected_authentication: str,
+    expected_authorization: str,
+    expected_reason: str,
+) -> None:
+    """Classify only bounded OAuth machine codes, never free-form provider text."""
+
+    from google.auth.exceptions import OAuthError
+
+    settings = _multi_provider_settings(tmp_path)
+    requests: list[httpx.Request] = []
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda request: requests.append(request) or httpx.Response(200, json={"items": []})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise OAuthError(exception_message, response_body)
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id=f"request-gcp-oauth-{expected_reason}",
+    )
+
+    assert health["authentication_state"] == expected_authentication
+    assert health["authorization_state"] == expected_authorization
+    assert health["reason_code"] == expected_reason
+    assert requests == []
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("response_body", "expected_reason"),
+    [
+        (None, "PROVIDER_ERROR"),
+        ("x" * 8193, "PROVIDER_ERROR"),
+    ],
+)
+def test_gcp_wif_health_rejects_absent_or_oversized_oauth_response_bodies(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    response_body: str | None,
+    expected_reason: str,
+) -> None:
+    """Malformed or oversized OAuth bodies never become credential evidence."""
+
+    from google.auth.exceptions import OAuthError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            if response_body is None:
+                raise OAuthError("invalid_target appeared only in this message")
+            raise OAuthError("private OAuth message", response_body)
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id=f"request-gcp-oauth-bad-body-{expected_reason}-{response_body is None}",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == expected_reason
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
+def test_gcp_wif_health_preserves_transport_error_classification(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Google token transport failures remain retryable and distinct from OAuth rejection."""
+
+    from google.auth.exceptions import TransportError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise TransportError("private transport detail")
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id="request-gcp-oauth-transport",
+    )
+
+    assert health["authentication_state"] == "UNKNOWN"
+    assert health["authorization_state"] == "UNKNOWN"
+    assert health["reason_code"] == "PROVIDER_UNAVAILABLE"
+    assert "private" not in json.dumps(health)
+    executor.close()
+
+
+def test_gcp_wif_health_reports_structured_iam_denial_as_permission_denied(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A structured WIF/IAM 403 is not mislabeled as an invalid source identity."""
+
+    from google.auth.exceptions import RefreshError
+
+    settings = _multi_provider_settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json={"items": []}))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    class _Credential:
+        valid = False
+
+        def refresh(self, _request: Any) -> None:
+            raise RefreshError(
+                "private denial detail",
+                {"error": {"code": 403, "status": "PERMISSION_DENIED", "message": "private"}},
+            )
+
+    monkeypatch.setitem(executor._credentials, "gcp/test", _Credential())  # noqa: SLF001
+    health = executor.call(
+        "cloud_provider_health",
+        {"profile_ref": "gcp/test"},
+        request_id="request-gcp-refresh-permission-denied",
+    )
+
+    assert health["authentication_state"] == "VALID"
+    assert health["authorization_state"] == "PERMISSION_DENIED"
+    assert health["reason_code"] == "SCOPE_DENIED"
+    assert "private denial detail" not in json.dumps(health)
+    assert '"message": "private"' not in json.dumps(health)
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("profile_ref", "target", "response"),
+    [
+        ("azure/test", {"resource_group": "rg-test"}, {"error": {"code": "Denied"}}),
+        ("gcp/test", {"zone": "us-central1-a"}, {"error": {"code": "denied"}}),
+        ("runpod/test", {"scope_ref": "pods"}, {"error": {"status": 403}}),
+    ],
+)
+def test_cloud_resource_list_does_not_turn_error_envelopes_into_empty_lists(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_ref: str,
+    target: dict[str, str],
+    response: dict[str, Any],
+) -> None:
+    """HTTP success with an error or malformed envelope never becomes resources=[]."""
+
+    settings = (
+        _multi_provider_settings(tmp_path)
+        if profile_ref != "runpod/test"
+        else _settings(tmp_path)
+    )
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", None))
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resources_list",
+            {"profile_ref": profile_ref, "target": target},
+            request_id=f"request-list-envelope-{profile_ref}",
+        )
+    executor.close()
+
+
+def test_runpod_v2_list_validates_and_preserves_pagination(tmp_path: Any) -> None:
+    """A valid v2 Pod page returns scoped records and its opaque next cursor."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(
+                200,
+                json={
+                    "pods": [_pod_response("pod-123", "cyrene-test-worker")],
+                    "pagination": {"nextCursor": "page-next", "hasNextPage": True},
+                },
+            )
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    listed = executor.call(
+        "cloud_resources_list",
+        {"profile_ref": "runpod/test", "target": {"scope_ref": "pods"}},
+        request_id="request-runpod-list-valid",
+    )
+
+    assert listed["resources"][0]["id"] == "pod-123"
+    assert listed["resources"][0]["status"] == "RUNNING"
+    assert listed["next_cursor"] == "page-next"
+    assert listed["has_next_page"] is True
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    "pagination",
+    [
+        {"hasNextPage": True},
+        {"nextCursor": None, "hasNextPage": True},
+        {"nextCursor": "", "hasNextPage": True},
+    ],
+)
+def test_runpod_v2_list_rejects_unfollowable_next_page(
+    tmp_path: Any,
+    pagination: dict[str, Any],
+) -> None:
+    """Runpod cannot claim another page without a usable continuation cursor."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, json={"pods": [], "pagination": pagination})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resources_list",
+            {"profile_ref": "runpod/test", "target": {"scope_ref": "pods"}},
+            request_id="request-runpod-list-invalid-pagination",
+        )
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    ("profile_ref", "target", "response"),
+    [
+        ("azure/test", {"resource_group": "rg-test"}, {"value": [{}]}),
+        ("gcp/test", {"zone": "us-central1-a"}, {"items": [{}]}),
+        (
+            "runpod/test",
+            {"scope_ref": "pods"},
+            {"pods": [{}], "pagination": {"nextCursor": None, "hasNextPage": False}},
+        ),
+    ],
+)
+def test_cloud_resource_list_rejects_incomplete_provider_items(
+    tmp_path: Any,
+    monkeypatch: pytest.MonkeyPatch,
+    profile_ref: str,
+    target: dict[str, str],
+    response: dict[str, Any],
+) -> None:
+    """Incomplete success records cannot vanish during scope filtering."""
+
+    settings = (
+        _multi_provider_settings(tmp_path)
+        if profile_ref != "runpod/test"
+        else _settings(tmp_path)
+    )
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+    monkeypatch.setattr(executor, "_azure_token", lambda _profile: ("fixture", None))
+    monkeypatch.setattr(executor, "_gcp_token", lambda _profile: ("fixture", None))
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resources_list",
+            {"profile_ref": profile_ref, "target": target},
+            request_id=f"request-list-item-{profile_ref}",
+        )
+    executor.close()
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        {"id": "pod-123", "error": {"code": "Unavailable"}},
+        {"id": "pod-123", "name": "cyrene-test-unit"},
+    ],
+)
+def test_runpod_get_requires_a_complete_pod_record(
+    tmp_path: Any,
+    response: dict[str, Any],
+) -> None:
+    """A matching ID alone cannot convert a malformed v2 read into a resource."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, json=response))
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor.call(
+            "cloud_resource_get",
+            {"profile_ref": "runpod/test", "target": {"pod_id": "pod-123"}},
+            request_id="request-runpod-malformed-get",
+        )
+    executor.close()
+
+
+def test_runpod_readback_does_not_treat_error_envelope_as_missing_pod(tmp_path: Any) -> None:
+    """A malformed Pod list cannot falsely confirm that a new resource is absent."""
+
+    settings = _settings(tmp_path)
+    client = httpx.Client(
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, json={"error": {"code": "Unavailable"}})
+        )
+    )
+    executor = CloudManagementExecutor(settings, http_client=client)
+
+    with pytest.raises(ProviderFailure, match="INVALID_PROVIDER_RESPONSE"):
+        executor._find_runpod_by_name(  # noqa: SLF001
+            settings.profile("runpod/test"), "cyrene-test-unit"
+        )
+    executor.close()
 
 
 def test_runpod_create_is_scope_bounded_and_replay_safe(tmp_path: Any) -> None:
@@ -293,6 +1187,49 @@ def test_runpod_create_is_scope_bounded_and_replay_safe(tmp_path: Any) -> None:
     operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
     assert operation["provider"] == "runpod"
     assert operation["profile_ref"] == "runpod/test"
+    executor.close()
+
+
+def test_runpod_create_malformed_201_stays_unknown_and_replay_safe(tmp_path: Any) -> None:
+    """A malformed create response cannot become success or trigger a duplicate POST."""
+
+    settings = _settings(tmp_path)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            201,
+            json={"id": "new-pod-1", "name": "cyrene-test-unit"},
+        )
+
+    client = httpx.Client(transport=httpx.MockTransport(handler))
+    executor = CloudManagementExecutor(settings, http_client=client)
+    arguments = {
+        "profile_ref": "runpod/test",
+        "target": {"pod_name": "cyrene-test-unit"},
+        "parameters": {
+            "image": "example/image:1",
+            "gpu": {"id": "NVIDIA GeForce RTX 4090", "count": 1},
+            "disk": 20,
+            "dataCenterIds": ["US-KS-2"],
+        },
+    }
+
+    result = executor.call(
+        "cloud_resource_create", arguments, request_id="request-create-malformed"
+    )
+    replay = executor.call(
+        "cloud_resource_create", arguments, request_id="request-create-malformed"
+    )
+
+    assert len(requests) == 1
+    assert result == replay
+    assert result["state"] == "UNKNOWN_RESULT"
+    assert result["actual_state"] == "UNKNOWN"
+    assert result["readiness"] == "UNKNOWN"
+    assert result["reason_code"] == "INVALID_PROVIDER_RESPONSE"
+    assert result["operation_ref"]
     executor.close()
 
 
@@ -1115,23 +2052,6 @@ def test_vendor_cli_uses_profile_scope_instead_of_claiming_one_vm(tmp_path: Any)
         executor._validate_cli_scope(
             gcp, ["compute", "instances", "list", "--url", "https://attacker.example"]
         )
-    gcp_disk_settings = _multi_provider_settings(tmp_path / "gcp-disk-cli", gcp_disk_scope=True)
-    gcp_disk = gcp_disk_settings.profile("gcp/test")
-    executor._validate_cli_scope(
-        gcp_disk,
-        ["compute", "disks", "describe", "cyrene-test-boot", "--zone", "us-central1-a"],
-    )
-    executor._validate_cli_scope(gcp_disk, ["compute", "disks", "list", "--zone=us-central1-a"])
-    with pytest.raises(ProviderFailure, match="SCOPE_DENIED"):
-        executor._validate_cli_scope(
-            gcp_disk,
-            ["compute", "disks", "describe", "outside-test-disk", "--zone=us-central1-a"],
-        )
-    with pytest.raises(ProviderFailure, match="UNSUPPORTED_OPERATION"):
-        executor._validate_cli_scope(
-            gcp_disk,
-            ["compute", "disks", "delete", "cyrene-test-boot", "--zone=us-central1-a"],
-        )
 
     runpod_settings = _settings(tmp_path / "runpod")
     runpod_executor = CloudManagementExecutor(
@@ -1680,44 +2600,6 @@ def test_gcp_list_filters_results_to_profile_name_scope(tmp_path: Any) -> None:
     executor.close()
 
 
-def test_gcp_disk_list_is_explicit_and_prefix_filtered(tmp_path: Any) -> None:
-    """Disk enumeration uses its own target kind and name-prefix allowlist."""
-
-    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    paths: list[str] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        paths.append(request.url.path)
-        return httpx.Response(
-            200,
-            json={
-                "items": [
-                    _gcp_disk_response(labels={"owner": "yidong-derek-li"}),
-                    _gcp_disk_response(name="other-disk"),
-                ],
-                "nextPageToken": "disk-next-page",
-            },
-        )
-
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    listed = executor.call(
-        "cloud_resources_list",
-        {"profile_ref": "gcp/test", "target": {"kind": "disk", "zone": "us-central1-a"}},
-        request_id="request-gcp-disk-list",
-    )
-    assert paths == ["/compute/v1/projects/cyrene-test-project/zones/us-central1-a/disks"]
-    assert listed["resource_kind"] == "disk"
-    assert [item["name"] for item in listed["resources"]] == ["cyrene-test-boot"]
-    assert listed["resources"][0]["labels"] == {"owner": "yidong-derek-li"}
-    assert listed["next_page_token"] == "disk-next-page"
-    assert "diskEncryptionKey" not in json.dumps(listed)
-    executor.close()
-
-
 def test_gcp_instance_operation_status_uses_zone_and_operation_name(tmp_path: Any) -> None:
     """GCE operation polling reconstructs only fixed project/zone REST paths."""
 
@@ -1768,6 +2650,859 @@ def test_gcp_instance_operation_status_uses_zone_and_operation_name(tmp_path: An
     assert all(path.startswith("/compute/v1/projects/cyrene-test-project/") for path in paths)
     executor.close()
 
+
+class _RecordingExecutor:
+    """Test seam that records already authenticated provider arguments."""
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+
+    def call(self, tool_id: str, arguments: dict[str, Any], **_: Any) -> dict[str, Any]:
+        self.calls.append({"tool_id": tool_id, "arguments": arguments})
+        return {"state": "SUCCEEDED", "resource_ref": "pod-123"}
+
+    def close(self) -> None:
+        return None
+
+
+def test_plugin_verifies_actor_operation_and_complete_argument_hash(tmp_path: Any) -> None:
+    """The provider accepts one exact Exchange signature and rejects payload edits."""
+
+    settings = _settings(tmp_path)
+    executor = _RecordingExecutor()
+    plugin = CloudManagementProvider(settings=settings, executor=executor)
+    arguments = {"profile_ref": "runpod/test", "target": {"pod_id": "pod-123"}}
+    now = datetime.now(UTC)
+    context = sign_context(
+        method="cloud_resource_get",
+        operation_id="cloud.resource.get",
+        payload=arguments,
+        caller_workload="exchange",
+        audience="cloud-management",
+        issuer="https://directory.example",
+        subject="user-1",
+        organization_id="org-fixture",
+        workspace_id="workspace-fixture",
+        binding_id=settings.binding_id,
+        request_id="request-plugin-1",
+        key=_EXCHANGE_KEY,
+        issued_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+
+    valid = _invoke(plugin, settings.binding_id, arguments, context.as_dict())
+    assert valid.outcome.is_error is False
+    assert len(executor.calls) == 1
+
+    modified = {**arguments, "target": {"pod_id": "different-pod"}}
+    invalid = _invoke(plugin, settings.binding_id, modified, context.as_dict())
+    assert invalid.outcome.is_error is True
+    assert (
+        json.loads(invalid.outcome.content[0].json.json)["error"]["code"] == "AUTHENTICATION_DENIED"
+    )
+    assert len(executor.calls) == 1
+    plugin.close()
+
+
+def test_cli_signature_binds_complete_argv_without_model_resource_target(tmp_path: Any) -> None:
+    """Exchange signs the exact native argv while the provider grant stays profile-scoped."""
+
+    settings = _settings(tmp_path)
+    executor = _RecordingExecutor()
+    plugin = CloudManagementProvider(settings=settings, executor=executor)
+    tool_id = "cloud_vendor_cli"
+    arguments = {
+        "profile_ref": "runpod/test",
+        "argv": ["pod", "delete", "pod-a"],
+    }
+    now = datetime.now(UTC)
+    context = sign_context(
+        method=tool_id,
+        operation_id="cloud.vendor.cli.execute",
+        payload=arguments,
+        caller_workload="exchange",
+        audience="cloud-management",
+        issuer="https://directory.example",
+        subject="user-1",
+        organization_id="org-fixture",
+        workspace_id="workspace-fixture",
+        binding_id=settings.binding_id,
+        request_id="request-cli-signature-1",
+        key=_EXCHANGE_KEY,
+        issued_at=now,
+        expires_at=now + timedelta(seconds=240),
+    )
+
+    valid = _invoke(plugin, settings.binding_id, arguments, context.as_dict(), tool_id=tool_id)
+    assert valid.outcome.is_error is False
+    assert executor.calls[0]["arguments"]["argv"] == arguments["argv"]
+    assert "target" not in executor.calls[0]["arguments"]
+
+    tampered = {**arguments, "argv": ["pod", "delete", "pod-b"]}
+    invalid = _invoke(plugin, settings.binding_id, tampered, context.as_dict(), tool_id=tool_id)
+    assert invalid.outcome.is_error is True
+    assert (
+        json.loads(invalid.outcome.content[0].json.json)["error"]["code"] == "AUTHENTICATION_DENIED"
+    )
+    assert len(executor.calls) == 1
+    plugin.close()
+
+
+def _invoke(
+    plugin: CloudManagementProvider,
+    binding_id: str,
+    arguments: dict[str, Any],
+    context: dict[str, Any],
+    *,
+    tool_id: str = "cloud_resource_get",
+) -> wire.CallToolResponse:
+    """Encode one signed tool envelope and decode the typed provider response."""
+
+    request = wire.CallToolRequest(
+        binding_id=binding_id,
+        provider_tool_id=tool_id,
+        arguments_json=json.dumps({"caller_context": context, "arguments": arguments}),
+    )
+    accepted, response = plugin.on_invoke(
+        CAPABILITY_ID,
+        CALL_TOOL_METHOD,
+        request.SerializeToString(),
+        request_type_url="type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest",
+    )
+    assert accepted is True
+    assert response.type_url == CALL_TOOL_RESPONSE_TYPE_URL
+    decoded = wire.CallToolResponse()
+    decoded.ParseFromString(response.value)
+    return decoded
+
+
+def test_read_only_profile_filters_catalog_and_server_denies_direct_mutations(
+    tmp_path: Any,
+) -> None:
+    """The provider enforces the host profile mode even for signed direct tool calls."""
+
+    settings = _settings(tmp_path, cli_enabled=True, read_only=True)
+    assert settings.profile("runpod/test").read_only is True
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(
+            200,
+            json={"pods": [], "pagination": {"nextCursor": None, "hasNextPage": False}},
+        )
+
+    class _ProcessRunner:
+        calls = 0
+
+        def run(self, *_args: Any, **_kwargs: Any) -> ProcessResult:
+            self.calls += 1
+            raise AssertionError("read-only rejection must happen before CLI execution")
+
+    process = _ProcessRunner()
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+        process_runner=process,
+    )
+    plugin = CloudManagementProvider(settings=settings, executor=executor)
+    catalog_request = wire.ListToolsRequest(binding_id=settings.binding_id)
+    accepted, catalog_payload = plugin.on_invoke(
+        CAPABILITY_ID,
+        LIST_TOOLS_METHOD,
+        catalog_request.SerializeToString(),
+    )
+    assert accepted is True
+    catalog = wire.ListToolsResponse.FromString(catalog_payload.value).catalog
+    assert {tool.provider_tool_id for tool in catalog.tools} == READ_ONLY_TOOL_IDS
+
+    cases = [
+        (
+            "cloud_resource_create",
+            {
+                "profile_ref": "runpod/test",
+                "target": {"pod_name": "cyrene-test-unit"},
+                "parameters": {
+                    "image": "example/image:1",
+                    "gpu": {"id": "NVIDIA GeForce RTX 4090", "count": 1},
+                    "disk": 20,
+                    "dataCenterIds": ["US-KS-2"],
+                },
+            },
+        ),
+        (
+            "cloud_operation_cancel",
+            {"profile_ref": "runpod/test", "operation_ref": "fixture-operation-ref"},
+        ),
+        (
+            "cloud_vendor_cli",
+            {"profile_ref": "runpod/test", "argv": ["pod", "list"]},
+        ),
+    ]
+    for index, (tool_id, arguments) in enumerate(cases):
+        request_id = f"request-readonly-{index}"
+        now = datetime.now(UTC)
+        context = sign_context(
+            method=tool_id,
+            operation_id=str(TOOL_BY_ID[tool_id]["operation_id"]),
+            payload=arguments,
+            caller_workload="exchange",
+            audience="cloud-management",
+            issuer="https://directory.example",
+            subject="user-1",
+            organization_id="org-fixture",
+            workspace_id="workspace-fixture",
+            binding_id=settings.binding_id,
+            request_id=request_id,
+            key=_EXCHANGE_KEY,
+            issued_at=now,
+            expires_at=now + timedelta(seconds=60),
+        )
+
+        response = _invoke(
+            plugin,
+            settings.binding_id,
+            arguments,
+            context.as_dict(),
+            tool_id=tool_id,
+        )
+
+        assert response.outcome.is_error is True
+        assert json.loads(response.outcome.content[0].json.json)["error"]["code"] == (
+            "READ_ONLY_PROFILE"
+        )
+        assert executor._ledger.get(request_id) is None  # noqa: SLF001
+
+    list_arguments = {"profile_ref": "runpod/test", "target": {"scope_ref": "pods"}}
+    now = datetime.now(UTC)
+    list_context = sign_context(
+        method="cloud_resources_list",
+        operation_id="cloud.resources.list",
+        payload=list_arguments,
+        caller_workload="exchange",
+        audience="cloud-management",
+        issuer="https://directory.example",
+        subject="user-1",
+        organization_id="org-fixture",
+        workspace_id="workspace-fixture",
+        binding_id=settings.binding_id,
+        request_id="request-readonly-list",
+        key=_EXCHANGE_KEY,
+        issued_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+    read_response = _invoke(
+        plugin,
+        settings.binding_id,
+        list_arguments,
+        list_context.as_dict(),
+        tool_id="cloud_resources_list",
+    )
+
+    assert read_response.outcome.is_error is False
+    assert [request.method for request in requests] == ["GET"]
+    assert process.calls == 0
+
+    attempted_override = {
+        "profile_ref": "runpod/test",
+        "target": {"pod_name": "cyrene-test-unit"},
+        "parameters": {
+            "image": "example/image:1",
+            "gpu": {"id": "NVIDIA GeForce RTX 4090", "count": 1},
+            "disk": 20,
+            "dataCenterIds": ["US-KS-2"],
+        },
+        "read_only": False,
+    }
+    now = datetime.now(UTC)
+    override_context = sign_context(
+        method="cloud_resource_create",
+        operation_id="cloud.resource.create",
+        payload=attempted_override,
+        caller_workload="exchange",
+        audience="cloud-management",
+        issuer="https://directory.example",
+        subject="user-1",
+        organization_id="org-fixture",
+        workspace_id="workspace-fixture",
+        binding_id=settings.binding_id,
+        request_id="request-readonly-override",
+        key=_EXCHANGE_KEY,
+        issued_at=now,
+        expires_at=now + timedelta(seconds=60),
+    )
+    override_response = _invoke(
+        plugin,
+        settings.binding_id,
+        attempted_override,
+        override_context.as_dict(),
+        tool_id="cloud_resource_create",
+    )
+    assert override_response.outcome.is_error is True
+    assert json.loads(override_response.outcome.content[0].json.json)["error"]["code"] == (
+        "INVALID_ARGUMENTS"
+    )
+    assert len(requests) == 1
+    plugin.close()
+
+
+def test_operation_ref_is_bound_to_exchange_key(tmp_path: Any) -> None:
+    """A caller cannot modify the resource or provider in a pollable reference."""
+
+    settings = _settings(tmp_path)
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda request: httpx.Response(500))
+        ),
+    )
+    reference = executor._new_operation_ref(  # noqa: SLF001
+        settings.profile("runpod/test"),
+        "cloud_resource_start",
+        {"pod_id": "pod-123"},
+        "request-opref-1",
+    )
+    assert parse_operation_ref(reference, _EXCHANGE_KEY)["target"] == {"pod_id": "pod-123"}
+    parts = reference.split(".")
+    tampered = f"{parts[0]}.{parts[1]}.{('0' if parts[2][0] != '0' else '1') + parts[2][1:]}"
+    with pytest.raises(InvalidOperationRef):
+        parse_operation_ref(tampered, _EXCHANGE_KEY)
+    executor.close()
+
+@pytest.mark.parametrize(
+    ("status_code", "expected_code"),
+    [(401, "AUTHENTICATION_FAILED"), (403, "SCOPE_DENIED")],
+)
+def test_gcp_disk_create_surfaces_auth_and_permission_failures(
+    tmp_path: Any, status_code: int, expected_code: str
+) -> None:
+    """GCE authentication and IAM failures remain explicit provider errors."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(status_code, json={"error": {"code": status_code}})
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-auth-check",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": {"cyrene-task": "teams-cloud-20261023"},
+            },
+        },
+        request_id=f"request-gcp-auth-{status_code}",
+    )
+    assert result["error"]["code"] == expected_code
+    assert len(requests) == 1
+    assert requests[0].method == "POST"
+    executor.close()
+
+def test_gcp_disk_creation_is_default_denied_without_explicit_disk_scope(tmp_path: Any) -> None:
+    """Legacy GCP profiles continue to manage instances but cannot create disks."""
+
+    settings = _multi_provider_settings(tmp_path)
+    requests: list[httpx.Request] = []
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda request: requests.append(request))
+        ),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-default-denied",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+            },
+        },
+        request_id="request-gcp-default-denied",
+    )
+    assert result["error"]["code"] == "SCOPE_DENIED"
+    assert requests == []
+    executor.close()
+
+@pytest.mark.parametrize(
+    ("readback_status", "expected_state", "actual_state", "release_confirmed"),
+    [(404, "SUCCEEDED", "ABSENT", True), (200, "UNKNOWN_RESULT", "PRESENT", False)],
+)
+def test_gcp_disk_delete_404_requires_a_fresh_absence_query(
+    tmp_path: Any,
+    readback_status: int,
+    expected_state: str,
+    actual_state: str,
+    release_confirmed: bool,
+) -> None:
+    """An idempotent delete verifies absence and stays unknown if the disk remains."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    methods: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        methods.append(request.method)
+        if request.method == "DELETE":
+            return httpx.Response(404, json={"error": {"code": 404}})
+        assert request.method == "GET"
+        if readback_status == 404:
+            return httpx.Response(404, json={"error": {"code": 404}})
+        return httpx.Response(200, json=_gcp_disk_response(status="READY"))
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_delete",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-already-absent",
+            },
+        },
+        request_id="request-gcp-delete-absent",
+    )
+    assert methods == ["DELETE", "GET"]
+    assert result["state"] == expected_state
+    assert result["actual_state"] == actual_state
+    assert result["release_confirmed"] is release_confirmed
+    operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
+    assert operation["request_id"] == "request-gcp-delete-absent"
+    executor.close()
+
+def test_gcp_disk_list_is_explicit_and_prefix_filtered(tmp_path: Any) -> None:
+    """Disk enumeration uses its own target kind and name-prefix allowlist."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    paths: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        paths.append(request.url.path)
+        return httpx.Response(
+            200,
+            json={
+                "items": [
+                    _gcp_disk_response(labels={"owner": "yidong-derek-li"}),
+                    _gcp_disk_response(name="other-disk"),
+                ],
+                "nextPageToken": "disk-next-page",
+            },
+        )
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    listed = executor.call(
+        "cloud_resources_list",
+        {"profile_ref": "gcp/test", "target": {"kind": "disk", "zone": "us-central1-a"}},
+        request_id="request-gcp-disk-list",
+    )
+    assert paths == ["/compute/v1/projects/cyrene-test-project/zones/us-central1-a/disks"]
+    assert listed["resource_kind"] == "disk"
+    assert [item["name"] for item in listed["resources"]] == ["cyrene-test-boot"]
+    assert listed["resources"][0]["labels"] == {"owner": "yidong-derek-li"}
+    assert listed["next_page_token"] == "disk-next-page"
+    assert "diskEncryptionKey" not in json.dumps(listed)
+    executor.close()
+
+@pytest.mark.parametrize(
+    ("field", "wrong_value"),
+    [
+        ("sourceImage", "projects/debian-cloud/global/images/family/debian-11"),
+        ("sizeGb", "12"),
+        ("labels", {"cyrene-task": "different-task"}),
+    ],
+)
+def test_gcp_disk_operation_requires_exact_configuration_readback(
+    tmp_path: Any, field: str, wrong_value: object
+) -> None:
+    """A READY disk with a different image, size, or owner/task label is not success."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    labels = {"cyrene-task": "teams-cloud-20261023"}
+    operation_body: dict[str, Any] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.method == "POST":
+            operation_body.update(
+                _gcp_operation_response(
+                    "disk-verify-op",
+                    "cyrene-test-readback-mismatch",
+                    request.url.params["requestId"],
+                    "create",
+                    "",
+                )
+            )
+            operation_body["status"] = "RUNNING"
+            return httpx.Response(
+                200,
+                json={"name": "disk-verify-op", "status": "RUNNING", "zone": "us-central1-a"},
+            )
+        if request.url.path.endswith("/operations/disk-verify-op"):
+            return httpx.Response(200, json=operation_body)
+        disk = _gcp_disk_response(labels=labels)
+        disk[field] = wrong_value
+        return httpx.Response(200, json=disk)
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    request_id = f"request-gcp-disk-readback-{uuid.uuid4()}"
+    created = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-readback-mismatch",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": labels,
+            },
+        },
+        request_id=request_id,
+    )
+    operation_ref = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
+    operation_body["insertTime"] = operation_ref["created_at"]
+    operation_body["status"] = "DONE"
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
+        request_id=f"request-gcp-disk-readback-status-{uuid.uuid4()}",
+    )
+    assert status["state"] == "UNKNOWN_RESULT"
+    assert status["actual_state"] == "READY"
+    assert status["reason_code"] == "DISK_CONFIGURATION_READBACK_MISMATCH"
+    executor.close()
+
+@pytest.mark.parametrize(
+    ("target", "parameters"),
+    [
+        (
+            {"kind": "disk", "zone": "us-central1-b", "disk_name": "cyrene-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+            },
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "outside-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+            },
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
+            {"sourceImage": "projects/other-cloud/global/images/family/debian-12", "sizeGb": 10},
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 17,
+            },
+        ),
+        (
+            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
+            {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": {"api_key": "sensitive"},
+            },
+        ),
+    ],
+)
+def test_gcp_disk_scope_and_create_bounds_fail_before_provider_calls(
+    tmp_path: Any, target: dict[str, str], parameters: dict[str, Any]
+) -> None:
+    """Wrong zones, names, images, sizes, and secret labels never reach GCE."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(
+            transport=httpx.MockTransport(lambda request: requests.append(request))
+        ),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {"profile_ref": "gcp/test", "target": target, "parameters": parameters},
+        request_id=f"request-gcp-invalid-{uuid.uuid4()}",
+    )
+    assert result["error"]["code"] in {"SCOPE_DENIED", "INVALID_ARGUMENTS"}
+    assert requests == []
+    executor.close()
+
+@pytest.mark.parametrize(
+    ("operation_list_status", "expected_lookup_error"),
+    [(200, None), (403, "SCOPE_DENIED")],
+)
+def test_gcp_interrupted_disk_create_is_queried_without_replay(
+    tmp_path: Any, operation_list_status: int, expected_lookup_error: str | None
+) -> None:
+    """A matching pre-existing disk is not adopted when LRO identity is unproved."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    methods: list[str] = []
+    labels = {"cyrene-task": "teams-cloud-20261023"}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        methods.append(request.method)
+        if request.method == "POST":
+            raise httpx.ReadTimeout("fixture write response lost")
+        if request.url.path.endswith("/zones/us-central1-a/operations"):
+            if operation_list_status == 403:
+                return httpx.Response(403, json={"error": {"code": 403}})
+            return httpx.Response(200, json={"items": []})
+        return httpx.Response(
+            200,
+            json=_gcp_disk_response(
+                name="cyrene-test-interrupted",
+                labels=labels,
+            ),
+        )
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    arguments = {
+        "profile_ref": "gcp/test",
+        "target": {
+            "kind": "disk",
+            "zone": "us-central1-a",
+            "disk_name": "cyrene-test-interrupted",
+        },
+        "parameters": {
+            "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+            "sizeGb": 10,
+            "labels": labels,
+        },
+    }
+    result = executor.call(
+        "cloud_resource_create", arguments, request_id="request-gcp-disk-unknown"
+    )
+    replay = executor.call(
+        "cloud_resource_create", arguments, request_id="request-gcp-disk-unknown"
+    )
+    assert replay == result
+    assert result["state"] == "UNKNOWN_RESULT"
+    assert methods == ["POST"]
+    operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
+    assert operation["request_id"] == "request-gcp-disk-unknown"
+    assert operation["vendor_operation"]["expected_labels"] == {
+        "cyrene-task": "teams-cloud-20261023"
+    }
+
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": result["operation_ref"]},
+        request_id="request-gcp-disk-unknown-status",
+    )
+    assert methods == ["POST", "GET", "GET"]
+    assert status["state"] == "UNKNOWN_RESULT"
+    assert status["actual_state"] == "READY"
+    assert status["reason_code"] == "DISK_OPERATION_IDENTITY_UNVERIFIED"
+    assert status["operation_lookup_error"] == expected_lookup_error
+    assert status["observed_configuration"] == {
+        "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+        "sizeGb": "10",
+        "type": "pd-standard",
+        "labels": labels,
+    }
+    executor.close()
+
+@pytest.mark.parametrize(
+    ("target_id", "time_offset_minutes", "expected_state", "expected_reason", "request_count"),
+    [
+        ("123456789", 0, "SUCCEEDED", None, 4),
+        ("987654321", 0, "UNKNOWN_RESULT", "DISK_TARGET_ID_READBACK_MISMATCH", 4),
+        (
+            "123456789",
+            10,
+            "UNKNOWN_RESULT",
+            "DISK_OPERATION_IDENTITY_UNVERIFIED",
+            3,
+        ),
+    ],
+)
+def test_gcp_interrupted_disk_create_requires_exact_operation_identity(
+    tmp_path: Any,
+    target_id: str,
+    time_offset_minutes: int,
+    expected_state: str,
+    expected_reason: str | None,
+    request_count: int,
+) -> None:
+    """A lost POST needs exact request, target, action, time, and disk incarnation matches."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    request_id = "request-gcp-disk-lro-proof"
+    client_operation_id = str(
+        uuid.uuid5(
+            uuid.NAMESPACE_URL,
+            f"cyrene-cloud-management:gcp:gcp/test:{request_id}",
+        )
+    )
+    operation_resource: dict[str, Any] = {
+        "kind": "compute#operation",
+        "name": "disk-insert-confirmed",
+        "zone": (
+            "https://www.googleapis.com/compute/v1/projects/cyrene-test-project/zones/us-central1-a"
+        ),
+        "clientOperationId": client_operation_id,
+        "operationType": "insert",
+        "targetLink": (
+            "https://www.googleapis.com/compute/v1/projects/"
+            "cyrene-test-project/zones/us-central1-a/disks/cyrene-test-lro-proof"
+        ),
+        "targetId": target_id,
+        "status": "DONE",
+        "insertTime": "",
+    }
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "POST":
+            assert request.url.params["requestId"] == client_operation_id
+            raise httpx.ReadTimeout("fixture write response lost")
+        if request.url.path.endswith("/zones/us-central1-a/operations"):
+            assert request.url.params["maxResults"] == "100"
+            assert request.url.params["orderBy"] == "creationTimestamp desc"
+            return httpx.Response(200, json={"items": [operation_resource]})
+        if request.url.path.endswith("/operations/disk-insert-confirmed"):
+            return httpx.Response(200, json=operation_resource)
+        return httpx.Response(
+            200,
+            json=_gcp_disk_response(
+                name="cyrene-test-lro-proof",
+                labels={"cyrene-task": "teams-cloud-20261023"},
+            ),
+        )
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    created = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {
+                "kind": "disk",
+                "zone": "us-central1-a",
+                "disk_name": "cyrene-test-lro-proof",
+            },
+            "parameters": {
+                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
+                "sizeGb": 10,
+                "labels": {"cyrene-task": "teams-cloud-20261023"},
+            },
+        },
+        request_id=request_id,
+    )
+    operation_ref = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
+    created_at = datetime.fromisoformat(operation_ref["created_at"].replace("Z", "+00:00"))
+    operation_resource["insertTime"] = (
+        (created_at + timedelta(minutes=time_offset_minutes)).isoformat().replace("+00:00", "Z")
+    )
+
+    status = executor.call(
+        "cloud_operation_status",
+        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
+        request_id="request-gcp-disk-lro-proof-status",
+    )
+    assert created["state"] == "UNKNOWN_RESULT"
+    assert status["state"] == expected_state
+    assert status["actual_state"] == "READY"
+    assert len(requests) == request_count
+    if expected_reason is None:
+        assert "reason_code" not in status
+    else:
+        assert status["reason_code"] == expected_reason
+    assert requests[0].method == "POST"
+    assert all(request.method == "GET" for request in requests[1:])
+    assert sum(request.method == "POST" for request in requests) == 1
+    executor.close()
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "projects/other-cloud/zones/us-central1-a/disks/cyrene-test-boot",
+        "projects/cyrene-test-project/zones/us-central1-b/disks/cyrene-test-boot",
+        "projects/cyrene-test-project/zones/us-central1-a/disks/outside-test-boot",
+    ],
+)
+def test_gcp_vm_cannot_attach_disk_outside_project_zone_or_prefix(
+    tmp_path: Any, source: str
+) -> None:
+    """Existing-disk attachment validates project, zone, and disk prefix before insert."""
+
+    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(500)
+
+    executor = CloudManagementExecutor(
+        settings,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
+    result = executor.call(
+        "cloud_resource_create",
+        {
+            "profile_ref": "gcp/test",
+            "target": {"zone": "us-central1-a", "instance_name": "cyrene-test-vm"},
+            "parameters": {
+                "machineType": "zones/us-central1-a/machineTypes/e2-medium",
+                "disks": [{"boot": True, "source": source, "autoDelete": False}],
+                "networkInterfaces": [],
+            },
+        },
+        request_id=f"request-gcp-vm-disk-scope-{uuid.uuid4()}",
+    )
+    assert result["error"]["code"] == "SCOPE_DENIED"
+    assert requests == []
+    executor.close()
 
 def test_gcp_zonal_disk_create_attach_delete_and_confirm_absence(tmp_path: Any) -> None:
     """Create, poll, attach, and delete one scoped boot disk through fixed REST routes."""
@@ -1976,7 +3711,6 @@ def test_gcp_zonal_disk_create_attach_delete_and_confirm_absence(tmp_path: Any) 
     assert len([request for request in requests if request.method == "DELETE"]) == 1
     executor.close()
 
-
 def test_gcp_zonal_disk_create_without_labels_is_allowed(tmp_path: Any) -> None:
     """An otherwise scoped persistent disk does not require provider-invented labels."""
 
@@ -2043,656 +3777,49 @@ def test_gcp_zonal_disk_create_without_labels_is_allowed(tmp_path: Any) -> None:
     executor.close()
 
 
-@pytest.mark.parametrize(
-    ("readback_status", "expected_state", "actual_state", "release_confirmed"),
-    [(404, "SUCCEEDED", "ABSENT", True), (200, "UNKNOWN_RESULT", "PRESENT", False)],
-)
-def test_gcp_disk_delete_404_requires_a_fresh_absence_query(
-    tmp_path: Any,
-    readback_status: int,
-    expected_state: str,
-    actual_state: str,
-    release_confirmed: bool,
-) -> None:
-    """An idempotent delete verifies absence and stays unknown if the disk remains."""
+def test_gcp_disk_cli_uses_one_documented_zone_flag(tmp_path: Any) -> None:
+    """Disk list uses one scoped --zones value; describe uses the singular --zone."""
 
     settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    methods: list[str] = []
+    executor = CloudManagementExecutor(settings)
+    profile = settings.profile("gcp/test")
 
-    def handler(request: httpx.Request) -> httpx.Response:
-        methods.append(request.method)
-        if request.method == "DELETE":
-            return httpx.Response(404, json={"error": {"code": 404}})
-        assert request.method == "GET"
-        if readback_status == 404:
-            return httpx.Response(404, json={"error": {"code": 404}})
-        return httpx.Response(200, json=_gcp_disk_response(status="READY"))
-
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    executor._validate_cli_scope(  # noqa: SLF001
+        profile, ["compute", "disks", "list", "--zones", "us-central1-a"]
     )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    result = executor.call(
-        "cloud_resource_delete",
-        {
-            "profile_ref": "gcp/test",
-            "target": {
-                "kind": "disk",
-                "zone": "us-central1-a",
-                "disk_name": "cyrene-test-already-absent",
-            },
-        },
-        request_id="request-gcp-delete-absent",
+    executor._validate_cli_scope(  # noqa: SLF001
+        profile, ["compute", "disks", "list", "--zones=us-central1-a"]
     )
-    assert methods == ["DELETE", "GET"]
-    assert result["state"] == expected_state
-    assert result["actual_state"] == actual_state
-    assert result["release_confirmed"] is release_confirmed
-    operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
-    assert operation["request_id"] == "request-gcp-delete-absent"
-    executor.close()
-
-
-@pytest.mark.parametrize(
-    ("field", "wrong_value"),
-    [
-        ("sourceImage", "projects/debian-cloud/global/images/family/debian-11"),
-        ("sizeGb", "12"),
-        ("labels", {"cyrene-task": "different-task"}),
-    ],
-)
-def test_gcp_disk_operation_requires_exact_configuration_readback(
-    tmp_path: Any, field: str, wrong_value: object
-) -> None:
-    """A READY disk with a different image, size, or owner/task label is not success."""
-
-    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    labels = {"cyrene-task": "teams-cloud-20261023"}
-    operation_body: dict[str, Any] = {}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        if request.method == "POST":
-            operation_body.update(
-                _gcp_operation_response(
-                    "disk-verify-op",
-                    "cyrene-test-readback-mismatch",
-                    request.url.params["requestId"],
-                    "create",
-                    "",
-                )
-            )
-            operation_body["status"] = "RUNNING"
-            return httpx.Response(
-                200,
-                json={"name": "disk-verify-op", "status": "RUNNING", "zone": "us-central1-a"},
-            )
-        if request.url.path.endswith("/operations/disk-verify-op"):
-            return httpx.Response(200, json=operation_body)
-        disk = _gcp_disk_response(labels=labels)
-        disk[field] = wrong_value
-        return httpx.Response(200, json=disk)
-
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    request_id = f"request-gcp-disk-readback-{uuid.uuid4()}"
-    created = executor.call(
-        "cloud_resource_create",
-        {
-            "profile_ref": "gcp/test",
-            "target": {
-                "kind": "disk",
-                "zone": "us-central1-a",
-                "disk_name": "cyrene-test-readback-mismatch",
-            },
-            "parameters": {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 10,
-                "labels": labels,
-            },
-        },
-        request_id=request_id,
-    )
-    operation_ref = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
-    operation_body["insertTime"] = operation_ref["created_at"]
-    operation_body["status"] = "DONE"
-    status = executor.call(
-        "cloud_operation_status",
-        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
-        request_id=f"request-gcp-disk-readback-status-{uuid.uuid4()}",
-    )
-    assert status["state"] == "UNKNOWN_RESULT"
-    assert status["actual_state"] == "READY"
-    assert status["reason_code"] == "DISK_CONFIGURATION_READBACK_MISMATCH"
-    executor.close()
-
-
-@pytest.mark.parametrize(
-    ("operation_list_status", "expected_lookup_error"),
-    [(200, None), (403, "SCOPE_DENIED")],
-)
-def test_gcp_interrupted_disk_create_is_queried_without_replay(
-    tmp_path: Any, operation_list_status: int, expected_lookup_error: str | None
-) -> None:
-    """A matching pre-existing disk is not adopted when LRO identity is unproved."""
-
-    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    methods: list[str] = []
-    labels = {"cyrene-task": "teams-cloud-20261023"}
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        methods.append(request.method)
-        if request.method == "POST":
-            raise httpx.ReadTimeout("fixture write response lost")
-        if request.url.path.endswith("/zones/us-central1-a/operations"):
-            if operation_list_status == 403:
-                return httpx.Response(403, json={"error": {"code": 403}})
-            return httpx.Response(200, json={"items": []})
-        return httpx.Response(
-            200,
-            json=_gcp_disk_response(
-                name="cyrene-test-interrupted",
-                labels=labels,
-            ),
-        )
-
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    arguments = {
-        "profile_ref": "gcp/test",
-        "target": {
-            "kind": "disk",
-            "zone": "us-central1-a",
-            "disk_name": "cyrene-test-interrupted",
-        },
-        "parameters": {
-            "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-            "sizeGb": 10,
-            "labels": labels,
-        },
-    }
-    result = executor.call(
-        "cloud_resource_create", arguments, request_id="request-gcp-disk-unknown"
-    )
-    replay = executor.call(
-        "cloud_resource_create", arguments, request_id="request-gcp-disk-unknown"
-    )
-    assert replay == result
-    assert result["state"] == "UNKNOWN_RESULT"
-    assert methods == ["POST"]
-    operation = parse_operation_ref(result["operation_ref"], _EXCHANGE_KEY)
-    assert operation["request_id"] == "request-gcp-disk-unknown"
-    assert operation["vendor_operation"]["expected_labels"] == {
-        "cyrene-task": "teams-cloud-20261023"
-    }
-
-    status = executor.call(
-        "cloud_operation_status",
-        {"profile_ref": "gcp/test", "operation_ref": result["operation_ref"]},
-        request_id="request-gcp-disk-unknown-status",
-    )
-    assert methods == ["POST", "GET", "GET"]
-    assert status["state"] == "UNKNOWN_RESULT"
-    assert status["actual_state"] == "READY"
-    assert status["reason_code"] == "DISK_OPERATION_IDENTITY_UNVERIFIED"
-    assert status["operation_lookup_error"] == expected_lookup_error
-    assert status["observed_configuration"] == {
-        "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-        "sizeGb": "10",
-        "type": "pd-standard",
-        "labels": labels,
-    }
-    executor.close()
-
-
-@pytest.mark.parametrize(
-    ("target_id", "time_offset_minutes", "expected_state", "expected_reason", "request_count"),
-    [
-        ("123456789", 0, "SUCCEEDED", None, 4),
-        ("987654321", 0, "UNKNOWN_RESULT", "DISK_TARGET_ID_READBACK_MISMATCH", 4),
-        (
-            "123456789",
-            10,
-            "UNKNOWN_RESULT",
-            "DISK_OPERATION_IDENTITY_UNVERIFIED",
-            3,
-        ),
-    ],
-)
-def test_gcp_interrupted_disk_create_requires_exact_operation_identity(
-    tmp_path: Any,
-    target_id: str,
-    time_offset_minutes: int,
-    expected_state: str,
-    expected_reason: str | None,
-    request_count: int,
-) -> None:
-    """A lost POST needs exact request, target, action, time, and disk incarnation matches."""
-
-    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    request_id = "request-gcp-disk-lro-proof"
-    client_operation_id = str(
-        uuid.uuid5(
-            uuid.NAMESPACE_URL,
-            f"cyrene-cloud-management:gcp:gcp/test:{request_id}",
-        )
-    )
-    operation_resource: dict[str, Any] = {
-        "kind": "compute#operation",
-        "name": "disk-insert-confirmed",
-        "zone": (
-            "https://www.googleapis.com/compute/v1/projects/cyrene-test-project/zones/us-central1-a"
-        ),
-        "clientOperationId": client_operation_id,
-        "operationType": "insert",
-        "targetLink": (
-            "https://www.googleapis.com/compute/v1/projects/"
-            "cyrene-test-project/zones/us-central1-a/disks/cyrene-test-lro-proof"
-        ),
-        "targetId": target_id,
-        "status": "DONE",
-        "insertTime": "",
-    }
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        if request.method == "POST":
-            assert request.url.params["requestId"] == client_operation_id
-            raise httpx.ReadTimeout("fixture write response lost")
-        if request.url.path.endswith("/zones/us-central1-a/operations"):
-            assert request.url.params["maxResults"] == "100"
-            assert request.url.params["orderBy"] == "creationTimestamp desc"
-            return httpx.Response(200, json={"items": [operation_resource]})
-        if request.url.path.endswith("/operations/disk-insert-confirmed"):
-            return httpx.Response(200, json=operation_resource)
-        return httpx.Response(
-            200,
-            json=_gcp_disk_response(
-                name="cyrene-test-lro-proof",
-                labels={"cyrene-task": "teams-cloud-20261023"},
-            ),
-        )
-
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    created = executor.call(
-        "cloud_resource_create",
-        {
-            "profile_ref": "gcp/test",
-            "target": {
-                "kind": "disk",
-                "zone": "us-central1-a",
-                "disk_name": "cyrene-test-lro-proof",
-            },
-            "parameters": {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 10,
-                "labels": {"cyrene-task": "teams-cloud-20261023"},
-            },
-        },
-        request_id=request_id,
-    )
-    operation_ref = parse_operation_ref(created["operation_ref"], _EXCHANGE_KEY)
-    created_at = datetime.fromisoformat(operation_ref["created_at"].replace("Z", "+00:00"))
-    operation_resource["insertTime"] = (
-        (created_at + timedelta(minutes=time_offset_minutes)).isoformat().replace("+00:00", "Z")
+    executor._validate_cli_scope(  # noqa: SLF001
+        profile,
+        ["compute", "disks", "describe", "cyrene-test-boot", "--zone=us-central1-a"],
     )
 
-    status = executor.call(
-        "cloud_operation_status",
-        {"profile_ref": "gcp/test", "operation_ref": created["operation_ref"]},
-        request_id="request-gcp-disk-lro-proof-status",
-    )
-    assert created["state"] == "UNKNOWN_RESULT"
-    assert status["state"] == expected_state
-    assert status["actual_state"] == "READY"
-    assert len(requests) == request_count
-    if expected_reason is None:
-        assert "reason_code" not in status
-    else:
-        assert status["reason_code"] == expected_reason
-    assert requests[0].method == "POST"
-    assert all(request.method == "GET" for request in requests[1:])
-    assert sum(request.method == "POST" for request in requests) == 1
-    executor.close()
-
-
-@pytest.mark.parametrize(
-    ("target", "parameters"),
-    [
-        (
-            {"kind": "disk", "zone": "us-central1-b", "disk_name": "cyrene-test-disk"},
-            {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 10,
-            },
-        ),
-        (
-            {"kind": "disk", "zone": "us-central1-a", "disk_name": "outside-test-disk"},
-            {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 10,
-            },
-        ),
-        (
-            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
-            {"sourceImage": "projects/other-cloud/global/images/family/debian-12", "sizeGb": 10},
-        ),
-        (
-            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
-            {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 17,
-            },
-        ),
-        (
-            {"kind": "disk", "zone": "us-central1-a", "disk_name": "cyrene-test-disk"},
-            {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 10,
-                "labels": {"api_key": "sensitive"},
-            },
-        ),
-    ],
-)
-def test_gcp_disk_scope_and_create_bounds_fail_before_provider_calls(
-    tmp_path: Any, target: dict[str, str], parameters: dict[str, Any]
-) -> None:
-    """Wrong zones, names, images, sizes, and secret labels never reach GCE."""
-
-    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    requests: list[httpx.Request] = []
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(
-            transport=httpx.MockTransport(lambda request: requests.append(request))
-        ),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    result = executor.call(
-        "cloud_resource_create",
-        {"profile_ref": "gcp/test", "target": target, "parameters": parameters},
-        request_id=f"request-gcp-invalid-{uuid.uuid4()}",
-    )
-    assert result["error"]["code"] in {"SCOPE_DENIED", "INVALID_ARGUMENTS"}
-    assert requests == []
-    executor.close()
-
-
-@pytest.mark.parametrize(
-    "source",
-    [
-        "projects/other-cloud/zones/us-central1-a/disks/cyrene-test-boot",
-        "projects/cyrene-test-project/zones/us-central1-b/disks/cyrene-test-boot",
-        "projects/cyrene-test-project/zones/us-central1-a/disks/outside-test-boot",
-    ],
-)
-def test_gcp_vm_cannot_attach_disk_outside_project_zone_or_prefix(
-    tmp_path: Any, source: str
-) -> None:
-    """Existing-disk attachment validates project, zone, and disk prefix before insert."""
-
-    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(500)
-
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    result = executor.call(
-        "cloud_resource_create",
-        {
-            "profile_ref": "gcp/test",
-            "target": {"zone": "us-central1-a", "instance_name": "cyrene-test-vm"},
-            "parameters": {
-                "machineType": "zones/us-central1-a/machineTypes/e2-medium",
-                "disks": [{"boot": True, "source": source, "autoDelete": False}],
-                "networkInterfaces": [],
-            },
-        },
-        request_id=f"request-gcp-vm-disk-scope-{uuid.uuid4()}",
-    )
-    assert result["error"]["code"] == "SCOPE_DENIED"
-    assert requests == []
-    executor.close()
-
-
-def test_gcp_disk_creation_is_default_denied_without_explicit_disk_scope(tmp_path: Any) -> None:
-    """Legacy GCP profiles continue to manage instances but cannot create disks."""
-
-    settings = _multi_provider_settings(tmp_path)
-    requests: list[httpx.Request] = []
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(
-            transport=httpx.MockTransport(lambda request: requests.append(request))
-        ),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    result = executor.call(
-        "cloud_resource_create",
-        {
-            "profile_ref": "gcp/test",
-            "target": {
-                "kind": "disk",
-                "zone": "us-central1-a",
-                "disk_name": "cyrene-test-default-denied",
-            },
-            "parameters": {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 10,
-            },
-        },
-        request_id="request-gcp-default-denied",
-    )
-    assert result["error"]["code"] == "SCOPE_DENIED"
-    assert requests == []
-    executor.close()
-
-
-@pytest.mark.parametrize(
-    ("status_code", "expected_code"),
-    [(401, "AUTHENTICATION_FAILED"), (403, "SCOPE_DENIED")],
-)
-def test_gcp_disk_create_surfaces_auth_and_permission_failures(
-    tmp_path: Any, status_code: int, expected_code: str
-) -> None:
-    """GCE authentication and IAM failures remain explicit provider errors."""
-
-    settings = _multi_provider_settings(tmp_path, gcp_disk_scope=True)
-    requests: list[httpx.Request] = []
-
-    def handler(request: httpx.Request) -> httpx.Response:
-        requests.append(request)
-        return httpx.Response(status_code, json={"error": {"code": status_code}})
-
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
-    )
-    executor._gcp_token = lambda _profile: ("fixture-token", None)  # noqa: SLF001
-    result = executor.call(
-        "cloud_resource_create",
-        {
-            "profile_ref": "gcp/test",
-            "target": {
-                "kind": "disk",
-                "zone": "us-central1-a",
-                "disk_name": "cyrene-test-auth-check",
-            },
-            "parameters": {
-                "sourceImage": "projects/debian-cloud/global/images/family/debian-12",
-                "sizeGb": 10,
-                "labels": {"cyrene-task": "teams-cloud-20261023"},
-            },
-        },
-        request_id=f"request-gcp-auth-{status_code}",
-    )
-    assert result["error"]["code"] == expected_code
-    assert len(requests) == 1
-    assert requests[0].method == "POST"
-    executor.close()
-
-
-class _RecordingExecutor:
-    """Test seam that records already authenticated provider arguments."""
-
-    def __init__(self) -> None:
-        self.calls: list[dict[str, Any]] = []
-
-    def call(self, tool_id: str, arguments: dict[str, Any], **_: Any) -> dict[str, Any]:
-        self.calls.append({"tool_id": tool_id, "arguments": arguments})
-        return {"state": "SUCCEEDED", "resource_ref": "pod-123"}
-
-    def close(self) -> None:
-        return None
-
-
-def test_plugin_verifies_actor_operation_and_complete_argument_hash(tmp_path: Any) -> None:
-    """The provider accepts one exact Exchange signature and rejects payload edits."""
-
-    settings = _settings(tmp_path)
-    executor = _RecordingExecutor()
-    plugin = CloudManagementProvider(settings=settings, executor=executor)
-    arguments = {"profile_ref": "runpod/test", "target": {"pod_id": "pod-123"}}
-    now = datetime.now(UTC)
-    context = sign_context(
-        method="cloud_resource_get",
-        operation_id="cloud.resource.get",
-        payload=arguments,
-        caller_workload="exchange",
-        audience="cloud-management",
-        issuer="https://directory.example",
-        subject="user-1",
-        organization_id="org-fixture",
-        workspace_id="workspace-fixture",
-        binding_id=settings.binding_id,
-        request_id="request-plugin-1",
-        key=_EXCHANGE_KEY,
-        issued_at=now,
-        expires_at=now + timedelta(seconds=60),
-    )
-
-    valid = _invoke(plugin, settings.binding_id, arguments, context.as_dict())
-    assert valid.outcome.is_error is False
-    assert len(executor.calls) == 1
-
-    modified = {**arguments, "target": {"pod_id": "different-pod"}}
-    invalid = _invoke(plugin, settings.binding_id, modified, context.as_dict())
-    assert invalid.outcome.is_error is True
-    assert (
-        json.loads(invalid.outcome.content[0].json.json)["error"]["code"] == "AUTHENTICATION_DENIED"
-    )
-    assert len(executor.calls) == 1
-    plugin.close()
-
-
-def test_cli_signature_binds_complete_argv_without_model_resource_target(tmp_path: Any) -> None:
-    """Exchange signs the exact native argv while the provider grant stays profile-scoped."""
-
-    settings = _settings(tmp_path)
-    executor = _RecordingExecutor()
-    plugin = CloudManagementProvider(settings=settings, executor=executor)
-    tool_id = "cloud_vendor_cli"
-    arguments = {
-        "profile_ref": "runpod/test",
-        "argv": ["pod", "delete", "pod-a"],
-    }
-    now = datetime.now(UTC)
-    context = sign_context(
-        method=tool_id,
-        operation_id="cloud.vendor.cli.execute",
-        payload=arguments,
-        caller_workload="exchange",
-        audience="cloud-management",
-        issuer="https://directory.example",
-        subject="user-1",
-        organization_id="org-fixture",
-        workspace_id="workspace-fixture",
-        binding_id=settings.binding_id,
-        request_id="request-cli-signature-1",
-        key=_EXCHANGE_KEY,
-        issued_at=now,
-        expires_at=now + timedelta(seconds=240),
-    )
-
-    valid = _invoke(plugin, settings.binding_id, arguments, context.as_dict(), tool_id=tool_id)
-    assert valid.outcome.is_error is False
-    assert executor.calls[0]["arguments"]["argv"] == arguments["argv"]
-    assert "target" not in executor.calls[0]["arguments"]
-
-    tampered = {**arguments, "argv": ["pod", "delete", "pod-b"]}
-    invalid = _invoke(plugin, settings.binding_id, tampered, context.as_dict(), tool_id=tool_id)
-    assert invalid.outcome.is_error is True
-    assert (
-        json.loads(invalid.outcome.content[0].json.json)["error"]["code"] == "AUTHENTICATION_DENIED"
-    )
-    assert len(executor.calls) == 1
-    plugin.close()
-
-
-def _invoke(
-    plugin: CloudManagementProvider,
-    binding_id: str,
-    arguments: dict[str, Any],
-    context: dict[str, Any],
-    *,
-    tool_id: str = "cloud_resource_get",
-) -> wire.CallToolResponse:
-    """Encode one signed tool envelope and decode the typed provider response."""
-
-    request = wire.CallToolRequest(
-        binding_id=binding_id,
-        provider_tool_id=tool_id,
-        arguments_json=json.dumps({"caller_context": context, "arguments": arguments}),
-    )
-    accepted, response = plugin.on_invoke(
-        CAPABILITY_ID,
-        CALL_TOOL_METHOD,
-        request.SerializeToString(),
-        request_type_url="type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest",
-    )
-    assert accepted is True
-    assert response.type_url == CALL_TOOL_RESPONSE_TYPE_URL
-    decoded = wire.CallToolResponse()
-    decoded.ParseFromString(response.value)
-    return decoded
-
-
-def test_operation_ref_is_bound_to_exchange_key(tmp_path: Any) -> None:
-    """A caller cannot modify the resource or provider in a pollable reference."""
-
-    settings = _settings(tmp_path)
-    executor = CloudManagementExecutor(
-        settings,
-        http_client=httpx.Client(
-            transport=httpx.MockTransport(lambda request: httpx.Response(500))
-        ),
-    )
-    reference = executor._new_operation_ref(  # noqa: SLF001
-        settings.profile("runpod/test"),
-        "cloud_resource_start",
-        {"pod_id": "pod-123"},
-        "request-opref-1",
-    )
-    assert parse_operation_ref(reference, _EXCHANGE_KEY)["target"] == {"pod_id": "pod-123"}
-    parts = reference.split(".")
-    tampered = f"{parts[0]}.{parts[1]}.{('0' if parts[2][0] != '0' else '1') + parts[2][1:]}"
-    with pytest.raises(InvalidOperationRef):
-        parse_operation_ref(tampered, _EXCHANGE_KEY)
+    invalid_argv = [
+        ["compute", "disks", "list", "--zone=us-central1-a"],
+        ["compute", "disks", "list", "-z", "us-central1-a"],
+        ["compute", "disks", "list", "--zon=us-central1-a"],
+        [
+            "compute",
+            "disks",
+            "list",
+            "--zones=us-central1-a",
+            "--zones=us-central1-a",
+        ],
+        ["compute", "disks", "list", "--zones=us-central1-a,us-central1-b"],
+        ["compute", "disks", "list", "--zones=us-central1-b"],
+        [
+            "compute",
+            "disks",
+            "list",
+            "--zones=us-central1-a",
+            "--zone=us-central1-a",
+        ],
+        ["compute", "disks", "describe", "cyrene-test-boot", "--zones=us-central1-a"],
+        ["compute", "disks", "describe", "cyrene-test-boot", "-z", "us-central1-a"],
+        ["compute", "disks", "describe", "cyrene-test-boot", "--zon=us-central1-a"],
+    ]
+    for argv in invalid_argv:
+        with pytest.raises(ProviderFailure, match="SCOPE_DENIED"):
+            executor._validate_cli_scope(profile, argv)  # noqa: SLF001
     executor.close()

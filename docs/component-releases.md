@@ -60,9 +60,13 @@ following fixed selections:
 | `legacy5` | Dataset Preparation, Document Parsing, Dataset Generation, Knowledge Preparation, Exact Match | Draft package release |
 | `integration-v1` | Account Center, GitHub Issues, WeCom | Immutable package releases |
 | `authorization-cloud-v1` | Cloud Resources, Email Notification, WeCom | Immutable package releases |
-| Pull request | All ten unique package IDs | Build and test only; no publication |
+| `teams-cloud-v1` | Teams, Cloud Management, Hugging Face, Account Center, GitHub Issues | Immutable package releases |
+| `office-pilot` | Microsoft Graph, Azure DevOps Observation | Immutable package releases |
+| Pull request | All 15 unique package IDs | Build and test only; no publication |
 
-The named sets are closed allowlists. Their releases bind their ZIPs, wheelhouse,
+Manual dispatch can also select one fixed package ID; legacy packages retain draft
+mode, while the other package IDs publish immutable releases. The named sets are
+closed allowlists. Their releases bind their ZIPs, wheelhouse,
 SBOM, attestations, and immutable `preview-<componentId>-<version>-<sourceSHA>`
 or `stable-<componentId>-<version>-<sourceSHA>` tags to the exact source commit.
 No package selection advances a mutable latest release.
@@ -123,8 +127,11 @@ Plugin ZIP。自动 push 保持现有 `legacy5` draft 发布。手动 dispatch �
 | `legacy5` | Dataset Preparation、Document Parsing、Dataset Generation、Knowledge Preparation、Exact Match | Draft package release |
 | `integration-v1` | Account Center、GitHub Issues、WeCom | 不可变 package release |
 | `authorization-cloud-v1` | Cloud Resources、Email Notification、WeCom | 不可变 package release |
-| Pull request | 全部十个唯一 package ID | 仅构建与测试，不发布 |
+| `teams-cloud-v1` | Teams、Cloud Management、Hugging Face、Account Center、GitHub Issues | 不可变 package release |
+| `office-pilot` | Microsoft Graph、Azure DevOps Observation | 不可变 package release |
+| Pull request | 全部 15 个唯一 package ID | 仅构建与测试，不发布 |
 
-命名集合均为固定 allowlist。不可变发布会将 ZIP、wheelhouse、SBOM、attestations 以及
+手动 dispatch 也可以选择一个固定 package ID；legacy package 保持 draft 模式，其他 package
+会发布不可变 release。命名集合均为固定 allowlist。不可变发布会将 ZIP、wheelhouse、SBOM、attestations 以及
 `preview-<componentId>-<version>-<sourceSHA>` 或 `stable-<componentId>-<version>-<sourceSHA>`
 tag 绑定到精确源码 commit。任何 package 选择都不会推进可变的 latest release。

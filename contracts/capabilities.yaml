@@ -10,8 +10,15 @@ capabilities:
       paths:
         - plugins/accounts/account-center/contracts/v1/schema.json
     contract_methods:
+      - begin_azure_devops_link
+      - begin_huggingface_renewal
       - begin_link
+      - begin_microsoft_graph_link
+      - begin_microsoft_graph_scope_upgrade
+      - complete_azure_devops_link
       - complete_github_link
+      - complete_microsoft_graph_link
+      - complete_microsoft_graph_scope_upgrade
       - confirm_wecom_link
       - create_credential_lease
       - create_provider_credential_lease
@@ -21,6 +28,7 @@ capabilities:
       - list_links
       - list_provider_profiles
       - observe_wecom_challenge
+      - poll_huggingface_renewal
       - redeem_credential_lease
       - redeem_provider_credential_lease
       - register_host_identity_profile
@@ -28,6 +36,7 @@ capabilities:
       - rotate_huggingface_profile
       - unlink
       - unlink_provider_profile
+      - update_microsoft_graph_v2_scope
     implementations:
       - ref: cyrene.accounts.account-center
         source: plugins/accounts/account-center/plugin.manifest.json
@@ -35,8 +44,15 @@ capabilities:
         language: python
         publication: published
         methods:
+          - begin_azure_devops_link
+          - begin_huggingface_renewal
           - begin_link
+          - begin_microsoft_graph_link
+          - begin_microsoft_graph_scope_upgrade
+          - complete_azure_devops_link
           - complete_github_link
+          - complete_microsoft_graph_link
+          - complete_microsoft_graph_scope_upgrade
           - confirm_wecom_link
           - create_credential_lease
           - create_provider_credential_lease
@@ -46,6 +62,7 @@ capabilities:
           - list_links
           - list_provider_profiles
           - observe_wecom_challenge
+          - poll_huggingface_renewal
           - redeem_credential_lease
           - redeem_provider_credential_lease
           - register_host_identity_profile
@@ -53,6 +70,7 @@ capabilities:
           - rotate_huggingface_profile
           - unlink
           - unlink_provider_profile
+          - update_microsoft_graph_v2_scope
         interface_versions:
           - "1"
         verification_level: IMPLEMENTATION_VERIFIED
@@ -756,6 +774,19 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: REAL
         verified_at: 2026-10-04
+      - ref: cyrene.providers.azure-devops-observation
+        source: plugins/providers/azure-devops-observation/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-27
       - ref: cyrene.providers.cloud-management
         source: plugins/providers/cloud-management/plugin.manifest.json
         kind: capability-plugin
@@ -809,6 +840,19 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-10-23
+      - ref: cyrene.providers.microsoft-graph
+        source: plugins/providers/microsoft-graph/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-27
       - ref: cyrene.runtime.mcp-tool-provider
         source: contracts/runtime-implementations.json
         language: rust
@@ -820,6 +864,20 @@ capabilities:
         verification_level: DISPATCH_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-09-13
+      - ref: cyrene.tools.computer-runtime
+        source: plugins/tools/computer-runtime/plugin.manifest.json
+        kind: tool-provider
+        language: rust
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        maturity: migrating
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: REAL
+        verified_at: 2026-10-24
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs
       - contracts/tck/tool-provider-v1

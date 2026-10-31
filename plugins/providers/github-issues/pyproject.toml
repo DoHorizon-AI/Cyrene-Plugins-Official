@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-github-issues-provider"
-version = "0.1.0"
-description = "Fixed GitHub Issues tools and webhook normalization for Cyrene"
+version = "0.2.0"
+description = "Fixed GitHub repository, issue, and Actions tools with bounded task-branch writes for Cyrene"
 requires-python = ">=3.11"
 dependencies = [
   "cyrene-account-center-contracts>=0.1,<0.2",

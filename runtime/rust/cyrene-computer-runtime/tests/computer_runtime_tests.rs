@@ -32,13 +32,14 @@ use cyrene_computer_runtime::sandbox::{
 };
 use cyrene_computer_runtime::security::{EnvironmentFilter, PathValidator};
 use cyrene_computer_runtime::shell::ShellProcessRunner;
-use cyrene_computer_runtime::ComputerRuntimeService;
+use cyrene_computer_runtime::{ComputerRuntimeLimits, ComputerRuntimeService};
 
 use cyrene_plugin_contracts::computer_runtime_v1::{
     command_execution_response, command_stream_event, create_artifact_response,
-    get_artifact_response, read_file_response, write_file_response, CommandExecutionRequest,
-    CommandExecutionResponse, CommandStreamEvent, ComputerError, ComputerErrorCode,
-    CreateArtifactRequest, GetArtifactRequest, ReadFileRequest, WriteFileRequest,
+    get_artifact_response, list_dir_response, read_file_response, write_file_response,
+    CommandExecutionRequest, CommandExecutionResponse, CommandStreamEvent, ComputerError,
+    ComputerErrorCode, CreateArtifactRequest, GetArtifactRequest, ReadFileRequest,
+    WriteFileRequest,
 };
 
 // ── T73 & T76: Command Execution with Complete Evidence ────────────────
@@ -67,7 +68,7 @@ async fn test_command_execution_evidence_t73_t76() {
             assert!(!ev.stdout_truncated);
             assert!(!ev.stderr_truncated);
             assert!(!ev.sha256_hash.is_empty());
-            assert!(ev.resource_usage.is_some());
+            assert!(ev.resource_usage.is_none());
         }
         command_execution_response::Result::Error(err) => {
             panic!("Expected evidence, got error: {:?}", err);
@@ -206,6 +207,68 @@ fn test_symlink_escape_prevention_t75_t80() {
     );
 }
 
+#[test]
+fn test_dangling_symlink_escape_is_rejected_for_new_file_paths() {
+    let workspace = tempdir().unwrap();
+    let outside = tempdir().unwrap();
+    let dangling = workspace.path().join("dangling-link");
+    symlink(outside.path().join("future-secret.txt"), &dangling).unwrap();
+
+    let validator = PathValidator::new(vec![workspace.path().to_path_buf()]);
+    let error = validator
+        .validate_path(dangling.to_str().unwrap())
+        .expect_err("dangling symlink must fail closed before a create/write");
+    assert_eq!(error.code, ComputerErrorCode::PathTraversalDenied as i32);
+}
+
+#[test]
+fn test_directory_walk_does_not_follow_symlinks_and_enforces_entry_limit() {
+    let workspace = tempdir().unwrap();
+    let outside = tempdir().unwrap();
+    fs::write(outside.path().join("outside.txt"), b"outside").unwrap();
+    symlink(outside.path(), workspace.path().join("linked-directory")).unwrap();
+    fs::write(workspace.path().join("inside.txt"), b"inside").unwrap();
+
+    let validator = PathValidator::new(vec![workspace.path().to_path_buf()]);
+    let service = FilesystemService::with_limits(validator, 1024, 8, 4);
+    let listed = service.list_dir(
+        cyrene_plugin_contracts::computer_runtime_v1::ListDirRequest {
+            path: ".".into(),
+            max_depth: Some(3),
+        },
+    );
+    let entries = match listed.result.unwrap() {
+        list_dir_response::Result::Entries(entries) => entries.entries,
+        list_dir_response::Result::Error(error) => panic!("directory listing failed: {error:?}"),
+    };
+    let link = entries
+        .iter()
+        .find(|entry| entry.name == "linked-directory")
+        .expect("symlink should be represented as an entry");
+    assert!(
+        !link.is_directory,
+        "symlink must not be followed as a directory"
+    );
+    assert!(!entries.iter().any(|entry| entry.name == "outside.txt"));
+
+    let limited = FilesystemService::with_limits(
+        PathValidator::new(vec![workspace.path().to_path_buf()]),
+        4,
+        1,
+        1,
+    );
+    let response = limited.list_dir(
+        cyrene_plugin_contracts::computer_runtime_v1::ListDirRequest {
+            path: ".".into(),
+            max_depth: Some(1),
+        },
+    );
+    let Some(list_dir_response::Result::Error(error)) = response.result else {
+        panic!("oversized directory result must be explicit");
+    };
+    assert_eq!(error.code, ComputerErrorCode::OutputLimitExceeded as i32);
+}
+
 // ── T75 & T80: Environment Variable Sanitization (No Leakage) ──────────
 // 中文：T75 与 T80：清理环境变量，避免信息泄漏。
 
@@ -255,6 +318,67 @@ async fn test_output_bomb_truncation_t75_t80() {
             assert_eq!(ev.stdout.len(), 1024);
         }
         _ => panic!("Expected truncated evidence"),
+    }
+}
+
+#[tokio::test]
+async fn test_configured_timeout_and_output_caps_override_larger_requests() {
+    let workspace = tempdir().unwrap();
+    let artifacts = tempdir().unwrap();
+    let service = ComputerRuntimeService::with_limits_and_artifact_dir(
+        vec![workspace.path().to_path_buf()],
+        artifacts.path().to_path_buf(),
+        ComputerRuntimeLimits {
+            command_default_timeout_ms: 20,
+            command_max_timeout_ms: 50,
+            max_output_bytes: 8,
+            max_file_bytes: 1024,
+            max_directory_entries: 8,
+            max_directory_depth: 2,
+            max_artifact_bytes: 1024,
+        },
+    );
+
+    let bounded_output = service
+        .execute_command(
+            CommandExecutionRequest {
+                command: "printf 0123456789012345".into(),
+                cwd: None,
+                env: HashMap::new(),
+                timeout_ms: Some(5_000),
+                max_output_bytes: Some(4096),
+            },
+            None,
+        )
+        .await;
+    match bounded_output.result.unwrap() {
+        command_execution_response::Result::Evidence(evidence) => {
+            assert_eq!(evidence.stdout, "01234567");
+            assert!(evidence.stdout_truncated);
+        }
+        command_execution_response::Result::Error(error) => {
+            panic!("expected bounded evidence, got {error:?}");
+        }
+    }
+
+    let bounded_time = service
+        .execute_command(
+            CommandExecutionRequest {
+                command: "sleep 1".into(),
+                cwd: None,
+                env: HashMap::new(),
+                timeout_ms: Some(5_000),
+                max_output_bytes: None,
+            },
+            None,
+        )
+        .await;
+    match bounded_time.result.unwrap() {
+        command_execution_response::Result::Error(error) => {
+            assert_eq!(error.code, ComputerErrorCode::CommandTimeout as i32);
+            assert!(error.message.contains("50 ms"));
+        }
+        _ => panic!("configured maximum timeout must override a larger request"),
     }
 }
 
@@ -367,6 +491,50 @@ async fn test_descendant_process_cleanup_t80() {
     }
 }
 
+#[tokio::test]
+async fn test_dropping_execution_future_kills_its_process_group() {
+    let tmp = tempdir().unwrap();
+    let marker_file = tmp.path().join("cancelled-child.pid");
+    let service = Arc::new(ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]));
+    let script = format!("sleep 30 & echo $! > '{}' ; wait", marker_file.display());
+    let request = CommandExecutionRequest {
+        command: script,
+        cwd: None,
+        env: HashMap::new(),
+        timeout_ms: Some(30_000),
+        max_output_bytes: None,
+    };
+
+    let task = tokio::spawn(async move { service.execute_command(request, None).await });
+    let mut child_pid = None;
+    for _ in 0..100 {
+        if let Ok(contents) = fs::read_to_string(&marker_file) {
+            child_pid = contents.trim().parse::<i32>().ok();
+            if child_pid.is_some() {
+                break;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    let child_pid = child_pid.expect("command should start its descendant");
+
+    task.abort();
+    let _ = task.await;
+
+    let mut exited = false;
+    for _ in 0..100 {
+        if unsafe { libc::kill(child_pid, 0) } != 0 {
+            exited = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(25)).await;
+    }
+    assert!(
+        exited,
+        "dropped execution future left descendant {child_pid} alive"
+    );
+}
+
 // ── T80: Streaming Execution & Partial Stream Handling ─────────────────
 // 中文：T80：流式执行与部分流处理。
 
@@ -410,6 +578,91 @@ async fn test_streaming_command_and_partial_stream_t80() {
         last.event.as_ref().unwrap(),
         command_stream_event::Event::ExitEvidence(_)
     ));
+}
+
+#[tokio::test]
+async fn test_streaming_utf8_chunks_match_terminal_evidence_across_read_boundaries() {
+    let tmp = tempdir().unwrap();
+    let service = ComputerRuntimeService::new(vec![tmp.path().to_path_buf()]);
+    let (tx, mut rx) = mpsc::channel::<CommandStreamEvent>(16);
+    let req = CommandExecutionRequest {
+        command: "printf '\\344'; sleep 0.02; printf '\\275'; sleep 0.02; printf '\\240'; sleep 0.02; printf '\\377'; { printf '\\345'; sleep 0.02; printf '\\245'; sleep 0.02; printf '\\275'; sleep 0.02; printf '\\376'; } >&2".into(),
+        cwd: Some(tmp.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(5_000),
+        max_output_bytes: None,
+    };
+
+    let execute = tokio::spawn(async move { service.execute_command_stream(req, None, tx).await });
+    let mut streamed_stdout = String::new();
+    let mut streamed_stderr = String::new();
+    let mut evidence = None;
+    while let Some(event) = rx.recv().await {
+        match event.event {
+            Some(command_stream_event::Event::StdoutChunk(text)) => streamed_stdout.push_str(&text),
+            Some(command_stream_event::Event::StderrChunk(text)) => streamed_stderr.push_str(&text),
+            Some(command_stream_event::Event::ExitEvidence(value)) => evidence = Some(value),
+            Some(command_stream_event::Event::StreamError(error)) => {
+                panic!("UTF-8 stream failed: {}", error.message)
+            }
+            None => {}
+        }
+    }
+    execute.await.unwrap().unwrap();
+
+    let evidence = evidence.expect("stream should end with execution evidence");
+    assert_eq!(streamed_stdout, "你�");
+    assert_eq!(streamed_stderr, "好�");
+    assert_eq!(streamed_stdout, evidence.stdout);
+    assert_eq!(streamed_stderr, evidence.stderr);
+}
+
+#[tokio::test]
+async fn test_streaming_command_does_not_send_beyond_output_quota() {
+    let workspace = tempdir().unwrap();
+    let artifacts = tempdir().unwrap();
+    let service = ComputerRuntimeService::with_limits_and_artifact_dir(
+        vec![workspace.path().to_path_buf()],
+        artifacts.path().to_path_buf(),
+        ComputerRuntimeLimits {
+            command_default_timeout_ms: 100,
+            command_max_timeout_ms: 1_000,
+            max_output_bytes: 8,
+            max_file_bytes: 1024,
+            max_directory_entries: 8,
+            max_directory_depth: 2,
+            max_artifact_bytes: 1024,
+        },
+    );
+    let (sender, mut receiver) = mpsc::channel::<CommandStreamEvent>(16);
+    let result = service
+        .execute_command_stream(
+            CommandExecutionRequest {
+                command: "printf 0123456789012345".into(),
+                cwd: None,
+                env: HashMap::new(),
+                timeout_ms: None,
+                max_output_bytes: Some(4096),
+            },
+            None,
+            sender,
+        )
+        .await;
+    assert!(result.is_ok());
+
+    let mut streamed_stdout = String::new();
+    let mut terminal = None;
+    while let Some(event) = receiver.recv().await {
+        match event.event.unwrap() {
+            command_stream_event::Event::StdoutChunk(chunk) => streamed_stdout.push_str(&chunk),
+            command_stream_event::Event::ExitEvidence(evidence) => terminal = Some(evidence),
+            _ => {}
+        }
+    }
+    let terminal = terminal.expect("command should report terminal evidence");
+    assert_eq!(streamed_stdout, "01234567");
+    assert_eq!(terminal.stdout, "01234567");
+    assert!(terminal.stdout_truncated);
 }
 
 // ── T78: Isolation Level Labeling (Bounded Managed Execution) ──────────
@@ -676,9 +929,25 @@ fn test_r03_artifact_externalization_and_opaque_token() {
         _ => panic!("Expected payload"),
     }
 
+    // 3. Reopen the same disk store to verify restart metadata recovery.
+    // 中文：3. 重新打开同一磁盘目录，验证服务重启后恢复制品索引。
+    let recovered_service = ComputerRuntimeService::with_artifact_dir(
+        vec![tmp_root.path().to_path_buf()],
+        tmp_artifact.path().to_path_buf(),
+    );
+    let recovered = recovered_service.get_artifact(GetArtifactRequest {
+        artifact_id: meta.artifact_id.clone(),
+    });
+    match recovered.result.unwrap() {
+        get_artifact_response::Result::Payload(recovered_payload) => {
+            assert_eq!(recovered_payload.data, payload);
+        }
+        _ => panic!("Expected artifact to survive runtime restart"),
+    }
+
     // 4. Tamper detection: modify the file on disk and verify checksum failure
     // 中文：4. 检测篡改：修改磁盘上的文件，并验证校验和失败。
-    fs::write(&file_path, b"corrupted bytes").unwrap();
+    fs::write(&file_path, b"badbyt").unwrap();
     let get_tampered = service.get_artifact(GetArtifactRequest {
         artifact_id: meta.artifact_id.clone(),
     });

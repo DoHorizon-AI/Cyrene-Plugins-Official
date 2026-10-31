@@ -61,6 +61,21 @@
       ]
     },
     {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.tools.computer-runtime",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "REAL",
+      "evidence": [
+        {
+          "observed_at": "2026-10-24",
+          "environment": "linux / cargo test / ComputerToolProvider backed by a real temporary workspace and artifact directory",
+          "command": "cargo test --locked --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml fixed_operations_read_write_list_and_execute_in_the_scoped_root -- --nocapture",
+          "result": "1 passed; fixed read, write, directory list, and command tools ran against the scoped workspace",
+          "notes": "The fixed provider implementation is verified locally; Exchange-to-runner managed-runtime deployment and external integration acceptance are not included."
+        }
+      ]
+    },
+    {
       "capability": "message.connector.v1",
       "implementation": "cyrene.connectors.onebot-v11",
       "verification_level": "IMPLEMENTATION_VERIFIED",
@@ -560,6 +575,36 @@
           "command": "PYTHONPATH=plugins/providers/huggingface/src:sdk/python/cyrene_account_center_contracts/src:sdk/python/cyrene_plugin_runtime/src uv run --locked --project plugins/providers/huggingface --with pytest pytest -o addopts='' -q plugins/providers/huggingface/tests",
           "result": "44 passed; profile-scoped model, dataset and Space access, device OAuth metadata, safe downloads, verified uploads, bound CLI argv and permissions, token suppression, redaction, and uncertain-write no-retry behavior exercised",
           "notes": "Hub/CDN and CLI use local fixtures; no Hugging Face account, OAuth login, token, repository, upload, or external call was used."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.microsoft-graph",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-27",
+          "environment": "Linux / Python 3.12 / local provider dispatch and synthetic Account Center/OAuth/vendor transports",
+          "command": "uv run --project plugins/providers/microsoft-graph --extra test pytest -q plugins/providers/microsoft-graph/tests",
+          "result": "31 passed",
+          "notes": "Fixed tools, actor/target/digest binding, bounded reads and typed failures verified locally. No live tenant OAuth, selected source resource access, Teams delivery or VM deployment acceptance is included."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.azure-devops-observation",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-27",
+          "environment": "Linux / Python 3.12 / local provider dispatch and synthetic Account Center/OAuth/vendor transports",
+          "command": "uv run --project plugins/providers/azure-devops-observation --extra test pytest -q plugins/providers/azure-devops-observation/tests",
+          "result": "20 passed",
+          "notes": "Fixed tools, actor/target/digest binding, bounded reads and typed failures verified locally. No live tenant OAuth, selected source resource access, Teams delivery or VM deployment acceptance is included."
         }
       ]
     }

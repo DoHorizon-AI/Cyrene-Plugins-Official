@@ -36,9 +36,18 @@ from .github import (
 from .github_app import GitHubAppClient, GitHubAppError
 from .huggingface_auth import HuggingFaceAuthError, HuggingFaceIdentityClient
 from .huggingface_oauth import (
+    ALLOWED_OAUTH_SCOPES,
     HuggingFaceOAuthClient,
     HuggingFaceOAuthError,
     parse_device_oauth_seed,
+)
+from .microsoft_graph_oauth import (
+    ALLOWED_GRAPH_SCOPES,
+    AZURE_DEVOPS_RESOURCE_SCOPE,
+    INITIAL_GRAPH_SCOPES,
+    AzureDevOpsOAuthClient,
+    MicrosoftGraphOAuthClient,
+    MicrosoftGraphOAuthError,
 )
 from .models import AccountCenterError, Anchor, OAuthCredential, require_object
 from .security import (
@@ -67,11 +76,20 @@ METHODS = (
     "link_github_app_installation",
     "link_huggingface_profile",
     "rotate_huggingface_profile",
+    "begin_huggingface_renewal",
+    "poll_huggingface_renewal",
     "register_host_identity_profile",
     "list_provider_profiles",
     "unlink_provider_profile",
     "create_provider_credential_lease",
     "redeem_provider_credential_lease",
+    "begin_microsoft_graph_link",
+    "complete_microsoft_graph_link",
+    "begin_microsoft_graph_scope_upgrade",
+    "complete_microsoft_graph_scope_upgrade",
+    "update_microsoft_graph_v2_scope",
+    "begin_azure_devops_link",
+    "complete_azure_devops_link",
 )
 PROVIDER_OPERATIONS = {
     "github.issue.get",
@@ -87,6 +105,17 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "github.pull_request.get",
         "github.actions.runs.list",
         "github.ci.status",
+        "github.issues.search",
+        "github.branch.get",
+        "github.file.get",
+        "github.actions.jobs.list",
+        "github.actions.job.logs.read",
+        "github.branch.create",
+        "github.branch.delete",
+        "github.file.commit",
+        "github.pull_request.draft.create",
+        "github.pull_request.draft.find",
+        "github.actions.rerun_failed",
         "github.vendor.cli.execute",
         *PROVIDER_OPERATIONS,
     },
@@ -99,8 +128,56 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "huggingface.file.upload",
         "huggingface.vendor.cli.execute",
     },
+    "microsoft_graph": {
+        "microsoft_graph.planner.plan.get",
+        "microsoft_graph.planner.plans.list",
+        "microsoft_graph.planner.tasks.list",
+        "microsoft_graph.planner.task.get",
+        "microsoft_graph.planner.task.create",
+        "microsoft_graph.planner.task.update",
+        "microsoft_graph.sharepoint.site.get",
+        "microsoft_graph.sharepoint.list.get",
+        "microsoft_graph.sharepoint.list.items.delta",
+        "microsoft_graph.todo.lists.list",
+        "microsoft_graph.todo.tasks.list",
+        "microsoft_graph.todo.task.get",
+        "microsoft_graph.todo.task.create",
+        "microsoft_graph.todo.task.update",
+        "microsoft_graph.todo.task.delete",
+        "microsoft_graph.calendar.calendars.list",
+        "microsoft_graph.calendar.events.list",
+        "microsoft_graph.calendar.event.get",
+        "microsoft_graph.calendar.event.create",
+        "microsoft_graph.calendar.event.update",
+        "microsoft_graph.calendar.event.delete",
+        "microsoft_graph.calendar.freebusy.get",
+        "microsoft_graph.mail.folders.list",
+        "microsoft_graph.mail.messages.list",
+        "microsoft_graph.mail.message.get",
+        "microsoft_graph.mail.drafts.list",
+        "microsoft_graph.mail.draft.create",
+        "microsoft_graph.mail.draft.update",
+        "microsoft_graph.mail.draft.delete",
+        "microsoft_graph.mail.message.send",
+        "microsoft_graph.sharepoint.drives.list",
+        "microsoft_graph.sharepoint.drive.items.list",
+    },
+    "azure_devops": {
+        "azure_devops.observations.poll",
+        "azure_devops.pipelines.list",
+        "azure_devops.pipeline_runs.list",
+        "azure_devops.pipeline_run.get",
+        "azure_devops.deployments.list",
+        "azure_devops.release_environment.get",
+    },
 }
-CALLBACK_METHODS = {"complete_github_link", "observe_wecom_challenge"}
+CALLBACK_METHODS = {
+    "complete_github_link",
+    "complete_microsoft_graph_link",
+    "complete_microsoft_graph_scope_upgrade",
+    "complete_azure_devops_link",
+    "observe_wecom_challenge",
+}
 EXCHANGE_ONLY_METHODS = {
     "begin_link",
     "confirm_wecom_link",
@@ -112,10 +189,16 @@ EXCHANGE_ONLY_METHODS = {
     "link_github_app_installation",
     "link_huggingface_profile",
     "rotate_huggingface_profile",
+    "begin_huggingface_renewal",
+    "poll_huggingface_renewal",
     "register_host_identity_profile",
     "list_provider_profiles",
     "unlink_provider_profile",
     "create_provider_credential_lease",
+    "begin_microsoft_graph_link",
+    "begin_microsoft_graph_scope_upgrade",
+    "update_microsoft_graph_v2_scope",
+    "begin_azure_devops_link",
 }
 PUBLIC_METHODS = {
     "begin_link",
@@ -129,8 +212,13 @@ PUBLIC_METHODS = {
     "rotate_huggingface_profile",
     "register_host_identity_profile",
     "unlink_provider_profile",
+    "begin_microsoft_graph_link",
+    "begin_microsoft_graph_scope_upgrade",
+    "update_microsoft_graph_v2_scope",
+    "begin_azure_devops_link",
 }
 REQUEST_TYPE_PREFIX = "type.googleapis.com/cyrene.account.center.v1."
+MICROSOFT_GRAPH_PROVIDER_CALLER_ID = "microsoft-graph-provider"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_IDEMPOTENCY_RESPONSE_BYTES = 64 * 1024
 SESSION_TTL_SECONDS = 600
@@ -144,6 +232,10 @@ IDEMPOTENT_METHODS = {
     "rotate_huggingface_profile",
     "register_host_identity_profile",
     "unlink_provider_profile",
+    "begin_microsoft_graph_link",
+    "begin_microsoft_graph_scope_upgrade",
+    "update_microsoft_graph_v2_scope",
+    "begin_azure_devops_link",
 }
 
 
@@ -183,18 +275,25 @@ def _action_type_name(action: str, suffix: str) -> str:
         "link_github_app_installation": "LinkGitHubAppInstallation",
         "link_huggingface_profile": "LinkHuggingFaceProfile",
         "rotate_huggingface_profile": "RotateHuggingFaceProfile",
+        "begin_huggingface_renewal": "BeginHuggingFaceRenewal",
+        "poll_huggingface_renewal": "PollHuggingFaceRenewal",
         "register_host_identity_profile": "RegisterHostIdentityProfile",
         "list_provider_profiles": "ListProviderProfiles",
         "unlink_provider_profile": "UnlinkProviderProfile",
         "create_provider_credential_lease": "CreateProviderCredentialLease",
         "redeem_provider_credential_lease": "RedeemProviderCredentialLease",
+        "begin_microsoft_graph_link": "BeginMicrosoftGraphLink",
+        "complete_microsoft_graph_link": "CompleteMicrosoftGraphLink",
+        "begin_microsoft_graph_scope_upgrade": "BeginMicrosoftGraphScopeUpgrade",
+        "complete_microsoft_graph_scope_upgrade": "CompleteMicrosoftGraphScopeUpgrade",
+        "update_microsoft_graph_v2_scope": "UpdateMicrosoftGraphV2Scope",
+        "begin_azure_devops_link": "BeginAzureDevOpsLink",
+        "complete_azure_devops_link": "CompleteAzureDevOpsLink",
     }
     return names[action] + suffix
 
 
-def _required_text(
-    payload: Mapping[str, Any], field: str, *, maximum: int = 4096
-) -> str:
+def _required_text(payload: Mapping[str, Any], field: str, *, maximum: int = 4096) -> str:
     value = payload.get(field)
     if not isinstance(value, str) or not value.strip() or len(value) > maximum:
         raise AccountCenterError("invalid_request")
@@ -257,6 +356,8 @@ class AccountCenterPlugin:
         github_app_client: Any | None = None,
         huggingface_client: Any | None = None,
         huggingface_oauth_client: Any | None = None,
+        microsoft_graph_oauth_client: Any | None = None,
+        azure_devops_oauth_client: Any | None = None,
         now: Any = time.time,
     ) -> None:
         selected = dict(config) if config is not None else _environment_config()
@@ -267,13 +368,17 @@ class AccountCenterPlugin:
             raise AccountCenterError("configuration_unavailable")
         self._encryption_key = encryption
         self._binding_id = _required_config_text(selected, "binding_id")
-        self._store = store or AccountStore(
-            _required_config_text(selected, "storage_path")
-        )
+        self._store = store or AccountStore(_required_config_text(selected, "storage_path"))
         self._now = now
         callback_uri = selected.get("github_callback_uri")
         self._callback_uri = (
             _validated_callback_uri(callback_uri) if callback_uri is not None else None
+        )
+        graph_callback_uri = selected.get("microsoft_graph_callback_uri")
+        self._microsoft_graph_callback_uri = (
+            _validated_microsoft_graph_callback_uri(graph_callback_uri)
+            if graph_callback_uri is not None
+            else None
         )
         self._caller_keys = _load_caller_keys(selected)
         self._wecom_sources = _mapping_config(selected, "wecom_sources")
@@ -284,50 +389,61 @@ class AccountCenterPlugin:
         ):
             raise AccountCenterError("configuration_unavailable")
         self._github_callback_caller = callback_caller
-        self._github_provider_caller = _required_config_text(
-            selected, "github_provider_caller_id"
-        )
+        graph_callback_caller = selected.get("microsoft_graph_callback_caller_id")
+        if graph_callback_caller is not None and (
+            not isinstance(graph_callback_caller, str) or not graph_callback_caller
+        ):
+            raise AccountCenterError("configuration_unavailable")
+        self._microsoft_graph_callback_caller = graph_callback_caller
+        self._github_provider_caller = _required_config_text(selected, "github_provider_caller_id")
         huggingface_provider_caller = selected.get("huggingface_provider_caller_id")
         if huggingface_provider_caller is not None and (
-            not isinstance(huggingface_provider_caller, str)
-            or not huggingface_provider_caller
+            not isinstance(huggingface_provider_caller, str) or not huggingface_provider_caller
         ):
             raise AccountCenterError("configuration_unavailable")
         self._provider_caller_ids = {"github": self._github_provider_caller}
         if huggingface_provider_caller:
             self._provider_caller_ids["huggingface"] = huggingface_provider_caller
+        microsoft_graph_provider_caller = selected.get("microsoft_graph_provider_caller_id")
+        if microsoft_graph_provider_caller is not None and (
+            not isinstance(microsoft_graph_provider_caller, str)
+            or not microsoft_graph_provider_caller
+            or microsoft_graph_provider_caller != MICROSOFT_GRAPH_PROVIDER_CALLER_ID
+        ):
+            raise AccountCenterError("configuration_unavailable")
+        if microsoft_graph_provider_caller:
+            self._provider_caller_ids["microsoft_graph"] = microsoft_graph_provider_caller
+        azure_devops_provider_caller = selected.get("azure_devops_provider_caller_id")
+        if azure_devops_provider_caller is not None and (
+            not isinstance(azure_devops_provider_caller, str) or not azure_devops_provider_caller
+        ):
+            raise AccountCenterError("configuration_unavailable")
+        if azure_devops_provider_caller:
+            self._provider_caller_ids["azure_devops"] = azure_devops_provider_caller
         provider_secrets = _mapping_config(selected, "provider_secrets")
         self._provider_secrets = {
             str(reference): str(secret)
             for reference, secret in provider_secrets.items()
-            if isinstance(reference, str)
-            and reference
-            and isinstance(secret, str)
-            and secret
+            if isinstance(reference, str) and reference and isinstance(secret, str) and secret
         }
         if len(self._provider_secrets) != len(provider_secrets):
             raise AccountCenterError("configuration_unavailable")
-        workspace_operator_profile_refs = selected.get(
-            "workspace_operator_profile_refs", []
-        )
+        workspace_operator_profile_refs = selected.get("workspace_operator_profile_refs", [])
         if (
             not isinstance(workspace_operator_profile_refs, list)
-            or any(
-                not isinstance(reference, str)
-                for reference in workspace_operator_profile_refs
-            )
-            or len(set(workspace_operator_profile_refs))
-            != len(workspace_operator_profile_refs)
+            or any(not isinstance(reference, str) for reference in workspace_operator_profile_refs)
+            or len(set(workspace_operator_profile_refs)) != len(workspace_operator_profile_refs)
         ):
             raise AccountCenterError("configuration_unavailable")
         self._workspace_operator_profile_refs = {
-            _opaque_profile_ref(reference)
-            for reference in workspace_operator_profile_refs
+            _opaque_profile_ref(reference) for reference in workspace_operator_profile_refs
         }
         self._method_callers = _load_method_callers(
             selected,
             exchange_caller=self._exchange_caller,
             callback_caller=self._github_callback_caller,
+            microsoft_graph_callback_caller=self._microsoft_graph_callback_caller,
+            microsoft_graph_provider_caller=microsoft_graph_provider_caller,
             provider_caller=self._github_provider_caller,
             provider_callers=set(self._provider_caller_ids.values()),
             wecom_callers=set(self._wecom_sources),
@@ -340,6 +456,8 @@ class AccountCenterPlugin:
         }
         if self._github_callback_caller:
             expected_callers.add(self._github_callback_caller)
+        if self._microsoft_graph_callback_caller:
+            expected_callers.add(self._microsoft_graph_callback_caller)
         caller_roles = [
             self._exchange_caller,
             *self._provider_caller_ids.values(),
@@ -347,6 +465,8 @@ class AccountCenterPlugin:
         ]
         if self._github_callback_caller:
             caller_roles.append(self._github_callback_caller)
+        if self._microsoft_graph_callback_caller:
+            caller_roles.append(self._microsoft_graph_callback_caller)
         if (
             len(caller_roles) != len(set(caller_roles))
             or set(self._caller_keys) != expected_callers
@@ -376,6 +496,56 @@ class AccountCenterPlugin:
                     raise AccountCenterError("configuration_unavailable") from None
         self._huggingface = huggingface_client or HuggingFaceIdentityClient()
         self._huggingface_oauth = huggingface_oauth_client or HuggingFaceOAuthClient()
+        graph_client_id = selected.get("microsoft_graph_client_id")
+        graph_client_secret = selected.get("microsoft_graph_client_secret")
+        if (graph_client_id is None) != (graph_client_secret is None):
+            raise AccountCenterError("configuration_unavailable")
+        if microsoft_graph_oauth_client is not None:
+            self._microsoft_graph_oauth = microsoft_graph_oauth_client
+        elif graph_client_id and graph_client_secret:
+            self._microsoft_graph_oauth = MicrosoftGraphOAuthClient(
+                client_id=_required_config_text(selected, "microsoft_graph_client_id"),
+                client_secret=_required_config_text(selected, "microsoft_graph_client_secret"),
+                office_v2_enabled=True,
+                now=now,
+            )
+        else:
+            self._microsoft_graph_oauth = None
+        self._microsoft_graph_client_id = graph_client_id or getattr(
+            self._microsoft_graph_oauth, "client_id", None
+        )
+        self._azure_devops_oauth = azure_devops_oauth_client
+        if self._azure_devops_oauth is None and graph_client_id and graph_client_secret:
+            self._azure_devops_oauth = AzureDevOpsOAuthClient(
+                client_id=_required_config_text(selected, "microsoft_graph_client_id"),
+                client_secret=_required_config_text(selected, "microsoft_graph_client_secret"),
+                now=now,
+            )
+        self._azure_devops_client_id = graph_client_id or getattr(
+            self._azure_devops_oauth, "client_id", None
+        )
+        entra_enabled = any(
+            value is not None
+            for value in (
+                graph_callback_uri,
+                graph_callback_caller,
+                microsoft_graph_provider_caller,
+                azure_devops_provider_caller,
+                graph_client_id,
+                graph_client_secret,
+                microsoft_graph_oauth_client,
+                azure_devops_oauth_client,
+            )
+        )
+        if entra_enabled and (
+            self._microsoft_graph_callback_uri is None
+            or self._microsoft_graph_callback_caller is None
+            or not isinstance(self._microsoft_graph_client_id, str)
+            or not self._microsoft_graph_client_id
+            or (microsoft_graph_provider_caller and self._microsoft_graph_oauth is None)
+            or (azure_devops_provider_caller and self._azure_devops_oauth is None)
+        ):
+            raise AccountCenterError("configuration_unavailable")
         self._provider_refresh_locks: dict[str, threading.Lock] = {}
         self._provider_refresh_lock = threading.Lock()
         self._recover_interrupted_callback_credentials()
@@ -411,9 +581,7 @@ class AccountCenterPlugin:
             }:
                 raise AccountCenterError("invalid_request")
             request = require_object(envelope["payload"])
-            context = require_object(
-                envelope["trusted_context"], code="untrusted_caller"
-            )
+            context = require_object(envelope["trusted_context"], code="untrusted_caller")
             result = self.call(action, request, context)
             response_name = _action_type_name(action, "Response")
             return True, DirectTypedPayload(
@@ -436,9 +604,7 @@ class AccountCenterPlugin:
             raise AccountCenterError("method_not_found")
         request = require_object(dict(payload))
         trusted = require_object(dict(context), code="untrusted_caller")
-        anchor = verify_context(
-            method, request, trusted, self._caller_keys, now=int(self._now())
-        )
+        anchor = verify_context(method, request, trusted, self._caller_keys, now=int(self._now()))
         caller_id = trusted["caller_id"]
         if trusted["binding_id"] != self._binding_id:
             raise AccountCenterError("untrusted_caller")
@@ -482,9 +648,7 @@ class AccountCenterPlugin:
             except Exception:  # noqa: BLE001 - persist only a fixed sanitized result.
                 self._store.complete_idempotent_command(
                     key_hash,
-                    self._encode_idempotency_response(
-                        key_hash, {"error": "execution_failed"}
-                    ),
+                    self._encode_idempotency_response(key_hash, {"error": "execution_failed"}),
                 )
                 raise AccountCenterError("execution_failed") from None
             return result
@@ -528,23 +692,37 @@ class AccountCenterPlugin:
             return self._link_huggingface_profile(request, anchor)
         if method == "rotate_huggingface_profile":
             return self._rotate_huggingface_profile(request, anchor)
+        if method == "begin_huggingface_renewal":
+            return self._begin_huggingface_renewal(request, anchor)
+        if method == "poll_huggingface_renewal":
+            return self._poll_huggingface_renewal(request, anchor)
         if method == "register_host_identity_profile":
             return self._register_host_identity_profile(request, anchor)
         if method == "list_provider_profiles":
-            return self._list_provider_profiles(request, anchor)
+            return self._list_provider_profiles(request, anchor, caller_id)
         if method == "unlink_provider_profile":
             return self._unlink_provider_profile(request, anchor)
         if method == "create_provider_credential_lease":
             return self._create_provider_credential_lease(request, anchor, trusted)
         if method == "redeem_provider_credential_lease":
-            return self._redeem_provider_credential_lease(
-                request, anchor, caller_id, trusted
-            )
+            return self._redeem_provider_credential_lease(request, anchor, caller_id, trusted)
+        if method == "begin_microsoft_graph_link":
+            return self._begin_microsoft_graph_link(request, anchor, idempotency_key_hash)
+        if method == "complete_microsoft_graph_link":
+            return self._complete_microsoft_graph_link(request)
+        if method == "begin_microsoft_graph_scope_upgrade":
+            return self._begin_microsoft_graph_scope_upgrade(request, anchor, idempotency_key_hash)
+        if method == "update_microsoft_graph_v2_scope":
+            return self._update_microsoft_graph_v2_scope(request, anchor)
+        if method == "complete_microsoft_graph_scope_upgrade":
+            return self._complete_microsoft_graph_scope_upgrade(request)
+        if method == "begin_azure_devops_link":
+            return self._begin_azure_devops_link(request, anchor, idempotency_key_hash)
+        if method == "complete_azure_devops_link":
+            return self._complete_azure_devops_link(request)
         raise AccountCenterError("method_not_found")
 
-    def _encode_idempotency_response(
-        self, key_hash: str, value: Mapping[str, Any]
-    ) -> bytes:
+    def _encode_idempotency_response(self, key_hash: str, value: Mapping[str, Any]) -> bytes:
         """Encrypt one bounded replay response before storing it privately."""
 
         clear = canonical_json(dict(value))
@@ -556,9 +734,7 @@ class AccountCenterPlugin:
             f"command-idempotency:{key_hash}".encode(),
         )
 
-    def _decode_idempotency_response(
-        self, key_hash: str, blob: bytes
-    ) -> dict[str, Any]:
+    def _decode_idempotency_response(self, key_hash: str, blob: bytes) -> dict[str, Any]:
         """Replay the exact cached public result or its stable sanitized error."""
 
         clear = decrypt(
@@ -620,9 +796,7 @@ class AccountCenterPlugin:
         command_result = (
             (
                 idempotency_key_hash,
-                self._encode_idempotency_response(
-                    idempotency_key_hash, {"value": response}
-                ),
+                self._encode_idempotency_response(idempotency_key_hash, {"value": response}),
             )
             if idempotency_key_hash is not None
             else None
@@ -649,9 +823,7 @@ class AccountCenterPlugin:
         code = _required_text(request, "code", maximum=4096)
         now = int(self._now())
         state_digest = _digest_text(state)
-        session = self._store.claim_session_by_state(
-            state_digest, self._callback_uri, now=now
-        )
+        session = self._store.claim_session_by_state(state_digest, self._callback_uri, now=now)
         session_ref = session["link_session_ref"]
         if (
             not hmac.compare_digest(session["state_digest"], state_digest)
@@ -673,15 +845,11 @@ class AccountCenterPlugin:
                 code,
                 redirect_uri=session["callback_uri"],
                 code_verifier=verifier,
-                on_credential=lambda value: self._persist_callback_credential(
-                    session_ref, value
-                ),
+                on_credential=lambda value: self._persist_callback_credential(session_ref, value),
             )
             owner = _anchor_from_session(session)
             account_ref = str(uuid.uuid4())
-            encrypted = self._encrypt_credential(
-                account_ref=account_ref, credential=credential
-            )
+            encrypted = self._encrypt_credential(account_ref=account_ref, credential=credential)
             account_ref = self._store.insert_account(
                 account_ref=account_ref,
                 anchor=owner,
@@ -787,9 +955,7 @@ class AccountCenterPlugin:
         anchor: Anchor,
         idempotency_key_hash: str | None = None,
     ) -> dict[str, Any]:
-        _require_fields(
-            request, {"link_session_ref", "challenge_id", "challenge_value"}
-        )
+        _require_fields(request, {"link_session_ref", "challenge_id", "challenge_value"})
         session_ref = _uuid_text(request["link_session_ref"])
         challenge_id = _uuid_text(request["challenge_id"])
         challenge_value = _required_text(request, "challenge_value", maximum=128)
@@ -799,18 +965,14 @@ class AccountCenterPlugin:
             raise AccountCenterError("link_session_invalid")
         if not _session_matches_anchor(session, anchor):
             raise AccountCenterError("scope_mismatch")
-        if not hmac.compare_digest(
-            session["nonce_digest"], _digest_text(challenge_value)
-        ):
+        if not hmac.compare_digest(session["nonce_digest"], _digest_text(challenge_value)):
             raise AccountCenterError("challenge_rejected")
         account_ref = str(uuid.uuid4())
         response = {"account_ref": account_ref, "provider": "wecom", "status": "active"}
         command_result = (
             (
                 idempotency_key_hash,
-                self._encode_idempotency_response(
-                    idempotency_key_hash, {"value": response}
-                ),
+                self._encode_idempotency_response(idempotency_key_hash, {"value": response}),
             )
             if idempotency_key_hash is not None
             else None
@@ -921,14 +1083,11 @@ class AccountCenterPlugin:
             seed = self._huggingface_oauth_seed(secret_ref, scopes)
             now = int(self._now())
             if seed.access_token_expires_at <= now or (
-                seed.refresh_token_expires_at is not None
-                and seed.refresh_token_expires_at <= now
+                seed.refresh_token_expires_at is not None and seed.refresh_token_expires_at <= now
             ):
                 raise AccountCenterError("credential_rejected")
             token = seed.access_token
-            refresh_blob = self._encrypt_provider_refresh_token(
-                profile_ref, seed.refresh_token
-            )
+            refresh_blob = self._encrypt_provider_refresh_token(profile_ref, seed.refresh_token)
             refresh_expires_at = seed.refresh_token_expires_at
             oauth_client_id = seed.client_id
             oauth_scopes_json = (
@@ -954,9 +1113,7 @@ class AccountCenterPlugin:
             target_scope_json=canonical_json(scopes).decode("utf-8"),
             auth_status="healthy",
             external_subject=external_subject,
-            credential_blob=self._encrypt_provider_token(
-                profile_ref, token, credential_expires_at
-            ),
+            credential_blob=self._encrypt_provider_token(profile_ref, token, credential_expires_at),
             credential_expires_at=credential_expires_at,
             credential_secret_ref=secret_ref,
             auth_mode=auth_mode,
@@ -992,9 +1149,7 @@ class AccountCenterPlugin:
         profile = self._store.get_provider_profile(profile_ref, anchor)
         if profile["provider"] != "huggingface":
             raise AccountCenterError("profile_provider_mismatch")
-        auth_mode = _huggingface_auth_mode(
-            request.get("auth_mode", profile["auth_mode"])
-        )
+        auth_mode = _huggingface_auth_mode(request.get("auth_mode", profile["auth_mode"]))
         scopes = _json_object(profile["target_scope_json"])
         token: str
         refresh_blob: bytes | None = None
@@ -1005,14 +1160,11 @@ class AccountCenterPlugin:
             seed = self._huggingface_oauth_seed(secret_ref, scopes)
             now = int(self._now())
             if seed.access_token_expires_at <= now or (
-                seed.refresh_token_expires_at is not None
-                and seed.refresh_token_expires_at <= now
+                seed.refresh_token_expires_at is not None and seed.refresh_token_expires_at <= now
             ):
                 raise AccountCenterError("credential_rejected")
             token = seed.access_token
-            refresh_blob = self._encrypt_provider_refresh_token(
-                profile_ref, seed.refresh_token
-            )
+            refresh_blob = self._encrypt_provider_refresh_token(profile_ref, seed.refresh_token)
             refresh_expires_at = seed.refresh_token_expires_at
             oauth_client_id = seed.client_id
             oauth_scopes_json = (
@@ -1030,17 +1182,12 @@ class AccountCenterPlugin:
             external_subject = self._huggingface.whoami(token)
         except HuggingFaceAuthError as error:
             raise AccountCenterError(error.code) from None
-        if (
-            profile["external_subject"]
-            and profile["external_subject"] != external_subject
-        ):
+        if profile["external_subject"] and profile["external_subject"] != external_subject:
             raise AccountCenterError("external_identity_mismatch")
         self._store.update_huggingface_profile_credentials(
             profile_ref=profile_ref,
             anchor=anchor,
-            credential_blob=self._encrypt_provider_token(
-                profile_ref, token, credential_expires_at
-            ),
+            credential_blob=self._encrypt_provider_token(profile_ref, token, credential_expires_at),
             credential_refresh_blob=refresh_blob,
             credential_expires_at=credential_expires_at,
             credential_refresh_expires_at=refresh_expires_at,
@@ -1061,9 +1208,908 @@ class AccountCenterPlugin:
             "expires_at": credential_expires_at,
         }
 
-    def _huggingface_oauth_seed(
-        self, secret_ref: str, scopes: Mapping[str, Any]
-    ) -> Any:
+    def _begin_huggingface_renewal(
+        self, request: Mapping[str, Any], anchor: Anchor
+    ) -> dict[str, Any]:
+        """Start one owner-scoped HF device login without returning its private code."""
+
+        _require_fields(request, {"profile_ref", "session_ref"})
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        session_ref = _opaque_profile_ref(request["session_ref"])
+        profile = self._store.get_provider_profile(profile_ref, anchor)
+        if (
+            profile["provider"] != "huggingface"
+            or profile["auth_mode"] != "device_oauth"
+            or not profile["oauth_client_id"]
+            or not profile["oauth_scopes_json"]
+        ):
+            raise AccountCenterError("profile_provider_mismatch")
+        if profile["refresh_claim_id"] is not None:
+            raise AccountCenterError("credential_refresh_in_progress")
+        oauth_scopes = _stored_huggingface_oauth_scopes(profile["oauth_scopes_json"])
+        now = int(self._now())
+        session, created = self._store.begin_huggingface_device_renewal(
+            profile_ref=profile_ref,
+            session_ref=session_ref,
+            anchor=anchor,
+            now=now,
+        )
+        if not created:
+            return _huggingface_renewal_response(session)
+        if session["profile_revision"] != profile["credential_revision"]:
+            session = self._store.fail_huggingface_device_renewal_start(
+                session_ref,
+                anchor,
+                state="failed",
+                reason_code="profile_changed_before_device_start",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(session)
+        try:
+            device = self._huggingface_oauth.begin_device_code(
+                client_id=str(profile["oauth_client_id"]),
+                oauth_scopes=oauth_scopes,
+            )
+        except HuggingFaceOAuthError as error:
+            session = self._store.fail_huggingface_device_renewal_start(
+                session_ref,
+                anchor,
+                state="unknown" if error.uncertain else "failed",
+                reason_code=error.code,
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(session)
+        encrypted_device_code = encrypt(
+            self._encryption_key,
+            device.device_code.encode("utf-8"),
+            f"huggingface-device-renewal:{session_ref}".encode(),
+        )
+        started_at = int(self._now())
+        session = self._store.complete_huggingface_device_renewal_start(
+            session_ref,
+            anchor,
+            encrypted_device_code=encrypted_device_code,
+            user_code=device.user_code,
+            verification_uri=device.verification_uri,
+            expires_at=started_at + device.expires_in,
+            interval_seconds=device.interval_seconds,
+            now=started_at,
+        )
+        return _huggingface_renewal_response(session)
+
+    def _poll_huggingface_renewal(
+        self, request: Mapping[str, Any], anchor: Anchor
+    ) -> dict[str, Any]:
+        """Poll one fenced HF device session and atomically replace its owned profile."""
+
+        _require_fields(request, {"profile_ref", "session_ref"})
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        session_ref = _opaque_profile_ref(request["session_ref"])
+        session = self._store.get_huggingface_device_renewal(session_ref, anchor)
+        if session["profile_ref"] != profile_ref:
+            raise AccountCenterError("renewal_session_not_found")
+        now = int(self._now())
+        session, claim_id = self._store.claim_huggingface_device_renewal_poll(
+            session_ref,
+            anchor,
+            now=now,
+        )
+        if claim_id is None:
+            return _huggingface_renewal_response(session)
+        profile = self._store.get_provider_profile(profile_ref, anchor)
+        if (
+            profile["provider"] != "huggingface"
+            or profile["auth_mode"] != "device_oauth"
+            or profile["credential_revision"] != session["profile_revision"]
+            or profile["refresh_claim_id"] is not None
+            or not isinstance(profile["oauth_client_id"], str)
+            or not profile["oauth_client_id"]
+        ):
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="profile_changed_during_renewal",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        device_blob = session.get("device_code_blob")
+        if not isinstance(device_blob, bytes):
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="unknown",
+                reason_code="device_code_unavailable",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        try:
+            device_code = decrypt(
+                self._encryption_key,
+                device_blob,
+                f"huggingface-device-renewal:{session_ref}".encode(),
+            ).decode("utf-8")
+            token = self._huggingface_oauth.poll_device_code(
+                client_id=profile["oauth_client_id"],
+                device_code=device_code,
+                now=now,
+            )
+        except UnicodeDecodeError:
+            token_error = HuggingFaceOAuthError("device_code_unavailable", uncertain=True)
+        except HuggingFaceOAuthError as error:
+            token_error = error
+        else:
+            token_error = None
+        if token_error is not None:
+            return self._record_huggingface_device_poll_error(
+                session_ref,
+                anchor,
+                claim_id,
+                session,
+                token_error,
+            )
+        if token.refresh_token is None:
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="refresh_token_missing",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        old_scopes = _stored_huggingface_oauth_scopes(profile["oauth_scopes_json"])
+        if token.oauth_scopes is not None and set(token.oauth_scopes) != set(old_scopes):
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="authorization_scope_mismatch",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        try:
+            external_subject = self._huggingface.whoami(token.access_token)
+        except HuggingFaceAuthError:
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="provider_authentication_failed",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        if not profile["external_subject"] or external_subject != profile["external_subject"]:
+            failed = self._store.fail_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                state="failed",
+                reason_code="external_identity_mismatch",
+                now=int(self._now()),
+            )
+            return _huggingface_renewal_response(failed)
+        scopes_json = profile["oauth_scopes_json"]
+        completed_at = int(self._now())
+        completed = self._store.complete_huggingface_device_renewal(
+            session_ref,
+            anchor,
+            claim_id,
+            credential_blob=self._encrypt_provider_token(
+                profile_ref,
+                token.access_token,
+                token.access_token_expires_at,
+            ),
+            credential_refresh_blob=self._encrypt_provider_refresh_token(
+                profile_ref,
+                token.refresh_token,
+            ),
+            credential_expires_at=token.access_token_expires_at,
+            credential_refresh_expires_at=token.refresh_token_expires_at,
+            oauth_scopes_json=scopes_json,
+            external_subject=external_subject,
+            now=completed_at,
+        )
+        return _huggingface_renewal_response(completed)
+
+    def _record_huggingface_device_poll_error(
+        self,
+        session_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        session: Mapping[str, Any],
+        error: HuggingFaceOAuthError,
+    ) -> dict[str, Any]:
+        """Persist pending, throttled, final, and uncertain poll outcomes safely."""
+
+        now = int(self._now())
+        current_interval = session.get("interval_seconds")
+        interval = (
+            current_interval
+            if isinstance(current_interval, int) and not isinstance(current_interval, bool)
+            else 5
+        )
+        if error.code == "authorization_pending":
+            updated = self._store.defer_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                interval_seconds=interval,
+                reason_code=None,
+                now=now,
+            )
+            return _huggingface_renewal_response(updated)
+        if error.code in {"slow_down", "provider_rate_limited"}:
+            updated = self._store.defer_huggingface_device_renewal_poll(
+                session_ref,
+                anchor,
+                claim_id,
+                interval_seconds=min(300, interval + 5),
+                reason_code=error.code,
+                now=now,
+            )
+            return _huggingface_renewal_response(updated)
+        state = {
+            "expired_token": "expired",
+            "access_denied": "cancelled",
+        }.get(error.code, "unknown" if error.uncertain else "failed")
+        updated = self._store.fail_huggingface_device_renewal_poll(
+            session_ref,
+            anchor,
+            claim_id,
+            state=state,
+            reason_code=error.code,
+            now=now,
+        )
+        return _huggingface_renewal_response(updated)
+
+    def _begin_microsoft_graph_link(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None,
+    ) -> dict[str, Any]:
+        """Start a v1 Planner link or one feature-scoped Office v2 link."""
+
+        _require_fields(
+            request,
+            {"profile_ref"},
+            {"planner_plan_ids", "office_v2_scope"},
+        )
+        if ("planner_plan_ids" in request) == ("office_v2_scope" in request):
+            raise AccountCenterError("invalid_request")
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        external_subject = _trusted_entra_external_subject(anchor)
+        if self._microsoft_graph_oauth is None or self._microsoft_graph_callback_uri is None:
+            raise AccountCenterError("provider_not_configured")
+        access_mode = self._configured_profile_access_mode(profile_ref)
+        if access_mode != "actor_owned" or profile_ref in self._workspace_operator_profile_refs:
+            raise AccountCenterError("profile_unavailable")
+        if "office_v2_scope" in request:
+            target_scope = _safe_microsoft_graph_profile_scope(request["office_v2_scope"])
+            tenant_id, _ = _graph_subject_parts(external_subject)
+            if (
+                target_scope.get("schema_version") != 2
+                or target_scope["tenant_id"] != tenant_id
+                or not isinstance(anchor.workspace_id, str)
+                or target_scope["workspace_id"] != anchor.workspace_id
+            ):
+                raise AccountCenterError("profile_scope_mismatch")
+            selection = target_scope
+            oauth_scopes = _expected_microsoft_graph_scopes(target_scope)
+        else:
+            plan_ids = _safe_graph_planner_ids(request["planner_plan_ids"])
+            selection = {"planner_plan_ids": plan_ids}
+            oauth_scopes = INITIAL_GRAPH_SCOPES
+        return self._start_microsoft_graph_oauth_session(
+            profile_ref=profile_ref,
+            flow="link",
+            anchor=anchor,
+            target_scope_json=canonical_json(selection).decode("utf-8"),
+            oauth_scopes=tuple(sorted(oauth_scopes)),
+            access_mode=access_mode,
+            profile_revision=None,
+            idempotency_key_hash=idempotency_key_hash,
+        )
+
+    def _begin_microsoft_graph_scope_upgrade(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None,
+    ) -> dict[str, Any]:
+        """Request one closed permission upgrade for an existing owned profile."""
+
+        _require_fields(
+            request,
+            {"profile_ref", "permission"},
+            {"site_id", "list_ids", "mail_features"},
+        )
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        permission = request["permission"]
+        profile = self._store.get_provider_profile(profile_ref, anchor)
+        if (
+            profile["provider"] != "microsoft_graph"
+            or profile["auth_mode"] != "delegated_oauth"
+            or profile["auth_status"] != "healthy"
+        ):
+            raise AccountCenterError("profile_provider_mismatch")
+        self._require_entra_profile_owner(profile, anchor)
+        if self._microsoft_graph_oauth is None or self._microsoft_graph_callback_uri is None:
+            raise AccountCenterError("provider_not_configured")
+        target_scope = _safe_microsoft_graph_profile_scope(
+            _json_object(profile["target_scope_json"])
+        )
+        current_scopes = _safe_microsoft_graph_oauth_scopes(
+            _json_array(profile["oauth_scopes_json"])
+        )
+        if current_scopes != _expected_microsoft_graph_scopes(target_scope):
+            raise AccountCenterError("profile_unavailable")
+        next_scopes = set(current_scopes)
+        if permission == "planner_tasks_write":
+            if "site_id" in request or "list_ids" in request or "mail_features" in request:
+                raise AccountCenterError("invalid_request")
+            if target_scope.get("schema_version") == 2:
+                raise AccountCenterError("office_v2_scope_upgrade_requires_relink")
+            if target_scope["planner"]["tasks_write"]:
+                raise AccountCenterError("scope_already_granted")
+            target_scope["planner"]["tasks_write"] = True
+            next_scopes.add("Tasks.ReadWrite")
+        elif permission == "sharepoint_selected":
+            if (
+                "site_id" not in request
+                or "list_ids" not in request
+                or "mail_features" in request
+            ):
+                raise AccountCenterError("invalid_request")
+            if target_scope.get("schema_version") == 2:
+                raise AccountCenterError("office_v2_scope_upgrade_requires_relink")
+            site_id = _safe_graph_site_id(request["site_id"])
+            list_ids = _safe_graph_uuid_list(request["list_ids"])
+            if target_scope["sharepoint"]["enabled"]:
+                raise AccountCenterError("scope_already_granted")
+            target_scope["sharepoint"] = {
+                "enabled": True,
+                "site_id": site_id,
+                "list_ids": list_ids,
+            }
+            next_scopes.add("Sites.Selected")
+        elif permission == "mail":
+            if "site_id" in request or "list_ids" in request or "mail_features" not in request:
+                raise AccountCenterError("invalid_request")
+            if target_scope.get("schema_version") != 2:
+                raise AccountCenterError("office_v2_scope_upgrade_requires_relink")
+            mail_features = _safe_microsoft_graph_mail_feature_request(request["mail_features"])
+            mail = target_scope["mail"]
+            if not any(
+                requested and not mail[target]
+                for requested, target in (
+                    (mail_features["metadata_read"], "metadata_read"),
+                    (mail_features["drafts_write"], "drafts_write"),
+                    (mail_features["send"], "send_enabled"),
+                )
+            ):
+                raise AccountCenterError("scope_already_granted")
+            mail["metadata_read"] = mail["metadata_read"] or mail_features["metadata_read"]
+            mail["drafts_write"] = mail["drafts_write"] or mail_features["drafts_write"]
+            mail["send_enabled"] = mail["send_enabled"] or mail_features["send"]
+            mail["enabled"] = bool(
+                mail["metadata_read"] or mail["drafts_write"] or mail["send_enabled"]
+            )
+            next_scopes = _expected_microsoft_graph_scopes(target_scope)
+        else:
+            raise AccountCenterError("invalid_request")
+        return self._start_microsoft_graph_oauth_session(
+            profile_ref=profile_ref,
+            flow="scope_upgrade",
+            anchor=anchor,
+            target_scope_json=canonical_json(target_scope).decode("utf-8"),
+            oauth_scopes=tuple(sorted(next_scopes)),
+            access_mode=profile["access_mode"],
+            profile_revision=int(profile["credential_revision"]),
+            idempotency_key_hash=idempotency_key_hash,
+        )
+
+    def _update_microsoft_graph_v2_scope(
+        self, request: Mapping[str, Any], anchor: Anchor
+    ) -> dict[str, Any]:
+        """CAS-update only the selected targets on one v2 actor-owned profile."""
+
+        _require_fields(
+            request,
+            {
+                "profile_ref",
+                "workspace_id",
+                "expected_credential_revision",
+                "target_scope",
+            },
+        )
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        workspace_id = _safe_graph_uuid(request["workspace_id"])
+        revision = request["expected_credential_revision"]
+        if isinstance(revision, bool) or not isinstance(revision, int) or revision < 0:
+            raise AccountCenterError("invalid_request")
+        target_scope = _safe_microsoft_graph_profile_scope(request["target_scope"])
+        external_subject = _trusted_entra_external_subject(anchor)
+        tenant_id, _ = _graph_subject_parts(external_subject)
+        if (
+            workspace_id != anchor.workspace_id
+            or target_scope.get("schema_version") != 2
+            or target_scope["workspace_id"] != workspace_id
+            or target_scope["tenant_id"] != tenant_id
+        ):
+            raise AccountCenterError("profile_scope_mismatch")
+
+        profile = self._store.get_provider_profile(profile_ref, anchor)
+        if (
+            profile["provider"] != "microsoft_graph"
+            or profile["auth_mode"] != "delegated_oauth"
+            or profile["auth_status"] != "healthy"
+            or profile["access_mode"] != "actor_owned"
+            or profile["external_subject"] != external_subject
+            or profile["credential_revision"] != revision
+        ):
+            raise AccountCenterError("profile_revision_conflict")
+        current_scope = _safe_microsoft_graph_profile_scope(
+            _json_object(profile["target_scope_json"])
+        )
+        if current_scope.get("schema_version") != 2:
+            raise AccountCenterError("profile_provider_mismatch")
+
+        # Only resource selections may change; OAuth feature grants and fixed
+        # privacy flags stay byte-for-byte equivalent after normalization.
+        if (
+            current_scope["tenant_id"] != target_scope["tenant_id"]
+            or current_scope["workspace_id"] != target_scope["workspace_id"]
+            or _microsoft_graph_scope_permissions(current_scope)
+            != _microsoft_graph_scope_permissions(target_scope)
+        ):
+            raise AccountCenterError("scope_upgrade_required")
+        oauth_scopes = _safe_microsoft_graph_oauth_scopes(_json_array(profile["oauth_scopes_json"]))
+        if oauth_scopes != _expected_microsoft_graph_scopes(target_scope):
+            raise AccountCenterError("scope_upgrade_required")
+        next_revision = self._store.update_provider_profile_target_scope(
+            profile_ref=profile_ref,
+            anchor=anchor,
+            expected_revision=revision,
+            target_scope_json=canonical_json(target_scope).decode("utf-8"),
+            now=int(self._now()),
+        )
+        return {
+            "profile_ref": profile_ref,
+            "provider": "microsoft_graph",
+            "workspace_id": workspace_id,
+            "scope_schema_version": 2,
+            "target_scope": target_scope,
+            "oauth_scopes": sorted(oauth_scopes),
+            "auth_status": "healthy",
+            "reauth_required": False,
+            "credential_revision": next_revision,
+            "expires_at": profile["credential_expires_at"],
+            "refresh_expires_at": profile["credential_refresh_expires_at"],
+        }
+
+    def _start_microsoft_graph_oauth_session(
+        self,
+        *,
+        profile_ref: str,
+        flow: str,
+        anchor: Anchor,
+        target_scope_json: str,
+        oauth_scopes: tuple[str, ...],
+        access_mode: str,
+        profile_revision: int | None,
+        idempotency_key_hash: str | None,
+    ) -> dict[str, Any]:
+        """Persist one owner-scoped PKCE/state/nonce session before redirect."""
+
+        client = self._microsoft_graph_oauth
+        callback_uri = self._microsoft_graph_callback_uri
+        client_id = self._microsoft_graph_client_id
+        if client is None or callback_uri is None or not isinstance(client_id, str):
+            raise AccountCenterError("provider_not_configured")
+        state = _secret_text()
+        nonce = _secret_text()
+        verifier = _secret_text()
+        session_ref = str(uuid.uuid4())
+        now = int(self._now())
+        expires_at = now + SESSION_TTL_SECONDS
+        graph_scopes = tuple(sorted(_safe_microsoft_graph_oauth_scopes(list(oauth_scopes))))
+        oauth_scopes_json = canonical_json(list(graph_scopes)).decode("utf-8")
+        try:
+            authorization_url = client.authorization_url(
+                redirect_uri=callback_uri,
+                state=state,
+                nonce=nonce,
+                code_challenge=pkce_s256_challenge(verifier),
+                scopes=("openid", "profile", "offline_access", *graph_scopes),
+                prompt="consent" if flow == "scope_upgrade" else None,
+            )
+        except MicrosoftGraphOAuthError as error:
+            raise AccountCenterError(error.code) from None
+        response = {
+            "link_session_ref": session_ref,
+            "authorization_url": authorization_url,
+            "expires_at": expires_at,
+        }
+        command_result = (
+            (
+                idempotency_key_hash,
+                self._encode_idempotency_response(idempotency_key_hash, {"value": response}),
+            )
+            if idempotency_key_hash is not None
+            else None
+        )
+        self._store.create_microsoft_entra_oauth_session(
+            session_ref=session_ref,
+            profile_ref=profile_ref,
+            provider="microsoft_graph",
+            flow=flow,
+            anchor=anchor,
+            state_digest=_digest_text(state),
+            nonce_digest=_digest_text(nonce),
+            callback_uri=callback_uri,
+            code_verifier_blob=self._encrypt_session_secret(session_ref, verifier),
+            target_scope_json=target_scope_json,
+            oauth_scopes_json=oauth_scopes_json,
+            oauth_client_id=client_id,
+            access_mode=access_mode,
+            profile_revision=profile_revision,
+            expires_at=expires_at,
+            now=now,
+            command_result=command_result,
+        )
+        return response
+
+    def _complete_microsoft_graph_link(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        """Consume one Graph callback and create its encrypted provider profile."""
+
+        return self._complete_microsoft_graph_oauth(request, expected_flow="link")
+
+    def _complete_microsoft_graph_scope_upgrade(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        """Consume one consent upgrade and atomically replace the profile tokens."""
+
+        return self._complete_microsoft_graph_oauth(request, expected_flow="scope_upgrade")
+
+    def _complete_microsoft_graph_oauth(
+        self, request: Mapping[str, Any], *, expected_flow: str
+    ) -> dict[str, Any]:
+        """Verify callback identity and commit token rotation before success."""
+
+        _require_fields(request, {"state", "code"})
+        client = self._microsoft_graph_oauth
+        callback_uri = self._microsoft_graph_callback_uri
+        if client is None or callback_uri is None:
+            raise AccountCenterError("provider_not_configured")
+        state = _required_text(request, "state", maximum=256)
+        code = _required_text(request, "code", maximum=4096)
+        session = self._store.claim_microsoft_entra_oauth_session(
+            _digest_text(state), callback_uri, now=int(self._now())
+        )
+        session_ref = str(session["session_ref"])
+        try:
+            if (
+                session["provider"] != "microsoft_graph"
+                or session["flow"] != expected_flow
+                or session["access_mode"] != "actor_owned"
+            ):
+                raise AccountCenterError("link_session_invalid")
+            verifier_blob = session["code_verifier_blob"]
+            if not isinstance(verifier_blob, bytes) or not verifier_blob:
+                raise AccountCenterError("link_session_invalid")
+            verifier = self._decrypt_session_secret(session_ref, verifier_blob)
+            graph_scopes = _safe_microsoft_graph_oauth_scopes(
+                _json_array(session["oauth_scopes_json"])
+            )
+            requested_scopes = (
+                "openid",
+                "profile",
+                "offline_access",
+                *sorted(graph_scopes),
+            )
+            token, identity = client.exchange_code(
+                code=code,
+                redirect_uri=callback_uri,
+                code_verifier=verifier,
+                nonce_digest=str(session["nonce_digest"]),
+                requested_scopes=requested_scopes,
+            )
+            tenant_id, object_id = _graph_subject_parts(identity.external_subject)
+            if identity.tenant_id != tenant_id or identity.object_id != object_id:
+                raise AccountCenterError("external_identity_mismatch")
+            session_anchor = _anchor_from_session(session)
+            if identity.external_subject != _trusted_entra_external_subject(session_anchor):
+                raise AccountCenterError("external_identity_mismatch")
+            actual_scopes = _safe_microsoft_graph_oauth_scopes(list(token.scopes))
+            if graph_scopes != actual_scopes:
+                raise AccountCenterError("scope_rejected")
+            if not token.refresh_token:
+                raise AccountCenterError("credential_unavailable")
+            if expected_flow == "scope_upgrade":
+                target_scope_json = str(session["target_scope_json"])
+            else:
+                selection = _json_object(session["target_scope_json"])
+                if selection.get("schema_version") == 2:
+                    target_scope = _safe_microsoft_graph_profile_scope(selection)
+                    if (
+                        target_scope["tenant_id"] != identity.tenant_id
+                        or target_scope["workspace_id"] != session_anchor.workspace_id
+                    ):
+                        raise AccountCenterError("external_identity_mismatch")
+                    target_scope_json = canonical_json(target_scope).decode("utf-8")
+                else:
+                    if set(selection) != {"planner_plan_ids"}:
+                        raise AccountCenterError("link_session_invalid")
+                    plan_ids = _safe_graph_planner_ids(selection["planner_plan_ids"])
+                    target_scope_json = canonical_json(
+                        {
+                            "tenant_id": identity.tenant_id,
+                            "planner": {
+                                "plan_ids": plan_ids,
+                                "tasks_read": True,
+                                "tasks_write": False,
+                            },
+                            "sharepoint": {
+                                "enabled": False,
+                                "site_id": None,
+                                "list_ids": [],
+                            },
+                        }
+                    ).decode("utf-8")
+            target_scope = _safe_microsoft_graph_profile_scope(_json_object(target_scope_json))
+            if actual_scopes != _expected_microsoft_graph_scopes(target_scope):
+                raise AccountCenterError("scope_rejected")
+            saved_scopes_json = canonical_json(sorted(actual_scopes)).decode("utf-8")
+            profile = self._store.complete_microsoft_entra_oauth_session(
+                session_ref=session_ref,
+                provider="microsoft_graph",
+                anchor=_anchor_from_session(session),
+                identity_ref=identity.external_subject,
+                external_subject=identity.external_subject,
+                target_scope_json=target_scope_json,
+                credential_blob=self._encrypt_provider_token(
+                    str(session["profile_ref"]), token.access_token, token.expires_at
+                ),
+                credential_refresh_blob=self._encrypt_provider_refresh_token(
+                    str(session["profile_ref"]), token.refresh_token
+                ),
+                credential_expires_at=token.expires_at,
+                credential_refresh_expires_at=token.refresh_expires_at,
+                oauth_scopes_json=saved_scopes_json,
+                oauth_client_id=str(session["oauth_client_id"]),
+                now=int(self._now()),
+            )
+            response = {
+                "profile_ref": profile["profile_ref"],
+                "provider": "microsoft_graph",
+                "auth_mode": "delegated_oauth",
+                "access_mode": profile["access_mode"],
+                "auth_status": "healthy",
+                "external_subject": profile["external_subject"],
+                "expires_at": profile["credential_expires_at"],
+                "refresh_expires_at": profile["credential_refresh_expires_at"],
+                "scope_schema_version": target_scope.get("schema_version", 1),
+                "oauth_scopes": sorted(actual_scopes),
+                "credential_revision": profile["credential_revision"],
+                "reauth_required": False,
+            }
+            if target_scope.get("schema_version") == 2:
+                response["workspace_id"] = target_scope["workspace_id"]
+            return response
+        except MicrosoftGraphOAuthError as error:
+            self._fail_microsoft_entra_oauth_session(session_ref)
+            raise AccountCenterError(error.code) from None
+        except AccountCenterError:
+            self._fail_microsoft_entra_oauth_session(session_ref)
+            raise
+        except Exception:  # noqa: BLE001 - callbacks never expose provider details.
+            self._fail_microsoft_entra_oauth_session(session_ref)
+            raise AccountCenterError("provider_unavailable") from None
+
+    def _fail_microsoft_entra_oauth_session(self, session_ref: str) -> None:
+        try:
+            self._store.fail_microsoft_entra_oauth_session(session_ref, now=int(self._now()))
+        except AccountCenterError:
+            pass
+
+    def _begin_azure_devops_link(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None,
+    ) -> dict[str, Any]:
+        """Start Entra consent for one host-authorized Azure DevOps source."""
+
+        _require_fields(
+            request,
+            {
+                "profile_ref",
+                "tenant_id",
+                "organization",
+                "project_id",
+                "source_id",
+                "source_kind",
+            },
+            {"pipeline_id", "definition_id", "definition_environment_id"},
+        )
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        if (
+            profile_ref in self._workspace_operator_profile_refs
+            or "azure_devops" not in self._provider_caller_ids
+        ):
+            raise AccountCenterError("profile_unavailable")
+        client = self._azure_devops_oauth
+        callback_uri = self._microsoft_graph_callback_uri
+        client_id = self._azure_devops_client_id
+        if client is None or callback_uri is None or not isinstance(client_id, str):
+            raise AccountCenterError("provider_not_configured")
+        target = {
+            field: request[field]
+            for field in (
+                "tenant_id",
+                "organization",
+                "project_id",
+                "source_id",
+                "source_kind",
+                "pipeline_id",
+                "definition_id",
+                "definition_environment_id",
+            )
+            if field in request
+        }
+        target_scope = _safe_azure_devops_profile_scope(target)
+        expected_subject = _trusted_entra_external_subject(anchor)
+        if target_scope["tenant_id"] != expected_subject.split(":", 1)[0]:
+            raise AccountCenterError("external_identity_mismatch")
+        if self._configured_profile_access_mode(profile_ref) != "actor_owned":
+            raise AccountCenterError("profile_unavailable")
+        state = _secret_text()
+        nonce = _secret_text()
+        verifier = _secret_text()
+        session_ref = str(uuid.uuid4())
+        now = int(self._now())
+        expires_at = now + SESSION_TTL_SECONDS
+        scopes = ("openid", "profile", "offline_access", AZURE_DEVOPS_RESOURCE_SCOPE)
+        try:
+            authorization_url = client.authorization_url(
+                redirect_uri=callback_uri,
+                state=state,
+                nonce=nonce,
+                code_challenge=pkce_s256_challenge(verifier),
+                scopes=scopes,
+            )
+        except MicrosoftGraphOAuthError as error:
+            raise AccountCenterError(error.code) from None
+        response = {
+            "link_session_ref": session_ref,
+            "authorization_url": authorization_url,
+            "expires_at": expires_at,
+        }
+        command_result = (
+            (
+                idempotency_key_hash,
+                self._encode_idempotency_response(idempotency_key_hash, {"value": response}),
+            )
+            if idempotency_key_hash is not None
+            else None
+        )
+        self._store.create_microsoft_entra_oauth_session(
+            session_ref=session_ref,
+            profile_ref=profile_ref,
+            provider="azure_devops",
+            flow="link",
+            anchor=anchor,
+            state_digest=_digest_text(state),
+            nonce_digest=_digest_text(nonce),
+            callback_uri=callback_uri,
+            code_verifier_blob=self._encrypt_session_secret(session_ref, verifier),
+            target_scope_json=canonical_json(target_scope).decode("utf-8"),
+            oauth_scopes_json=canonical_json([AZURE_DEVOPS_RESOURCE_SCOPE]).decode("utf-8"),
+            oauth_client_id=client_id,
+            access_mode="actor_owned",
+            profile_revision=None,
+            expires_at=expires_at,
+            now=now,
+            command_result=command_result,
+        )
+        return response
+
+    def _complete_azure_devops_link(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        """Verify Entra identity and persist the opaque ADO bearer pair."""
+
+        _require_fields(request, {"state", "code"})
+        client = self._azure_devops_oauth
+        callback_uri = self._microsoft_graph_callback_uri
+        if client is None or callback_uri is None:
+            raise AccountCenterError("provider_not_configured")
+        state = _required_text(request, "state", maximum=256)
+        code = _required_text(request, "code", maximum=4096)
+        session = self._store.claim_microsoft_entra_oauth_session(
+            _digest_text(state), callback_uri, now=int(self._now())
+        )
+        session_ref = str(session["session_ref"])
+        try:
+            if (
+                session["provider"] != "azure_devops"
+                or session["flow"] != "link"
+                or session["access_mode"] != "actor_owned"
+            ):
+                raise AccountCenterError("link_session_invalid")
+            verifier_blob = session["code_verifier_blob"]
+            if not isinstance(verifier_blob, bytes) or not verifier_blob:
+                raise AccountCenterError("link_session_invalid")
+            verifier = self._decrypt_session_secret(session_ref, verifier_blob)
+            scopes = (
+                "openid",
+                "profile",
+                "offline_access",
+                AZURE_DEVOPS_RESOURCE_SCOPE,
+            )
+            token, identity = client.exchange_code(
+                code=code,
+                redirect_uri=callback_uri,
+                code_verifier=verifier,
+                nonce_digest=str(session["nonce_digest"]),
+                requested_scopes=scopes,
+            )
+            tenant_id, object_id = _graph_subject_parts(identity.external_subject)
+            target_scope = _safe_azure_devops_profile_scope(
+                _json_object(session["target_scope_json"])
+            )
+            if (
+                identity.tenant_id != tenant_id
+                or identity.object_id != object_id
+                or identity.external_subject
+                != _trusted_entra_external_subject(_anchor_from_session(session))
+                or tenant_id != target_scope["tenant_id"]
+                or set(token.scopes) != {AZURE_DEVOPS_RESOURCE_SCOPE}
+                or not token.refresh_token
+            ):
+                raise AccountCenterError("external_identity_mismatch")
+            oauth_scopes_json = canonical_json([AZURE_DEVOPS_RESOURCE_SCOPE]).decode("utf-8")
+            profile = self._store.complete_microsoft_entra_oauth_session(
+                session_ref=session_ref,
+                provider="azure_devops",
+                anchor=_anchor_from_session(session),
+                identity_ref=identity.external_subject,
+                external_subject=identity.external_subject,
+                target_scope_json=canonical_json(target_scope).decode("utf-8"),
+                credential_blob=self._encrypt_provider_token(
+                    str(session["profile_ref"]), token.access_token, token.expires_at
+                ),
+                credential_refresh_blob=self._encrypt_provider_refresh_token(
+                    str(session["profile_ref"]), token.refresh_token
+                ),
+                credential_expires_at=token.expires_at,
+                credential_refresh_expires_at=token.refresh_expires_at,
+                oauth_scopes_json=oauth_scopes_json,
+                oauth_client_id=str(session["oauth_client_id"]),
+                now=int(self._now()),
+            )
+            return {
+                "profile_ref": profile["profile_ref"],
+                "provider": "azure_devops",
+                "auth_mode": "delegated_oauth",
+                "access_mode": "actor_owned",
+                "auth_status": "healthy",
+                "external_subject": profile["external_subject"],
+                "expires_at": profile["credential_expires_at"],
+            }
+        except MicrosoftGraphOAuthError as error:
+            self._fail_microsoft_entra_oauth_session(session_ref)
+            raise AccountCenterError(error.code) from None
+        except AccountCenterError:
+            self._fail_microsoft_entra_oauth_session(session_ref)
+            raise
+        except Exception:  # noqa: BLE001 - no callback detail or tokens may escape.
+            self._fail_microsoft_entra_oauth_session(session_ref)
+            raise AccountCenterError("provider_unavailable") from None
+
+    def _huggingface_oauth_seed(self, secret_ref: str, scopes: Mapping[str, Any]) -> Any:
         """Read and validate one launcher-provided OAuth seed without logging it."""
 
         serialized = self._provider_secrets.get(secret_ref)
@@ -1086,9 +2132,7 @@ class AccountCenterPlugin:
     ) -> dict[str, Any]:
         """Register only metadata for host-managed cloud credentials."""
 
-        _require_fields(
-            request, {"profile_ref", "provider", "identity_ref", "target_scope"}
-        )
+        _require_fields(request, {"profile_ref", "provider", "identity_ref", "target_scope"})
         profile_ref = _opaque_profile_ref(request["profile_ref"])
         provider = request["provider"]
         if provider not in {"azure", "gcp", "runpod"}:
@@ -1121,13 +2165,22 @@ class AccountCenterPlugin:
         }
 
     def _list_provider_profiles(
-        self, request: Mapping[str, Any], anchor: Anchor
+        self, request: Mapping[str, Any], anchor: Anchor, caller_id: str
     ) -> dict[str, Any]:
         """Return profile references, scope, and health without secret material."""
 
         _require_fields(request, set())
+        graph_provider_caller = self._provider_caller_ids.get("microsoft_graph")
+        graph_provider_view = caller_id == graph_provider_caller
+        if graph_provider_view:
+            _trusted_entra_external_subject(anchor)
+        rows = self._store.list_provider_profiles(anchor)
+        if graph_provider_view:
+            rows = [row for row in rows if row["provider"] == "microsoft_graph"]
         profiles = []
-        for row in self._store.list_provider_profiles(anchor):
+        for row in rows:
+            if graph_provider_view:
+                self._require_entra_profile_owner(row, anchor)
             try:
                 scope = json.loads(row["target_scope_json"])
             except (TypeError, json.JSONDecodeError):
@@ -1142,6 +2195,8 @@ class AccountCenterPlugin:
                 "auth_status": row["auth_status"],
                 "external_subject": row["external_subject"],
                 "expires_at": row["credential_expires_at"],
+                "refresh_expires_at": row["credential_refresh_expires_at"],
+                "credential_revision": row["credential_revision"],
             }
             if row["provider"] == "huggingface" and row["auth_mode"] == "device_oauth":
                 if row["oauth_scopes_json"] is None:
@@ -1154,6 +2209,22 @@ class AccountCenterPlugin:
                     if not isinstance(oauth_scopes, list):
                         raise AccountCenterError("profile_unavailable")
                 profile["oauth_scopes"] = oauth_scopes
+            if row["provider"] == "microsoft_graph":
+                profile_scope = _safe_microsoft_graph_profile_scope(scope)
+                oauth_scopes = _safe_microsoft_graph_oauth_scopes(
+                    _json_array(row["oauth_scopes_json"])
+                )
+                if oauth_scopes != _expected_microsoft_graph_scopes(profile_scope):
+                    raise AccountCenterError("profile_unavailable")
+                profile["target_scope"] = profile_scope
+                profile["oauth_scopes"] = sorted(oauth_scopes)
+                profile["scope_schema_version"] = profile_scope.get("schema_version", 1)
+                profile["reauth_required"] = row["auth_status"] == "reauthorization_required"
+            if row["provider"] == "azure_devops":
+                profile["target_scope"] = _safe_azure_devops_profile_scope(scope)
+                profile["oauth_scopes"] = sorted(
+                    _safe_azure_devops_oauth_scopes(_json_array(row["oauth_scopes_json"]))
+                )
             profiles.append(profile)
         return {"profiles": profiles}
 
@@ -1191,6 +2262,8 @@ class AccountCenterPlugin:
             profile_ref, anchor, allow_workspace_operator=True
         )
         provider = profile["provider"]
+        if provider in {"microsoft_graph", "azure_devops"}:
+            self._require_entra_profile_owner(profile, anchor)
         if operation_id not in PROVIDER_OPERATIONS_BY_PROVIDER.get(provider, set()):
             raise AccountCenterError("authorization_denied")
         now = int(self._now())
@@ -1210,6 +2283,14 @@ class AccountCenterPlugin:
         target = _safe_provider_target(provider, operation_id, request["target"])
         scope = _json_object(profile["target_scope_json"])
         if not _provider_target_allowed(provider, operation_id, target, scope):
+            raise AccountCenterError("authorization_denied")
+        if provider == "microsoft_graph" and not _microsoft_graph_operation_authorized(
+            operation_id, profile
+        ):
+            raise AccountCenterError("authorization_denied")
+        if provider == "azure_devops" and not _azure_devops_operation_authorized(
+            operation_id, profile
+        ):
             raise AccountCenterError("authorization_denied")
         provider_caller = self._provider_caller_ids.get(provider)
         if provider_caller is None or profile["auth_status"] != "healthy":
@@ -1237,7 +2318,7 @@ class AccountCenterPlugin:
             grant_issued_at=grant["issued_at"] if grant is not None else None,
             grant_expires_at=grant["expires_at"] if grant is not None else None,
         )
-        return {
+        response = {
             "lease_ref": lease_ref,
             "profile_ref": profile_ref,
             "provider": provider,
@@ -1246,6 +2327,15 @@ class AccountCenterPlugin:
             "arguments_sha256": arguments_sha256,
             "expires_at": expires_at,
         }
+        if provider == "microsoft_graph":
+            graph_scope = _safe_microsoft_graph_profile_scope(scope)
+            response["profile_scope_sha256"] = hashlib.sha256(
+                canonical_json(graph_scope)
+            ).hexdigest()
+        if provider == "azure_devops":
+            ado_scope = _safe_azure_devops_profile_scope(scope)
+            response["profile_scope_sha256"] = hashlib.sha256(canonical_json(ado_scope)).hexdigest()
+        return response
 
     def _redeem_provider_credential_lease(
         self,
@@ -1268,6 +2358,8 @@ class AccountCenterPlugin:
             profile_ref, anchor, allow_workspace_operator=True
         )
         provider = profile["provider"]
+        if provider in {"microsoft_graph", "azure_devops"}:
+            self._require_entra_profile_owner(profile, anchor)
         if caller_id != self._provider_caller_ids.get(provider):
             raise AccountCenterError("untrusted_caller")
         if operation_id not in PROVIDER_OPERATIONS_BY_PROVIDER.get(provider, set()):
@@ -1275,6 +2367,14 @@ class AccountCenterPlugin:
         target = _safe_provider_target(provider, operation_id, request["target"])
         scope = _json_object(profile["target_scope_json"])
         if not _provider_target_allowed(provider, operation_id, target, scope):
+            raise AccountCenterError("lease_rejected")
+        if provider == "microsoft_graph" and not _microsoft_graph_operation_authorized(
+            operation_id, profile
+        ):
+            raise AccountCenterError("lease_rejected")
+        if provider == "azure_devops" and not _azure_devops_operation_authorized(
+            operation_id, profile
+        ):
             raise AccountCenterError("lease_rejected")
         profile = self._store.redeem_provider_lease(
             lease_ref=lease_ref,
@@ -1294,13 +2394,18 @@ class AccountCenterPlugin:
             "external_subject": profile["external_subject"] or profile["identity_ref"],
             "expires_at": expires_at,
         }
-        if (
-            provider == "huggingface"
-            and operation_id == "huggingface.vendor.cli.execute"
-        ):
+        if provider == "huggingface" and operation_id == "huggingface.vendor.cli.execute":
             response["profile_scope_sha256"] = hashlib.sha256(
                 canonical_json(_safe_huggingface_scopes(scope))
             ).hexdigest()
+        if provider == "microsoft_graph":
+            graph_scope = _safe_microsoft_graph_profile_scope(scope)
+            response["profile_scope_sha256"] = hashlib.sha256(
+                canonical_json(graph_scope)
+            ).hexdigest()
+        if provider == "azure_devops":
+            ado_scope = _safe_azure_devops_profile_scope(scope)
+            response["profile_scope_sha256"] = hashlib.sha256(canonical_json(ado_scope)).hexdigest()
         return response
 
     def _fresh_provider_credential(
@@ -1309,6 +2414,10 @@ class AccountCenterPlugin:
         """Reuse a cached installation token or mint one once near expiry."""
 
         profile_ref = str(profile["profile_ref"])
+        if profile["provider"] == "azure_devops":
+            return self._fresh_azure_devops_oauth_credential(profile, anchor)
+        if profile["provider"] == "microsoft_graph":
+            return self._fresh_microsoft_graph_oauth_credential(profile, anchor)
         if profile["provider"] == "huggingface":
             if profile["auth_mode"] == "device_oauth":
                 return self._fresh_huggingface_oauth_credential(profile, anchor)
@@ -1330,9 +2439,7 @@ class AccountCenterPlugin:
         if profile["provider"] != "github":
             raise AccountCenterError("profile_provider_mismatch")
         with self._provider_refresh_lock:
-            lock = self._provider_refresh_locks.setdefault(
-                profile_ref, threading.Lock()
-            )
+            lock = self._provider_refresh_locks.setdefault(profile_ref, threading.Lock())
         with lock:
             current = self._store.get_provider_profile(
                 profile_ref, anchor, allow_workspace_operator=True
@@ -1343,9 +2450,7 @@ class AccountCenterPlugin:
                 and isinstance(expires_at, int)
                 and expires_at > int(self._now()) + 60
             ):
-                return self._decrypt_provider_token(
-                    profile_ref, bytes(current["credential_blob"])
-                )
+                return self._decrypt_provider_token(profile_ref, bytes(current["credential_blob"]))
             if self._github_app is None:
                 self._store.update_provider_profile_auth_status(
                     profile_ref,
@@ -1396,6 +2501,317 @@ class AccountCenterPlugin:
             )
             return token.access_token, token.expires_at
 
+    def _fresh_azure_devops_oauth_credential(
+        self, profile: Mapping[str, Any], anchor: Anchor
+    ) -> tuple[str, int]:
+        """Refresh one opaque ADO resource token under the profile claim."""
+
+        self._require_entra_profile_owner(profile, anchor)
+        profile_ref = str(profile["profile_ref"])
+        with self._provider_refresh_lock:
+            lock = self._provider_refresh_locks.setdefault(profile_ref, threading.Lock())
+        with lock:
+            deadline = time.monotonic() + 18
+            while True:
+                state, current, claim_id = self._store.claim_provider_oauth_refresh(
+                    profile_ref,
+                    anchor,
+                    provider="azure_devops",
+                    auth_mode="delegated_oauth",
+                    now=int(self._now()),
+                )
+                if state == "ready" and current is not None:
+                    if current["credential_blob"] is None:
+                        raise AccountCenterError("credential_unavailable")
+                    token, expires_at = self._decrypt_provider_token(
+                        profile_ref, bytes(current["credential_blob"])
+                    )
+                    if not isinstance(expires_at, int):
+                        raise AccountCenterError("credential_unavailable")
+                    return token, expires_at
+                if state == "reauthorization_required":
+                    raise AccountCenterError("credential_reauthorization_required")
+                if state == "claimed" and current is not None and claim_id is not None:
+                    break
+                if state != "waiting" or time.monotonic() >= deadline:
+                    raise AccountCenterError("credential_refresh_in_progress")
+                time.sleep(0.05)
+
+            refresh_blob = current["credential_refresh_blob"]
+            if (
+                refresh_blob is None
+                or current["oauth_client_id"] != self._azure_devops_client_id
+                or self._azure_devops_oauth is None
+            ):
+                self._release_azure_devops_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise AccountCenterError("credential_reauthorization_required")
+            try:
+                refresh_token = self._decrypt_provider_refresh_token(
+                    profile_ref, bytes(refresh_blob)
+                )
+                scopes = _safe_azure_devops_oauth_scopes(_json_array(current["oauth_scopes_json"]))
+                tenant_id, _object_id = _graph_subject_parts(current["external_subject"])
+                expected_subject = _trusted_entra_external_subject(anchor)
+                scope = _safe_azure_devops_profile_scope(_json_object(current["target_scope_json"]))
+                if (
+                    current["identity_ref"] != current["external_subject"]
+                    or current["external_subject"] != expected_subject
+                    or scope["tenant_id"] != tenant_id
+                ):
+                    raise AccountCenterError("external_identity_mismatch")
+                refreshed = self._azure_devops_oauth.refresh(
+                    tenant_id=tenant_id,
+                    refresh_token=refresh_token,
+                    requested_scopes=tuple(sorted(scopes)),
+                )
+                if set(refreshed.scopes) != scopes:
+                    raise AccountCenterError("scope_rejected")
+                if (
+                    refreshed.identity is None
+                    or refreshed.identity.external_subject != expected_subject
+                    or refreshed.identity.tenant_id != tenant_id
+                ):
+                    raise AccountCenterError("external_identity_mismatch")
+                next_refresh_token = refreshed.refresh_token or refresh_token
+                self._store.complete_provider_oauth_refresh(
+                    profile_ref=profile_ref,
+                    anchor=anchor,
+                    claim_id=claim_id,
+                    credential_blob=self._encrypt_provider_token(
+                        profile_ref, refreshed.access_token, refreshed.expires_at
+                    ),
+                    credential_refresh_blob=self._encrypt_provider_refresh_token(
+                        profile_ref, next_refresh_token
+                    ),
+                    credential_expires_at=refreshed.expires_at,
+                    credential_refresh_expires_at=current["credential_refresh_expires_at"],
+                    oauth_scopes_json=canonical_json(sorted(scopes)).decode("utf-8"),
+                    provider="azure_devops",
+                    auth_mode="delegated_oauth",
+                    now=int(self._now()),
+                )
+                return refreshed.access_token, refreshed.expires_at
+            except MicrosoftGraphOAuthError as error:
+                self._release_azure_devops_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise AccountCenterError(error.code) from None
+            except AccountCenterError:
+                self._release_azure_devops_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise
+            except Exception:  # noqa: BLE001 - rotated resource tokens are uncertain.
+                self._release_azure_devops_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise AccountCenterError("credential_refresh_unknown") from None
+
+    def _release_azure_devops_refresh(
+        self,
+        profile_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        *,
+        clear_credentials: bool,
+    ) -> None:
+        """Invalidate an ambiguous ADO refresh and its outstanding leases."""
+
+        try:
+            self._store.release_provider_oauth_refresh(
+                profile_ref=profile_ref,
+                anchor=anchor,
+                claim_id=claim_id,
+                now=int(self._now()),
+                provider="azure_devops",
+                auth_mode="delegated_oauth",
+                auth_status="reauthorization_required",
+                clear_credentials=clear_credentials,
+            )
+        except AccountCenterError:
+            return
+
+    def _fresh_microsoft_graph_oauth_credential(
+        self, profile: Mapping[str, Any], anchor: Anchor
+    ) -> tuple[str, int]:
+        """Refresh Graph credentials under the shared durable profile claim."""
+
+        self._require_entra_profile_owner(profile, anchor)
+        profile_ref = str(profile["profile_ref"])
+        with self._provider_refresh_lock:
+            lock = self._provider_refresh_locks.setdefault(profile_ref, threading.Lock())
+        with lock:
+            deadline = time.monotonic() + 18
+            while True:
+                state, current, claim_id = self._store.claim_provider_oauth_refresh(
+                    profile_ref,
+                    anchor,
+                    provider="microsoft_graph",
+                    auth_mode="delegated_oauth",
+                    now=int(self._now()),
+                )
+                if state == "ready" and current is not None:
+                    if current["credential_blob"] is None:
+                        raise AccountCenterError("credential_unavailable")
+                    access_token, expires_at = self._decrypt_provider_token(
+                        profile_ref, bytes(current["credential_blob"])
+                    )
+                    if not isinstance(expires_at, int):
+                        raise AccountCenterError("credential_unavailable")
+                    return access_token, expires_at
+                if state == "reauthorization_required":
+                    raise AccountCenterError("credential_reauthorization_required")
+                if state == "claimed" and current is not None and claim_id is not None:
+                    break
+                if state != "waiting" or time.monotonic() >= deadline:
+                    raise AccountCenterError("credential_refresh_in_progress")
+                time.sleep(0.05)
+
+            refresh_blob = current["credential_refresh_blob"]
+            stored_client_id = current["oauth_client_id"]
+            if (
+                refresh_blob is None
+                or not isinstance(stored_client_id, str)
+                or stored_client_id != self._microsoft_graph_client_id
+                or self._microsoft_graph_oauth is None
+            ):
+                self._release_microsoft_graph_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise AccountCenterError("credential_reauthorization_required")
+            try:
+                refresh_token = self._decrypt_provider_refresh_token(
+                    profile_ref, bytes(refresh_blob)
+                )
+                scopes = _safe_microsoft_graph_oauth_scopes(
+                    _json_array(current["oauth_scopes_json"])
+                )
+                current_scope = _safe_microsoft_graph_profile_scope(
+                    _json_object(current["target_scope_json"])
+                )
+                if scopes != _expected_microsoft_graph_scopes(current_scope):
+                    raise AccountCenterError("credential_reauthorization_required")
+                tenant_id, expected_object_id = _graph_subject_parts(current["external_subject"])
+                expected_subject = _trusted_entra_external_subject(anchor)
+                refreshed = self._microsoft_graph_oauth.refresh(
+                    tenant_id=tenant_id,
+                    refresh_token=refresh_token,
+                    requested_scopes=tuple(sorted(scopes)),
+                )
+                refreshed_scopes = set(refreshed.scopes)
+                if refreshed_scopes != scopes:
+                    raise AccountCenterError("scope_rejected")
+                if (
+                    refreshed.identity is None
+                    or refreshed.identity.external_subject != expected_subject
+                    or refreshed.identity.tenant_id != tenant_id
+                    or refreshed.identity.object_id != expected_object_id
+                ):
+                    raise AccountCenterError("external_identity_mismatch")
+                identity = self._microsoft_graph_oauth.verify_identity(
+                    refreshed.access_token, tenant_id
+                )
+                if (
+                    identity.tenant_id != tenant_id
+                    or identity.object_id != expected_object_id
+                    or identity.external_subject != current["external_subject"]
+                    or identity.external_subject != expected_subject
+                ):
+                    raise AccountCenterError("external_identity_mismatch")
+                next_refresh_token = refreshed.refresh_token or refresh_token
+                self._store.complete_provider_oauth_refresh(
+                    profile_ref=profile_ref,
+                    anchor=anchor,
+                    claim_id=claim_id,
+                    credential_blob=self._encrypt_provider_token(
+                        profile_ref, refreshed.access_token, refreshed.expires_at
+                    ),
+                    credential_refresh_blob=self._encrypt_provider_refresh_token(
+                        profile_ref, next_refresh_token
+                    ),
+                    credential_expires_at=refreshed.expires_at,
+                    credential_refresh_expires_at=current["credential_refresh_expires_at"],
+                    oauth_scopes_json=canonical_json(sorted(refreshed_scopes)).decode("utf-8"),
+                    provider="microsoft_graph",
+                    auth_mode="delegated_oauth",
+                    now=int(self._now()),
+                )
+                return refreshed.access_token, refreshed.expires_at
+            except MicrosoftGraphOAuthError as error:
+                self._release_microsoft_graph_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise AccountCenterError(error.code) from None
+            except AccountCenterError:
+                self._release_microsoft_graph_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise
+            except Exception:  # noqa: BLE001 - rotated refresh outcomes are uncertain.
+                self._release_microsoft_graph_refresh(
+                    profile_ref, anchor, claim_id, clear_credentials=True
+                )
+                raise AccountCenterError("credential_refresh_unknown") from None
+
+    def _require_entra_profile_owner(self, profile: Mapping[str, Any], anchor: Anchor) -> str:
+        """Require a Microsoft profile to match its trusted Entra actor anchor."""
+
+        expected_subject = _trusted_entra_external_subject(anchor)
+        profile_ref = str(profile["profile_ref"])
+        if (
+            profile["provider"] not in {"microsoft_graph", "azure_devops"}
+            or profile["auth_mode"] != "delegated_oauth"
+            or profile["access_mode"] != "actor_owned"
+            or profile["external_subject"] != expected_subject
+            or profile["identity_ref"] != expected_subject
+        ):
+            try:
+                self._store.require_provider_reauthorization(
+                    profile_ref, anchor, now=int(self._now())
+                )
+            except AccountCenterError:
+                pass
+            raise AccountCenterError("external_identity_mismatch")
+        try:
+            tenant_id, object_id = _graph_subject_parts(profile["external_subject"])
+        except AccountCenterError:
+            try:
+                self._store.require_provider_reauthorization(
+                    profile_ref, anchor, now=int(self._now())
+                )
+            except AccountCenterError:
+                pass
+            raise AccountCenterError("external_identity_mismatch") from None
+        if f"{tenant_id}:{object_id}" != expected_subject:
+            raise AccountCenterError("external_identity_mismatch")
+        return expected_subject
+
+    def _release_microsoft_graph_refresh(
+        self,
+        profile_ref: str,
+        anchor: Anchor,
+        claim_id: str,
+        *,
+        clear_credentials: bool,
+    ) -> None:
+        """Clear ambiguous Graph refresh material and invalidate outstanding leases."""
+
+        try:
+            self._store.release_provider_oauth_refresh(
+                profile_ref=profile_ref,
+                anchor=anchor,
+                claim_id=claim_id,
+                now=int(self._now()),
+                provider="microsoft_graph",
+                auth_mode="delegated_oauth",
+                auth_status="reauthorization_required",
+                clear_credentials=clear_credentials,
+            )
+        except AccountCenterError:
+            return
+
     def _fresh_huggingface_oauth_credential(
         self, profile: Mapping[str, Any], anchor: Anchor
     ) -> tuple[str, int | None]:
@@ -1403,15 +2819,15 @@ class AccountCenterPlugin:
 
         profile_ref = str(profile["profile_ref"])
         with self._provider_refresh_lock:
-            lock = self._provider_refresh_locks.setdefault(
-                profile_ref, threading.Lock()
-            )
+            lock = self._provider_refresh_locks.setdefault(profile_ref, threading.Lock())
         with lock:
             deadline = time.monotonic() + 18
             while True:
-                state, current, claim_id = self._store.claim_huggingface_oauth_refresh(
+                state, current, claim_id = self._store.claim_provider_oauth_refresh(
                     profile_ref,
                     anchor,
+                    provider="huggingface",
+                    auth_mode="device_oauth",
                     now=int(self._now()),
                 )
                 if state == "ready" and current is not None:
@@ -1462,15 +2878,14 @@ class AccountCenterPlugin:
                     raise AccountCenterError("external_identity_mismatch")
                 next_refresh_token = refreshed.refresh_token or refresh_token
                 next_refresh_expires_at = (
-                    refreshed.refresh_token_expires_at
-                    or current["credential_refresh_expires_at"]
+                    refreshed.refresh_token_expires_at or current["credential_refresh_expires_at"]
                 )
                 next_oauth_scopes_json = (
                     canonical_json(list(refreshed.oauth_scopes)).decode("utf-8")
                     if refreshed.oauth_scopes is not None
                     else current["oauth_scopes_json"]
                 )
-                self._store.complete_huggingface_oauth_refresh(
+                self._store.complete_provider_oauth_refresh(
                     profile_ref=profile_ref,
                     anchor=anchor,
                     claim_id=claim_id,
@@ -1485,13 +2900,13 @@ class AccountCenterPlugin:
                     credential_expires_at=refreshed.access_token_expires_at,
                     credential_refresh_expires_at=next_refresh_expires_at,
                     oauth_scopes_json=next_oauth_scopes_json,
+                    provider="huggingface",
+                    auth_mode="device_oauth",
                     now=int(self._now()),
                 )
                 return refreshed.access_token, refreshed.access_token_expires_at
             except HuggingFaceOAuthError as error:
-                needs_reauthorization = (
-                    error.uncertain or error.code == "credential_rejected"
-                )
+                needs_reauthorization = error.uncertain or error.code == "credential_rejected"
                 auth_status = (
                     "reauthorization_required"
                     if needs_reauthorization
@@ -1548,11 +2963,13 @@ class AccountCenterPlugin:
         """Best-effort release after a provider outcome leaves no safe retry."""
 
         try:
-            self._store.release_huggingface_oauth_refresh(
+            self._store.release_provider_oauth_refresh(
                 profile_ref=profile_ref,
                 anchor=anchor,
                 claim_id=claim_id,
                 now=int(self._now()),
+                provider="huggingface",
+                auth_mode="device_oauth",
                 auth_status=auth_status,
                 clear_credentials=clear_credentials,
             )
@@ -1574,9 +2991,7 @@ class AccountCenterPlugin:
             f"provider-profile:{profile_ref}".encode(),
         )
 
-    def _decrypt_provider_token(
-        self, profile_ref: str, blob: bytes
-    ) -> tuple[str, int | None]:
+    def _decrypt_provider_token(self, profile_ref: str, blob: bytes) -> tuple[str, int | None]:
         """Decrypt one provider token into short-lived process memory."""
 
         clear = decrypt(
@@ -1628,11 +3043,9 @@ class AccountCenterPlugin:
             raise AccountCenterError("credential_unavailable")
         return token
 
-    def _get_authorization(
-        self, request: Mapping[str, Any], anchor: Anchor
-    ) -> dict[str, Any]:
-        account_ref, provider, operation_id, resource, _args_digest = (
-            _authorization_request(request)
+    def _get_authorization(self, request: Mapping[str, Any], anchor: Anchor) -> dict[str, Any]:
+        account_ref, provider, operation_id, resource, _args_digest = _authorization_request(
+            request
         )
         row = self._store.get_account(account_ref, anchor)
         authorized = (
@@ -1652,9 +3065,7 @@ class AccountCenterPlugin:
     def _create_credential_lease(
         self, request: Mapping[str, Any], anchor: Anchor, context: Mapping[str, Any]
     ) -> dict[str, Any]:
-        account_ref, provider, operation_id, resource, args_digest = (
-            _authorization_request(request)
-        )
+        account_ref, provider, operation_id, resource, args_digest = _authorization_request(request)
         if (
             provider != "github"
             or operation_id not in PROVIDER_OPERATIONS
@@ -1695,9 +3106,7 @@ class AccountCenterPlugin:
         caller_id: str,
         context: Mapping[str, Any],
     ) -> dict[str, Any]:
-        _require_fields(
-            request, {"lease_ref", "operation_id", "resource", "arguments_sha256"}
-        )
+        _require_fields(request, {"lease_ref", "operation_id", "resource", "arguments_sha256"})
         if caller_id != self._github_provider_caller:
             raise AccountCenterError("untrusted_caller")
         lease_ref = _uuid_text(request["lease_ref"])
@@ -1731,9 +3140,7 @@ class AccountCenterPlugin:
     ) -> dict[str, Any]:
         """Resolve trusted WeCom sender identity to an owner anchor without grants."""
 
-        _require_fields(
-            request, {"source_authority", "bot_namespace", "stable_subject"}
-        )
+        _require_fields(request, {"source_authority", "bot_namespace", "stable_subject"})
         source_authority = _required_text(request, "source_authority", maximum=500)
         bot_namespace = _required_text(request, "bot_namespace", maximum=200)
         stable_subject = _required_text(request, "stable_subject", maximum=500)
@@ -1769,9 +3176,7 @@ class AccountCenterPlugin:
 
         account_ref = account["account_ref"]
         with self._refresh_lock:
-            account_lock = self._account_refresh_locks.setdefault(
-                account_ref, threading.Lock()
-            )
+            account_lock = self._account_refresh_locks.setdefault(account_ref, threading.Lock())
         with account_lock:
             owner = Anchor(
                 account["anchor_issuer"],
@@ -1787,15 +3192,12 @@ class AccountCenterPlugin:
                 current["credential_expires_at"] is None
                 or current["credential_expires_at"] > now + 30
             ):
-                return self._decrypt_credential(
-                    account_ref, bytes(current["credential_blob"])
-                )
+                return self._decrypt_credential(account_ref, bytes(current["credential_blob"]))
             current_credential = self._decrypt_credential(
                 account_ref, bytes(current["credential_blob"])
             )
             if not current_credential.refresh_token or (
-                current["refresh_expires_at"] is not None
-                and current["refresh_expires_at"] <= now
+                current["refresh_expires_at"] is not None and current["refresh_expires_at"] <= now
             ):
                 claim_id = str(uuid.uuid4())
                 self._store.claim_refresh(account_ref, owner, claim_id, now=now)
@@ -1817,9 +3219,7 @@ class AccountCenterPlugin:
             except Exception:  # noqa: BLE001 - unknown rotation outcomes fail closed.
                 self._store.fail_refresh(account_ref, claim_id)
                 raise AccountCenterError("credential_refresh_unknown") from None
-            encrypted = self._encrypt_credential(
-                account_ref=account_ref, credential=refreshed
-            )
+            encrypted = self._encrypt_credential(account_ref=account_ref, credential=refreshed)
             self._store.finish_refresh(
                 account_ref,
                 owner,
@@ -1842,9 +3242,7 @@ class AccountCenterPlugin:
         except Exception:  # noqa: BLE001 - outcome is remote and cannot be inferred.
             return "unknown"
 
-    def _persist_callback_credential(
-        self, session_ref: str, credential: OAuthCredential
-    ) -> None:
+    def _persist_callback_credential(self, session_ref: str, credential: OAuthCredential) -> None:
         """Durably encrypt a minted token before GitHub identity verification."""
 
         encrypted = self._encrypt_credential(
@@ -1881,9 +3279,7 @@ class AccountCenterPlugin:
             key_hash = row["remote_revocation_command_hash"]
             response = {"unlinked": True, "status": "revocation_unknown"}
             encrypted = self._encode_idempotency_response(key_hash, {"value": response})
-            self._store.finalize_interrupted_unlink(
-                row["account_ref"], key_hash, encrypted
-            )
+            self._store.finalize_interrupted_unlink(row["account_ref"], key_hash, encrypted)
 
     def _recover_pending_idempotency_results(self) -> None:
         """Turn crashed command reservations into stable terminal errors."""
@@ -1907,9 +3303,7 @@ class AccountCenterPlugin:
         credential_unavailable = False
         if row["provider"] == "github" and row["credential_blob"] is not None:
             try:
-                credential = self._decrypt_credential(
-                    account_ref, bytes(row["credential_blob"])
-                )
+                credential = self._decrypt_credential(account_ref, bytes(row["credential_blob"]))
             except AccountCenterError as error:
                 if error.code != "credential_unavailable":
                     raise
@@ -1926,9 +3320,7 @@ class AccountCenterPlugin:
             command_result = (
                 (
                     idempotency_key_hash,
-                    self._encode_idempotency_response(
-                        idempotency_key_hash, {"value": response}
-                    ),
+                    self._encode_idempotency_response(idempotency_key_hash, {"value": response}),
                 )
                 if idempotency_key_hash is not None
                 else None
@@ -1955,14 +3347,8 @@ class AccountCenterPlugin:
             remote_status = "revoked"
             status = "unlinked"
         except AccountCenterError as error:
-            remote_status = (
-                "unknown" if error.code == "provider_unavailable" else "failed"
-            )
-            status = (
-                "revocation_unknown"
-                if remote_status == "unknown"
-                else "revocation_failed"
-            )
+            remote_status = "unknown" if error.code == "provider_unavailable" else "failed"
+            status = "revocation_unknown" if remote_status == "unknown" else "revocation_failed"
         except Exception:  # noqa: BLE001 - network outcome is not knowable.
             remote_status = "unknown"
             status = "revocation_unknown"
@@ -1970,21 +3356,15 @@ class AccountCenterPlugin:
         command_result = (
             (
                 idempotency_key_hash,
-                self._encode_idempotency_response(
-                    idempotency_key_hash, {"value": response}
-                ),
+                self._encode_idempotency_response(idempotency_key_hash, {"value": response}),
             )
             if idempotency_key_hash is not None
             else None
         )
-        self._store.set_revocation_status(
-            account_ref, remote_status, command_result=command_result
-        )
+        self._store.set_revocation_status(account_ref, remote_status, command_result=command_result)
         return response
 
-    def _resource_scope_allowed(
-        self, resource: Mapping[str, Any], operation_id: str
-    ) -> bool:
+    def _resource_scope_allowed(self, resource: Mapping[str, Any], operation_id: str) -> bool:
         """Fail closed unless a fixed configured repository allowlist permits use."""
 
         # A host can constrain repositories per operation; absent policy grants none.
@@ -2099,9 +3479,7 @@ def _safe_github_repositories(value: Any) -> list[dict[str, str]]:
         ):
             raise AccountCenterError("invalid_request")
         seen_ids.add(repository_id)
-        repositories.append(
-            {"repository_id": repository_id, "owner": owner, "name": name}
-        )
+        repositories.append({"repository_id": repository_id, "owner": owner, "name": name})
     return repositories
 
 
@@ -2150,9 +3528,7 @@ def _safe_huggingface_scopes(value: Any) -> dict[str, Any]:
                 "permissions": sorted(permissions),
             }
         )
-    repositories.sort(
-        key=lambda repository: (repository["repo_type"], repository["repo_id"])
-    )
+    repositories.sort(key=lambda repository: (repository["repo_type"], repository["repo_id"]))
     return {"repositories": repositories}
 
 
@@ -2173,10 +3549,7 @@ def _safe_identity_ref(value: Any) -> str:
         or not value
         or len(value) > 256
         or not re.fullmatch(r"[A-Za-z0-9._:/@-]+", value)
-        or any(
-            fragment in value.lower()
-            for fragment in ("token", "secret", "password", "key=")
-        )
+        or any(fragment in value.lower() for fragment in ("token", "secret", "password", "key="))
     ):
         raise AccountCenterError("invalid_request")
     return value
@@ -2218,12 +3591,608 @@ def _safe_profile_scope(value: Any) -> dict[str, Any]:
     return dict(scope)
 
 
+def _safe_graph_uuid_list(value: Any) -> list[str]:
+    """Normalize one nonempty list of unique Microsoft Graph object IDs."""
+
+    if not isinstance(value, list) or not 1 <= len(value) <= 100:
+        raise AccountCenterError("invalid_request")
+    normalized = [_safe_graph_uuid(item) for item in value]
+    if len(set(normalized)) != len(normalized):
+        raise AccountCenterError("invalid_request")
+    return normalized
+
+
+def _safe_graph_uuid_list_optional(value: Any) -> list[str]:
+    """Validate an optionally empty list of canonical Graph object IDs."""
+
+    if not isinstance(value, list) or len(value) > 100:
+        raise AccountCenterError("invalid_request")
+    normalized = [_safe_graph_uuid(item) for item in value]
+    if len(set(normalized)) != len(normalized):
+        raise AccountCenterError("invalid_request")
+    return normalized
+
+
+def _safe_graph_planner_ids_allow_empty(value: Any) -> list[str]:
+    """Validate a bounded Planner allowlist that may be empty for discovery."""
+
+    if not isinstance(value, list) or len(value) > 100:
+        raise AccountCenterError("invalid_request")
+    if any(
+        not isinstance(item, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", item) is None
+        for item in value
+    ) or len(set(value)) != len(value):
+        raise AccountCenterError("invalid_request")
+    return list(value)
+
+
+def _safe_graph_opaque_id(value: Any) -> str:
+    """Validate an opaque Graph resource ID without permitting URL syntax."""
+
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 512
+        or re.fullmatch(r"[A-Za-z0-9._!~+=-]{1,512}", value) is None
+    ):
+        raise AccountCenterError("invalid_request")
+    return value
+
+
+def _safe_graph_opaque_id_list(value: Any) -> list[str]:
+    """Validate a bounded optionally empty allowlist of Graph opaque IDs."""
+
+    if not isinstance(value, list) or len(value) > 100:
+        raise AccountCenterError("invalid_request")
+    normalized = [_safe_graph_opaque_id(item) for item in value]
+    if len(set(normalized)) != len(normalized):
+        raise AccountCenterError("invalid_request")
+    return normalized
+
+
+def _safe_graph_schedule_ids(value: Any) -> list[str]:
+    """Validate a bounded set of exact mailbox/room identifiers for free/busy."""
+
+    if not isinstance(value, list) or len(value) > 100:
+        raise AccountCenterError("invalid_request")
+    normalized: list[str] = []
+    for item in value:
+        if (
+            not isinstance(item, str)
+            or not 3 <= len(item) <= 320
+            or any(char in item for char in "\r\n\x00")
+            or re.fullmatch(r"[^\s@]+@[^\s@]+", item) is None
+        ):
+            raise AccountCenterError("invalid_request")
+        normalized.append(item.casefold())
+    if len(set(normalized)) != len(normalized):
+        raise AccountCenterError("invalid_request")
+    return normalized
+
+
+def _safe_graph_planner_ids(value: Any) -> list[str]:
+    """Validate the opaque case-sensitive identifiers used by Planner."""
+
+    if not isinstance(value, list) or not 1 <= len(value) <= 100:
+        raise AccountCenterError("invalid_request")
+    if any(
+        not isinstance(item, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", item) is None
+        for item in value
+    ) or len(set(value)) != len(value):
+        raise AccountCenterError("invalid_request")
+    return list(value)
+
+
+def _safe_graph_planner_id(value: Any) -> str:
+    """Validate one opaque case-sensitive Planner resource identifier."""
+
+    if not isinstance(value, str) or re.fullmatch(r"[A-Za-z0-9_-]{1,128}", value) is None:
+        raise AccountCenterError("invalid_request")
+    return value
+
+
+def _safe_graph_uuid(value: Any) -> str:
+    """Require a canonical lowercase Microsoft tenant or object UUID."""
+
+    try:
+        if not isinstance(value, str):
+            raise TypeError("invalid UUID")
+        parsed = uuid.UUID(value)
+        normalized = str(parsed)
+        if normalized != value.lower():
+            raise ValueError("noncanonical UUID")
+        return normalized
+    except (TypeError, ValueError):
+        raise AccountCenterError("invalid_request") from None
+
+
+def _graph_subject_parts(value: Any) -> tuple[str, str]:
+    """Parse the immutable canonical tenant/object subject stored by Graph."""
+
+    if not isinstance(value, str) or value.count(":") != 1:
+        raise AccountCenterError("profile_unavailable")
+    tenant_id, object_id = value.split(":", 1)
+    try:
+        return _safe_graph_uuid(tenant_id), _safe_graph_uuid(object_id)
+    except AccountCenterError:
+        raise AccountCenterError("profile_unavailable") from None
+
+
+def _trusted_entra_external_subject(anchor: Anchor) -> str:
+    """Map a signed Entra issuer/subject pair to immutable tenant/object IDs."""
+
+    match = re.fullmatch(
+        r"https://login\.microsoftonline\.com/([0-9a-fA-F-]{36})/v2\.0",
+        anchor.issuer,
+    )
+    if match is None:
+        raise AccountCenterError("external_identity_mismatch")
+    try:
+        tenant_id = _safe_graph_uuid(match.group(1))
+        object_id = _safe_graph_uuid(anchor.subject)
+    except AccountCenterError:
+        raise AccountCenterError("external_identity_mismatch") from None
+    if anchor.issuer != f"https://login.microsoftonline.com/{tenant_id}/v2.0":
+        raise AccountCenterError("external_identity_mismatch")
+    if anchor.subject != object_id:
+        raise AccountCenterError("external_identity_mismatch")
+    return f"{tenant_id}:{object_id}"
+
+
+def _safe_graph_site_id(value: Any) -> str:
+    """Accept one host/collection/web SharePoint ID, never a path or URL."""
+
+    if not isinstance(value, str) or not 1 <= len(value) <= 512:
+        raise AccountCenterError("invalid_request")
+    parts = value.split(",")
+    if (
+        len(parts) != 3
+        or re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?", parts[0]) is None
+        or any(label.startswith("-") or label.endswith("-") for label in parts[0].split("."))
+    ):
+        raise AccountCenterError("invalid_request")
+    _safe_graph_uuid(parts[1])
+    _safe_graph_uuid(parts[2])
+    return value
+
+
+def _safe_microsoft_graph_profile_scope(value: Any) -> dict[str, Any]:
+    """Validate one exact v1 or v2 actor-owned Graph target scope."""
+
+    scope = require_object(value, code="profile_unavailable")
+    if scope.get("schema_version") == 2:
+        return _safe_microsoft_graph_profile_scope_v2(scope)
+    if set(scope) != {"tenant_id", "planner", "sharepoint"}:
+        raise AccountCenterError("profile_unavailable")
+    try:
+        tenant_id = _safe_graph_uuid(scope["tenant_id"])
+        planner = require_object(scope["planner"], code="profile_unavailable")
+        if set(planner) != {"plan_ids", "tasks_read", "tasks_write"}:
+            raise AccountCenterError("profile_unavailable")
+        plan_ids = _safe_graph_planner_ids(planner["plan_ids"])
+        if planner["tasks_read"] is not True or not isinstance(planner["tasks_write"], bool):
+            raise AccountCenterError("profile_unavailable")
+        sharepoint = require_object(scope["sharepoint"], code="profile_unavailable")
+        if set(sharepoint) != {"enabled", "site_id", "list_ids"}:
+            raise AccountCenterError("profile_unavailable")
+        enabled = sharepoint["enabled"]
+        if not isinstance(enabled, bool):
+            raise AccountCenterError("profile_unavailable")
+        if enabled:
+            site_id = _safe_graph_site_id(sharepoint["site_id"])
+            list_ids = _safe_graph_uuid_list(sharepoint["list_ids"])
+        elif sharepoint["site_id"] is None and sharepoint["list_ids"] == []:
+            site_id = None
+            list_ids = []
+        else:
+            raise AccountCenterError("profile_unavailable")
+    except AccountCenterError:
+        raise AccountCenterError("profile_unavailable") from None
+    return {
+        "tenant_id": tenant_id,
+        "planner": {
+            "plan_ids": plan_ids,
+            "tasks_read": True,
+            "tasks_write": planner["tasks_write"],
+        },
+        "sharepoint": {
+            "enabled": enabled,
+            "site_id": site_id,
+            "list_ids": list_ids,
+        },
+    }
+
+
+def _safe_microsoft_graph_profile_scope_v2(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the closed Office v2 scope while keeping message bodies and file content off."""
+
+    required = {
+        "schema_version",
+        "tenant_id",
+        "workspace_id",
+        "planner",
+        "sharepoint",
+        "todo",
+        "calendar",
+        "mail",
+    }
+    if set(value) != required:
+        raise AccountCenterError("profile_unavailable")
+    try:
+        tenant_id = _safe_graph_uuid(value["tenant_id"])
+        workspace_id = _safe_graph_uuid(value["workspace_id"])
+        if value["schema_version"] != 2:
+            raise AccountCenterError("profile_unavailable")
+
+        planner = require_object(value["planner"], code="profile_unavailable")
+        if set(planner) != {"plan_ids", "tasks_read", "tasks_write"}:
+            raise AccountCenterError("profile_unavailable")
+        plan_ids = _safe_graph_planner_ids_allow_empty(planner["plan_ids"])
+        planner_read = planner["tasks_read"]
+        planner_write = planner["tasks_write"]
+        if (
+            not isinstance(planner_read, bool)
+            or not isinstance(planner_write, bool)
+            or (planner_write and not planner_read)
+            or (not planner_read and (plan_ids or planner_write))
+        ):
+            raise AccountCenterError("profile_unavailable")
+
+        sharepoint = require_object(value["sharepoint"], code="profile_unavailable")
+        if set(sharepoint) != {
+            "enabled",
+            "site_id",
+            "list_ids",
+            "drive_ids",
+            "metadata_read",
+            "content_read",
+        }:
+            raise AccountCenterError("profile_unavailable")
+        sp_enabled = sharepoint["enabled"]
+        sp_metadata = sharepoint["metadata_read"]
+        if not isinstance(sp_enabled, bool) or not isinstance(sp_metadata, bool):
+            raise AccountCenterError("profile_unavailable")
+        if sharepoint["content_read"] is not False:
+            raise AccountCenterError("profile_unavailable")
+        if sp_enabled:
+            site_id = _safe_graph_site_id(sharepoint["site_id"])
+            list_ids = _safe_graph_uuid_list_optional(sharepoint["list_ids"])
+            drive_ids = _safe_graph_opaque_id_list(sharepoint["drive_ids"])
+            if not sp_metadata:
+                raise AccountCenterError("profile_unavailable")
+        elif (
+            sharepoint["site_id"] is None
+            and sharepoint["list_ids"] == []
+            and sharepoint["drive_ids"] == []
+            and sp_metadata is False
+        ):
+            site_id, list_ids, drive_ids = None, [], []
+        else:
+            raise AccountCenterError("profile_unavailable")
+
+        todo = require_object(value["todo"], code="profile_unavailable")
+        if set(todo) != {"enabled", "task_list_ids", "tasks_read", "tasks_write"}:
+            raise AccountCenterError("profile_unavailable")
+        todo_enabled = todo["enabled"]
+        todo_read = todo["tasks_read"]
+        todo_write = todo["tasks_write"]
+        if not all(isinstance(item, bool) for item in (todo_enabled, todo_read, todo_write)):
+            raise AccountCenterError("profile_unavailable")
+        task_list_ids = _safe_graph_opaque_id_list(todo["task_list_ids"])
+        if (
+            (todo_write and not todo_read)
+            or (todo_enabled and not todo_read)
+            or (not todo_enabled and (task_list_ids or todo_read or todo_write))
+        ):
+            raise AccountCenterError("profile_unavailable")
+
+        calendar = require_object(value["calendar"], code="profile_unavailable")
+        if set(calendar) != {
+            "enabled",
+            "calendar_ids",
+            "events_read",
+            "events_write",
+            "freebusy_read",
+            "freebusy_subjects",
+            "attendees_write",
+        }:
+            raise AccountCenterError("profile_unavailable")
+        calendar_enabled = calendar["enabled"]
+        events_read = calendar["events_read"]
+        events_write = calendar["events_write"]
+        freebusy_read = calendar["freebusy_read"]
+        attendees_write = calendar["attendees_write"]
+        if not all(
+            isinstance(item, bool)
+            for item in (
+                calendar_enabled,
+                events_read,
+                events_write,
+                freebusy_read,
+                attendees_write,
+            )
+        ):
+            raise AccountCenterError("profile_unavailable")
+        calendar_ids = _safe_graph_opaque_id_list(calendar["calendar_ids"])
+        freebusy_subjects = _safe_graph_schedule_ids(calendar["freebusy_subjects"])
+        if (
+            attendees_write
+            or (events_write and not events_read)
+            or (calendar_enabled and not (events_read or freebusy_read))
+            or (
+                not calendar_enabled
+                and (
+                    calendar_ids
+                    or events_read
+                    or events_write
+                    or freebusy_read
+                    or freebusy_subjects
+                )
+            )
+            or (not events_read and calendar_ids)
+            or (not freebusy_read and freebusy_subjects)
+        ):
+            raise AccountCenterError("profile_unavailable")
+
+        mail = require_object(value["mail"], code="profile_unavailable")
+        if set(mail) != {
+            "enabled",
+            "folder_ids",
+            "metadata_read",
+            "body_read",
+            "drafts_write",
+            "send_enabled",
+        }:
+            raise AccountCenterError("profile_unavailable")
+        metadata_read = mail["metadata_read"]
+        body_read = mail["body_read"]
+        drafts_write = mail["drafts_write"]
+        send_enabled = mail["send_enabled"]
+        if not all(
+            isinstance(item, bool)
+            for item in (mail["enabled"], metadata_read, body_read, drafts_write, send_enabled)
+        ):
+            raise AccountCenterError("profile_unavailable")
+        folder_ids = _safe_graph_opaque_id_list(mail["folder_ids"])
+        if (
+            body_read is not False
+            or (not metadata_read and folder_ids)
+            or mail["enabled"] != (metadata_read or drafts_write or send_enabled)
+        ):
+            raise AccountCenterError("profile_unavailable")
+    except AccountCenterError:
+        raise AccountCenterError("profile_unavailable") from None
+    return {
+        "schema_version": 2,
+        "tenant_id": tenant_id,
+        "workspace_id": workspace_id,
+        "planner": {
+            "plan_ids": plan_ids,
+            "tasks_read": planner_read,
+            "tasks_write": planner_write,
+        },
+        "sharepoint": {
+            "enabled": sp_enabled,
+            "site_id": site_id,
+            "list_ids": list_ids,
+            "drive_ids": drive_ids,
+            "metadata_read": sp_metadata,
+            "content_read": False,
+        },
+        "todo": {
+            "enabled": todo_enabled,
+            "task_list_ids": task_list_ids,
+            "tasks_read": todo_read,
+            "tasks_write": todo_write,
+        },
+        "calendar": {
+            "enabled": calendar_enabled,
+            "calendar_ids": calendar_ids,
+            "events_read": events_read,
+            "events_write": events_write,
+            "freebusy_read": freebusy_read,
+            "freebusy_subjects": freebusy_subjects,
+            "attendees_write": False,
+        },
+        "mail": {
+            "enabled": mail["enabled"],
+            "folder_ids": folder_ids,
+            "metadata_read": metadata_read,
+            "body_read": False,
+            "drafts_write": drafts_write,
+            "send_enabled": send_enabled,
+        },
+    }
+
+
+def _safe_microsoft_graph_mail_feature_request(value: Any) -> dict[str, bool]:
+    """Validate one explicit, additive Mail permission selection."""
+
+    features = require_object(value, code="invalid_request")
+    if set(features) != {"metadata_read", "drafts_write", "send"}:
+        raise AccountCenterError("invalid_request")
+    if any(not isinstance(features[key], bool) for key in features):
+        raise AccountCenterError("invalid_request")
+    if not any(features.values()):
+        raise AccountCenterError("invalid_request")
+    return dict(features)
+
+
+def _expected_microsoft_graph_scopes(scope: Mapping[str, Any]) -> set[str]:
+    """Derive the minimum exact Graph OAuth set from one validated profile."""
+
+    if scope.get("schema_version") != 2:
+        return {
+            "User.Read",
+            "Tasks.Read",
+            *({"Tasks.ReadWrite"} if scope["planner"]["tasks_write"] else set()),
+            *({"Sites.Selected"} if scope["sharepoint"]["enabled"] else set()),
+        }
+    required = {"User.Read"}
+    if scope["planner"]["tasks_write"] or scope["todo"]["tasks_write"]:
+        required.add("Tasks.ReadWrite")
+    elif scope["planner"]["tasks_read"] or scope["todo"]["tasks_read"]:
+        required.add("Tasks.Read")
+    if scope["sharepoint"]["enabled"]:
+        required.add("Sites.Selected")
+    if scope["calendar"]["events_write"]:
+        required.add("Calendars.ReadWrite")
+    elif scope["calendar"]["events_read"] or scope["calendar"]["freebusy_read"]:
+        required.add("Calendars.ReadBasic")
+    mail = scope["mail"]
+    if mail["drafts_write"]:
+        required.add("Mail.ReadWrite")
+    elif mail["metadata_read"] or mail["send_enabled"]:
+        required.add("Mail.ReadBasic")
+    if mail["send_enabled"]:
+        required.add("Mail.Send")
+    return required
+
+
+def _microsoft_graph_scope_permissions(scope: Mapping[str, Any]) -> dict[str, Any]:
+    """Return only immutable v2 feature grants, excluding selected resource IDs."""
+
+    return {
+        "planner": {
+            "tasks_read": scope["planner"]["tasks_read"],
+            "tasks_write": scope["planner"]["tasks_write"],
+        },
+        "sharepoint": {
+            "enabled": scope["sharepoint"]["enabled"],
+            "site_id": scope["sharepoint"]["site_id"],
+            "metadata_read": scope["sharepoint"]["metadata_read"],
+            "content_read": scope["sharepoint"]["content_read"],
+        },
+        "todo": {
+            "enabled": scope["todo"]["enabled"],
+            "tasks_read": scope["todo"]["tasks_read"],
+            "tasks_write": scope["todo"]["tasks_write"],
+        },
+        "calendar": {
+            "enabled": scope["calendar"]["enabled"],
+            "events_read": scope["calendar"]["events_read"],
+            "events_write": scope["calendar"]["events_write"],
+            "freebusy_read": scope["calendar"]["freebusy_read"],
+            "attendees_write": scope["calendar"]["attendees_write"],
+        },
+        "mail": {
+            "enabled": scope["mail"]["enabled"],
+            "metadata_read": scope["mail"]["metadata_read"],
+            "body_read": scope["mail"]["body_read"],
+            "drafts_write": scope["mail"]["drafts_write"],
+            "send_enabled": scope["mail"]["send_enabled"],
+        },
+    }
+
+
+def _safe_microsoft_graph_oauth_scopes(value: Any) -> set[str]:
+    """Require the Graph delegated-scope set stored with one profile."""
+
+    if (
+        not isinstance(value, list)
+        or not value
+        or any(not isinstance(scope, str) for scope in value)
+    ):
+        raise AccountCenterError("profile_unavailable")
+    scopes = set(value)
+    if len(scopes) != len(value) or not scopes <= ALLOWED_GRAPH_SCOPES or "User.Read" not in scopes:
+        raise AccountCenterError("profile_unavailable")
+    return scopes
+
+
+def _safe_azure_devops_numeric_id(value: Any) -> int:
+    """Validate one bounded, positive Azure DevOps numeric locator."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 2_147_483_647:
+        raise AccountCenterError("invalid_request")
+    return value
+
+
+def _safe_azure_devops_profile_scope(value: Any) -> dict[str, Any]:
+    """Validate one host-selected Azure DevOps project source tuple."""
+
+    scope = require_object(value, code="profile_unavailable")
+    allowed = {
+        "tenant_id",
+        "organization",
+        "project_id",
+        "source_id",
+        "source_kind",
+        "pipeline_id",
+        "definition_id",
+        "definition_environment_id",
+    }
+    if set(scope) - allowed or not {
+        "tenant_id",
+        "organization",
+        "project_id",
+        "source_id",
+        "source_kind",
+    }.issubset(scope):
+        raise AccountCenterError("profile_unavailable")
+    try:
+        tenant_id = _safe_graph_uuid(scope["tenant_id"])
+        project_id = _safe_graph_uuid(scope["project_id"])
+        organization = scope["organization"]
+        source_id = scope["source_id"]
+        source_kind = scope["source_kind"]
+        if (
+            not isinstance(organization, str)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}", organization) is None
+            or not isinstance(source_id, str)
+            or re.fullmatch(r"[A-Za-z0-9._-]{1,128}", source_id) is None
+            or source_kind not in {"project_pipelines", "pipeline_runs", "release_deployments"}
+        ):
+            raise AccountCenterError("profile_unavailable")
+        normalized: dict[str, Any] = {
+            "tenant_id": tenant_id,
+            "organization": organization,
+            "project_id": project_id,
+            "source_id": source_id,
+            "source_kind": source_kind,
+        }
+        if source_kind == "project_pipelines":
+            if (
+                "pipeline_id" in scope
+                or "definition_id" in scope
+                or "definition_environment_id" in scope
+            ):
+                raise AccountCenterError("profile_unavailable")
+        elif source_kind == "pipeline_runs":
+            if (
+                "pipeline_id" not in scope
+                or "definition_id" in scope
+                or "definition_environment_id" in scope
+            ):
+                raise AccountCenterError("profile_unavailable")
+            normalized["pipeline_id"] = _safe_azure_devops_numeric_id(scope["pipeline_id"])
+        else:
+            if "pipeline_id" in scope:
+                raise AccountCenterError("profile_unavailable")
+            if "definition_id" in scope:
+                normalized["definition_id"] = _safe_azure_devops_numeric_id(scope["definition_id"])
+            if "definition_environment_id" in scope:
+                if "definition_id" not in normalized:
+                    raise AccountCenterError("profile_unavailable")
+                normalized["definition_environment_id"] = _safe_azure_devops_numeric_id(
+                    scope["definition_environment_id"]
+                )
+        return normalized
+    except AccountCenterError:
+        raise AccountCenterError("profile_unavailable") from None
+
+
+def _safe_azure_devops_oauth_scopes(value: Any) -> set[str]:
+    """Accept only the separate Entra Azure DevOps `.default` resource grant."""
+
+    if value != [AZURE_DEVOPS_RESOURCE_SCOPE]:
+        raise AccountCenterError("profile_unavailable")
+    return {AZURE_DEVOPS_RESOURCE_SCOPE}
+
+
 def _safe_secret_reference(value: Any) -> str:
     """Require one allowlisted host secret reference, never a token value."""
 
-    if not isinstance(value, str) or not re.fullmatch(
-        r"[a-z][a-z0-9._/-]{0,127}", value
-    ):
+    if not isinstance(value, str) or not re.fullmatch(r"[a-z][a-z0-9._/-]{0,127}", value):
         raise AccountCenterError("invalid_request")
     return value
 
@@ -2260,9 +4229,7 @@ def _validated_connector_grant(
         raise AccountCenterError("connector_grant_required")
     try:
         grant_ref = grant["grant_ref"]
-        if not isinstance(grant_ref, str) or not re.fullmatch(
-            r"sha256:[0-9a-f]{64}", grant_ref
-        ):
+        if not isinstance(grant_ref, str) or not re.fullmatch(r"sha256:[0-9a-f]{64}", grant_ref):
             raise AccountCenterError("connector_grant_required")
         connection_ref = _uuid_text(grant["connection_ref"])
         granted_profile_ref = _opaque_profile_ref(grant["profile_ref"])
@@ -2311,9 +4278,7 @@ def _validated_connector_grant(
     }
 
 
-def _safe_provider_target(
-    provider: str, operation_id: str, value: Any
-) -> dict[str, Any]:
+def _safe_provider_target(provider: str, operation_id: str, value: Any) -> dict[str, Any]:
     """Validate a provider-specific, URL-free target for lease binding."""
 
     target = require_object(value)
@@ -2329,21 +4294,50 @@ def _safe_provider_target(
                 raise AccountCenterError("invalid_request")
             return {}
         allowed = {"repository_id", "repository"}
+        required = {"repository_id", "repository"}
         if operation_id in {
             "github.issue.get",
             "github.issue.comment.create",
             "github.issue.state.update",
         }:
             allowed.add("issue_number")
+            required.add("issue_number")
         elif operation_id == "github.pull_request.get":
             allowed.add("pull_number")
+            required.add("pull_number")
         elif operation_id == "github.actions.runs.list":
             allowed.update({"branch", "commit_sha"})
         elif operation_id == "github.ci.status":
             allowed.add("commit_sha")
-        if set(target) - allowed or not {"repository_id", "repository"}.issubset(
-            target
-        ):
+            required.add("commit_sha")
+        elif operation_id == "github.issues.search":
+            pass  # Search filters are argument-digest-bound, not resource locators.
+        elif operation_id in {
+            "github.branch.get",
+            "github.branch.create",
+            "github.branch.delete",
+        }:
+            allowed.add("branch")
+            required.add("branch")
+        elif operation_id in {"github.file.get", "github.file.commit"}:
+            allowed.update({"branch", "path"})
+            required.update({"branch", "path"})
+        elif operation_id == "github.actions.jobs.list":
+            allowed.add("run_id")
+            required.add("run_id")
+        elif operation_id == "github.actions.job.logs.read":
+            allowed.update({"run_id", "job_id"})
+            required.update({"run_id", "job_id"})
+        elif operation_id in {
+            "github.pull_request.draft.create",
+            "github.pull_request.draft.find",
+        }:
+            allowed.update({"head_branch", "base_branch"})
+            required.update({"head_branch", "base_branch"})
+        elif operation_id == "github.actions.rerun_failed":
+            allowed.add("run_id")
+            required.add("run_id")
+        if set(target) - allowed or not required.issubset(target):
             raise AccountCenterError("invalid_request")
         repository_id = _numeric_id(target["repository_id"])
         repository = target["repository"]
@@ -2355,28 +4349,35 @@ def _safe_provider_target(
         for field in ("issue_number", "pull_number"):
             if field in target:
                 number = target[field]
-                if (
-                    isinstance(number, bool)
-                    or not isinstance(number, int)
-                    or number < 1
-                ):
+                if isinstance(number, bool) or not isinstance(number, int) or number < 1:
                     raise AccountCenterError("invalid_request")
                 normalized[field] = number
-        for field in ("branch", "commit_sha"):
+        for field in ("branch", "head_branch", "base_branch"):
             if field in target:
                 text = target[field]
-                pattern = (
-                    r"[A-Za-z0-9._/-]{1,255}"
-                    if field == "branch"
-                    else r"[0-9a-fA-F]{7,64}"
-                )
-                if (
-                    not isinstance(text, str)
-                    or not re.fullmatch(pattern, text)
-                    or ".." in text.split("/")
-                ):
+                if not _github_branch_locator(text):
                     raise AccountCenterError("invalid_request")
                 normalized[field] = text
+        if "path" in target:
+            path = target["path"]
+            if not _github_path_locator(path):
+                raise AccountCenterError("invalid_request")
+            normalized["path"] = path
+        for field in ("run_id", "job_id"):
+            if field in target:
+                identifier = target[field]
+                if not isinstance(identifier, str) or not re.fullmatch(
+                    r"[1-9][0-9]{0,19}", identifier
+                ):
+                    raise AccountCenterError("invalid_request")
+                normalized[field] = identifier
+        if "commit_sha" in target:
+            commit_sha = target["commit_sha"]
+            if not isinstance(commit_sha, str) or not re.fullmatch(
+                r"[0-9a-fA-F]{7,64}", commit_sha
+            ):
+                raise AccountCenterError("invalid_request")
+            normalized["commit_sha"] = commit_sha
         return normalized
     if provider == "huggingface":
         if operation_id == "huggingface.vendor.cli.execute":
@@ -2429,7 +4430,253 @@ def _safe_provider_target(
         if operation_id in required and set(normalized) < required[operation_id]:
             raise AccountCenterError("invalid_request")
         return normalized
+    if provider == "microsoft_graph":
+        target_fields = {
+            "microsoft_graph.planner.plan.get": {"tenant_id", "plan_id"},
+            "microsoft_graph.planner.plans.list": {"tenant_id"},
+            "microsoft_graph.planner.tasks.list": {"tenant_id", "plan_id"},
+            "microsoft_graph.planner.task.get": {
+                "tenant_id",
+                "plan_id",
+                "task_id",
+            },
+            "microsoft_graph.planner.task.create": {
+                "tenant_id",
+                "plan_id",
+                "bucket_id",
+            },
+            "microsoft_graph.planner.task.update": {
+                "tenant_id",
+                "plan_id",
+                "task_id",
+            },
+            "microsoft_graph.sharepoint.site.get": {"tenant_id", "site_id"},
+            "microsoft_graph.sharepoint.list.get": {
+                "tenant_id",
+                "site_id",
+                "list_id",
+            },
+            "microsoft_graph.sharepoint.list.items.delta": {
+                "tenant_id",
+                "site_id",
+                "list_id",
+            },
+            "microsoft_graph.todo.lists.list": {"tenant_id"},
+            "microsoft_graph.todo.tasks.list": {"tenant_id", "task_list_id"},
+            "microsoft_graph.todo.task.get": {
+                "tenant_id",
+                "task_list_id",
+                "task_id",
+            },
+            "microsoft_graph.todo.task.create": {"tenant_id", "task_list_id"},
+            "microsoft_graph.todo.task.update": {
+                "tenant_id",
+                "task_list_id",
+                "task_id",
+            },
+            "microsoft_graph.todo.task.delete": {
+                "tenant_id",
+                "task_list_id",
+                "task_id",
+            },
+            "microsoft_graph.calendar.calendars.list": {"tenant_id"},
+            "microsoft_graph.calendar.events.list": {"tenant_id", "calendar_id"},
+            "microsoft_graph.calendar.event.get": {
+                "tenant_id",
+                "calendar_id",
+                "event_id",
+            },
+            "microsoft_graph.calendar.event.create": {
+                "tenant_id",
+                "calendar_id",
+                "transaction_id",
+            },
+            "microsoft_graph.calendar.event.update": {
+                "tenant_id",
+                "calendar_id",
+                "event_id",
+            },
+            "microsoft_graph.calendar.event.delete": {
+                "tenant_id",
+                "calendar_id",
+                "event_id",
+            },
+            "microsoft_graph.calendar.freebusy.get": {
+                "tenant_id",
+                "schedule_ids",
+            },
+            "microsoft_graph.mail.folders.list": {"tenant_id"},
+            "microsoft_graph.mail.messages.list": {"tenant_id", "folder_id"},
+            "microsoft_graph.mail.message.get": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
+            "microsoft_graph.mail.drafts.list": {"tenant_id", "folder_id"},
+            "microsoft_graph.mail.draft.create": {"tenant_id", "folder_id"},
+            "microsoft_graph.mail.draft.update": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
+            "microsoft_graph.mail.draft.delete": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
+            "microsoft_graph.mail.message.send": {
+                "tenant_id",
+                "folder_id",
+                "message_id",
+            },
+            "microsoft_graph.sharepoint.drives.list": {"tenant_id", "site_id"},
+            "microsoft_graph.sharepoint.drive.items.list": {
+                "tenant_id",
+                "site_id",
+                "drive_id",
+            },
+        }
+        expected = target_fields.get(operation_id)
+        if expected is None:
+            raise AccountCenterError("authorization_denied")
+        if set(target) != expected:
+            raise AccountCenterError("invalid_request")
+        normalized = {"tenant_id": _safe_graph_uuid(target["tenant_id"])}
+        if "plan_id" in expected:
+            normalized["plan_id"] = _safe_graph_planner_id(target["plan_id"])
+        if "task_id" in expected:
+            task_id_validator = (
+                _safe_graph_opaque_id
+                if operation_id.startswith("microsoft_graph.todo.")
+                else _safe_graph_planner_id
+            )
+            normalized["task_id"] = task_id_validator(target["task_id"])
+        if "bucket_id" in expected:
+            normalized["bucket_id"] = _safe_graph_planner_id(target["bucket_id"])
+        if "site_id" in expected:
+            normalized["site_id"] = _safe_graph_site_id(target["site_id"])
+        if "list_id" in expected:
+            normalized["list_id"] = _safe_graph_uuid(target["list_id"])
+        if "task_list_id" in expected:
+            normalized["task_list_id"] = _safe_graph_opaque_id(target["task_list_id"])
+        if "calendar_id" in expected:
+            normalized["calendar_id"] = _safe_graph_opaque_id(target["calendar_id"])
+        if "event_id" in expected:
+            normalized["event_id"] = _safe_graph_opaque_id(target["event_id"])
+        if "transaction_id" in expected:
+            normalized["transaction_id"] = _safe_graph_uuid(target["transaction_id"])
+        if "schedule_ids" in expected:
+            normalized["schedule_ids"] = sorted(_safe_graph_schedule_ids(target["schedule_ids"]))
+        if "folder_id" in expected:
+            if operation_id in {
+                "microsoft_graph.mail.drafts.list",
+                "microsoft_graph.mail.draft.create",
+                "microsoft_graph.mail.draft.update",
+                "microsoft_graph.mail.draft.delete",
+                "microsoft_graph.mail.message.send",
+            }:
+                if target["folder_id"] != "drafts":
+                    raise AccountCenterError("invalid_request")
+                normalized["folder_id"] = "drafts"
+            else:
+                normalized["folder_id"] = _safe_graph_opaque_id(target["folder_id"])
+        if "message_id" in expected:
+            normalized["message_id"] = _safe_graph_opaque_id(target["message_id"])
+        if "drive_id" in expected:
+            normalized["drive_id"] = _safe_graph_opaque_id(target["drive_id"])
+        return normalized
+    if provider == "azure_devops":
+        base = {"tenant_id", "organization", "project_id", "source_id", "source_kind"}
+        allowed_fields = {
+            "azure_devops.observations.poll": base
+            | {"pipeline_id", "definition_id", "definition_environment_id"},
+            "azure_devops.pipelines.list": base,
+            "azure_devops.pipeline_runs.list": base | {"pipeline_id"},
+            "azure_devops.pipeline_run.get": base | {"pipeline_id", "run_id"},
+            "azure_devops.deployments.list": base | {"definition_id", "definition_environment_id"},
+            "azure_devops.release_environment.get": base
+            | {
+                "definition_id",
+                "definition_environment_id",
+                "release_id",
+                "environment_id",
+            },
+        }
+        required_fields = {
+            "azure_devops.observations.poll": base,
+            "azure_devops.pipelines.list": base,
+            "azure_devops.pipeline_runs.list": base | {"pipeline_id"},
+            "azure_devops.pipeline_run.get": base | {"pipeline_id", "run_id"},
+            "azure_devops.deployments.list": base,
+            "azure_devops.release_environment.get": base | {"release_id", "environment_id"},
+        }
+        allowed = allowed_fields.get(operation_id)
+        required = required_fields.get(operation_id)
+        if allowed is None or required is None:
+            raise AccountCenterError("authorization_denied")
+        if set(target) - allowed or not required.issubset(target):
+            raise AccountCenterError("invalid_request")
+        tenant_id = _safe_graph_uuid(target["tenant_id"])
+        project_id = _safe_graph_uuid(target["project_id"])
+        organization = target["organization"]
+        source_id = target["source_id"]
+        source_kind = target["source_kind"]
+        if (
+            not isinstance(organization, str)
+            or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9-]{0,63}", organization) is None
+            or not isinstance(source_id, str)
+            or re.fullmatch(r"[A-Za-z0-9._-]{1,128}", source_id) is None
+            or source_kind not in {"project_pipelines", "pipeline_runs", "release_deployments"}
+        ):
+            raise AccountCenterError("invalid_request")
+        normalized = {
+            "tenant_id": tenant_id,
+            "organization": organization,
+            "project_id": project_id,
+            "source_id": source_id,
+            "source_kind": source_kind,
+        }
+        for field in (
+            "pipeline_id",
+            "definition_id",
+            "definition_environment_id",
+            "run_id",
+            "release_id",
+            "environment_id",
+        ):
+            if field in target:
+                normalized[field] = _safe_azure_devops_numeric_id(target[field])
+        return normalized
     raise AccountCenterError("authorization_denied")
+
+
+def _github_branch_locator(value: Any) -> bool:
+    """Validate a bounded Git reference locator without normalizing its identity."""
+
+    return not (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 255
+        or re.fullmatch(r"[A-Za-z0-9._/-]+", value) is None
+        or value.startswith("/")
+        or value.endswith(("/", "."))
+        or "//" in value
+        or "@{" in value
+        or any(
+            part in {"", ".", ".."} or part.startswith(".") or part.endswith(".lock")
+            for part in value.split("/")
+        )
+    )
+
+
+def _github_path_locator(value: Any) -> bool:
+    """Validate a bounded repository-relative file locator."""
+
+    return not (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 512
+        or re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", value) is None
+        or any(part in {"", ".", ".."} or part.startswith(".") for part in value.split("/"))
+    )
 
 
 def _provider_target_allowed(
@@ -2448,8 +4695,7 @@ def _provider_target_allowed(
             return bool(repositories)
         return any(
             repository["repository_id"] == target.get("repository_id")
-            and f"{repository['owner']}/{repository['name']}"
-            == target.get("repository")
+            and f"{repository['owner']}/{repository['name']}" == target.get("repository")
             for repository in repositories
         )
     if provider == "huggingface":
@@ -2457,18 +4703,241 @@ def _provider_target_allowed(
         if operation_id == "huggingface.vendor.cli.execute":
             return bool(repositories)
         repo_type = target.get("repo_type")
-        required_permission = (
-            "write" if operation_id == "huggingface.file.upload" else "read"
-        )
+        required_permission = "write" if operation_id == "huggingface.file.upload" else "read"
         matching = [item for item in repositories if item["repo_type"] == repo_type]
         if operation_id.endswith(".list"):
             return any("read" in item["permissions"] for item in matching)
         return any(
-            item["repo_id"] == target.get("repo_id")
-            and required_permission in item["permissions"]
+            item["repo_id"] == target.get("repo_id") and required_permission in item["permissions"]
             for item in matching
         )
+    if provider == "microsoft_graph":
+        try:
+            graph_scope = _safe_microsoft_graph_profile_scope(scope)
+        except AccountCenterError:
+            return False
+        if target.get("tenant_id") != graph_scope["tenant_id"]:
+            return False
+        if operation_id.startswith("microsoft_graph.planner."):
+            if operation_id == "microsoft_graph.planner.plans.list":
+                return graph_scope["planner"]["tasks_read"]
+            return (
+                graph_scope["planner"]["tasks_read"]
+                and target.get("plan_id") in graph_scope["planner"]["plan_ids"]
+            )
+        if graph_scope.get("schema_version") == 2:
+            mail = graph_scope["mail"]
+            if operation_id == "microsoft_graph.mail.folders.list":
+                return mail["metadata_read"]
+            if operation_id in {
+                "microsoft_graph.mail.messages.list",
+                "microsoft_graph.mail.message.get",
+            }:
+                return mail["metadata_read"] and target.get("folder_id") in mail["folder_ids"]
+            if operation_id in {
+                "microsoft_graph.mail.drafts.list",
+                "microsoft_graph.mail.draft.create",
+                "microsoft_graph.mail.draft.update",
+                "microsoft_graph.mail.draft.delete",
+            }:
+                return mail["drafts_write"]
+            if operation_id == "microsoft_graph.mail.message.send":
+                return mail["send_enabled"]
+            if operation_id == "microsoft_graph.todo.lists.list":
+                return graph_scope["todo"]["enabled"] and graph_scope["todo"]["tasks_read"]
+            if operation_id.startswith("microsoft_graph.todo."):
+                todo = graph_scope["todo"]
+                if (
+                    not todo["enabled"]
+                    or not todo["tasks_read"]
+                    or target.get("task_list_id") not in todo["task_list_ids"]
+                ):
+                    return False
+                return (
+                    not operation_id.rsplit(".", 1)[-1]
+                    in {
+                        "create",
+                        "update",
+                        "delete",
+                    }
+                    or todo["tasks_write"]
+                )
+            if operation_id == "microsoft_graph.calendar.calendars.list":
+                calendar = graph_scope["calendar"]
+                return calendar["enabled"] and (
+                    calendar["events_read"] or calendar["freebusy_read"]
+                )
+            if operation_id.startswith("microsoft_graph.calendar."):
+                calendar = graph_scope["calendar"]
+                if not calendar["enabled"]:
+                    return False
+                if operation_id == "microsoft_graph.calendar.freebusy.get":
+                    schedule_ids = target.get("schedule_ids")
+                    return (
+                        calendar["freebusy_read"]
+                        and isinstance(schedule_ids, list)
+                        and bool(schedule_ids)
+                        and set(schedule_ids) <= set(calendar["freebusy_subjects"])
+                    )
+                if target.get("calendar_id") not in calendar["calendar_ids"]:
+                    return False
+                if operation_id in {
+                    "microsoft_graph.calendar.events.list",
+                    "microsoft_graph.calendar.event.get",
+                }:
+                    return calendar["events_read"]
+                return calendar["events_write"]
+            if operation_id.startswith("microsoft_graph.sharepoint."):
+                sharepoint = graph_scope["sharepoint"]
+                if (
+                    not sharepoint["enabled"]
+                    or not sharepoint["metadata_read"]
+                    or target.get("site_id") != sharepoint["site_id"]
+                ):
+                    return False
+                if "drive_id" in target:
+                    return target.get("drive_id") in sharepoint["drive_ids"]
+                if "list_id" in target:
+                    return target.get("list_id") in sharepoint["list_ids"]
+                return True
+            return False
+        if operation_id.startswith("microsoft_graph.sharepoint."):
+            if (
+                not graph_scope["sharepoint"]["enabled"]
+                or target.get("site_id") != graph_scope["sharepoint"]["site_id"]
+            ):
+                return False
+            return (
+                target.get("list_id") in graph_scope["sharepoint"]["list_ids"]
+                if "list_id" in target
+                else True
+            )
+    if provider == "azure_devops":
+        try:
+            ado_scope = _safe_azure_devops_profile_scope(scope)
+        except AccountCenterError:
+            return False
+        exact_fields = (
+            "tenant_id",
+            "organization",
+            "project_id",
+            "source_id",
+            "source_kind",
+            "pipeline_id",
+            "definition_id",
+            "definition_environment_id",
+        )
+        if any(target.get(field) != ado_scope.get(field) for field in exact_fields):
+            return False
+        required_kind = {
+            "azure_devops.pipelines.list": "project_pipelines",
+            "azure_devops.pipeline_runs.list": "pipeline_runs",
+            "azure_devops.pipeline_run.get": "pipeline_runs",
+            "azure_devops.deployments.list": "release_deployments",
+            "azure_devops.release_environment.get": "release_deployments",
+        }.get(operation_id)
+        if required_kind is not None and ado_scope["source_kind"] != required_kind:
+            return False
+        if operation_id == "azure_devops.observations.poll" and ado_scope["source_kind"] not in {
+            "pipeline_runs",
+            "release_deployments",
+        }:
+            return False
+        return not (
+            operation_id == "azure_devops.release_environment.get"
+            and "definition_environment_id" in ado_scope
+            and target.get("environment_id") != ado_scope["definition_environment_id"]
+        )
     return False
+
+
+def _microsoft_graph_operation_authorized(operation_id: str, profile: Mapping[str, Any]) -> bool:
+    """Require recorded delegated consent for the exact Graph operation class."""
+
+    try:
+        scopes = _safe_microsoft_graph_oauth_scopes(_json_array(profile["oauth_scopes_json"]))
+        profile_scope = _safe_microsoft_graph_profile_scope(
+            _json_object(profile["target_scope_json"])
+        )
+    except (AccountCenterError, KeyError, TypeError):
+        return False
+    if scopes != _expected_microsoft_graph_scopes(profile_scope):
+        return False
+    if operation_id in {
+        "microsoft_graph.planner.task.create",
+        "microsoft_graph.planner.task.update",
+    }:
+        return profile_scope["planner"]["tasks_write"] and "Tasks.ReadWrite" in scopes
+    if operation_id.startswith("microsoft_graph.planner."):
+        return bool({"Tasks.Read", "Tasks.ReadWrite"} & scopes)
+    if operation_id.startswith("microsoft_graph.sharepoint."):
+        return profile_scope["sharepoint"]["enabled"] and "Sites.Selected" in scopes
+    if profile_scope.get("schema_version") == 2:
+        mail = profile_scope["mail"]
+        if operation_id in {
+            "microsoft_graph.mail.folders.list",
+            "microsoft_graph.mail.messages.list",
+            "microsoft_graph.mail.message.get",
+        }:
+            return mail["metadata_read"] and bool({"Mail.ReadBasic", "Mail.ReadWrite"} & scopes)
+        if operation_id in {
+            "microsoft_graph.mail.drafts.list",
+            "microsoft_graph.mail.draft.create",
+            "microsoft_graph.mail.draft.update",
+            "microsoft_graph.mail.draft.delete",
+        }:
+            return mail["drafts_write"] and "Mail.ReadWrite" in scopes
+        if operation_id == "microsoft_graph.mail.message.send":
+            return (
+                mail["send_enabled"]
+                and "Mail.Send" in scopes
+                and bool({"Mail.ReadBasic", "Mail.ReadWrite"} & scopes)
+            )
+        if operation_id.startswith("microsoft_graph.todo."):
+            return profile_scope["todo"]["enabled"] and profile_scope["todo"]["tasks_read"]
+        if operation_id.startswith("microsoft_graph.calendar."):
+            calendar = profile_scope["calendar"]
+            if operation_id.endswith((".create", ".update", ".delete")):
+                return calendar["events_write"] and "Calendars.ReadWrite" in scopes
+            if operation_id == "microsoft_graph.calendar.freebusy.get":
+                return calendar["freebusy_read"] and bool(
+                    {"Calendars.ReadBasic", "Calendars.ReadWrite"} & scopes
+                )
+            return calendar["enabled"] and bool(
+                {"Calendars.ReadBasic", "Calendars.ReadWrite"} & scopes
+            )
+    return False
+
+
+def _azure_devops_operation_authorized(operation_id: str, profile: Mapping[str, Any]) -> bool:
+    """Require the fixed Entra Azure DevOps resource on one actor-owned profile."""
+
+    try:
+        scopes = _safe_azure_devops_oauth_scopes(_json_array(profile["oauth_scopes_json"]))
+        scope = _safe_azure_devops_profile_scope(_json_object(profile["target_scope_json"]))
+    except (AccountCenterError, KeyError, TypeError):
+        return False
+    if (
+        profile["provider"] != "azure_devops"
+        or profile["auth_mode"] != "delegated_oauth"
+        or profile["access_mode"] != "actor_owned"
+        or AZURE_DEVOPS_RESOURCE_SCOPE not in scopes
+    ):
+        return False
+    allowed_by_source = {
+        "project_pipelines": {"azure_devops.pipelines.list"},
+        "pipeline_runs": {
+            "azure_devops.observations.poll",
+            "azure_devops.pipeline_runs.list",
+            "azure_devops.pipeline_run.get",
+        },
+        "release_deployments": {
+            "azure_devops.observations.poll",
+            "azure_devops.deployments.list",
+            "azure_devops.release_environment.get",
+        },
+    }
+    return operation_id in allowed_by_source[scope["source_kind"]]
 
 
 def _json_object(value: Any) -> dict[str, Any]:
@@ -2483,14 +4952,24 @@ def _json_object(value: Any) -> dict[str, Any]:
     return result
 
 
+def _json_array(value: Any) -> list[Any]:
+    """Decode one stored JSON list or fail closed on corrupt profile metadata."""
+
+    try:
+        result = json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        raise AccountCenterError("profile_unavailable") from None
+    if not isinstance(result, list):
+        raise AccountCenterError("profile_unavailable")
+    return result
+
+
 def _authorization_request(
     request: Mapping[str, Any],
 ) -> tuple[str, str, str, dict[str, Any], str]:
     """Validate common authorization and lease request fields."""
 
-    _require_fields(
-        request, {"account_ref", "operation_id", "resource", "arguments_sha256"}
-    )
+    _require_fields(request, {"account_ref", "operation_id", "resource", "arguments_sha256"})
     account_ref = _uuid_text(request["account_ref"])
     operation_id = _required_text(request, "operation_id", maximum=200)
     resource = _safe_resource(request["resource"])
@@ -2601,6 +5080,17 @@ def _validated_callback_uri(value: str) -> str:
     return value
 
 
+def _validated_microsoft_graph_callback_uri(value: str) -> str:
+    """Require a private localhost OAuth UI callback with a fixed path."""
+
+    if not isinstance(value, str):
+        raise AccountCenterError("configuration_unavailable")
+    match = re.fullmatch(r"http://localhost:([0-9]{1,5})/oauth/callback", value)
+    if match is None or not 1 <= int(match.group(1)) <= 65_535:
+        raise AccountCenterError("configuration_unavailable")
+    return value
+
+
 def _mapping_config(config: Mapping[str, Any], key: str) -> Mapping[str, Any]:
     value = config.get(key, {})
     if not isinstance(value, Mapping):
@@ -2635,6 +5125,8 @@ def _load_method_callers(
     *,
     exchange_caller: str,
     callback_caller: str | None,
+    microsoft_graph_callback_caller: str | None,
+    microsoft_graph_provider_caller: str | None,
     provider_caller: str,
     provider_callers: set[str],
     wecom_callers: set[str],
@@ -2646,7 +5138,22 @@ def _load_method_callers(
         raise AccountCenterError("configuration_unavailable")
     role_callers = {
         **{method: {exchange_caller} for method in EXCHANGE_ONLY_METHODS},
+        "list_provider_profiles": {exchange_caller}
+        | (
+            {microsoft_graph_provider_caller}
+            if microsoft_graph_provider_caller is not None
+            else set()
+        ),
         "complete_github_link": {callback_caller} if callback_caller else set(),
+        "complete_microsoft_graph_link": (
+            {microsoft_graph_callback_caller} if microsoft_graph_callback_caller else set()
+        ),
+        "complete_microsoft_graph_scope_upgrade": (
+            {microsoft_graph_callback_caller} if microsoft_graph_callback_caller else set()
+        ),
+        "complete_azure_devops_link": (
+            {microsoft_graph_callback_caller} if microsoft_graph_callback_caller else set()
+        ),
         "observe_wecom_challenge": wecom_callers,
         "redeem_credential_lease": {provider_caller},
         "redeem_provider_credential_lease": provider_callers,
@@ -2681,15 +5188,19 @@ def _environment_config() -> dict[str, Any]:
         settings = read_environment_settings()
         if settings is None:
             raise AccountCenterError("configuration_unavailable")
-        supplied = json.loads(
-            settings["config"], object_pairs_hook=_reject_duplicate_pairs
-        )
+        supplied = json.loads(settings["config"], object_pairs_hook=_reject_duplicate_pairs)
         if not isinstance(supplied, dict):
             raise AccountCenterError("configuration_unavailable")
         config = dict(supplied)
         allowed_fields = {
             "storage_path",
             "github_callback_uri",
+            "microsoft_graph_callback_uri",
+            "microsoft_graph_client_id",
+            "microsoft_graph_client_secret_ref",
+            "microsoft_graph_callback_caller_id",
+            "microsoft_graph_provider_caller_id",
+            "azure_devops_provider_caller_id",
             "github_client_id",
             "github_client_secret_ref",
             "encryption_key_ref",
@@ -2712,6 +5223,12 @@ def _environment_config() -> dict[str, Any]:
             "wecom_sources",
             "storage_path",
             "github_callback_uri",
+            "microsoft_graph_callback_uri",
+            "microsoft_graph_client_id",
+            "microsoft_graph_client_secret_ref",
+            "microsoft_graph_callback_caller_id",
+            "microsoft_graph_provider_caller_id",
+            "azure_devops_provider_caller_id",
             "github_client_id",
             "github_client_secret_ref",
             "github_callback_caller_id",
@@ -2726,9 +5243,7 @@ def _environment_config() -> dict[str, Any]:
         required_fields = allowed_fields - optional_fields
         if set(config) - allowed_fields or not required_fields <= set(config):
             raise AccountCenterError("configuration_unavailable")
-        storage_root = _validated_private_storage_root(
-            os.environ.get("CYRENE_PLUGIN_STORAGE_PATH")
-        )
+        storage_root = _validated_private_storage_root(os.environ.get("CYRENE_PLUGIN_STORAGE_PATH"))
         config["storage_path"] = str(
             _resolved_account_database_path(config.get("storage_path"), storage_root)
         )
@@ -2736,10 +5251,7 @@ def _environment_config() -> dict[str, Any]:
         config["binding_id"] = settings["binding_id"]
         refs = config.get("hostSecretRefs")
         if not isinstance(refs, dict) or any(
-            not isinstance(ref, str)
-            or not ref
-            or not isinstance(env_name, str)
-            or not env_name
+            not isinstance(ref, str) or not ref or not isinstance(env_name, str) or not env_name
             for ref, env_name in refs.items()
         ):
             raise AccountCenterError("configuration_unavailable")
@@ -2766,6 +5278,16 @@ def _environment_config() -> dict[str, Any]:
             config.get(field) for field in oauth_fields
         ):
             raise AccountCenterError("configuration_unavailable")
+        graph_oauth_fields = (
+            "microsoft_graph_callback_uri",
+            "microsoft_graph_client_id",
+            "microsoft_graph_client_secret_ref",
+            "microsoft_graph_callback_caller_id",
+        )
+        if any(config.get(field) is not None for field in graph_oauth_fields) and not all(
+            config.get(field) for field in graph_oauth_fields
+        ):
+            raise AccountCenterError("configuration_unavailable")
 
         def resolve(reference: Any) -> str:
             if not isinstance(reference, str) or reference not in refs:
@@ -2781,6 +5303,7 @@ def _environment_config() -> dict[str, Any]:
         encryption_ref = config.pop("encryption_key_ref", None)
         caller_key_refs = config.pop("caller_key_refs", None)
         github_secret_ref = config.pop("github_client_secret_ref", None)
+        graph_secret_ref = config.pop("microsoft_graph_client_secret_ref", None)
         app_private_key_ref = config.pop("github_app_private_key_ref", None)
         provider_secret_refs = config.pop("provider_secret_refs", [])
         provider_secret_file_refs = config.pop("provider_secret_file_refs", [])
@@ -2794,10 +5317,7 @@ def _environment_config() -> dict[str, Any]:
             raise AccountCenterError("configuration_unavailable")
         if (
             not isinstance(provider_secret_file_refs, list)
-            or any(
-                not isinstance(reference, str)
-                for reference in provider_secret_file_refs
-            )
+            or any(not isinstance(reference, str) for reference in provider_secret_file_refs)
             or len(set(provider_secret_file_refs)) != len(provider_secret_file_refs)
             or set(provider_secret_file_refs) - set(file_refs)
             or set(provider_secret_file_refs) & set(provider_secret_refs)
@@ -2811,6 +5331,8 @@ def _environment_config() -> dict[str, Any]:
         }
         if github_secret_ref is not None:
             config["github_client_secret"] = resolve(github_secret_ref)
+        if graph_secret_ref is not None:
+            config["microsoft_graph_client_secret"] = resolve(graph_secret_ref)
         if app_private_key_ref is not None:
             config["github_app_private_key"] = resolve(app_private_key_ref)
         config["provider_secrets"] = {
@@ -2826,6 +5348,7 @@ def _environment_config() -> dict[str, Any]:
         used = {
             encryption_ref,
             github_secret_ref,
+            graph_secret_ref,
             app_private_key_ref,
             *caller_key_refs.values(),
             *provider_secret_refs,
@@ -2841,6 +5364,68 @@ def _environment_config() -> dict[str, Any]:
 
 class Plugin(AccountCenterPlugin):
     """Manifest-compatible short entrypoint alias."""
+
+
+def _stored_huggingface_oauth_scopes(value: Any) -> tuple[str, ...]:
+    """Load an exact persisted OAuth scope set without adding privileges."""
+
+    try:
+        scopes = json.loads(value)
+    except (TypeError, json.JSONDecodeError):
+        raise AccountCenterError("profile_unavailable") from None
+    if (
+        not isinstance(scopes, list)
+        or not scopes
+        or any(not isinstance(scope, str) or scope not in ALLOWED_OAUTH_SCOPES for scope in scopes)
+        or len(scopes) != len(set(scopes))
+    ):
+        raise AccountCenterError("profile_unavailable")
+    return tuple(sorted(scopes))
+
+
+def _huggingface_renewal_response(session: Mapping[str, Any]) -> dict[str, Any]:
+    """Project only user-action metadata from a private device renewal row."""
+
+    state = session.get("status")
+    if state not in {
+        "starting",
+        "waiting_user",
+        "succeeded",
+        "failed",
+        "expired",
+        "cancelled",
+        "unknown",
+    }:
+        raise AccountCenterError("renewal_session_unavailable")
+    profile_revision = session.get("profile_revision")
+    if isinstance(profile_revision, bool) or not isinstance(profile_revision, int):
+        raise AccountCenterError("renewal_session_unavailable")
+    active = state == "waiting_user"
+    user_code = session.get("user_code") if active else None
+    verification_uri = session.get("verification_uri") if active else None
+    if active and (
+        not isinstance(user_code, str)
+        or re.fullmatch(r"[A-Z0-9]{4}-[A-Z0-9]{4}", user_code) is None
+        or verification_uri
+        not in {
+            "https://hf.co/oauth/device",
+            "https://huggingface.co/oauth/device",
+        }
+    ):
+        raise AccountCenterError("renewal_session_unavailable")
+    expires_at = session.get("expires_at") if active else None
+    interval = session.get("interval_seconds") if active else None
+    return {
+        "profile_ref": session.get("profile_ref"),
+        "session_ref": session.get("session_ref"),
+        "state": state,
+        "user_code": user_code,
+        "verification_uri": verification_uri,
+        "expires_at": expires_at if isinstance(expires_at, int) else None,
+        "interval_seconds": interval if isinstance(interval, int) else None,
+        "generation": profile_revision + (1 if state == "succeeded" else 0),
+        "reason_code": session.get("reason_code"),
+    }
 
 
 def _read_private_secret_file(path: str) -> str:

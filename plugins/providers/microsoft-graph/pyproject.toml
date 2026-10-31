@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-microsoft-graph-provider"
+version = "0.2.0"
+description = "Actor-scoped Planner, To Do, calendar, selected SharePoint metadata, and opt-in Mail tools for Cyrene"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-account-center-contracts>=0.1,<0.2",
+  "cyrene-plugin-runtime>=0.2,<0.3",
+]
+
+[project.optional-dependencies]
+test = ["jsonschema>=4.23,<5", "pytest>=8,<10"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.providers.microsoft-graph" = [
+  "plugin.manifest.json",
+  "configuration.schema.json",
+]
+"share/cyrene/plugins/cyrene.providers.microsoft-graph/contracts" = [
+  "contracts/office-v2-operations.json",
+  "contracts/office-v2-target-scope.schema.json",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+cyrene-account-center-contracts = { path = "../../../sdk/python/cyrene_account_center_contracts" }
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["src/microsoft_graph_provider/_generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

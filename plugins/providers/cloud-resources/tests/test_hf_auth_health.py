@@ -146,7 +146,11 @@ def test_public_hf_can_be_valid_anonymously_with_login_missing() -> None:
 
     assert health.login_state == "MISSING"
     assert health.authorization_state == "VALID"
+    assert health.checked_at is not None
+    assert health.expires_at is None
+    assert health.generation == 0
     assert health.capabilities[0].state == "VALID"
+    assert health.capabilities[0].expires_at is None
     assert transport.tokens == [None]
 
 
@@ -184,8 +188,23 @@ def test_rejected_configured_hf_token_is_distinct_from_missing_login() -> None:
     assert transport.tokens == ["fixture-scoped-read-token"]
 
 
+def test_hf_permission_denial_is_not_misreported_as_invalid_credentials() -> None:
+    """A source 403 means access is denied, not that the token is necessarily invalid."""
+
+    provider, transport, environment = make_provider()
+    environment["TEST_HF_READ_TOKEN"] = "fixture-scoped-read-token"
+    transport.response = CloudProviderFailure("PERMISSION_DENIED")
+
+    health = call_health(provider)
+
+    assert health.login_state == "PRESENT"
+    assert health.authorization_state == "PERMISSION_DENIED"
+    assert health.capabilities[0].state == "PERMISSION_DENIED"
+    assert health.capabilities[0].reason_code == "CLOUD_PERMISSION_DENIED"
+
+
 def test_hf_transport_failure_keeps_configured_login_presence_unknown_for_auth() -> None:
-    """A timeout preserves configured login presence but cannot prove Hub access."""
+    """A timeout preserves configured login presence but leaves Hub access unknown."""
 
     provider, transport, environment = make_provider()
     environment["TEST_HF_READ_TOKEN"] = "fixture-scoped-read-token"
@@ -194,5 +213,6 @@ def test_hf_transport_failure_keeps_configured_login_presence_unknown_for_auth()
     health = call_health(provider)
 
     assert health.login_state == "PRESENT"
-    assert health.authorization_state == "UNAVAILABLE"
-    assert health.capabilities[0].state == "UNAVAILABLE"
+    assert health.authorization_state == "UNKNOWN"
+    assert health.capabilities[0].state == "UNKNOWN"
+    assert health.capabilities[0].reason_code == "CLOUD_PROVIDER_TIMEOUT"

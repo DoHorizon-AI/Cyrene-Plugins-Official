@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.microsoft-graph/configuration.schema.json",
+  "title": "Microsoft Graph provider activation configuration",
+  "type": "object",
+  "required": ["exchange_caller_id", "exchange_verification_key_ref", "account_center", "hostSecretRefs"],
+  "properties": {
+    "exchange_caller_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "exchange_verification_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+    "account_center": {
+      "type": "object",
+      "required": ["binding_id", "connection_ref", "transport", "caller_id", "signing_key_ref"],
+      "properties": {
+        "binding_id": {"type": "string", "minLength": 1, "maxLength": 256, "x-cyrene-host-provided": true},
+        "connection_ref": {"type": "string", "minLength": 1, "maxLength": 512, "x-cyrene-host-provided": true},
+        "transport": {"type": "string", "enum": ["local", "mtls"], "default": "local", "x-cyrene-host-provided": true},
+        "caller_id": {"const": "microsoft-graph-provider"},
+        "signing_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+        "mtls": {
+          "type": "object",
+          "properties": {
+            "root_cert_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+            "client_cert_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"},
+            "client_key_ref": {"type": "string", "pattern": "^[a-z][a-z0-9._/-]{0,127}$"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false,
+      "allOf": [
+        {"if": {"properties": {"transport": {"const": "mtls"}}, "required": ["transport"]}, "then": {"properties": {"mtls": {"required": ["root_cert_ref", "client_cert_ref", "client_key_ref"]}}, "required": ["mtls"]}}
+      ]
+    },
+    "read_only": {"type": "boolean", "default": false},
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 60, "default": 15},
+    "max_page_size": {"type": "integer", "minimum": 1, "maximum": 100, "default": 50},
+    "sharepointTargets": {
+      "type": "object",
+      "description": "Optional exact SharePoint target allowlist supplied by the host binding; consent remains actor-owned in Account Center.",
+      "required": ["siteId", "listIds"],
+      "properties": {
+        "siteId": {"type": "string", "pattern": "^[A-Za-z0-9.-]{1,255},[0-9a-fA-F-]{36},[0-9a-fA-F-]{36}$"},
+        "listIds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 100,
+          "uniqueItems": true,
+          "items": {"type": "string", "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"}
+        }
+      },
+      "additionalProperties": false,
+      "x-cyrene-host-provided": true
+    },
+    "officeV2": {
+      "type": "object",
+      "description": "Host-owned Office v2 feature switches. Provider source fields are snake_case; deployment host camelCase flags require explicit mapping. Per-actor Account Center scopes and Directory target grants remain mandatory.",
+      "required": ["planner_enabled", "todo_enabled", "calendar_enabled", "mail_metadata_enabled", "mail_drafts_enabled", "mail_send_enabled", "sharepoint_drive_metadata_enabled"],
+      "properties": {
+        "planner_enabled": {"type": "boolean", "default": false},
+        "todo_enabled": {"type": "boolean", "default": false},
+        "calendar_enabled": {"type": "boolean", "default": false},
+        "mail_metadata_enabled": {"type": "boolean", "default": false},
+        "mail_drafts_enabled": {"type": "boolean", "default": false},
+        "mail_send_enabled": {"type": "boolean", "default": false},
+        "sharepoint_drive_metadata_enabled": {"type": "boolean", "default": false}
+      },
+      "additionalProperties": false,
+      "x-cyrene-host-provided": true
+    },
+    "hostSecretRefs": {
+      "type": "object",
+      "description": "Maps stable signing and optional mTLS references to host-injected environment names; OAuth tokens stay in Account Center.",
+      "required": ["microsoft-graph/exchange-verification-key", "microsoft-graph/account-center-provider-signing-key"],
+      "properties": {
+        "microsoft-graph/exchange-verification-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "microsoft-graph/account-center-provider-signing-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "microsoft-graph/account-center-root-certificate": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "microsoft-graph/account-center-client-certificate": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+        "microsoft-graph/account-center-client-key": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"account_center": {"properties": {"transport": {"const": "mtls"}}, "required": ["transport"]}}, "required": ["account_center"]},
+      "then": {"properties": {"hostSecretRefs": {"required": ["microsoft-graph/account-center-root-certificate", "microsoft-graph/account-center-client-certificate", "microsoft-graph/account-center-client-key"]}}}
+    }
+  ],
+  "additionalProperties": false
+}

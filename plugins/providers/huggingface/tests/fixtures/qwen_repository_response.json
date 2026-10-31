@@ -1,0 +1,26 @@
+{
+  "capture": {
+    "source": "https://huggingface.co/api/models/Qwen/Qwen2.5-0.5B-Instruct",
+    "captured_at_utc": "2026-10-27",
+    "http_status": 200,
+    "projection": "actual public response fields used by the test"
+  },
+  "payload": {
+    "id": "Qwen/Qwen2.5-0.5B-Instruct",
+    "sha": "7ae557604adf67be50417f59c2c2f167def9a775",
+    "private": false,
+    "gated": false,
+    "siblings": [
+      {"rfilename": ".gitattributes"},
+      {"rfilename": "LICENSE"},
+      {"rfilename": "README.md"},
+      {"rfilename": "config.json"},
+      {"rfilename": "generation_config.json"},
+      {"rfilename": "merges.txt"},
+      {"rfilename": "model.safetensors"},
+      {"rfilename": "tokenizer.json"},
+      {"rfilename": "tokenizer_config.json"},
+      {"rfilename": "vocab.json"}
+    ]
+  }
+}

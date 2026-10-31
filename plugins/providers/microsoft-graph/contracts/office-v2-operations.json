@@ -1,0 +1,83 @@
+{
+  "contractVersion": "cyrene.microsoft-graph.office-v2",
+  "schemaVersion": 2,
+  "toolIdentity": "toolId == operationId == provider_tool_id",
+  "activationFeatureFlags": {
+    "plannerDiscovery": "officeV2.planner_enabled",
+    "todo": "officeV2.todo_enabled",
+    "calendar": "officeV2.calendar_enabled",
+    "sharepointDriveMetadata": "officeV2.sharepoint_drive_metadata_enabled",
+    "mailMetadata": "officeV2.mail_metadata_enabled",
+    "mailDrafts": "officeV2.mail_drafts_enabled",
+    "mailSend": "officeV2.mail_send_enabled"
+  },
+  "hostToProviderFeatureFlagMap": {
+    "plannerEnabled": "officeV2.planner_enabled",
+    "todoEnabled": "officeV2.todo_enabled",
+    "calendarEnabled": "officeV2.calendar_enabled",
+    "mailMetadataEnabled": "officeV2.mail_metadata_enabled",
+    "mailDraftsEnabled": "officeV2.mail_drafts_enabled",
+    "mailSendEnabled": "officeV2.mail_send_enabled",
+    "sharepointDriveMetadataEnabled": "officeV2.sharepoint_drive_metadata_enabled"
+  },
+  "oauthScopeDerivation": {
+    "oidcScopes": ["openid", "profile", "offline_access"],
+    "always": ["User.Read"],
+    "plannerAndTodo": "Tasks.ReadWrite when any selected task feature writes; otherwise Tasks.Read when any selected task feature reads; omit when neither reads nor writes.",
+    "sharepoint": "Sites.Selected only when a host-selected site is enabled; explicit site resource grant remains required.",
+    "calendar": "Calendars.ReadWrite when event writes are enabled; otherwise Calendars.ReadBasic when event or free/busy reads are enabled; omit when calendar features are disabled.",
+    "mail": "Add Mail.ReadBasic when metadata or send preflight is enabled unless Mail.ReadWrite is enabled for drafts; Mail.ReadWrite covers basic reads; add Mail.Send only for explicit send. Send-only therefore uses Mail.ReadBasic and Mail.Send. Never request Mail.Read or body-reading permission."
+  },
+  "selectionSemantics": "Discovery returns only the signed-in actor metadata. Empty plan, task-list, calendar, or mail-folder selections authorize only their discovery call; detail and write calls require an exact selected resource after a revision-checked scope update. Draft operations always use the signed-in user's fixed Drafts folder.",
+  "mailLeaseTargets": {"folders.list":{"required":["tenant_id"]},"messages.list":{"required":["tenant_id","folder_id"]},"message.get":{"required":["tenant_id","folder_id","message_id"]},"drafts.list":{"required":["tenant_id","folder_id"],"folder_id":"drafts"},"draft.create":{"required":["tenant_id","folder_id"],"folder_id":"drafts"},"draft.update":{"required":["tenant_id","folder_id","message_id"],"folder_id":"drafts"},"draft.delete":{"required":["tenant_id","folder_id","message_id"],"folder_id":"drafts"},"message.send":{"required":["tenant_id","folder_id","message_id"],"folder_id":"drafts"}},
+  "paging": {
+    "defaultPageSize": 50,
+    "maximumPageSize": 100,
+    "cursorMaximumCharacters": 12000,
+    "cursorBoundTo": ["binding_id", "profile_ref", "actor_id", "target", "page_size"],
+    "collectionResult": {"items": "array", "page_cursor": "input cursor or null", "next_cursor": "signed opaque cursor or null", "complete": "boolean", "truncated": false}
+  },
+  "errors": {
+    "authentication": "GRAPH_AUTHENTICATION_FAILED",
+    "authorization": "GRAPH_ACCESS_DENIED",
+    "notFound": "GRAPH_RESOURCE_NOT_FOUND",
+    "rateLimit": "GRAPH_RATE_LIMITED",
+    "reauthRequired": "ACCOUNT_CENTER_REAUTH_REQUIRED",
+    "unknownWriteResult": "UNKNOWN",
+    "writePolicy": "Never replay an ambiguous write; reconcile by exact identity and return UNKNOWN if proof is incomplete."
+  },
+  "operations": [
+    {"toolId":"microsoft_graph.planner.plan.get","operationId":"microsoft_graph.planner.plan.get","mutating":false,"status":"existing-v1","args":{"required":["plan_id"],"optional":[]},"projection":"plan id, title, owner, container and ETag"},
+    {"toolId":"microsoft_graph.planner.plans.list","operationId":"microsoft_graph.planner.plans.list","mutating":false,"status":"v2-discovery","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"current actor's plan IDs, titles, owner IDs, creation time and ETag; empty plan_ids authorize only this discovery call"},
+    {"toolId":"microsoft_graph.planner.tasks.list","operationId":"microsoft_graph.planner.tasks.list","mutating":false,"status":"existing-v1","args":{"required":["plan_id"],"optional":["page_size","page_cursor"]},"projection":"bounded task metadata and signed continuation"},
+    {"toolId":"microsoft_graph.planner.task.get","operationId":"microsoft_graph.planner.task.get","mutating":false,"status":"existing-v1","args":{"required":["plan_id","task_id"],"optional":[]},"projection":"task metadata and ETag"},
+    {"toolId":"microsoft_graph.planner.task.create","operationId":"microsoft_graph.planner.task.create","mutating":true,"status":"existing-v1","args":{"required":["plan_id","bucket_id","title"],"optional":["due_date_time"]},"projection":"CONFIRMED or UNKNOWN and task metadata"},
+    {"toolId":"microsoft_graph.planner.task.update","operationId":"microsoft_graph.planner.task.update","mutating":true,"status":"existing-v1","args":{"required":["plan_id","task_id","if_match","changes"],"optional":[]},"projection":"CONFIRMED, RECONCILED or UNKNOWN and task metadata"},
+    {"toolId":"microsoft_graph.sharepoint.site.get","operationId":"microsoft_graph.sharepoint.site.get","mutating":false,"status":"existing-v1","args":{"required":["site_id"],"optional":[]},"projection":"selected site ID and display name"},
+    {"toolId":"microsoft_graph.sharepoint.list.get","operationId":"microsoft_graph.sharepoint.list.get","mutating":false,"status":"existing-v1","args":{"required":["site_id","list_id"],"optional":[]},"projection":"selected list metadata only"},
+    {"toolId":"microsoft_graph.sharepoint.list.items.delta","operationId":"microsoft_graph.sharepoint.list.items.delta","mutating":false,"status":"existing-v1","args":{"required":["site_id","list_id"],"optional":["page_size","page_cursor"]},"projection":"selected list item metadata only; no file bytes"},
+    {"toolId":"microsoft_graph.todo.lists.list","operationId":"microsoft_graph.todo.lists.list","mutating":false,"status":"v2","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"complete server-sized page of task list IDs and display metadata, with a signed continuation when more pages exist; each page is capped at 100 items and is not sliced to page_size"},
+    {"toolId":"microsoft_graph.todo.tasks.list","operationId":"microsoft_graph.todo.tasks.list","mutating":false,"status":"v2","args":{"required":["task_list_id"],"optional":["page_size","page_cursor"]},"projection":"task IDs, title, status, due/completion times, importance and ETag"},
+    {"toolId":"microsoft_graph.todo.task.get","operationId":"microsoft_graph.todo.task.get","mutating":false,"status":"v2","args":{"required":["task_list_id","task_id"],"optional":[]},"projection":"task metadata and ETag"},
+    {"toolId":"microsoft_graph.todo.task.create","operationId":"microsoft_graph.todo.task.create","mutating":true,"status":"v2","args":{"required":["task_list_id","title"],"optional":["due_date_time","importance"]},"projection":"CONFIRMED or UNKNOWN and task metadata"},
+    {"toolId":"microsoft_graph.todo.task.update","operationId":"microsoft_graph.todo.task.update","mutating":true,"status":"v2","args":{"required":["task_list_id","task_id","if_match","changes"],"optional":[]},"projection":"CONFIRMED, RECONCILED or UNKNOWN and task metadata"},
+    {"toolId":"microsoft_graph.todo.task.delete","operationId":"microsoft_graph.todo.task.delete","mutating":true,"status":"v2","args":{"required":["task_list_id","task_id","if_match"],"optional":[]},"projection":"CONFIRMED or UNKNOWN and resource identity"},
+    {"toolId":"microsoft_graph.calendar.calendars.list","operationId":"microsoft_graph.calendar.calendars.list","mutating":false,"status":"v2","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"calendar IDs, names and owner metadata"},
+    {"toolId":"microsoft_graph.calendar.events.list","operationId":"microsoft_graph.calendar.events.list","mutating":false,"status":"v2","args":{"required":["calendar_id","start_date_time","end_date_time"],"optional":["page_size","page_cursor"]},"projection":"bounded event metadata in UTC; no attendees or body"},
+    {"toolId":"microsoft_graph.calendar.event.get","operationId":"microsoft_graph.calendar.event.get","mutating":false,"status":"v2","args":{"required":["calendar_id","event_id"],"optional":[]},"projection":"event metadata in UTC, ETag and transaction ID; no attendees or body"},
+    {"toolId":"microsoft_graph.calendar.freebusy.get","operationId":"microsoft_graph.calendar.freebusy.get","mutating":false,"status":"v2","args":{"required":["schedules","start_date_time","end_date_time","interval_minutes"],"optional":[]},"projection":"availability slots only for exact selected schedule IDs"},
+    {"toolId":"microsoft_graph.calendar.event.create","operationId":"microsoft_graph.calendar.event.create","mutating":true,"status":"v2","args":{"required":["calendar_id","subject","start_date_time","end_date_time","transaction_id"],"optional":["location"]},"projection":"CONFIRMED or UNKNOWN and event metadata; no attendees"},
+    {"toolId":"microsoft_graph.calendar.event.update","operationId":"microsoft_graph.calendar.event.update","mutating":true,"status":"v2","args":{"required":["calendar_id","event_id","if_match","changes"],"optional":[]},"projection":"CONFIRMED, RECONCILED or UNKNOWN and event metadata; no attendees"},
+    {"toolId":"microsoft_graph.calendar.event.delete","operationId":"microsoft_graph.calendar.event.delete","mutating":true,"status":"v2","args":{"required":["calendar_id","event_id","if_match"],"optional":[]},"projection":"CONFIRMED or UNKNOWN and resource identity"},
+    {"toolId":"microsoft_graph.mail.folders.list","operationId":"microsoft_graph.mail.folders.list","mutating":false,"status":"v2","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"folder ID, display name, parent ID, counts and hidden state only"},
+    {"toolId":"microsoft_graph.mail.messages.list","operationId":"microsoft_graph.mail.messages.list","mutating":false,"status":"v2","args":{"required":["folder_id"],"optional":["page_size","page_cursor"]},"projection":"selected-folder message metadata only; never body, bodyPreview or attachment data"},
+    {"toolId":"microsoft_graph.mail.message.get","operationId":"microsoft_graph.mail.message.get","mutating":false,"status":"v2","args":{"required":["folder_id","message_id"],"optional":[]},"projection":"selected-folder message metadata and ETag only; never body, bodyPreview or attachment data"},
+    {"toolId":"microsoft_graph.mail.drafts.list","operationId":"microsoft_graph.mail.drafts.list","mutating":false,"status":"v2","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"metadata-only drafts from the current user's fixed Drafts folder"},
+    {"toolId":"microsoft_graph.mail.draft.create","operationId":"microsoft_graph.mail.draft.create","mutating":true,"status":"v2","args":{"required":["subject","body_text"],"optional":["to_recipients","cc_recipients"]},"projection":"CONFIRMED with metadata, or UNKNOWN; body_text is write input only and ambiguous outcome is never replayed"},
+    {"toolId":"microsoft_graph.mail.draft.update","mutating":true,"status":"v2","args":{"required":["message_id","if_match","changes"],"optional":[]},"projection":"CONFIRMED with metadata, or UNKNOWN; ETag-protected update in fixed Drafts folder","operationId":"microsoft_graph.mail.draft.update"},
+    {"toolId":"microsoft_graph.mail.draft.delete","operationId":"microsoft_graph.mail.draft.delete","mutating":true,"status":"v2","args":{"required":["message_id","if_match"],"optional":[]},"projection":"CONFIRMED or UNKNOWN; ETag-protected delete in fixed Drafts folder"},
+    {"toolId":"microsoft_graph.mail.message.send","operationId":"microsoft_graph.mail.message.send","mutating":true,"status":"v2","args":{"required":["message_id"],"optional":[]},"projection":"ACCEPTED only for Graph HTTP 202, or UNKNOWN; verifies an existing Drafts-folder draft and never claims delivery or replays an ambiguous outcome"},
+    {"toolId":"microsoft_graph.sharepoint.drives.list","operationId":"microsoft_graph.sharepoint.drives.list","mutating":false,"status":"v2","args":{"required":["site_id"],"optional":["page_size","page_cursor"]},"projection":"selected document library IDs and metadata only"},
+    {"toolId":"microsoft_graph.sharepoint.drive.items.list","operationId":"microsoft_graph.sharepoint.drive.items.list","mutating":false,"status":"v2","args":{"required":["site_id","drive_id"],"optional":["parent_item_id","page_size","page_cursor"]},"projection":"selected item metadata and original links; no contents/download"}
+  ]
+}

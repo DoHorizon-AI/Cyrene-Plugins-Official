@@ -333,7 +333,7 @@ class CloudResourcesProvider:
             else:
                 if error.credential_present is None:
                     login_state = "UNKNOWN"
-                authorization_state = "UNAVAILABLE" if error.retryable else "UNKNOWN"
+                authorization_state = "UNKNOWN"
         health_value = {
             "schema_version": 1,
             "authorization_ref": settings.binding_id,

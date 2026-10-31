@@ -21,6 +21,25 @@ are never returned. Runpod profiles use a host-injected API key and REST API
 v2, with explicit Pod IDs, name prefixes, GPU types, data centers, and resource
 limits.
 
+Each profile in `CYRENE_CAPABILITY_CONFIGURATION_JSON.profiles[]` accepts an
+optional host-only `read_only` boolean (omitted means `false`). A read-only
+profile permits only provider health, resource list/get,
+and operation status/log reads. Mutations, cancellation, and the native vendor
+CLI are rejected by the executor before it writes a replay receipt or contacts
+the vendor. When every profile in a binding is read-only, `list_tools` hides the
+mutating tools as well; mixed bindings retain a union catalog while the
+per-profile execution gate remains authoritative.
+
+`cloud_provider_health` reports the bound profile's authentication state,
+authorization state, scope references, check time, and credential expiry when
+the provider supplies one. Azure Managed Identity and GCP Workload Identity
+Federation tokens are refreshed by their SDKs and report the resulting
+short-lived token expiry. Runpod uses a static API key; the v2 API does not
+provide a key-expiry timestamp, so `expires_at: null` means expiry is unknown,
+not that the key is guaranteed to remain valid. A provider 401 is reported as
+authentication failure, 403 as scope denial, and network/upstream failures as
+unknown health. Response bodies and credential material are never included.
+
 Every tool request selects a host-bound `profile_ref`; typed API calls also
 carry a provider-specific resource `target`. The CLI call is granted the whole
 host profile scope and signs the complete vendor `argv[]`, without claiming an
@@ -42,16 +61,6 @@ from exit code zero to verified remote success. Runpod results report expected
 state, observed state, service readiness, and confirmed resource release
 separately.
 
-GCE disk lifecycle status checks the zonal Operation and then reads the Disk:
-`READY` describes disk readiness, while a VM's `RUNNING` state remains a
-separate resource state. Delete success is reported only after a fresh GET
-returns 404. GCE mutation request IDs derive deterministically from the signed
-pre-dispatch request ID. After a lost disk-create response, the provider checks
-a bounded number of recent zonal operations and requires an exact request ID,
-disk target, operation type, and request-time match before reporting success.
-A matching disk by itself remains `UNKNOWN_RESULT`; writes are never replayed.
-This recovery read requires the host identity to have `compute.zoneOperations.list`.
-
 The SQLite receipt ledger is bounded by default to 8,192 rows and 128 MiB.
 Known terminal receipts become purgeable after 90 days, longer than the
 provider's 30-day operation-reference lifetime. Pending, unknown, and
@@ -72,6 +81,17 @@ commands report `remote_state=UNKNOWN` until native status read-back; captured
 GCP and Runpod JSON operation/resource references can be reconciled through
 the typed status tool. Cloud IAM and Runpod API-key permissions remain the
 final vendor-side boundary.
+
+GCE disk lifecycle status checks the zonal Operation and then reads the Disk:
+`READY` describes disk readiness, while a VM's `RUNNING` state remains a
+separate resource state. Delete success is reported only after a fresh GET
+returns 404. GCE mutation request IDs derive deterministically from the signed
+pre-dispatch request ID. After a lost disk-create response, the provider checks
+a bounded number of recent zonal operations and requires an exact request ID,
+disk target, operation type, and request-time match before reporting success.
+A matching disk by itself remains `UNKNOWN_RESULT`; writes are never replayed.
+This recovery read requires the host identity to have
+`compute.zoneOperations.list`.
 
 ## Local validation
 
@@ -105,7 +125,7 @@ cloud tenant, create provider resources, or incur cost.
 
 Azure profile 使用 Managed Identity，并限制到指定订阅、资源组和资源 ID 范围。Google
 Cloud profile 使用主机挂载的 Workload Identity Federation 凭据配置和专用服务账号，并限制
-到指定 project、zone 和实例名前缀。Zonal 磁盘的读取和删除还要求单独配置
+到指定 project、zone 和实例名前缀。Zonal 磁盘读取和删除还要求单独配置
 `disk_name_prefixes`；创建磁盘还要求配置 `disk_size_gb_range` 和精确的 `disk_source_images`
 白名单。磁盘创建使用 `sizeGb`、已允许的公开 `sourceImage`、可选的有界 GCE labels 和可选的固定磁盘类型；传入的 labels 必须与回读值完全一致。
 VM 实例目标保持不变；VM 只有在已有磁盘属于相同 project 和 zone、且名称匹配磁盘前缀时才能挂载，
@@ -136,6 +156,18 @@ GCP 磁盘生命周期状态会先检查 zonal Operation，再读取 Disk：磁�
 预分派 request ID 稳定派生。创建响应丢失时，Provider 有界查询近期 zonal operations，并精确核对 request ID、磁盘目标、
 操作类型和发起时间后才报告成功；仅有同名且配置相同的磁盘仍返回 `UNKNOWN_RESULT`，写入绝不重放。
 此恢复查询要求主机身份具备 `compute.zoneOperations.list` 权限。
+
+`CYRENE_CAPABILITY_CONFIGURATION_JSON.profiles[]` 中的每个 profile 可配置宿主 `read_only` 布尔值
+（省略时为 `false`）。只读 profile 只允许 provider
+健康检查、资源列表/详情与操作状态/日志读取。写操作、取消和供应商 CLI 会在 executor 写入重放回执或访问供应商
+前拒绝。当 binding 中所有 profile 都是只读时，`list_tools` 也会隐藏写工具；混合 binding 保留联合目录，最终权限
+仍由逐 profile 的执行端门禁强制。
+
+`cloud_provider_health` 会返回绑定 profile 的认证状态、授权状态、范围引用、检查时间，以及供应商
+提供的凭据过期时间。Azure Managed Identity 和 GCP Workload Identity Federation token 由各自 SDK
+刷新，并报告最新短期 token 的到期时间。Runpod 使用静态 API key；v2 API 不提供 key 过期时间字段，
+因此 `expires_at: null` 表示过期时间未知，不表示 key 保证长期有效。供应商 401 会报告认证失败，403
+报告范围授权不足，网络或上游故障报告为状态未知。响应正文和凭据不会进入结果。
 
 SQLite 回执账本默认上限为 8,192 条、128 MiB。只有已知终态回执在 90 天后才可清理，该期限长于
 30 天的 operation reference 有效期。Pending、unknown 和未验证写入 tombstone 永不清理；受保护回执达到上限时，

@@ -89,4 +89,27 @@ impl EnvironmentFilter {
 
         clean_env
     }
+
+    /// Filters only caller-supplied entries without importing host variables.
+    ///
+    /// MXC receives this map inside its isolated workload request. Host control
+    /// values such as the SDK lookup `PATH` are supplied on a separate channel.
+    /// 仅过滤调用方提供的环境变量，不继承宿主环境。
+    pub fn sanitize_requested_environment(
+        &self,
+        requested_env: &HashMap<String, String>,
+    ) -> HashMap<String, String> {
+        requested_env
+            .iter()
+            .filter(|(key, _)| !self.is_sensitive_key(key))
+            .map(|(key, value)| (key.clone(), value.clone()))
+            .collect()
+    }
+
+    fn is_sensitive_key(&self, key: &str) -> bool {
+        let upper = key.to_uppercase();
+        self.sensitive_patterns
+            .iter()
+            .any(|pattern| upper.contains(pattern))
+    }
 }

@@ -5,6 +5,10 @@ edition = "2021"
 description = "Standalone native gRPC host binary for Cyrene Agent, Memory, and Computer Runtimes (R08)"
 license = "Apache-2.0"
 
+[features]
+default = []
+mxc = ["cyrene-computer-runtime/mxc"]
+
 [[bin]]
 name = "cyrene-plugin-server"
 path = "src/main.rs"
@@ -19,6 +23,7 @@ tokio-stream = { version = "0.1", features = ["sync", "net"] }
 futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+base64 = "0.22"
 
 cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contracts" }
 cyrene-agent-runtime = { path = "../cyrene-agent-runtime" }

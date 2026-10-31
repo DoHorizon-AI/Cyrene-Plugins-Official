@@ -25,6 +25,14 @@ impl PathValidator {
         }
     }
 
+    /// Returns the canonical roots approved for workspace access.
+    ///
+    /// External sandbox adapters use these exact roots to build their mount
+    /// policy; they must not widen access from the requested working directory.
+    pub fn allowed_roots(&self) -> &[PathBuf] {
+        &self.allowed_roots
+    }
+
     /// Validates and resolves a path against allowed roots.
     /// Rejects path traversal (`..`), empty paths, and symlinks escaping the roots.
     /// 根据允许的根目录校验并解析路径。
@@ -67,33 +75,42 @@ impl PathValidator {
 
         // Canonicalize to resolve symlinks and `..`
         // 执行规范化以解析符号链接和 ..。
-        let resolved = if full_path.exists() {
-            full_path.canonicalize().map_err(|e| ComputerError {
+        let resolved = match std::fs::symlink_metadata(&full_path) {
+            Ok(_) => full_path.canonicalize().map_err(|error| ComputerError {
                 code: ComputerErrorCode::PathTraversalDenied as i32,
-                message: format!("Failed to canonicalize path: {}", e),
+                message: format!("Failed to canonicalize existing path: {error}"),
                 retryable: false,
-            })?
-        } else {
-            // For write/create operations, validate the existing parent directory
-            // 对写入/创建操作，验证现有父目录。
-            let parent = full_path.parent().ok_or_else(|| ComputerError {
-                code: ComputerErrorCode::PathTraversalDenied as i32,
-                message: "Path has no parent directory".to_string(),
-                retryable: false,
-            })?;
+            })?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                // A dangling symlink has symlink metadata, so only a genuinely
+                // absent leaf reaches this branch.
+                // 只有目标确实不存在时才验证父目录；悬空符号链接会在上方失败关闭。
+                let parent = full_path.parent().ok_or_else(|| ComputerError {
+                    code: ComputerErrorCode::PathTraversalDenied as i32,
+                    message: "Path has no parent directory".to_string(),
+                    retryable: false,
+                })?;
 
-            let parent_canonical = parent.canonicalize().map_err(|e| ComputerError {
-                code: ComputerErrorCode::PathTraversalDenied as i32,
-                message: format!("Parent directory does not exist or inaccessible: {}", e),
-                retryable: false,
-            })?;
+                let parent_canonical = parent.canonicalize().map_err(|error| ComputerError {
+                    code: ComputerErrorCode::PathTraversalDenied as i32,
+                    message: format!("Parent directory does not exist or is inaccessible: {error}"),
+                    retryable: false,
+                })?;
 
-            if let Some(file_name) = full_path.file_name() {
-                parent_canonical.join(file_name)
-            } else {
+                if let Some(file_name) = full_path.file_name() {
+                    parent_canonical.join(file_name)
+                } else {
+                    return Err(ComputerError {
+                        code: ComputerErrorCode::PathTraversalDenied as i32,
+                        message: "Invalid file name".to_string(),
+                        retryable: false,
+                    });
+                }
+            }
+            Err(error) => {
                 return Err(ComputerError {
                     code: ComputerErrorCode::PathTraversalDenied as i32,
-                    message: "Invalid file name".to_string(),
+                    message: format!("Failed to inspect path: {error}"),
                     retryable: false,
                 });
             }

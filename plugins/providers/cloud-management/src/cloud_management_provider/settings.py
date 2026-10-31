@@ -82,6 +82,7 @@ class CloudProfile:
     api_key_ref: str | None
     cli_executable: str | None
     cli_timeout_seconds: float
+    read_only: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,6 +251,7 @@ def _parse_profiles(raw: object) -> tuple[dict[str, CloudProfile], set[str]]:
             "scope",
             "auth",
             "cli",
+            "read_only",
         }:
             raise ConfigurationError("profile has an invalid shape")
         profile_ref = _required_text(item.get("profile_ref"), "profile_ref", 192)
@@ -261,6 +263,9 @@ def _parse_profiles(raw: object) -> tuple[dict[str, CloudProfile], set[str]]:
         identity_ref = _required_text(item.get("identity_ref"), "identity_ref", 256)
         if not re.fullmatch(r"[A-Za-z0-9._:/-]{1,256}", identity_ref):
             raise ConfigurationError("identity_ref contains unsupported characters")
+        read_only = item.get("read_only", False)
+        if not isinstance(read_only, bool):
+            raise ConfigurationError("profile read_only must be boolean")
         scope = _parse_scope(provider, item.get("scope"))
         auth_mode, client_id, credential_ref, api_key_ref = _parse_auth(provider, item.get("auth"))
         if credential_ref is not None:
@@ -274,6 +279,7 @@ def _parse_profiles(raw: object) -> tuple[dict[str, CloudProfile], set[str]]:
             identity_ref=identity_ref,
             scope=scope,
             auth_mode=auth_mode,
+            read_only=read_only,
             client_id=client_id,
             credential_config_ref=credential_ref,
             api_key_ref=api_key_ref,

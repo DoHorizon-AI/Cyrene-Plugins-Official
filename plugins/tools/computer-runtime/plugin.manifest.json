@@ -3,47 +3,68 @@
   "id": "cyrene.tools.computer-runtime",
   "name": "Cyrene Bounded Computer Runtime",
   "version": "0.1.0",
-  "description": "Rust implementation of bounded filesystem, process, browser, and artifact operations; it does not claim hostile-code containment.",
+  "description": "Low-privilege bounded workspace command and file runtime with a fixed tool.provider.v1 facade; it does not claim hostile-code containment.",
   "kind": "tool-provider",
   "capabilities": [
-    "computer.runtime.v1"
+    "computer.runtime.v1",
+    "tool.provider.v1"
   ],
   "supportedServices": [
-    "Cyrene-Navigator"
+    "Cyrene-Navigator",
+    "Cyrene-Exchange"
   ],
   "methods": [
     {
+      "capability": "computer.runtime.v1",
       "name": "ExecuteCommand",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "ExecuteCommandStream",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "ReadFile",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "WriteFile",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "ListDir",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "CreateArtifact",
       "interfaceVersion": "1",
       "executionMode": "service"
     },
     {
+      "capability": "computer.runtime.v1",
       "name": "GetArtifact",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "capability": "tool.provider.v1",
+      "name": "list_tools",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "capability": "tool.provider.v1",
+      "name": "call_tool",
       "interfaceVersion": "1",
       "executionMode": "service"
     }

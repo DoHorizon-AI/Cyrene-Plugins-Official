@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -35,7 +36,7 @@ class PluginCatalogTest(unittest.TestCase):
     and catalog export format and field integrity.
     """
 
-    EXPECTED_PLUGIN_COUNT = 24
+    EXPECTED_PLUGIN_COUNT = 26
     EXPECTED_PLUGIN_IDS: ClassVar[set[str]] = {
         "cyrene.accounts.account-center",
         "cyrene.connectors.email-notification",
@@ -52,6 +53,8 @@ class PluginCatalogTest(unittest.TestCase):
         "cyrene.providers.cloud-management",
         "cyrene.providers.github-issues",
         "cyrene.providers.huggingface",
+        "cyrene.providers.azure-devops-observation",
+        "cyrene.providers.microsoft-graph",
         "cyrene.providers.model-api-connector",
         "cyrene.serving.vllm-runtime",
         "cyrene.tools.computer-runtime",
@@ -79,6 +82,16 @@ class PluginCatalogTest(unittest.TestCase):
         "cyrene.accounts.account-center": (
             "Cyrene Account Center",
             "account.center.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.azure-devops-observation": (
+            "Azure DevOps Observation Provider",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.microsoft-graph": (
+            "Microsoft Graph Provider",
+            "tool.provider.v1",
             ("Cyrene-Exchange",),
         ),
         "cyrene.providers.github-issues": (
@@ -130,8 +143,8 @@ class PluginCatalogTest(unittest.TestCase):
     def setUp(self) -> None:
         self.catalog = load_catalog(root_dir=REPO_ROOT)
 
-    def test_discover_all_24_plugins_and_metadata_extraction(self) -> None:
-        """1. Discover the 24 expected plugins and verify their published metadata."""
+    def test_discover_all_26_plugins_and_metadata_extraction(self) -> None:
+        """1. Discover the 26 expected plugins and verify their published metadata."""
         manifests = discover_plugin_manifests(REPO_ROOT)
         self.assertEqual(
             len(manifests),
@@ -247,13 +260,13 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(empty_plugins), 0)
 
     def test_language_filtering(self) -> None:
-        """3. Test language filtering across python (21), rust (1), and csharp (2)."""
-        # Python: 21 plugins, including Teams, Cloud Management, and HF providers.
+        """3. Test language filtering across python (23), rust (1), and csharp (2)."""
+        # Python: 23 plugins, including Teams, Cloud Management, and HF providers.
         python_plugins = list_plugins(language="python", catalog=self.catalog)
         self.assertEqual(
             len(python_plugins),
-            21,
-            f"Expected 21 Python plugins, got {len(python_plugins)}",
+            23,
+            f"Expected 23 Python plugins, got {len(python_plugins)}",
         )
         for p in python_plugins:
             self.assertEqual(p["language"], "python")
@@ -291,7 +304,38 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(list_plugins(language="c#", catalog=self.catalog)), 2)
         self.assertEqual(len(list_plugins(language="dotnet", catalog=self.catalog)), 2)
         self.assertEqual(len(list_plugins(language="RUST", catalog=self.catalog)), 1)
-        self.assertEqual(len(list_plugins(language="Python", catalog=self.catalog)), 21)
+        self.assertEqual(len(list_plugins(language="Python", catalog=self.catalog)), 23)
+
+    def test_computer_runtime_methods_are_scoped_to_their_capability(self) -> None:
+        """Multi-capability runtime methods must remain explicitly attributable."""
+        manifest_path = (
+            REPO_ROOT / "plugins/tools/computer-runtime/plugin.manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        methods_by_capability = {
+            capability: sorted(
+                method["name"]
+                for method in manifest["methods"]
+                if method["capability"] == capability
+            )
+            for capability in manifest["capabilities"]
+        }
+
+        self.assertEqual(
+            methods_by_capability,
+            {
+                "computer.runtime.v1": [
+                    "CreateArtifact",
+                    "ExecuteCommand",
+                    "ExecuteCommandStream",
+                    "GetArtifact",
+                    "ListDir",
+                    "ReadFile",
+                    "WriteFile",
+                ],
+                "tool.provider.v1": ["call_tool", "list_tools"],
+            },
+        )
 
     def test_export_format_and_field_integrity(self) -> None:
         """4. Test plugins-catalog.json export format, schemaVersion, and field integrity."""
@@ -382,7 +426,7 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(by_service["Cyrene-Echo"]), 3)
         self.assertEqual(len(by_service["Cyrene-Reactor"]), 3)
         self.assertEqual(len(by_service["Cyrene-Yield"]), 3)
-        self.assertEqual(len(by_service["Cyrene-Exchange"]), 11)
+        self.assertEqual(len(by_service["Cyrene-Exchange"]), 14)
         self.assertEqual(
             set(by_service["Cyrene-Exchange"]),
             {
@@ -396,7 +440,10 @@ class PluginCatalogTest(unittest.TestCase):
                 "cyrene.providers.cloud-resources",
                 "cyrene.providers.github-issues",
                 "cyrene.providers.huggingface",
+                "cyrene.providers.azure-devops-observation",
+                "cyrene.providers.microsoft-graph",
                 "cyrene.providers.model-api-connector",
+                "cyrene.tools.computer-runtime",
             },
         )
         self.assertEqual(len(by_service["Cyrene-Catalyst"]), 5)

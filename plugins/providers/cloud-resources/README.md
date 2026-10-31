@@ -12,7 +12,10 @@ identity, Google Compute Engine instances through explicit metadata credentials
 for GCE/GKE Workload Identity or a configured service-account JSON environment
 reference, Hugging Face models, datasets, and Spaces metadata, Tailscale device
 metadata through a scoped OAuth client, and one Runpod Pod through the REST
-`GET /v1/pods/{podId}` endpoint.
+`GET /v2/pods/{podId}` endpoint. Runpod API v1 is deprecated and scheduled to
+retire on November 15, 2026; the provider uses the v2 base URL and response
+shape. Runpod API keys do not expose a documented expiry timestamp, so health
+reports an unknown expiry rather than promising that a static key remains valid.
 Tailscale requests ask for `devices:core:read` and use only the fixed device
 read endpoint. Runpod activation requires a host-injected Read Only API key and
 uses the documented Bearer header, never the GraphQL query-string key form.
@@ -63,7 +66,9 @@ Official references:
 - [Hugging Face Hub API](https://huggingface.co/docs/hub/en/api)
 - [Tailscale scoped trust credentials](https://tailscale.com/docs/reference/trust-credentials)
 - [Tailscale OAuth clients](https://tailscale.com/docs/features/oauth-clients)
-- [Runpod Find a Pod by ID REST API](https://docs.runpod.io/api-reference/pods/GET/pods/podId)
+- [Runpod API v2 overview](https://docs.runpod.io/api-reference-v2/overview)
+- [Runpod list Pods API v2](https://docs.runpod.io/api-reference-v2/pods/list-pods)
+- [Runpod API v1 migration](https://docs.runpod.io/api-reference-v2/migrate-from-v1)
 - [Runpod API key permissions](https://docs.runpod.io/get-started/credentials)
 
 <!-- 中文翻译 -->
@@ -78,7 +83,9 @@ Official references:
 当前可执行适配器覆盖 Azure 托管身份读取 VM Instance View、Google Compute Engine
 GCE/GKE Workload Identity 元数据凭据或绑定配置的服务账号 JSON 环境引用、Hugging Face 模型/数据集/Spaces 元数据，
 以及使用限权 OAuth 客户端读取 Tailscale 设备元数据，并通过 REST
-`GET /v1/pods/{podId}` 读取一个 Runpod Pod。Tailscale 请求只申请
+`GET /v2/pods/{podId}` 读取一个 Runpod Pod。Runpod API v1 已弃用并计划于 2026 年 11 月 15 日退役；此
+provider 使用 v2 base URL 和响应格式。Runpod API key 的官方文档未提供过期时间字段，因此健康状态会将
+过期时间标为未知，不承诺静态 key 始终有效。Tailscale 请求只申请
 `devices:core:read`，且只调用固定设备读取 Endpoint。Runpod 激活要求主机注入 Read Only
 API key，并使用文档中的 Bearer header，不使用 GraphQL 查询字符串凭据方式。Runpod 文档将
 `desiredStatus` 定义为预期状态；本观察保留 `status=UNKNOWN` 和这一项有界源事实。

@@ -6,11 +6,13 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import hmac
 import json
 import re
 from collections.abc import Mapping
+from datetime import datetime
 from typing import Any
 
 from cyrene_account_center_contracts import payload_sha256
@@ -28,7 +30,7 @@ from .account_center import (
     AccountCenterUnavailable,
     require_credential,
 )
-from .github_api import GitHubApi, GitHubApiFailure
+from .github_api import TASK_BRANCH_PREFIX, GitHubApi, GitHubApiFailure
 from .settings import ConfigurationError, ProviderSettings
 from .trust import (
     TrustedContextError,
@@ -44,7 +46,7 @@ from .vendor_cli import (
 CAPABILITY_ID = "tool.provider.v1"
 INTERFACE_VERSION = "1"
 PLUGIN_ID = "cyrene.providers.github-issues"
-PLUGIN_VERSION = "0.1.0"
+PLUGIN_VERSION = "0.2.0"
 LIST_TOOLS_METHOD = "list_tools"
 CALL_TOOL_METHOD = "call_tool"
 WEBHOOK_METHOD = "normalize_webhook"
@@ -199,6 +201,245 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
                 "commit_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{7,64}$"},
             },
             "required": ["repository_id", "repository", "commit_sha"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.issues.search",
+        "display_name": "Search GitHub Issues",
+        "description": "Search a bounded set of issues in one configured repository.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "query": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 128,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9 _.-]{0,127}$",
+                },
+                "state": {"type": "string", "enum": ["OPEN", "CLOSED", "ALL"]},
+                "labels": {
+                    "type": "array",
+                    "maxItems": 10,
+                    "uniqueItems": True,
+                    "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 50,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9 _.-]{0,49}$",
+                    },
+                },
+                "updated_since": {
+                    "type": "string",
+                    "pattern": r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)$",
+                },
+                "updated_until": {
+                    "type": "string",
+                    "pattern": r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)$",
+                },
+                "page_cursor": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]{0,3}$",
+                },
+                "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+            },
+            "required": ["repository_id", "repository", "state", "limit"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.branch.get",
+        "display_name": "Get GitHub Branch",
+        "description": "Read whether one exact branch exists and its current head SHA.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "branch": {"type": "string", "maxLength": 255},
+            },
+            "required": ["repository_id", "repository", "branch"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.file.get",
+        "display_name": "Get GitHub Branch File",
+        "description": "Read file SHA, size, and a bounded text excerpt from one branch.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "branch": {"type": "string", "maxLength": 255},
+                "path": {"type": "string", "minLength": 1, "maxLength": 512},
+            },
+            "required": ["repository_id", "repository", "branch", "path"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.actions.jobs.list",
+        "display_name": "List GitHub Actions Jobs",
+        "description": "Read at most 100 jobs from one workflow run in a configured repository.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "run_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+            },
+            "required": ["repository_id", "repository", "run_id", "limit"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.actions.job.logs.read",
+        "display_name": "Read GitHub Actions Job Log Excerpt",
+        "description": "Read a bounded excerpt from a job belonging to the specified run.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "run_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "job_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "max_lines": {"type": "integer", "minimum": 1, "maximum": 200},
+            },
+            "required": ["repository_id", "repository", "run_id", "job_id", "max_lines"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.branch.create",
+        "display_name": "Create GitHub Task Branch",
+        "description": (
+            "Create a branch under cyrene/assistant/<task> from an exact repository commit."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "branch": {"type": "string", "maxLength": 255},
+                "from_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+            },
+            "required": ["repository_id", "repository", "branch", "from_sha"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.branch.delete",
+        "display_name": "Delete GitHub Task Branch",
+        "description": (
+            "Delete a cyrene/assistant/<task> branch only when its head matches the expected SHA "
+            "and no open pull request uses it."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "branch": {"type": "string", "maxLength": 255},
+                "expected_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+            },
+            "required": ["repository_id", "repository", "branch", "expected_sha"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.file.commit",
+        "display_name": "Commit a File to a GitHub Task Branch",
+        "description": (
+            "Create a bounded file or update it with an expected blob SHA under "
+            "cyrene/assistant/<task>. "
+            "Workflow, deployment, and production configuration paths are denied."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "branch": {"type": "string", "maxLength": 255},
+                "path": {"type": "string", "minLength": 1, "maxLength": 512},
+                "message": {"type": "string", "minLength": 1, "maxLength": 200},
+                "content_base64": {"type": "string", "maxLength": 666668},
+                "expected_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+            },
+            "required": [
+                "repository_id",
+                "repository",
+                "branch",
+                "path",
+                "message",
+                "content_base64",
+            ],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.pull_request.draft.create",
+        "display_name": "Create GitHub Draft Pull Request",
+        "description": (
+            "Create and read back a draft pull request from a cyrene/assistant/<task> branch."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "head_branch": {"type": "string", "maxLength": 255},
+                "base_branch": {"type": "string", "maxLength": 255},
+                "title": {"type": "string", "minLength": 1, "maxLength": 256},
+                "body": {"type": "string", "maxLength": 65536},
+            },
+            "required": [
+                "repository_id",
+                "repository",
+                "head_branch",
+                "base_branch",
+                "title",
+                "body",
+            ],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.pull_request.draft.find",
+        "display_name": "Find GitHub Draft Pull Requests",
+        "description": "Read all PRs for an exact head and base branch pair to reconcile a create.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "head_branch": {"type": "string", "maxLength": 255},
+                "base_branch": {"type": "string", "maxLength": 255},
+            },
+            "required": ["repository_id", "repository", "head_branch", "base_branch"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.actions.rerun_failed",
+        "display_name": "Rerun Failed GitHub Actions Jobs",
+        "description": (
+            "Rerun failed jobs only for an exact failed cyrene/assistant/<task> CI attempt "
+            "and verify "
+            "the new state."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "run_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "expected_workflow_id": {"type": "string", "pattern": "^[1-9][0-9]{0,19}$"},
+                "expected_head_branch": {"type": "string", "maxLength": 255},
+                "expected_head_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+                "expected_attempt": {"type": "integer", "minimum": 1, "maximum": 2147483647},
+            },
+            "required": [
+                "repository_id",
+                "repository",
+                "run_id",
+                "expected_workflow_id",
+                "expected_head_branch",
+                "expected_head_sha",
+                "expected_attempt",
+            ],
             "additionalProperties": False,
         },
     },
@@ -441,6 +682,17 @@ class GitHubIssuesProvider:
                 result = api.get_repository(repository, credential.access_token)
             elif tool_id == "github.branches.list" and repository is not None:
                 result = api.list_branches(repository, credential.access_token)
+            elif tool_id == "github.branch.get" and repository is not None:
+                result = api.get_branch(
+                    repository, str(arguments["branch"]), credential.access_token
+                )
+            elif tool_id == "github.file.get" and repository is not None:
+                result = api.get_file(
+                    repository,
+                    str(arguments["branch"]),
+                    str(arguments["path"]),
+                    credential.access_token,
+                )
             elif tool_id == "github.pull_requests.list" and repository is not None:
                 result = api.list_pull_requests(
                     repository, str(arguments["state"]), credential.access_token
@@ -457,6 +709,87 @@ class GitHubIssuesProvider:
                     commit_sha=(
                         str(arguments["commit_sha"]) if "commit_sha" in arguments else None
                     ),
+                )
+            elif tool_id == "github.issues.search" and repository is not None:
+                result = api.search_issues(
+                    repository,
+                    str(arguments["query"]) if "query" in arguments else "",
+                    str(arguments["state"]),
+                    [str(label) for label in arguments.get("labels", [])],
+                    int(arguments["limit"]),
+                    credential.access_token,
+                    updated_since=(
+                        str(arguments["updated_since"]) if "updated_since" in arguments else None
+                    ),
+                    updated_until=(
+                        str(arguments["updated_until"]) if "updated_until" in arguments else None
+                    ),
+                    page_cursor=str(arguments.get("page_cursor", "1")),
+                )
+            elif tool_id == "github.actions.jobs.list" and repository is not None:
+                result = api.list_workflow_jobs(
+                    repository,
+                    str(arguments["run_id"]),
+                    int(arguments["limit"]),
+                    credential.access_token,
+                )
+            elif tool_id == "github.actions.job.logs.read" and repository is not None:
+                result = api.read_job_log_excerpt(
+                    repository,
+                    str(arguments["run_id"]),
+                    str(arguments["job_id"]),
+                    int(arguments["max_lines"]),
+                    credential.access_token,
+                )
+            elif tool_id == "github.branch.create" and repository is not None:
+                result = api.create_branch(
+                    repository,
+                    str(arguments["branch"]),
+                    str(arguments["from_sha"]),
+                    credential.access_token,
+                )
+            elif tool_id == "github.branch.delete" and repository is not None:
+                result = api.delete_branch(
+                    repository,
+                    str(arguments["branch"]),
+                    str(arguments["expected_sha"]),
+                    credential.access_token,
+                )
+            elif tool_id == "github.file.commit" and repository is not None:
+                result = api.commit_file(
+                    repository,
+                    str(arguments["branch"]),
+                    str(arguments["path"]),
+                    str(arguments["message"]),
+                    str(arguments["content_base64"]),
+                    str(arguments["expected_sha"]) if "expected_sha" in arguments else None,
+                    credential.access_token,
+                )
+            elif tool_id == "github.pull_request.draft.create" and repository is not None:
+                result = api.create_draft_pull_request(
+                    repository,
+                    str(arguments["head_branch"]),
+                    str(arguments["base_branch"]),
+                    str(arguments["title"]),
+                    str(arguments["body"]),
+                    credential.access_token,
+                )
+            elif tool_id == "github.pull_request.draft.find" and repository is not None:
+                result = api.find_draft_pull_request(
+                    repository,
+                    str(arguments["head_branch"]),
+                    str(arguments["base_branch"]),
+                    credential.access_token,
+                )
+            elif tool_id == "github.actions.rerun_failed" and repository is not None:
+                result = api.rerun_failed_jobs(
+                    repository,
+                    str(arguments["run_id"]),
+                    str(arguments["expected_workflow_id"]),
+                    str(arguments["expected_head_branch"]),
+                    str(arguments["expected_head_sha"]),
+                    int(arguments["expected_attempt"]),
+                    credential.access_token,
                 )
             elif tool_id == "github.ci.status" and repository is not None:
                 result = api.get_ci_status(
@@ -712,7 +1045,7 @@ def _valid_arguments(
     """Enforce the static input contract before hashing or provider access."""
 
     schema = _TOOL_BY_ID[tool_id]["input_schema"]
-    required = set(schema["required"])
+    required = set(schema.get("required", []))
     allowed = set(schema["properties"])
     supplied = set(arguments)
     if not required.issubset(supplied) or supplied - allowed:
@@ -744,6 +1077,72 @@ def _valid_arguments(
         r"[A-Za-z0-9_.-]{1,100}/[A-Za-z0-9_.-]{1,100}", arguments["repository"]
     ):
         return False
+    if tool_id == "github.issues.search":
+        query = arguments.get("query")
+        labels = arguments.get("labels", [])
+        limit = arguments.get("limit")
+        page_cursor = arguments.get("page_cursor", "1")
+        updated_since = arguments.get("updated_since")
+        updated_until = arguments.get("updated_until")
+        return (
+            ("query" not in arguments or (
+                isinstance(query, str)
+                and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _.-]{0,127}", query) is not None
+            ))
+            and isinstance(arguments.get("state"), str)
+            and arguments.get("state") in {"OPEN", "CLOSED", "ALL"}
+            and isinstance(labels, list)
+            and len(labels) <= 10
+            and all(
+                isinstance(label, str)
+                and re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 _.-]{0,49}", label) is not None
+                for label in labels
+            )
+            and len(set(labels)) == len(labels)
+            and (
+                "updated_since" not in arguments
+                or (
+                    isinstance(updated_since, str)
+                    and _valid_updated_since(updated_since)
+                )
+            )
+            and (
+                "updated_until" not in arguments
+                or (
+                    isinstance(updated_until, str)
+                    and _valid_updated_since(updated_until)
+                )
+            )
+            and (
+                updated_since is None
+                or updated_until is None
+                or _updated_timestamp(updated_since) <= _updated_timestamp(updated_until)
+            )
+            and isinstance(page_cursor, str)
+            and re.fullmatch(r"[1-9][0-9]{0,3}", page_cursor) is not None
+            and _bounded_int(limit, 1, 50)
+            and int(page_cursor) <= (1000 + limit - 1) // limit
+        )
+    if tool_id in {
+        "github.actions.jobs.list",
+        "github.actions.job.logs.read",
+        "github.actions.rerun_failed",
+    }:
+        if not _provider_id(arguments.get("run_id")):
+            return False
+        if tool_id == "github.actions.jobs.list":
+            return _bounded_int(arguments.get("limit"), 1, 100)
+        if tool_id == "github.actions.rerun_failed":
+            attempt = arguments.get("expected_attempt")
+            return (
+                _provider_id(arguments.get("expected_workflow_id"))
+                and _valid_task_branch(arguments.get("expected_head_branch"))
+                and _full_sha(arguments.get("expected_head_sha"))
+                and _bounded_int(attempt, 1, 2_147_483_647)
+            )
+        return _provider_id(arguments.get("job_id")) and _bounded_int(
+            arguments.get("max_lines"), 1, 200
+        )
     for number_field in ("issue_number", "pull_number"):
         number = arguments.get(number_field)
         if number_field in arguments and (
@@ -754,14 +1153,61 @@ def _valid_arguments(
         body = arguments.get("body")
         return isinstance(body, str) and 1 <= len(body) <= 65_536
     if tool_id == "github.issue.state.update":
-        return arguments.get("state") in {"OPEN", "CLOSED"}
+        state = arguments.get("state")
+        return isinstance(state, str) and state in {"OPEN", "CLOSED"}
     if tool_id == "github.pull_requests.list":
-        return arguments.get("state") in {"OPEN", "CLOSED", "ALL"}
-    if "branch" in arguments and (
-        not isinstance(arguments["branch"], str)
-        or not re.fullmatch(r"[A-Za-z0-9._/-]{1,255}", arguments["branch"])
-        or ".." in arguments["branch"].split("/")
-    ):
+        state = arguments.get("state")
+        return isinstance(state, str) and state in {"OPEN", "CLOSED", "ALL"}
+    if tool_id == "github.branch.get":
+        return _valid_branch_name(arguments.get("branch"))
+    if tool_id == "github.branch.create":
+        return _valid_task_branch(arguments.get("branch")) and _full_sha(
+            arguments.get("from_sha")
+        )
+    if tool_id == "github.branch.delete":
+        return _valid_task_branch(arguments.get("branch")) and _full_sha(
+            arguments.get("expected_sha")
+        )
+    if tool_id == "github.file.get":
+        return _valid_branch_name(arguments.get("branch")) and _valid_file_path(
+            arguments.get("path")
+        )
+    if tool_id == "github.file.commit":
+        content = arguments.get("content_base64")
+        if (
+            not _valid_task_branch(arguments.get("branch"))
+            or not _valid_file_path(arguments.get("path"))
+            or not isinstance(arguments.get("message"), str)
+            or not 1 <= len(arguments["message"]) <= 200
+            or not isinstance(content, str)
+            or len(content) > 666_668
+        ):
+            return False
+        if "expected_sha" in arguments and not _full_sha(arguments.get("expected_sha")):
+            return False
+        try:
+            decoded = base64.b64decode(content, validate=True)
+        except (ValueError, binascii.Error):
+            return False
+        return len(decoded) <= 500_000 and base64.b64encode(decoded).decode("ascii") == content
+    if tool_id in {"github.pull_request.draft.create", "github.pull_request.draft.find"}:
+        head_branch = arguments.get("head_branch")
+        base_branch = arguments.get("base_branch")
+        if (
+            not _valid_task_branch(head_branch)
+            or not _valid_branch_name(base_branch)
+            or head_branch == base_branch
+        ):
+            return False
+        if tool_id == "github.pull_request.draft.find":
+            return True
+        return (
+            isinstance(arguments.get("title"), str)
+            and 1 <= len(arguments["title"]) <= 256
+            and isinstance(arguments.get("body"), str)
+            and len(arguments["body"]) <= 65_536
+        )
+    if "branch" in arguments and not _valid_branch_name(arguments["branch"]):
         return False
     return not (
         "commit_sha" in arguments
@@ -769,6 +1215,131 @@ def _valid_arguments(
             not isinstance(arguments["commit_sha"], str)
             or not re.fullmatch(r"[0-9a-fA-F]{7,64}", arguments["commit_sha"])
         )
+    )
+
+
+def _bounded_int(value: Any, minimum: int, maximum: int) -> bool:
+    """Check an integer boundary without accepting JSON booleans."""
+
+    return isinstance(value, int) and not isinstance(value, bool) and minimum <= value <= maximum
+
+
+def _provider_id(value: Any) -> bool:
+    """Validate a numeric GitHub identifier kept as text for precision."""
+
+    return isinstance(value, str) and re.fullmatch(r"[1-9][0-9]{0,19}", value) is not None
+
+
+def _full_sha(value: Any) -> bool:
+    """Validate the full Git object identifier required for writes."""
+
+    return isinstance(value, str) and re.fullmatch(r"[0-9a-fA-F]{40}", value) is not None
+
+
+def _valid_updated_since(value: str) -> bool:
+    """Validate a real UTC RFC3339 timestamp before placing it in a search query."""
+
+    if re.fullmatch(
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?(?:Z|\+00:00)",
+        value,
+    ) is None:
+        return False
+    try:
+        normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+        datetime.fromisoformat(normalized)
+    except ValueError:
+        return False
+    return True
+
+
+def _updated_timestamp(value: str) -> datetime:
+    """Parse a validated UTC timestamp for window ordering checks."""
+
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    return datetime.fromisoformat(normalized)
+
+
+def _valid_branch_name(value: Any) -> bool:
+    """Validate branch syntax before lease redemption or URL construction."""
+
+    return not (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 255
+        or not re.fullmatch(r"[A-Za-z0-9._/-]+", value)
+        or value.startswith("/")
+        or value.endswith(("/", "."))
+        or "//" in value
+        or "@{" in value
+        or any(
+            part in {"", ".", ".."} or part.startswith(".") or part.endswith(".lock")
+            for part in value.split("/")
+        )
+    )
+
+
+def _valid_task_branch(value: Any) -> bool:
+    """Require the reserved Cyrene assistant task-branch namespace."""
+
+    if not _valid_branch_name(value):
+        return False
+    return value.casefold().startswith(TASK_BRANCH_PREFIX)
+
+
+def _valid_file_path(value: Any) -> bool:
+    """Reject hidden, deployment, workflow, and production control paths."""
+
+    if (
+        not isinstance(value, str)
+        or not 1 <= len(value) <= 512
+        or not re.fullmatch(r"[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*", value)
+    ):
+        return False
+    parts = value.split("/")
+    lowered = [part.casefold() for part in parts]
+    protected_dirs = {
+        ".github",
+        ".git",
+        ".gitlab",
+        ".circleci",
+        ".azure",
+        "deploy",
+        "deployment",
+        "infra",
+        "infrastructure",
+        "terraform",
+        "helm",
+        "k8s",
+        "kubernetes",
+        "production",
+        "prod",
+        "permissions",
+    }
+    protected_files = {
+        "codeowners",
+        "azure-pipelines.yml",
+        "azure-pipelines.yaml",
+        "bitbucket-pipelines.yml",
+        "bitbucket-pipelines.yaml",
+        "buildkite.yml",
+        "buildkite.yaml",
+        "docker-compose.yml",
+        "docker-compose.yaml",
+        "compose.yml",
+        "compose.yaml",
+        "jenkinsfile",
+        ".gitmodules",
+    }
+    sensitive_name = re.compile(
+        r"(?:^|[._-])(?:prod|production|staging|release|publish|deploy|deployment|"
+        r"infra|infrastructure|terraform|helm|k8s|kubernetes|permissions|authorization|"
+        r"access-control)(?:[._-]|$)"
+    )
+    return not (
+        any(part in {"", ".", ".."} or part.startswith(".") for part in parts)
+        or any(part in protected_dirs for part in lowered)
+        or lowered[-1] in protected_files
+        or lowered[-1].startswith("dockerfile")
+        or any(sensitive_name.search(part) for part in lowered)
     )
 
 
@@ -798,6 +1369,26 @@ def _github_target(
             target["commit_sha"] = str(arguments["commit_sha"])
     if tool_id == "github.ci.status":
         target["commit_sha"] = str(arguments["commit_sha"])
+    if tool_id in {
+        "github.branch.get",
+        "github.branch.create",
+        "github.branch.delete",
+    }:
+        target["branch"] = str(arguments["branch"])
+    if tool_id in {"github.file.get", "github.file.commit"}:
+        target["branch"] = str(arguments["branch"])
+        target["path"] = str(arguments["path"])
+    if tool_id in {"github.pull_request.draft.find", "github.pull_request.draft.create"}:
+        target["head_branch"] = str(arguments["head_branch"])
+        target["base_branch"] = str(arguments["base_branch"])
+    if tool_id in {
+        "github.actions.jobs.list",
+        "github.actions.job.logs.read",
+        "github.actions.rerun_failed",
+    }:
+        target["run_id"] = str(arguments["run_id"])
+    if tool_id == "github.actions.job.logs.read":
+        target["job_id"] = str(arguments["job_id"])
     return target
 
 

@@ -281,7 +281,10 @@ class Harness:
                 "workspace_id": None,
             },
         )
-        assert self.github.exchange_requests[-1]["code_verifier"].encode() not in verifier_blob
+        assert (
+            self.github.exchange_requests[-1]["code_verifier"].encode()
+            not in verifier_blob
+        )
         return completed["account_ref"]
 
 
@@ -566,20 +569,21 @@ def test_wecom_challenge_requires_trusted_source_and_primary_confirmation(
             "workspace_id": None,
         },
     )
-    assert (
-        harness.call(
-            "observe_wecom_challenge",
-            observed,
-            caller=WECOM,
-            actor={
-                "issuer": "service://wecom",
-                "subject": "connector",
-                "organization_id": "org-a",
-                "workspace_id": None,
-            },
-        )
-        == {"accepted": True, "challenge_id": challenge_id, "expires_at": harness.now + 90}
-    )
+    assert harness.call(
+        "observe_wecom_challenge",
+        observed,
+        caller=WECOM,
+        actor={
+            "issuer": "service://wecom",
+            "subject": "connector",
+            "organization_id": "org-a",
+            "workspace_id": None,
+        },
+    ) == {
+        "accepted": True,
+        "challenge_id": challenge_id,
+        "expires_at": harness.now + 90,
+    }
     with pytest.raises(AccountCenterError, match="challenge_rejected"):
         harness.call(
             "observe_wecom_challenge",
@@ -730,7 +734,12 @@ def test_wecom_authority_and_bot_namespace_are_stored_as_distinct_identity_parts
     sender = "same-wecom-user"
     cases = (
         (WECOM, "wecom:tenant:9", "bot/main", "00000000-0000-4000-8000-000000000411"),
-        (WECOM_SECOND, "wecom:tenant:9/bot", "main", "00000000-0000-4000-8000-000000000412"),
+        (
+            WECOM_SECOND,
+            "wecom:tenant:9/bot",
+            "main",
+            "00000000-0000-4000-8000-000000000412",
+        ),
     )
     linked_refs: list[str] = []
     for caller, authority, bot, challenge_id in cases:
@@ -784,18 +793,12 @@ def test_wecom_authority_and_bot_namespace_are_stored_as_distinct_identity_parts
     assert first["account_ref"] == linked_refs[0]
     assert second["account_ref"] == linked_refs[1]
     listed = harness.call("list_links", {})["links"]
-    assert {
-        (item["source_authority"], item["bot_namespace"])
-        for item in listed
-    } == {
+    assert {(item["source_authority"], item["bot_namespace"]) for item in listed} == {
         ("wecom:tenant:9", "bot/main"),
         ("wecom:tenant:9/bot", "main"),
     }
     listed = harness.call("list_links", {})["links"]
-    assert {
-        (item["source_authority"], item["bot_namespace"])
-        for item in listed
-    } == {
+    assert {(item["source_authority"], item["bot_namespace"]) for item in listed} == {
         ("wecom:tenant:9", "bot/main"),
         ("wecom:tenant:9/bot", "main"),
     }
@@ -908,9 +911,13 @@ def test_unlink_with_unreadable_ciphertext_still_clears_local_access(
     assert account["credential_blob"] is None
     assert account["remote_revocation_status"] == "unknown"
     with harness.plugin._store._connect() as db:
-        assert db.execute(
-            "SELECT count(*) FROM credential_leases WHERE account_ref=?", (account_ref,)
-        ).fetchone()[0] == 0
+        assert (
+            db.execute(
+                "SELECT count(*) FROM credential_leases WHERE account_ref=?",
+                (account_ref,),
+            ).fetchone()[0]
+            == 0
+        )
     request = {
         key: lease[key]
         for key in ("lease_ref", "operation_id", "resource", "arguments_sha256")
@@ -961,9 +968,7 @@ def test_interrupted_callback_recovery_revokes_encrypted_pending_token(
         now=harness.now,
     )
     credential = OAuthCredential(TOKEN, "refresh_private_token", 20_000, 30_000)
-    harness.plugin._persist_callback_credential(
-        started["link_session_ref"], credential
-    )
+    harness.plugin._persist_callback_credential(started["link_session_ref"], credential)
 
     harness.plugin = harness.make_plugin()
 
@@ -1025,7 +1030,9 @@ def test_concurrent_expired_leases_rotate_github_refresh_token_once(
     assert {item["access_token"] for item in results} == {"ghu_refreshed_token"}
 
 
-def test_interrupted_refresh_claim_requires_relink_after_restart(tmp_path: Path) -> None:
+def test_interrupted_refresh_claim_requires_relink_after_restart(
+    tmp_path: Path,
+) -> None:
     harness = Harness(tmp_path / "accounts.sqlite", now=20_000)
     account_ref = harness.link_github()
     lease = harness.call(
@@ -1034,7 +1041,10 @@ def test_interrupted_refresh_claim_requires_relink_after_restart(tmp_path: Path)
         request_id="00000000-0000-4000-8000-000000000711",
     )
     harness.plugin._store.claim_refresh(
-        account_ref, ACTOR_ANCHOR(), "00000000-0000-4000-8000-000000000712", now=harness.now
+        account_ref,
+        ACTOR_ANCHOR(),
+        "00000000-0000-4000-8000-000000000712",
+        now=harness.now,
     )
 
     harness.plugin = harness.make_plugin()
@@ -1044,7 +1054,10 @@ def test_interrupted_refresh_claim_requires_relink_after_restart(tmp_path: Path)
     with pytest.raises(AccountCenterError, match="lease_rejected"):
         harness.call(
             "redeem_credential_lease",
-            {key: lease[key] for key in ("lease_ref", "operation_id", "resource", "arguments_sha256")},
+            {
+                key: lease[key]
+                for key in ("lease_ref", "operation_id", "resource", "arguments_sha256")
+            },
             caller=PROVIDER,
             request_id="00000000-0000-4000-8000-000000000713",
         )
@@ -1184,7 +1197,7 @@ def test_schema_v1_migration_preserves_legacy_data_and_fails_closed_on_wecom_tup
     store = AccountStore(db_path)
 
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
     links = store.list_accounts(ACTOR_ANCHOR(), ACTOR["workspace_id"])
     assert links[0]["source_authority"] == "wecom:tenant:9/bot/main"
     assert links[0]["status"] == "reauthorization_required"
@@ -1225,16 +1238,14 @@ def test_fresh_schema_ddl_rolls_back_as_one_transaction(
     with original_connect(db_path) as db:
         tables = {
             row[0]
-            for row in db.execute(
-                "SELECT name FROM sqlite_master WHERE type='table'"
-            )
+            for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
         assert "accounts" not in tables
         assert db.execute("PRAGMA user_version").fetchone()[0] == 0
 
     store = AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 7
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
 
 
 def test_direct_runtime_rejects_duplicate_json_keys_and_wrong_type_url(
@@ -1294,10 +1305,12 @@ def test_no_argument_entrypoint_uses_standard_configuration_over_real_grpc(
         },
     }
     for index, env_name in enumerate(secret_refs.values()):
-        value = "test-github-app-secret" if "GITHUB_APP" in env_name else bytes([index + 1]) * 32
-        monkeypatch.setenv(
-            env_name, value if isinstance(value, str) else value.hex()
+        value = (
+            "test-github-app-secret"
+            if "GITHUB_APP" in env_name
+            else bytes([index + 1]) * 32
         )
+        monkeypatch.setenv(env_name, value if isinstance(value, str) else value.hex())
 
     method_callers = {
         method: [EXCHANGE]
@@ -1343,9 +1356,7 @@ def test_no_argument_entrypoint_uses_standard_configuration_over_real_grpc(
         "CYRENE_CAPABILITY_CONFIGURATION_JSON", json.dumps(configuration)
     )
     plugin = load_entrypoint("account_center.plugin:AccountCenterPlugin")
-    server, connection_ref = serve(
-        plugin, "account.center.v1", "1", "127.0.0.1:0"
-    )
+    server, connection_ref = serve(plugin, "account.center.v1", "1", "127.0.0.1:0")
     client = DirectPluginClient.for_local_connection_ref(connection_ref)
     try:
         assert plugin._store.path == tmp_path / "accounts.sqlite3"
@@ -1362,9 +1373,7 @@ def test_no_argument_entrypoint_uses_standard_configuration_over_real_grpc(
             binding_id="account-center-binding",
             request_id="00000000-0000-4000-8000-000000000901",
             operation_id="begin_link",
-            key=bytes.fromhex(
-                os.environ[secret_refs[caller_refs[EXCHANGE]]]
-            ),
+            key=bytes.fromhex(os.environ[secret_refs[caller_refs[EXCHANGE]]]),
             issued_at=issued_at,
             expires_at=issued_at + 120,
         )
@@ -1409,7 +1418,10 @@ def test_no_argument_entrypoint_uses_standard_configuration_over_real_grpc(
                 request=DirectPayload(
                     type_url=REQUEST_TYPE_PREFIX + "ListLinksRequest",
                     value=canonical_json(
-                        {"payload": {}, "trusted_context": wrong_binding_context.as_dict()}
+                        {
+                            "payload": {},
+                            "trusted_context": wrong_binding_context.as_dict(),
+                        }
                     ),
                 ),
                 deadline_seconds=5,

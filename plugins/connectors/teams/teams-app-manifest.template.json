@@ -18,10 +18,11 @@
     "full": "Cyrene Teams Assistant"
   },
   "description": {
-    "short": "Talk to Cyrene in an approved team channel.",
-    "full": "Cyrene receives messages only in teams where this app is installed and consented. Channel replies in an active Cyrene thread continue without another mention."
+    "short": "Talk to Cyrene in an approved channel or personal chat.",
+    "full": "Cyrene receives channel messages only in teams where this app is installed and consented. One-person bot chat is available only after the app is installed for the user and the host approves that personal binding."
   },
   "accentColor": "#2563EB",
+  "supportsChannelFeatures": "tier1",
   "webApplicationInfo": {
     "id": "<BOT_APP_CLIENT_ID>",
     "resource": "https://RscBasedStoreApp"
@@ -40,6 +41,7 @@
     {
       "botId": "<BOT_APP_CLIENT_ID>",
       "scopes": [
+        "personal",
         "team"
       ],
       "supportsFiles": false,

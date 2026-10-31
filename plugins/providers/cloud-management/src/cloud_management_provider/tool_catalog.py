@@ -216,6 +216,18 @@ _OPERATION_ARGUMENTS = {
 
 TOOL_BY_ID = {str(tool["provider_tool_id"]): tool for tool in CANONICAL_TOOLS}
 TOOL_OPERATIONS = {tool_id: str(tool["operation_id"]) for tool_id, tool in TOOL_BY_ID.items()}
+READ_ONLY_TOOL_IDS = frozenset(
+    {
+        "cloud_provider_health",
+        "cloud_resources_list",
+        "cloud_resource_get",
+        "cloud_operation_status",
+        "cloud_operation_logs",
+    }
+)
+
+if not READ_ONLY_TOOL_IDS.issubset(TOOL_BY_ID):
+    raise RuntimeError("read-only tool allowlist contains an unknown provider tool")
 
 for _tool_id, _operation_id in TOOL_OPERATIONS.items():
     if CONTRACT_TOOL_OPERATIONS.get(_tool_id) != _operation_id:

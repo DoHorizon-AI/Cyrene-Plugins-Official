@@ -11,10 +11,15 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from teams_connector.activity import ActivityRejected, normalize_activity
+from teams_connector.activity import (
+    ActivityRejected,
+    normalize_activity,
+    normalize_personal_installation,
+)
 
 BOT_APP_ID = "11111111-1111-4111-8111-111111111111"
 TENANT_ID = "22222222-2222-4222-8222-222222222222"
@@ -105,6 +110,332 @@ def test_initial_mention_creates_stable_channel_envelope():
     assert event.payload["content"][1] == {"text": {"text": "inspect this"}}
 
 
+def test_two_actors_in_one_channel_thread_keep_distinct_authenticated_identity():
+    """Keep actor identity separate when the shared route and thread are equal.
+
+    中文：共享频道路由与根线程相同时，仍保留各自的已验证 actor 身份。
+    """
+
+    second_actor = "44444444-4444-4444-8444-444444444444"
+    first = _normalize(_activity())
+    second = _normalize(
+        _activity(
+            **{
+                "from": {"id": "29:another-actor", "aadObjectId": second_actor},
+                "id": "1749000000001",
+                "replyToId": "1749000000000",
+                "text": "another participant",
+                "entities": [],
+            }
+        )
+    )
+
+    assert first.trust["root_thread_id"] == second.trust["root_thread_id"]
+    assert first.payload["conversation"] == second.payload["conversation"]
+    assert first.trust["actor_aad_object_id"] == ACTOR_ID
+    assert second.trust["actor_aad_object_id"] == second_actor
+    assert first.payload["sender_id"] != second.payload["sender_id"]
+
+
+def _personal_activity(
+    *, actor_aad_id=ACTOR_ID, activity_id="personal-message-1", **overrides
+):
+    """Return one fabricated authenticated one-person bot activity.
+
+    中文：返回一条伪造的个人 bot activity。
+    """
+
+    value = {
+        "type": "message",
+        "id": activity_id,
+        "from": {"id": "29:actor", "aadObjectId": actor_aad_id},
+        "recipient": {"id": "28:cyrene-bot", "type": "bot"},
+        "conversation": {
+            "id": "a:personal-conversation-opaque",
+            "tenantId": TENANT_ID,
+            "conversationType": "personal",
+        },
+        "serviceUrl": SERVICE_URL,
+        "channelData": {"tenant": {"id": TENANT_ID}},
+        "text": "private question",
+        "entities": [],
+        "attachments": [],
+    }
+    value.update(overrides)
+    return value
+
+
+def test_personal_message_is_opt_in_and_keeps_private_route_in_trust():
+    """Keep direct messages disabled by default and isolate enabled private scope.
+
+    中文：个人消息默认关闭；启用后按 private scope 归一化并保留私有路由。
+    """
+
+    with pytest.raises(ActivityRejected, match="personal_chat_disabled"):
+        _normalize(_personal_activity())
+
+    event = normalize_activity(
+        _personal_activity(),
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        allowed_team_ids=frozenset({TEAM_ID}),
+        personal_chat_enabled=True,
+    )
+
+    assert event.payload["conversation"] == {
+        "vendor": "msteams",
+        "account_id": BOT_APP_ID,
+        "conversation_id": "a:personal-conversation-opaque",
+        "kind": "private",
+    }
+    assert event.payload["sender_id"] == ACTOR_ID
+    assert event.payload["content"] == [{"text": {"text": "private question"}}]
+    assert event.trust["conversation_kind"] == "private"
+    assert event.trust["conversation_id"] == "a:personal-conversation-opaque"
+    assert event.trust["actor_aad_object_id"] == ACTOR_ID
+    assert "team_id" not in event.trust
+    assert "channel_id" not in event.trust
+    assert "root_thread_id" not in event.trust
+
+
+@pytest.mark.parametrize(
+    "conversation_id",
+    ["19:personal@thread.v2", "personal-conversation", "a:" + ("x" * 511)],
+)
+def test_personal_message_requires_bounded_a_prefix_conversation_id(conversation_id):
+    """Reject personal routes that Exchange cannot use for direct sends."""
+
+    with pytest.raises(ActivityRejected, match="invalid_personal_conversation_id"):
+        normalize_activity(
+            _personal_activity(
+                conversation={
+                    "id": conversation_id,
+                    "tenantId": TENANT_ID,
+                    "conversationType": "personal",
+                }
+            ),
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            allowed_team_ids=frozenset({TEAM_ID}),
+            personal_chat_enabled=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("overrides", "reason"),
+    [
+        (
+            {"conversation": {"id": "personal", "tenantId": TENANT_ID}},
+            "team_or_channel_not_allowed",
+        ),
+        ({"from": {"id": "29:actor"}}, "missing_stable_actor_id"),
+        (
+            {
+                "channelData": {
+                    "tenant": {"id": TENANT_ID},
+                    "team": {"id": TEAM_ID},
+                    "channel": {"id": CHANNEL_ID},
+                }
+            },
+            "invalid_personal_scope",
+        ),
+    ],
+)
+def test_personal_message_rejects_missing_actor_or_mixed_scope(overrides, reason):
+    """Fail closed when a personal activity lacks stable scope or actor facts.
+
+    中文：个人 activity 缺少稳定 scope 或 actor 身份时 fail closed。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        normalize_activity(
+            _personal_activity(**overrides),
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            allowed_team_ids=frozenset({TEAM_ID}),
+            personal_chat_enabled=True,
+        )
+    assert error.value.reason == reason
+
+
+def _personal_installation(
+    action, *, conversation_type="personal", actor_aad_id=ACTOR_ID, **overrides
+):
+    """Return a fabricated personal install lifecycle activity.
+
+    中文：返回伪造的个人安装生命周期 activity。
+    """
+
+    value = {
+        "type": "installationUpdate",
+        "action": action,
+        "id": f"installation-{action}-1",
+        "timestamp": "2026-10-30T04:00:00Z",
+        "from": {"id": "29:actor", "aadObjectId": actor_aad_id},
+        "conversation": {
+            "id": "a:personal-install-conversation",
+            "tenantId": TENANT_ID,
+            "conversationType": conversation_type,
+        },
+        "serviceUrl": SERVICE_URL,
+        "channelData": {"tenant": {"id": TENANT_ID}},
+    }
+    value.update(overrides)
+    return value
+
+
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_personal_installation_add_and_remove_are_host_only_trust_events(action):
+    """Carry lifecycle action to Work without placing actor or route in payload.
+
+    中文：将安装生命周期传给 Work；actor 与路由只进入 host trust。
+    """
+
+    event = normalize_personal_installation(
+        _personal_installation(action),
+        action=action,
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        personal_chat_enabled=True,
+    ).as_event()
+
+    assert event["event_type"] == "personal_installation"
+    assert event["payload"] == {"action": action}
+    assert event["trust"]["installation_action"] == action
+    assert event["trust"]["actor_aad_object_id"] == ACTOR_ID
+    assert event["trust"]["conversation_id"] == "a:personal-install-conversation"
+    assert event["trust"]["service_url"] == SERVICE_URL
+    assert event["trust"]["activity_occurred_at"] == "2026-10-30T04:00:00.000000Z"
+
+
+@pytest.mark.parametrize("action", ["add", "remove"])
+def test_personal_installation_timestamp_datetime_is_normalized_to_utc(action):
+    """Preserve the provider event time when the SDK exposes a datetime.
+
+    中文：SDK 以 datetime 暴露供应商事件时间时，保留并规范化为 UTC。
+    """
+
+    occurred_at = datetime(
+        2026, 10, 27, 9, 8, 7, 123456, tzinfo=timezone(timedelta(hours=-4))
+    )
+    event = normalize_personal_installation(
+        _personal_installation(action, timestamp=occurred_at),
+        action=action,
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        personal_chat_enabled=True,
+    )
+
+    assert event.trust["activity_occurred_at"] == "2026-10-27T13:08:07.123456Z"
+
+
+@pytest.mark.parametrize(
+    ("timestamp", "expected"),
+    [
+        ("2026-10-27T09:08:07-04:00", "2026-10-27T13:08:07.000000Z"),
+        ("2026-10-27T09:08:07.5+02:30", "2026-10-27T06:38:07.500000Z"),
+    ],
+)
+def test_personal_installation_iso_timestamp_is_normalized_to_utc(timestamp, expected):
+    """Normalize the ISO string emitted by the SDK JSON projection.
+
+    中文：将 SDK JSON 投影输出的 ISO 时间字符串规范化为 UTC。
+    """
+
+    event = normalize_personal_installation(
+        _personal_installation("add", timestamp=timestamp),
+        action="add",
+        bot_app_id=BOT_APP_ID,
+        tenant_id=TENANT_ID,
+        personal_chat_enabled=True,
+    )
+
+    assert event.trust["activity_occurred_at"] == expected
+
+
+@pytest.mark.parametrize(
+    "timestamp",
+    [
+        "2026-10-27T09:08:07",
+        "not-a-timestamp",
+        1_798_000_000,
+        datetime(2026, 10, 27, 9, 8, 7),
+    ],
+)
+def test_personal_installation_rejects_invalid_or_naive_timestamp(timestamp):
+    """Reject supplied event times that cannot establish a stable order.
+
+    中文：拒绝无法用于稳定排序的无效或无时区事件时间。
+    """
+
+    with pytest.raises(ActivityRejected, match="invalid_activity_timestamp"):
+        normalize_personal_installation(
+            _personal_installation("add", timestamp=timestamp),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
+
+
+def test_personal_installation_rejects_missing_timestamp_without_synthesizing_time():
+    """Reject installation events without official time instead of synthesizing one.
+
+    中文：缺少官方 timestamp 时，不从 localTimestamp 或接收时间合成排序字段。
+    """
+
+    with pytest.raises(ActivityRejected, match="missing_activity_timestamp"):
+        normalize_personal_installation(
+            _personal_installation(
+                "add",
+                timestamp=None,
+                localTimestamp="2026-10-27T09:08:07Z",
+            ),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
+
+
+def test_personal_installation_rejects_disabled_or_nonpersonal_install():
+    """Never create an installation binding outside enabled personal scope.
+
+    中文：个人 scope 未启用或安装发生在其他 scope 时不得创建 binding。
+    """
+
+    with pytest.raises(ActivityRejected, match="personal_chat_disabled"):
+        normalize_personal_installation(
+            _personal_installation("add"),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+        )
+    with pytest.raises(ActivityRejected, match="personal_installation_required"):
+        normalize_personal_installation(
+            _personal_installation("add", conversation_type="channel"),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
+    with pytest.raises(ActivityRejected, match="invalid_personal_conversation_id"):
+        normalize_personal_installation(
+            _personal_installation(
+                "add",
+                conversation={
+                    "id": "19:personal@thread.v2",
+                    "tenantId": TENANT_ID,
+                    "conversationType": "personal",
+                },
+            ),
+            action="add",
+            bot_app_id=BOT_APP_ID,
+            tenant_id=TENANT_ID,
+            personal_chat_enabled=True,
+        )
+
+
 def test_reply_without_mention_keeps_root_thread_and_direct_parent():
     """A no-mention reply remains a normal inbound event in the same root thread.
 
@@ -125,6 +456,162 @@ def test_reply_without_mention_keeps_root_thread_and_direct_parent():
     assert event.payload["message_id"] == "1749000000001"
     assert event.payload["reply"] == {"message_id": "1749000000000"}
     assert event.payload["content"] == [{"text": {"text": "continue"}}]
+
+
+def test_conversation_messageid_routes_root_activity_without_reply_to_id():
+    """Use the Teams conversation suffix as the root for the initial post.
+
+    中文：初始帖子没有 replyToId 时，以 Teams conversation 后缀确定根帖子。
+    """
+
+    root_id = "1749000000000"
+    conversation_id = f"{CONVERSATION_ID};messageid={root_id}"
+    event = _normalize(
+        _activity(
+            id=root_id,
+            conversation={"id": conversation_id, "tenantId": TENANT_ID},
+        )
+    )
+
+    assert event.payload["conversation"]["conversation_id"] == conversation_id
+    assert event.payload["message_id"] == root_id
+    assert "reply" not in event.payload
+    assert event.trust["root_thread_id"] == root_id
+
+
+def test_conversation_messageid_routes_unmentioned_child_to_original_root():
+    """Keep child-message deduplication while routing its reply to the root.
+
+    中文：子消息仍用自身 ID 去重，并路由到原根帖子。
+    """
+
+    root_id = "1749000000000"
+    child_id = "1749000000001"
+    conversation_id = f"{CONVERSATION_ID};messageid={root_id}"
+    event = _normalize(
+        _activity(
+            id=child_id,
+            conversation={"id": conversation_id, "tenantId": TENANT_ID},
+            text="continue without mention",
+            entities=[],
+        )
+    )
+
+    assert event.payload["conversation"]["conversation_id"] == conversation_id
+    assert event.payload["message_id"] == child_id
+    assert event.payload["reply"] == {"message_id": root_id}
+    assert event.trust["message_id"] == child_id
+    assert event.trust["root_thread_id"] == event.payload["reply"]["message_id"]
+
+
+def test_direct_reply_parent_is_fallback_when_conversation_has_no_root_suffix():
+    """Retain the validated direct-parent fallback for older activity shapes.
+
+    中文：conversation ID 无根帖后缀时，保留经过验证的直接父消息回退。
+    """
+
+    event = _normalize(
+        _activity(
+            id="1749000000001",
+            replyToId="1749000000000",
+            text="continue",
+            entities=[],
+        )
+    )
+
+    assert event.payload["reply"] == {"message_id": "1749000000000"}
+    assert event.trust["root_thread_id"] == event.payload["reply"]["message_id"]
+
+
+@pytest.mark.parametrize(
+    "root_id",
+    ["", "letters", "0", "0000", "١٢٣"],
+)
+def test_malformed_conversation_root_fails_closed(root_id):
+    """Reject malformed or unbounded root metadata instead of misrouting.
+
+    中文：根帖 metadata 格式错误或超长时直接拒绝，避免错误路由。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                conversation={
+                    "id": f"{CONVERSATION_ID};messageid={root_id}",
+                    "tenantId": TENANT_ID,
+                }
+            )
+        )
+
+    assert error.value.reason == "invalid_thread_identity"
+
+
+def test_oversized_conversation_identity_fails_closed():
+    """Reject an overlong conversation ID before it can define a thread route.
+
+    中文：conversation ID 超出上限时拒绝，不允许其定义线程路由。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                conversation={
+                    "id": f"{CONVERSATION_ID};messageid={'9' * 513}",
+                    "tenantId": TENANT_ID,
+                }
+            )
+        )
+
+    assert error.value.reason == "missing_conversation_identity"
+
+
+@pytest.mark.parametrize(
+    "suffix",
+    [
+        ";messageid",
+        ";messageid=1749000000000;messageid=1749000000000",
+        ";messageid=1749000000000;messageid=1749000000001",
+        ";messageid-extra=1749000000000",
+    ],
+)
+def test_ambiguous_conversation_root_fails_closed(suffix):
+    """Reject missing, duplicate, or malformed root metadata segments.
+
+    中文：根帖 metadata 缺失、重复或格式含糊时直接拒绝。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                conversation={
+                    "id": f"{CONVERSATION_ID}{suffix}",
+                    "tenantId": TENANT_ID,
+                }
+            )
+        )
+
+    assert error.value.reason == "invalid_thread_identity"
+
+
+def test_conflicting_direct_parent_and_conversation_root_fail_closed():
+    """Reject contradictory root sources rather than choosing one silently.
+
+    中文：直接父消息与 conversation 根帖不一致时拒绝，不静默选择其中一方。
+    """
+
+    with pytest.raises(ActivityRejected) as error:
+        _normalize(
+            _activity(
+                id="1749000000002",
+                replyToId="1749000000001",
+                conversation={
+                    "id": f"{CONVERSATION_ID};messageid=1749000000000",
+                    "tenantId": TENANT_ID,
+                },
+            )
+        )
+
+    assert error.value.reason == "invalid_thread_identity"
 
 
 @pytest.mark.parametrize(
