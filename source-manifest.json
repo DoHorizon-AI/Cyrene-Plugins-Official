@@ -7089,7 +7089,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "6e6ba7eada0cca12db41477a5663d77d51648d47e09b3790e92d44c2e5391300",
+      "sha256": "8a834598cef3a1c495b86b0a6901a537ea50c9d306f7d75f55fcfcaa3371229e",
       "size_bytes": 85582
     },
     {
@@ -7173,14 +7173,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/account-center.in",
-      "sha256": "d8c24fa942623d54f69e0c14005a0086e95964d7ecc60f07a10d73211d15b54b",
+      "sha256": "3cfdd300d0edc30d252dbcab88240f3a3369305d30eaf28233072622aa1fccc4",
       "size_bytes": 337
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/azure-devops-observation.in",
-      "sha256": "5bb9d74c760cba21556cee0e6c81b93138a4bbf251af93c72fd379324fd66f93",
+      "sha256": "2b734bebc51f86ed5418df2b0fb1121fd862102b8be6ae08cad8fb2d6f631f93",
       "size_bytes": 334
     },
     {
@@ -7236,14 +7236,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/github-issues.in",
-      "sha256": "7c34911508801f3d660bff0b2cd3f4bb624e58c098a4fe0aef0ef30db512d7d7",
+      "sha256": "d884380ba32b84a2f524e49a21980d38ec2bb43663a50c4a28133f0af8625c06",
       "size_bytes": 316
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/huggingface.in",
-      "sha256": "5314cb9922737945fbcac5d5cc6974c5229fab9b2403b9e580d41b321cc0f267",
+      "sha256": "8b98eb024151bfde2daa03c4ae43d2a31119b9d747bb4afabfa5bda1fdd41378",
       "size_bytes": 337
     },
     {
@@ -7257,7 +7257,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/microsoft-graph.in",
-      "sha256": "7c34911508801f3d660bff0b2cd3f4bb624e58c098a4fe0aef0ef30db512d7d7",
+      "sha256": "d884380ba32b84a2f524e49a21980d38ec2bb43663a50c4a28133f0af8625c06",
       "size_bytes": 316
     },
     {
