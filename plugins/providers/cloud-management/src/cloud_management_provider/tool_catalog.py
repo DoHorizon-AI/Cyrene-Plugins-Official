@@ -39,13 +39,15 @@ _PROFILE_ARGUMENTS = {
 _TARGET = {
     "type": "object",
     "minProperties": 1,
-    "maxProperties": 8,
+    "maxProperties": 10,
     "properties": {
         "scope_ref": {"type": "string", "maxLength": 192},
         "resource_id": {"type": "string", "maxLength": 2048},
         "resource_group": {"type": "string", "maxLength": 90},
         "deployment_name": {"type": "string", "maxLength": 64},
         "instance_name": {"type": "string", "maxLength": 63},
+        "disk_name": {"type": "string", "pattern": "^[a-z]([-a-z0-9]{0,61}[a-z0-9])?$"},
+        "kind": {"type": "string", "enum": ["instance", "disk"]},
         "zone": {"type": "string", "maxLength": 128},
         "pod_id": {"type": "string", "maxLength": 128},
         "pod_name": {"type": "string", "maxLength": 63},

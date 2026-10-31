@@ -8,9 +8,18 @@ native CLI through one bounded `argv[]` process runner.
 Azure profiles use Managed Identity and bind a subscription plus resource-group
 and resource-ID scope. Google Cloud profiles use a host-mounted Workload
 Identity Federation credential configuration and a dedicated service account,
-then bind a project, zones, and instance-name prefixes. Runpod profiles use a
-host-injected API key and REST API v2, with explicit Pod IDs, name prefixes,
-GPU types, data centers, and resource limits.
+then bind a project, zones, and instance-name prefixes. Zonal disk reads and
+deletes require separate `disk_name_prefixes`; disk creation additionally
+requires `disk_size_gb_range` and an exact `disk_source_images` allowlist.
+Disk create requests use `sizeGb`, an approved public `sourceImage`, optional
+bounded GCE labels, and an optional fixed disk type. Supplied labels must match
+the exact values returned by read-back. Existing VM instance targets stay
+unchanged; a VM may attach an existing same-project, same-zone disk only when
+its name matches the disk prefix, with `autoDelete` preserved. Disk summaries
+project status, size, type, zone, and bounded labels; encryption-key fields
+are never returned. Runpod profiles use a host-injected API key and REST API
+v2, with explicit Pod IDs, name prefixes, GPU types, data centers, and resource
+limits.
 
 Each profile in `CYRENE_CAPABILITY_CONFIGURATION_JSON.profiles[]` accepts an
 optional host-only `read_only` boolean (omitted means `false`). A read-only
@@ -73,6 +82,17 @@ GCP and Runpod JSON operation/resource references can be reconciled through
 the typed status tool. Cloud IAM and Runpod API-key permissions remain the
 final vendor-side boundary.
 
+GCE disk lifecycle status checks the zonal Operation and then reads the Disk:
+`READY` describes disk readiness, while a VM's `RUNNING` state remains a
+separate resource state. Delete success is reported only after a fresh GET
+returns 404. GCE mutation request IDs derive deterministically from the signed
+pre-dispatch request ID. After a lost disk-create response, the provider checks
+a bounded number of recent zonal operations and requires an exact request ID,
+disk target, operation type, and request-time match before reporting success.
+A matching disk by itself remains `UNKNOWN_RESULT`; writes are never replayed.
+This recovery read requires the host identity to have
+`compute.zoneOperations.list`.
+
 ## Local validation
 
 Run tests with `uv run --project . --extra test pytest -q tests`. Tests use
@@ -84,6 +104,12 @@ cloud tenant, create provider resources, or incur cost.
 - [Azure Resource Manager resource APIs](https://learn.microsoft.com/en-us/rest/api/resources/resources?view=rest-resources-2021-04-01)
 - [Azure deployment cancel](https://learn.microsoft.com/en-us/rest/api/resources/deployments/cancel?view=rest-resources-2025-04-01)
 - [Compute Engine instance REST API](https://docs.cloud.google.com/compute/docs/reference/rest/v1/instances)
+- [Compute Engine zonal disk insert](https://docs.cloud.google.com/compute/docs/reference/rest/v1/disks/insert)
+- [Compute Engine zonal disk get](https://docs.cloud.google.com/compute/docs/reference/rest/v1/disks/get)
+- [Compute Engine zonal disk list](https://docs.cloud.google.com/compute/docs/reference/rest/v1/disks/list)
+- [Compute Engine zonal disk delete](https://docs.cloud.google.com/compute/docs/reference/rest/v1/disks/delete)
+- [Compute Engine zonal operation get](https://docs.cloud.google.com/compute/docs/reference/rest/v1/zoneOperations/get)
+- [Compute Engine zonal operation list](https://docs.cloud.google.com/compute/docs/reference/rest/v1/zoneOperations/list)
 - [Google Workload Identity Federation](https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-other-clouds)
 - [Runpod REST API v2](https://docs.runpod.io/api-reference-v2/overview)
 - [Runpod Pod API](https://docs.runpod.io/api-reference-v2/pods/list-pods)
@@ -99,8 +125,12 @@ cloud tenant, create provider resources, or incur cost.
 
 Azure profile 使用 Managed Identity，并限制到指定订阅、资源组和资源 ID 范围。Google
 Cloud profile 使用主机挂载的 Workload Identity Federation 凭据配置和专用服务账号，并限制
-到指定 project、zone 和实例名前缀。Runpod profile 使用仅由主机注入的 API key 和 REST API
-v2，并限制 Pod ID、名称前缀、GPU 类型、数据中心和资源上限。
+到指定 project、zone 和实例名前缀。Zonal 磁盘读取和删除还要求单独配置
+`disk_name_prefixes`；创建磁盘还要求配置 `disk_size_gb_range` 和精确的 `disk_source_images`
+白名单。磁盘创建使用 `sizeGb`、已允许的公开 `sourceImage`、可选的有界 GCE labels 和可选的固定磁盘类型；传入的 labels 必须与回读值完全一致。
+VM 实例目标保持不变；VM 只有在已有磁盘属于相同 project 和 zone、且名称匹配磁盘前缀时才能挂载，
+并保留请求中的 `autoDelete`。磁盘摘要只返回状态、容量、类型、zone 和有界 labels；不会返回加密密钥字段。
+Runpod profile 使用仅由主机注入的 API key 和 REST API v2，并限制 Pod ID、名称前缀、GPU 类型、数据中心和资源上限。
 
 每个工具请求都选择主机绑定的 `profile_ref`；typed API 调用还会携带供应商专属资源
 `target`。CLI 调用授权范围是整个主机 profile，并签署完整供应商 `argv[]`，不会宣称拥有某个
@@ -120,6 +150,12 @@ stdout/stderr 不会送入模型或 Teams；结果只报告有界执行元数据
 `command_state=COMMAND_COMPLETED` 只描述本地进程退出；写命令的 `remote_state=UNKNOWN` 会持续到原生状态回读。
 安全解析的 GCP 和 Runpod JSON operation/resource 引用可通过 typed 状态工具对账。最终权限仍由云 IAM 和 Runpod
 API key 权限控制。
+
+GCP 磁盘生命周期状态会先检查 zonal Operation，再读取 Disk：磁盘 `READY` 表示磁盘就绪；VM 的
+`RUNNING` 是另一种资源状态。只有删除后的新 GET 返回 404，才报告删除成功。GCP 写入 request ID 会根据签名的
+预分派 request ID 稳定派生。创建响应丢失时，Provider 有界查询近期 zonal operations，并精确核对 request ID、磁盘目标、
+操作类型和发起时间后才报告成功；仅有同名且配置相同的磁盘仍返回 `UNKNOWN_RESULT`，写入绝不重放。
+此恢复查询要求主机身份具备 `compute.zoneOperations.list` 权限。
 
 `CYRENE_CAPABILITY_CONFIGURATION_JSON.profiles[]` 中的每个 profile 可配置宿主 `read_only` 布尔值
 （省略时为 `false`）。只读 profile 只允许 provider
