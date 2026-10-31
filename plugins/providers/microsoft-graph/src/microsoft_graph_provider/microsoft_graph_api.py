@@ -35,7 +35,6 @@ _SITE_ID = re.compile(r"[A-Za-z0-9.-]{1,255},[0-9a-fA-F-]{36},[0-9a-fA-F-]{36}\Z
 _SP_DELTA_SELECT = (
     "id,name,eTag,createdDateTime,lastModifiedDateTime,contentType,deleted,parentReference"
 )
-_TODO_LIST_SELECT = "id,displayName,wellknownListName"
 _PLAN_LIST_SELECT = "id,title,owner,createdDateTime"
 _TODO_TASK_SELECT = (
     "id,title,status,dueDateTime,completedDateTime,importance,createdDateTime,lastModifiedDateTime"
@@ -569,17 +568,56 @@ class MicrosoftGraphSession:
     def list_todo_lists(
         self, *, page_size: int = 50, page_cursor: str | None = None
     ) -> dict[str, Any]:
-        """Read one bounded page of the signed-in user's To Do list metadata."""
+        """Read one complete server-sized page of the signed-in user's To Do lists.
 
-        return self._list_metadata(
-            f"{GRAPH_ROOT}/me/todo/lists",
+        Microsoft Graph chooses this endpoint's page size because its reliable request is a
+        plain GET; the caller's validated page_size remains bound to continuation cursors but
+        does not change the upstream page length. Pages are capped at MAX_PAGE_SIZE and are
+        never sliced, so no item is skipped when following @odata.nextLink. 中文：本端点沿用
+        Graph 服务端分页；保留完整有界页，不按调用方 page_size 截断。
+        """
+
+        _page_size(page_size)
+        path = f"{GRAPH_ROOT}/me/todo/lists"
+        continuation = self._decode_cursor(
+            page_cursor,
             kind="todo_lists",
             target={},
-            select=_TODO_LIST_SELECT,
             page_size=page_size,
-            page_cursor=page_cursor,
-            projection=_todo_list_projection,
         )
+        query: dict[str, str] = {}
+        if continuation is not None:
+            parameter = _decode_page_parameter(continuation)
+            query[parameter["name"]] = parameter["value"]
+        request_path = f"{path}?{urlencode(query)}" if query else path
+        value = _json_object(self._api._request("GET", request_path, self._token))
+        rows = _collection(value, "value", page_size=MAX_PAGE_SIZE)
+        items = [_todo_list_projection(row) for row in rows]
+        if "@odata.deltaLink" in value:
+            raise GraphApiFailure("INVALID_PROVIDER_RESPONSE")
+        next_link = value.get("@odata.nextLink")
+        next_cursor = None
+        if next_link is not None:
+            page_parameter = _safe_page_parameter(
+                next_link,
+                expected_path=path,
+                expected_top=None,
+                expected_select=None,
+                fixed_query={},
+            )
+            next_cursor = self._encode_cursor(
+                kind="todo_lists",
+                target={},
+                page_size=page_size,
+                token=json.dumps(page_parameter, sort_keys=True, separators=(",", ":")),
+            )
+        return {
+            "items": items,
+            "page_cursor": page_cursor,
+            "next_cursor": next_cursor,
+            "complete": next_cursor is None,
+            "truncated": False,
+        }
 
     def list_todo_tasks(
         self,
@@ -1766,8 +1804,8 @@ def _safe_page_parameter(
     link: Any,
     *,
     expected_path: str,
-    expected_top: int,
-    expected_select: str,
+    expected_top: int | None,
+    expected_select: str | None,
     fixed_query: Mapping[str, str],
 ) -> dict[str, str]:
     """Extract a paging parameter from an exact Graph origin/path and query."""
@@ -1790,15 +1828,22 @@ def _safe_page_parameter(
         or parsed.fragment
     ):
         raise GraphApiFailure("INVALID_PROVIDER_CURSOR")
-    allowed = _PAGE_PARAMETER_KEYS | {"$top", "$select"} | set(fixed_query)
+    allowed = _PAGE_PARAMETER_KEYS | set(fixed_query)
+    if expected_top is not None:
+        allowed.add("$top")
+    if expected_select is not None:
+        allowed.add("$select")
     if set(query) - allowed or any(len(values) != 1 for values in query.values()):
         raise GraphApiFailure("INVALID_PROVIDER_CURSOR")
     names = _PAGE_PARAMETER_KEYS.intersection(query)
     if len(names) != 1:
         raise GraphApiFailure("INVALID_PROVIDER_CURSOR")
-    if query.get("$top", [str(expected_top)])[0] != str(expected_top):
+    if expected_top is not None and query.get("$top", [str(expected_top)])[0] != str(expected_top):
         raise GraphApiFailure("INVALID_PROVIDER_CURSOR")
-    if query.get("$select", [expected_select])[0] != expected_select:
+    if (
+        expected_select is not None
+        and query.get("$select", [expected_select])[0] != expected_select
+    ):
         raise GraphApiFailure("INVALID_PROVIDER_CURSOR")
     for key, expected in fixed_query.items():
         if key in query and query[key][0] != expected:

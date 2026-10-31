@@ -210,7 +210,11 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
     {
         "provider_tool_id": "microsoft_graph.todo.lists.list",
         "display_name": "List Microsoft To Do Lists",
-        "description": "Read bounded metadata for lists owned by the signed-in user.",
+        "description": (
+            "Read one complete server-sized metadata page for the signed-in user's To Do lists; "
+            "the Graph service controls page length and returns a signed continuation cursor. "
+            "page_size is validated and bound to the cursor but does not limit the upstream page."
+        ),
         "input_schema": {
             "type": "object",
             "properties": dict(_PAGE_ARGUMENTS),

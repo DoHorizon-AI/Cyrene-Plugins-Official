@@ -15,6 +15,7 @@ import pytest
 
 from microsoft_graph_provider.microsoft_graph_api import (
     GRAPH_HOST,
+    MAX_PAGE_SIZE,
     GraphApiFailure,
     HttpResponse,
     MicrosoftGraphApi,
@@ -204,6 +205,135 @@ def test_planner_rejects_off_host_next_link() -> None:
 
     with pytest.raises(GraphApiFailure, match="INVALID_PROVIDER_CURSOR"):
         _open(transport).list_tasks(PLAN_ID)
+
+
+def test_todo_lists_use_plain_get_and_preserve_complete_server_pages() -> None:
+    base = "https://graph.microsoft.com/v1.0/me/todo/lists"
+    rows = [
+        {
+            "id": f"list-{index}",
+            "displayName": f"List {index}",
+            "wellknownListName": "defaultList" if index == 1 else None,
+            "@odata.etag": f'W/"list-{index}"',
+            "sensitiveMetadata": "must-not-escape",
+        }
+        for index in range(1, 4)
+    ]
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response({"value": rows, "@odata.nextLink": f"{base}?$skiptoken=opaque-page-2"}),
+            _json_response({"value": [rows[0]]}),
+        ]
+    )
+    session = _open(transport)
+
+    first = session.list_todo_lists(page_size=2)
+    second = session.list_todo_lists(page_size=2, page_cursor=first["next_cursor"])
+
+    assert first["complete"] is False
+    assert first["truncated"] is False
+    assert len(first["items"]) == 3
+    assert first["items"][0] == {
+        "task_list_id": "list-1",
+        "display_name": "List 1",
+        "well_known_list_name": "defaultList",
+        "etag": 'W/"list-1"',
+    }
+    assert "must-not-escape" not in json.dumps(first)
+    assert "opaque-page-2" not in first["next_cursor"]
+    assert second["complete"] is True
+    assert second["items"][0]["task_list_id"] == "list-1"
+
+    first_path = urlsplit(transport.calls[1][2])
+    second_path = urlsplit(transport.calls[2][2])
+    assert first_path.path == second_path.path == "/v1.0/me/todo/lists"
+    assert first_path.query == ""
+    assert parse_qs(second_path.query) == {"$skiptoken": ["opaque-page-2"]}
+
+
+@pytest.mark.parametrize(
+    "next_link",
+    [
+        "https://attacker.example/v1.0/me/todo/lists?$skiptoken=next",
+        "https://graph.microsoft.com/v1.0/me/todo/tasks?$skiptoken=next",
+        "https://graph.microsoft.com/v1.0/me/todo/lists?$skiptoken=next&$filter=id%20ne%20null",
+        "https://graph.microsoft.com/v1.0/me/todo/lists?$skiptoken=next&$top=2",
+    ],
+)
+def test_todo_lists_reject_unsafe_or_unsupported_next_links(next_link: str) -> None:
+    transport = FakeTransport([_me(), _json_response({"value": [], "@odata.nextLink": next_link})])
+
+    with pytest.raises(GraphApiFailure) as raised:
+        _open(transport).list_todo_lists(page_size=2)
+
+    assert raised.value.code == "INVALID_PROVIDER_CURSOR"
+    assert len(transport.calls) == 2
+
+
+def test_todo_lists_cursor_is_bound_to_profile_and_page_size() -> None:
+    base = "https://graph.microsoft.com/v1.0/me/todo/lists"
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response({"value": [], "@odata.nextLink": f"{base}?skiptoken=next"}),
+            _me(),
+        ]
+    )
+    session = _open(transport)
+    cursor = session.list_todo_lists(page_size=2)["next_cursor"]
+    other_profile = _api(transport).open_session(
+        SYNTHETIC_TOKEN,
+        f"{TENANT_ID}:{ACTOR_ID}",
+        binding_id=BINDING_ID,
+        profile_ref="88888888-8888-4888-8888-888888888888",
+    )
+
+    with pytest.raises(GraphApiFailure) as raised:
+        other_profile.list_todo_lists(page_size=2, page_cursor=cursor)
+
+    assert raised.value.code == "INVALID_PROVIDER_CURSOR"
+    assert len(transport.calls) == 3
+    with pytest.raises(GraphApiFailure, match="INVALID_PROVIDER_CURSOR"):
+        session.list_todo_lists(page_size=3, page_cursor=cursor)
+    assert len(transport.calls) == 3
+
+
+def test_todo_lists_enforce_global_page_boundary_without_truncating() -> None:
+    transport = FakeTransport(
+        [
+            _me(),
+            _json_response(
+                {"value": [{"id": f"list-{index}"} for index in range(MAX_PAGE_SIZE + 1)]}
+            ),
+        ]
+    )
+
+    with pytest.raises(GraphApiFailure) as raised:
+        _open(transport).list_todo_lists(page_size=1)
+
+    assert raised.value.code == "INVALID_PROVIDER_RESPONSE"
+    assert len(transport.calls) == 2
+
+
+def test_todo_lists_reject_requested_page_size_above_global_limit() -> None:
+    transport = FakeTransport([_me()])
+    session = _open(transport)
+
+    with pytest.raises(GraphApiFailure, match="INVALID_ARGUMENTS"):
+        session.list_todo_lists(page_size=MAX_PAGE_SIZE + 1)
+
+    assert len(transport.calls) == 1
+
+
+def test_todo_lists_keep_graph_request_errors_explicit() -> None:
+    transport = FakeTransport([_me(), _empty_response(status=400)])
+
+    with pytest.raises(GraphApiFailure) as raised:
+        _open(transport).list_todo_lists()
+
+    assert raised.value.code == "GRAPH_INVALID_REQUEST"
+    assert len(transport.calls) == 2
 
 
 def test_update_uses_fresh_etag_and_confirms_with_readback() -> None:
