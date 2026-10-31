@@ -3057,8 +3057,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/contracts/office-v2-operations.json",
-      "sha256": "d4e65d708a3f0f68daddb7aeb815e4d016eae4886141f754d221828e4d0ae94f",
-      "size_bytes": 12293
+      "sha256": "250625b60e933747be3a14d22eadd747418e94584afb16091845d8ddbaab4d3e",
+      "size_bytes": 12438
     },
     {
       "kind": "file",
@@ -3141,15 +3141,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/microsoft_graph_api.py",
-      "sha256": "1f133fe056cd778cbaf86f8e757fe26d51698783213cc184690ae38ae86b9143",
-      "size_bytes": 90061
+      "sha256": "76d267387ef3b6e2cbde3f6ee64cf300e9cc58e14431fa22e522acd15d9afd03",
+      "size_bytes": 92023
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/plugin.py",
-      "sha256": "4f8d876ea90082166defc427c9b27d8d989c3729a1deb43933590911eab4ce4c",
-      "size_bytes": 77182
+      "sha256": "1909609132c8b296882b4ce945bd4a04023dfd1f2c2bea2b3ec4f676fc4ec9e3",
+      "size_bytes": 77706
     },
     {
       "kind": "file",
@@ -3183,8 +3183,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_microsoft_graph_api.py",
-      "sha256": "e6b788cd6b789951cf2b05b842cef8342e03d45c48f8bdf101a7ec1646548421",
-      "size_bytes": 20838
+      "sha256": "4130a5b6cac2840d754d6d4bbda16cdc2ab5426a8d72fe72cf484f7d21090442",
+      "size_bytes": 25421
     },
     {
       "kind": "file",
@@ -3197,8 +3197,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_provider.py",
-      "sha256": "368c510be484fcafffad9d2c4f0be997514c5f15f761a4cbadb1a27dd299d365",
-      "size_bytes": 27524
+      "sha256": "891c8712829df74686cb45b1bdb13dde611dd7d03f04372137e3398623cf0a94",
+      "size_bytes": 27811
     },
     {
       "kind": "file",

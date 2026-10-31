@@ -747,12 +747,17 @@ def test_office_v2_host_flags_hide_disabled_tools_and_forbid_mail() -> None:
     ok, payload = provider._list_tools(request.SerializeToString())
 
     assert ok is True
-    tool_ids = {
-        tool.provider_tool_id
-        for tool in wire.ListToolsResponse.FromString(payload.value).catalog.tools
-    }
+    response = wire.ListToolsResponse.FromString(payload.value)
+    tools = {tool.provider_tool_id: tool for tool in response.catalog.tools}
+    tool_ids = set(tools)
     assert "microsoft_graph.planner.plans.list" in tool_ids
     assert "microsoft_graph.todo.lists.list" in tool_ids
+    todo_lists = tools["microsoft_graph.todo.lists.list"]
+    assert "server-sized" in todo_lists.description
+    assert (
+        "Graph server page size"
+        in json.loads(todo_lists.input_schema_json)["properties"]["page_size"]["description"]
+    )
     assert "microsoft_graph.calendar.calendars.list" not in tool_ids
     assert "microsoft_graph.sharepoint.drives.list" not in tool_ids
     assert not any(tool_id.startswith("microsoft_graph.mail.") for tool_id in tool_ids)
