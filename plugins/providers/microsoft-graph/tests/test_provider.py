@@ -754,9 +754,18 @@ def test_office_v2_host_flags_hide_disabled_tools_and_forbid_mail() -> None:
     assert "microsoft_graph.todo.lists.list" in tool_ids
     todo_lists = tools["microsoft_graph.todo.lists.list"]
     assert "server-sized" in todo_lists.description
-    assert (
-        "Graph server page size"
-        in json.loads(todo_lists.input_schema_json)["properties"]["page_size"]["description"]
+    assert "page_size is validated and bound to the cursor" in todo_lists.description
+    assert todo_lists.input_schema_json == json.dumps(
+        {
+            "type": "object",
+            "properties": {
+                "page_size": {"type": "integer", "minimum": 1, "maximum": 100},
+                "page_cursor": {"type": "string", "minLength": 1, "maxLength": 12000},
+            },
+            "additionalProperties": False,
+        },
+        ensure_ascii=False,
+        separators=(",", ":"),
     )
     assert "microsoft_graph.calendar.calendars.list" not in tool_ids
     assert "microsoft_graph.sharepoint.drives.list" not in tool_ids

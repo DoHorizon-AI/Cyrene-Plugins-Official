@@ -3148,8 +3148,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/plugin.py",
-      "sha256": "1909609132c8b296882b4ce945bd4a04023dfd1f2c2bea2b3ec4f676fc4ec9e3",
-      "size_bytes": 77706
+      "sha256": "709250d8fedc8653edb0702fd0ffed1c7e6850767b3df432481e61f0f27feaea",
+      "size_bytes": 77424
     },
     {
       "kind": "file",
@@ -3197,8 +3197,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_provider.py",
-      "sha256": "891c8712829df74686cb45b1bdb13dde611dd7d03f04372137e3398623cf0a94",
-      "size_bytes": 27811
+      "sha256": "87fd832a63217f01097622aee4ad7ea93029de1cea97710ce1011342364c64a4",
+      "size_bytes": 28175
     },
     {
       "kind": "file",

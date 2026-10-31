@@ -212,20 +212,12 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         "display_name": "List Microsoft To Do Lists",
         "description": (
             "Read one complete server-sized metadata page for the signed-in user's To Do lists; "
-            "the Graph service controls page length and returns a signed continuation cursor."
+            "the Graph service controls page length and returns a signed continuation cursor. "
+            "page_size is validated and bound to the cursor but does not limit the upstream page."
         ),
         "input_schema": {
             "type": "object",
-            "properties": {
-                "page_size": {
-                    **_PAGE_ARGUMENTS["page_size"],
-                    "description": (
-                        "Validated and bound to the continuation cursor; this endpoint uses "
-                        "the complete Graph server page size."
-                    ),
-                },
-                "page_cursor": dict(_PAGE_ARGUMENTS["page_cursor"]),
-            },
+            "properties": dict(_PAGE_ARGUMENTS),
             "additionalProperties": False,
         },
     },
