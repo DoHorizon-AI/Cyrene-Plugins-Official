@@ -66,9 +66,30 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "AGENTS.md",
+      "sha256": "cf79af5feb735e3f35a3bfb3892c306668b78a034c6235345c432f87f94fb2a2",
+      "size_bytes": 2297
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "CLAUDE.md",
+      "sha256": "824fbdb4cac2064d0f5ca400ef422172179aa1bca83453693c1e3d251483c595",
+      "size_bytes": 59
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "CODEBUDDY.md",
+      "sha256": "824fbdb4cac2064d0f5ca400ef422172179aa1bca83453693c1e3d251483c595",
+      "size_bytes": 59
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "CONTRIBUTING.md",
-      "sha256": "2589543004bd71f7bca958f956f669976deed692cdb7426c7282f4a4933e1db4",
-      "size_bytes": 5669
+      "sha256": "364a7fc9b888c4d33af1b4e0071f25a02836d8da2424fd2f8ec0b249a2819bd7",
+      "size_bytes": 7289
     },
     {
       "kind": "file",
