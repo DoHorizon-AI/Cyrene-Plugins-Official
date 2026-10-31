@@ -15,7 +15,7 @@ import json
 import re
 import sys
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
@@ -132,7 +132,7 @@ def format_cyrene_log(
     """Format a single UTF-8 NDJSON log record conforming to Cyrene specification.
 
         中文:格式化一条符合 Cyrene 规范的 UTF-8 NDJSON 日志记录。"""
-    now_utc = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now_utc = datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
     truncated_msg = message[:MAX_MESSAGE_BYTES] if len(message) > MAX_MESSAGE_BYTES else message
 

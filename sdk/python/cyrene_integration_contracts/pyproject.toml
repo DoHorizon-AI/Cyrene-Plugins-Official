@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=77.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-integration-contracts"
+version = "0.1.0"
+description = "Plugins-owned integration support v1 DTOs, schemas, and trusted caller signing"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+dependencies = ["jsonschema>=4.23,<5"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cyrene_integration_contracts = ["py.typed", "schema.json"]

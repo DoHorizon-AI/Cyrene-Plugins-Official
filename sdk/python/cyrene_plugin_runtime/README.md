@@ -15,8 +15,29 @@ cyrene-plugin-runtime \
   --capability model.provider.v1 \
   --interface-version 1 \
   --interface-version 2 \
-  --listen 127.0.0.1:51051
+  --listen plugin-runtime.internal:7443 \
+  --tls-cert-file /run/secrets/plugin-server-cert.pem \
+  --tls-key-file /run/secrets/plugin-server-key.pem \
+  --tls-client-ca-file /run/secrets/plugin-client-ca.pem
 ```
+
+Remote DirectPluginRuntime endpoints use mutual TLS and publish a `grpcs://`
+connection reference. The listen hostname is included in that reference and
+must resolve to the endpoint from the Product or Exchange network. The server
+certificate must include the DNS name used by the Product or Exchange target.
+The client CA file controls which client
+certificates are accepted. Mount all three PEM files read-only from the host
+secret provider; pass file paths only, never PEM contents. The three TLS flags
+are all-or-none, and TLS mode always requires a client certificate. Without
+TLS flags, the compatibility mode is restricted to loopback or Unix sockets.
+Local tests can continue to use the default `127.0.0.1:0` listener.
+
+远程 DirectPluginRuntime endpoint 必须使用双向 TLS，并发布 `grpcs://` connection reference。listen hostname 会写入
+connection reference，并且必须能从 Product 或 Exchange 网络解析到该 endpoint。服务端证书必须包含 Product 或
+Exchange 实际连接使用的 DNS 名称；客户端 CA 文件决定哪些客户端证书可通过验证。三个 PEM
+文件都应从主机 secret provider 只读挂载；命令行只传文件路径，不能传 PEM 内容。三个 TLS flag 必须全部提供或全部省略，
+TLS 模式始终要求客户端证书。省略 TLS 参数时，兼容模式仅限 loopback 或 Unix socket。本地测试仍可使用默认的
+`127.0.0.1:0` listener。
 
 Products use the SDK facade after receiving a local connection reference from
 their composition layer:

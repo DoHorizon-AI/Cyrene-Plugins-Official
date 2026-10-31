@@ -303,6 +303,7 @@ dependencies = [
  "async-trait",
  "cyrene-plugin-contracts",
  "hyper-util",
+ "prost",
  "prost-types",
  "thiserror 1.0.69",
  "tokio",

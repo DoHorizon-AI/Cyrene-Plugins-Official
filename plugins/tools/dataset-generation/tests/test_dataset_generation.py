@@ -11,6 +11,7 @@ import zipfile
 from pathlib import Path
 from typing import Any
 
+import pytest
 from cyrene_model_provider_contracts import (
     CAPABILITY_ID as MODEL_CAPABILITY_ID,
 )
@@ -23,7 +24,12 @@ from cyrene_model_provider_contracts import (
     decode_chat_completion_request,
     encode_chat_completion_response,
 )
-from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, serve
+from cyrene_plugin_runtime import (
+    DirectPayload,
+    DirectPluginClient,
+    DirectPluginFailure,
+    serve,
+)
 from dataset_generation import (
     CAPABILITY_ID,
     DatasetGenerationPlugin,
@@ -132,6 +138,86 @@ def _prepare_request(
         "mode": "instruction",
         "split": SPLIT,
     }
+
+
+@pytest.mark.parametrize("configuration", [None, "{}"])
+def test_binding_without_provider_configuration_starts_and_reports_unavailable(
+    monkeypatch: pytest.MonkeyPatch, configuration: str | None
+) -> None:
+    monkeypatch.setenv("CYRENE_CAPABILITY_BINDING_ID", "generation.binding")
+    if configuration is None:
+        monkeypatch.delenv("CYRENE_CAPABILITY_CONFIGURATION_JSON", raising=False)
+    else:
+        monkeypatch.setenv("CYRENE_CAPABILITY_CONFIGURATION_JSON", configuration)
+
+    plugin = DatasetGenerationPlugin()
+    assert plugin._config is None
+    server, connection_ref = serve(plugin, CAPABILITY_ID, "1", "127.0.0.1:0")
+    client = DirectPluginClient.for_local_connection_ref(connection_ref)
+    request = {
+        "blocks_path": "unused.json",
+        "drafts_path": "unused.jsonl",
+        "provenance_path": "unused.jsonl",
+        "result_path": "unused.json",
+        "dataset_id": DATASET_ID,
+        "content_revision_id": CONTENT_REVISION_ID,
+        "processing_run_id": PROCESSING_RUN_ID,
+        "generation": {},
+    }
+    try:
+        with pytest.raises(
+            DirectPluginFailure,
+            match="no configured model.provider.v1 binding",
+        ):
+            client.invoke(
+                capability=CAPABILITY_ID,
+                interface_version="1",
+                method="generate_qa",
+                request=DirectPayload(
+                    type_url=f"type.cyrene.io/{CAPABILITY_ID}.generate_qa.request",
+                    value=json.dumps(request).encode("utf-8"),
+                ),
+                deadline_seconds=5,
+            )
+    finally:
+        client.close()
+        server.stop(grace=None).wait()
+
+
+def test_partial_environment_provider_configuration_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("CYRENE_CAPABILITY_BINDING_ID", "generation.binding")
+    monkeypatch.setenv(
+        "CYRENE_CAPABILITY_CONFIGURATION_JSON",
+        json.dumps({"model_endpoint": "grpc://127.0.0.1:43127"}),
+    )
+
+    with pytest.raises(ValueError, match="config.model"):
+        DatasetGenerationPlugin()
+
+
+def test_complete_environment_provider_configuration_is_preserved(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    configuration = {
+        "model_endpoint": "grpc://127.0.0.1:43127",
+        "model": "configured-model",
+        "temperature": 0.25,
+    }
+    monkeypatch.setenv("CYRENE_CAPABILITY_BINDING_ID", "generation.binding")
+    monkeypatch.setenv(
+        "CYRENE_CAPABILITY_CONFIGURATION_JSON", json.dumps(configuration)
+    )
+
+    plugin = DatasetGenerationPlugin()
+
+    assert plugin._config == GenerationConfig(
+        binding_id="generation.binding",
+        model_endpoint="grpc://127.0.0.1:43127",
+        model="configured-model",
+        temperature=0.25,
+    )
 
 
 def test_prepare_sft_bundle_is_stable_source_family_split_and_excludes_management_fields(

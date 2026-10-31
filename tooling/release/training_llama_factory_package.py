@@ -37,8 +37,8 @@ PACKAGE_ID = "cyrene.training.llama-factory"
 CAPABILITY_ID = "training.llama-factory.v1"
 INTERFACE_VERSION = "1"
 RUNTIME_DISTRIBUTION = "cyrene-plugin-runtime"
-RUNTIME_VERSION = "0.2.0"
-RUNTIME_WHEEL_NAME = "cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
+RUNTIME_VERSION = "0.2.2"
+RUNTIME_WHEEL_NAME = "cyrene_plugin_runtime-0.2.2-py3-none-any.whl"
 TARGET_ID = "linux-x86_64"
 SUPPORTED_CHANNELS = {"candidate", "preview", "stable"}
 EXPECTED_LOCK_LINES = ("grpcio==1.62.3", "protobuf==4.25.9")
@@ -172,7 +172,10 @@ def _package_entries(source_files: dict[str, bytes]) -> dict[str, bytes]:
         f"{PACKAGE_SOURCE}/README.md": "README.md",
         f"{PACKAGE_SOURCE}/PROVENANCE.md": "PROVENANCE.md",
         f"{PACKAGE_SOURCE}/plugin.manifest.json": "plugin.manifest.json",
-        f"{PACKAGE_SOURCE}/llama_factory.py": "llama_factory.py",
+        # The bootstrap only adds ``payload/src`` to the import path. Keep the
+        # training entrypoint beside the vendored SDK so a clean process does
+        # not depend on the caller's working directory or PYTHONPATH.
+        f"{PACKAGE_SOURCE}/llama_factory.py": "src/llama_factory.py",
         f"{PACKAGE_SOURCE}/contracts/v1/schema.json": "contracts/v1/schema.json",
         LOCK_SOURCE: "requirements.lock",
     }
@@ -293,10 +296,11 @@ def _validate_preparer_wheel(path: Path) -> None:
             entrypoints = archive.read(entrypoint_names[0]).decode("utf-8")
             if (
                 "Name: cyrene-plugin-runtime\n" not in metadata
-                or "Version: 0.2.0\n" not in metadata
+                or f"Version: {RUNTIME_VERSION}\n" not in metadata
             ):
                 raise PackageBuildError(
-                    "preparer wheel package identity is not cyrene-plugin-runtime 0.2.0"
+                    "preparer wheel package identity is not "
+                    f"cyrene-plugin-runtime {RUNTIME_VERSION}"
                 )
             if "Tag: py3-none-any\n" not in wheel:
                 raise PackageBuildError("preparer wheel target must be py3-none-any")

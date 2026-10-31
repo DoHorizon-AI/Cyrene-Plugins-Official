@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-account-center"
+version = "0.2.0"
+description = "Private actor-scoped external account links and credential leases"
+requires-python = ">=3.11"
+dependencies = [
+  "cryptography>=44,<51",
+  "cyrene-account-center-contracts>=0.1,<0.3",
+  "cyrene-plugin-runtime>=0.2,<0.3",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["account_center"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.accounts.account-center" = ["plugin.manifest.json", "contracts/v1/schema.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
+[tool.uv.sources]
+cyrene-account-center-contracts = { path = "../../../sdk/python/cyrene_account_center_contracts" }
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }

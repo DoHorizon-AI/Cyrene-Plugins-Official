@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/message.connector.v1.teams/configuration.schema.json",
+  "title": "Cyrene Teams channel connector activation configuration",
+  "type": "object",
+  "properties": {
+    "binding_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "bot_app_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Microsoft Entra application ID for the dedicated Cyrene Teams bot."
+    },
+    "tenant_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Single allowed Microsoft Entra tenant."
+    },
+    "allowed_team_ids": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 512
+      },
+      "description": "Explicit Team IDs allowed by this binding; add a new Team here only after RSC consent and Directory policy are configured."
+    },
+    "personal_chat_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Opt-in support for authenticated one-person bot conversations. Keep false until the host has an approved active personal-install binding; this does not grant a user role or add Graph permissions."
+    },
+    "client_secret_env_ref": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]{0,127}$",
+      "default": "TEAMS_BOT_APP_SECRET",
+      "description": "Host secret reference resolved only inside the Plugin runtime; the secret value must never be stored in this configuration."
+    },
+    "service_url": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^https://",
+      "description": "Optional compatibility base URL. Production sends use the verified per-activity service URL carried in signed route metadata."
+    },
+    "timeout_seconds": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 30,
+      "default": 10
+    }
+  },
+  "required": [
+    "binding_id",
+    "bot_app_id",
+    "tenant_id",
+    "allowed_team_ids",
+    "client_secret_env_ref"
+  ],
+  "additionalProperties": false
+}

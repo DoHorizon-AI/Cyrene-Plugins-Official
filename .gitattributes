@@ -1,0 +1,2 @@
+# Preserve the exact upstream license bytes and recognize its CRLF endings.
+plugins/connectors/wecom/third_party/licenses/wecom-aibot-python-sdk/LICENSE -text whitespace=cr-at-eol

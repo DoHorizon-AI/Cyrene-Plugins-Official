@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-azure-devops-observation-provider"
+version = "0.1.0"
+description = "Read-only, project-scoped Azure DevOps pipeline and release observations for Cyrene"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-account-center-contracts>=0.1,<0.2",
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "httpx>=0.28,<0.29",
+]
+
+[project.optional-dependencies]
+test = ["jsonschema>=4.23,<5", "pytest>=8,<10", "ruff>=0.9,<1"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.providers.azure-devops-observation" = [
+  "plugin.manifest.json",
+  "configuration.schema.json",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+cyrene-account-center-contracts = { path = "../../../sdk/python/cyrene_account_center_contracts" }
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/azure_devops_observation_provider/_generated/*.py" = ["E501", "E712", "I001", "UP009"]

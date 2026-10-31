@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.providers.github-issues",
+  "name": "GitHub Issues Provider",
+  "version": "0.2.0",
+  "licenseExpression": "Apache-2.0",
+  "description": "Fixed GitHub Cloud issue, repository, Actions, and bounded task-branch tools with actor-bound Account Center leases and signed webhook normalization.",
+  "kind": "capability-plugin",
+  "capabilities": ["tool.provider.v1"],
+  "supportedServices": ["Cyrene-Exchange"],
+  "methods": [
+    {"capability": "tool.provider.v1", "name": "list_tools", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "tool.provider.v1", "name": "call_tool", "interfaceVersion": "1", "executionMode": "service"},
+    {
+      "capability": "tool.provider.v1",
+      "name": "normalize_webhook",
+      "interfaceVersion": "1",
+      "executionMode": "service",
+      "inputSchema": "contracts/v1/webhook.schema.json#/$defs/WebhookRequest",
+      "outputSchema": "contracts/v1/webhook.schema.json#/$defs/WebhookResponse"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "github_issues_provider.plugin:GitHubIssuesProvider",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": ["-B", "src/cyrene_plugin_runtime/bootstrap.py", "--entrypoint", "github_issues_provider.plugin:GitHubIssuesProvider"]
+    }
+  },
+  "compatibility": {"platformVersion": ">=0.1.0", "requiresPython": ">=3.11"},
+  "configuration": {"schemaRef": "configuration.schema.json"},
+  "secrets": {
+    "requiredSecretRefs": [
+      "github-issues/exchange-verification-key",
+      "github-issues/account-center-provider-signing-key",
+      "github-issues/webhook-secret"
+    ],
+    "optionalSecretRefs": [
+      "github-issues/account-center-root-certificate",
+      "github-issues/account-center-client-certificate",
+      "github-issues/account-center-client-key"
+    ]
+  },
+  "state": {"isStateful": false, "storageCategory": "stateless", "retentionPolicyOnUninstall": "retain"}
+}

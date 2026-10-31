@@ -97,16 +97,27 @@ jobs:
         run: |
           python3 -m pip install --disable-pip-version-check \
             -r tools/ci/connection-release-requirements.txt \
-            pytest ruff PyYAML grpcio-tools==1.62.3
+            pytest ruff PyYAML grpcio-tools==1.62.3 'pytest-asyncio>=0.24,<1'
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
-            -e sdk/python/cyrene_plugin_runtime \
+            -e sdk/python/cyrene_account_center_contracts \
+            -e sdk/python/cyrene_integration_contracts \
+            -e 'sdk/python/cyrene_plugin_runtime[test]' \
             -e plugins/connectors/onebot-v11 \
             -e plugins/connectors/im \
-          -e plugins/connectors/wecom \
+            -e plugins/connectors/wecom \
             -e plugins/evaluation/exact-match \
-          -e plugins/evaluation/evaluator-pack \
-          -e plugins/evaluation/llm-judge \
+            -e plugins/evaluation/evaluator-pack \
+            -e plugins/evaluation/llm-judge \
+            -e plugins/accounts/account-center \
+            -e plugins/providers/github-issues \
+            -e plugins/providers/microsoft-graph \
+            -e plugins/providers/azure-devops-observation \
+            -e plugins/providers/cloud-resources \
+            -e plugins/providers/cloud-management \
+            -e plugins/providers/huggingface \
+            -e plugins/connectors/teams \
+            -e plugins/connectors/email-notification \
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
             -e plugins/providers/model-api-connector \
@@ -117,6 +128,17 @@ jobs:
             -e plugins/tools/dataset-generation \
             -e plugins/tools/dataset-validator \
             -e plugins/training/llama-factory
+      - name: Fetch pinned Navigator receipt contract source
+        run: |
+          set -euo pipefail
+          navigator_root="$RUNNER_TEMP/cyrene-navigator-contracts"
+          git init "$navigator_root"
+          git -C "$navigator_root" remote add origin https://github.com/DoHorizon-AI/Cyrene-Navigator.git
+          git -C "$navigator_root" sparse-checkout init --no-cone
+          git -C "$navigator_root" sparse-checkout set --no-cone /contracts/product/v1/work.openapi.json
+          git -C "$navigator_root" fetch --depth=1 origin 683b36451db0de55e8f01d707b391dd940128d15
+          git -C "$navigator_root" checkout --quiet --detach FETCH_HEAD
+          test "$(git -C "$navigator_root" rev-parse HEAD)" = "683b36451db0de55e8f01d707b391dd940128d15"
       - name: Verify reproducible WeCom capability bindings
         run: |
           python3 plugins/connectors/wecom/tools/generate_message_connector_bindings.py
@@ -126,6 +148,8 @@ jobs:
           python3 -m ruff check \
             --exclude '**/_generated/**' \
             sdk/python/cyrene_model_provider_contracts/src \
+            sdk/python/cyrene_account_center_contracts/src \
+            sdk/python/cyrene_integration_contracts/src \
             sdk/python/cyrene_plugin_runtime/src \
             plugins/connectors/onebot-v11/src \
             plugins/connectors/onebot-v11/tools \
@@ -140,6 +164,15 @@ jobs:
             tools/ci/exercise_im_native_qqnt.py \
             tools/ci/im_real_smoke.py \
             plugins/connectors/wecom \
+            plugins/connectors/email-notification \
+            plugins/accounts/account-center \
+            plugins/providers/github-issues \
+            plugins/providers/microsoft-graph \
+            plugins/providers/azure-devops-observation \
+            plugins/providers/cloud-resources \
+            plugins/providers/cloud-management \
+            plugins/providers/huggingface \
+            plugins/connectors/teams \
             plugins/evaluation/exact-match \
             plugins/evaluation/evaluator-pack \
             plugins/evaluation/llm-judge \
@@ -153,24 +186,39 @@ jobs:
             plugins/tools/dataset-generation \
             plugins/tools/dataset-validator \
             plugins/training/llama-factory \
+            contracts/tck/tool-provider-v1/test_github_webhook_schema_tck.py \
+            contracts/tck/tool-provider-v1/test_integration_support_contracts.py \
             tools/ci/capability_catalog.py \
             tools/ci/connection_release.py \
             tools/ci/update_source_manifest.py \
+            tooling/release/select_official_plugin_packages.py \
+            tests/release/test_select_official_plugin_packages.py \
             tools/ci/validate_manifests.py \
             tests/release/test_connection_release_health.py \
             tools/ci/verify_source_manifest.py
       - name: Run Python runtime and official Plugin tests
         run: |
-          python3 -m pytest -q \
+          python3 -m pytest -q --import-mode=importlib \
             sdk/python/cyrene_plugin_runtime/tests \
+            sdk/python/cyrene_account_center_contracts/tests \
+            plugins/accounts/account-center/tests \
+            plugins/providers/github-issues/tests \
+            plugins/providers/microsoft-graph/tests \
+            plugins/providers/azure-devops-observation/tests \
+            contracts/tck/tool-provider-v1 \
             contracts/tck/execution-engine-v1 \
             contracts/tck/training-llama-factory-v1 \
             plugins/connectors/onebot-v11/tests \
             plugins/connectors/im/tests \
             plugins/connectors/wecom/tests \
+            plugins/connectors/email-notification/tests \
             plugins/evaluation/evaluator-pack/tests \
             plugins/evaluation/llm-judge/tests \
             plugins/providers/model-api-connector/tests \
+            plugins/providers/cloud-resources/tests \
+            plugins/providers/cloud-management/tests \
+            plugins/providers/huggingface/tests \
+            plugins/connectors/teams/tests \
             plugins/serving/vllm-runtime/tests \
             plugins/tools/dataset-preparation/tests \
             plugins/tools/document-parsing/tests \
@@ -179,8 +227,11 @@ jobs:
             plugins/tools/dataset-validator/tests \
             plugins/training/llama-factory/tests \
             tests/release/test_connection_release_health.py \
+            tests/release/test_select_official_plugin_packages.py \
             tests/store/test_catalog.py \
             tests/store/test_cli.py
+        env:
+          CYRENE_NAVIGATOR_OPENAPI: ${{ runner.temp }}/cyrene-navigator-contracts/contracts/product/v1/work.openapi.json
       - name: Verify Python/native behavior matrix
         run: python3 plugins/connectors/im/tools/verify_behavior_matrix.py
 
@@ -434,6 +485,27 @@ jobs:
           buf build
       - name: Verify shared Workspace contract fingerprints
         run: bash contracts/check-workspace-contract-digests.sh
+
+  mxc-feature:
+    name: public-ci / mxc-feature-compile-and-unit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Compile and unit-test the optional Linux MXC backend
+        run: |
+          set -euo pipefail
+          cargo fmt --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --check
+          cargo clippy --locked --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --features mxc --all-targets -- -D warnings
+          cargo test --locked --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --features mxc --lib --bins
+          cargo test --locked --manifest-path runtime/rust/cyrene-computer-runtime/Cargo.toml --features mxc --test mxc_backend_tests --no-run
+          cargo clippy --locked --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml --features mxc --all-targets -- -D warnings
+          cargo test --locked --manifest-path runtime/rust/cyrene-plugin-server/Cargo.toml --features mxc
+      # Real containment acceptance runs separately on a verified Linux host.
+      # This job does not change hosted-runner namespace or security policies.
 
   rust-native:
     name: public-ci / rust-native

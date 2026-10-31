@@ -5,6 +5,15 @@ edition = "2021"
 description = "Bounded Managed Execution and Tool Runtime for Cyrene (Milestone M5C)"
 license = "Apache-2.0"
 
+[[bin]]
+name = "cyrene-mxc-exec"
+path = "src/mxc_exec.rs"
+required-features = ["mxc"]
+
+[features]
+default = []
+mxc = ["dep:mxc-sdk"]
+
 [dependencies]
 prost = "0.12"
 prost-types = "0.12"
@@ -13,7 +22,12 @@ async-trait = "0.1"
 sha2 = "0.10"
 libc = "0.2"
 tempfile = "3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 cyrene-plugin-contracts = { path = "../../../contracts/rust/cyrene-plugin-contracts" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+mxc-sdk = { version = "=1.0.1", optional = true, default-features = false }
 
 [dev-dependencies]
 tempfile = "3"

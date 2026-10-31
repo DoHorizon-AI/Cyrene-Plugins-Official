@@ -1,0 +1,211 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.cloud-management/configuration.schema.json",
+  "title": "Cloud management provider activation configuration",
+  "type": "object",
+  "required": ["trusted_callers", "profiles", "hostSecretRefs"],
+  "properties": {
+    "authorization_generation": {"type": "integer", "minimum": 0, "default": 0},
+    "trusted_callers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["caller_workload", "audience", "organization_id", "workspace_id", "issuer", "verification_key_ref"],
+        "properties": {
+          "caller_workload": {"type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,256}$"},
+          "audience": {"const": "cloud-management"},
+          "organization_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "workspace_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "issuer": {"type": "string", "minLength": 1, "maxLength": 512},
+          "verification_key_ref": {"const": "cloud-management/exchange-verification-key"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "profiles": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {"oneOf": [
+        {"$ref": "#/$defs/azureProfile"},
+        {"$ref": "#/$defs/gcpProfile"},
+        {"$ref": "#/$defs/runpodProfile"}
+      ]}
+    },
+    "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 30, "default": 12},
+    "hostSecretRefs": {
+      "type": "object",
+      "required": ["cloud-management/exchange-verification-key", "cloud-management/state-dir"],
+      "properties": {
+        "cloud-management/exchange-verification-key": {"$ref": "#/$defs/environmentName"},
+        "cloud-management/state-dir": {"$ref": "#/$defs/environmentName"},
+        "cloud-management/gcp-wif-credential-config": {"$ref": "#/$defs/environmentName"},
+        "cloud-management/runpod-api-key": {"$ref": "#/$defs/environmentName"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "$defs": {
+    "environmentName": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"},
+    "profileIdentity": {
+      "type": "object",
+      "required": ["profile_ref", "identity_ref"],
+      "properties": {
+        "profile_ref": {"type": "string", "pattern": "^[A-Za-z0-9._/-]{1,192}$"},
+        "identity_ref": {"type": "string", "pattern": "^[A-Za-z0-9._:/-]{1,256}$"},
+        "read_only": {"type": "boolean", "default": false}
+      }
+    },
+    "azureProfile": {
+      "allOf": [
+        {"$ref": "#/$defs/profileIdentity"},
+        {
+          "type": "object",
+          "required": ["provider", "scope", "auth"],
+          "properties": {
+            "provider": {"const": "azure"},
+            "scope": {
+              "type": "object",
+              "required": ["subscription_id", "resource_groups"],
+              "properties": {
+                "subscription_id": {"type": "string", "pattern": "^[0-9a-fA-F-]{36}$"},
+                "resource_groups": {
+                  "type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true,
+                  "items": {"type": "string", "pattern": "^[A-Za-z0-9_.() -]{1,90}$"}
+                },
+                "resource_api_versions": {
+                  "type": "object", "maxProperties": 100,
+                  "propertyNames": {"pattern": "^[A-Za-z0-9.]+/[A-Za-z0-9./]+$"},
+                  "additionalProperties": {"type": "string", "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}(-preview)?$"}
+                },
+                "vm_api_version": {"type": "string", "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}(-preview)?$", "default": "2024-07-01"},
+                "deployment_api_version": {"type": "string", "pattern": "^20[0-9]{2}-[0-9]{2}-[0-9]{2}(-preview)?$", "default": "2025-04-01"}
+              },
+              "additionalProperties": false
+            },
+            "auth": {
+              "type": "object",
+              "required": ["mode"],
+              "properties": {"mode": {"const": "managed_identity"}, "client_id": {"type": "string", "pattern": "^[0-9a-fA-F-]{36}$"}},
+              "additionalProperties": false
+            },
+            "cli": {"$ref": "#/$defs/azureCli"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "gcpProfile": {
+      "allOf": [
+        {"$ref": "#/$defs/profileIdentity"},
+        {
+          "type": "object",
+          "required": ["provider", "scope", "auth"],
+          "properties": {
+            "provider": {"const": "gcp"},
+            "scope": {
+              "type": "object",
+              "required": ["project_id", "zones", "instance_name_prefixes"],
+              "properties": {
+                "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]{4,28}[a-z0-9]$"},
+                "zones": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z]+-[a-z0-9]+-[a-z]$"}},
+                "instance_name_prefixes": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][-a-z0-9]{0,61}$"}}
+              },
+              "additionalProperties": false
+            },
+            "auth": {
+              "type": "object",
+              "required": ["mode", "credential_config_ref"],
+              "properties": {"mode": {"const": "workload_identity_federation"}, "credential_config_ref": {"const": "cloud-management/gcp-wif-credential-config"}},
+              "additionalProperties": false
+            },
+            "cli": {"$ref": "#/$defs/gcpCli"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "runpodProfile": {
+      "allOf": [
+        {"$ref": "#/$defs/profileIdentity"},
+        {
+          "type": "object",
+          "required": ["provider", "scope", "auth"],
+          "properties": {
+            "provider": {"const": "runpod"},
+            "scope": {
+              "type": "object",
+              "required": ["pod_name_prefixes", "gpu_type_ids", "data_center_ids"],
+              "properties": {
+                "pod_ids": {"type": "array", "maxItems": 500, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}},
+                "pod_id_prefixes": {"type": "array", "maxItems": 50, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}},
+                "pod_name_prefixes": {"type": "array", "minItems": 1, "maxItems": 50, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$"}},
+                "gpu_type_ids": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9 ._:-]{0,127}$"}},
+                "data_center_ids": {"type": "array", "minItems": 1, "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,62}$"}},
+                "max_gpu_count": {"type": "integer", "minimum": 1, "maximum": 8, "default": 1},
+                "max_container_disk_gb": {"type": "integer", "minimum": 1, "maximum": 2048, "default": 100},
+                "max_volume_disk_gb": {"type": "integer", "minimum": 0, "maximum": 4096, "default": 100}
+              },
+              "additionalProperties": false,
+              "anyOf": [{"required": ["pod_ids"]}, {"required": ["pod_id_prefixes"]}]
+            },
+            "auth": {
+              "type": "object",
+              "required": ["mode", "api_key_ref"],
+              "properties": {"mode": {"const": "api_key"}, "api_key_ref": {"const": "cloud-management/runpod-api-key"}},
+              "additionalProperties": false
+            },
+            "cli": {"$ref": "#/$defs/runpodCli"}
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    },
+    "azureCli": {"$ref": "#/$defs/cli", "properties": {"executable": {"type": "string", "pattern": "^/.*/az$"}}},
+    "gcpCli": {"$ref": "#/$defs/cli", "properties": {"executable": {"type": "string", "pattern": "^/.*/gcloud$"}}},
+    "runpodCli": {"$ref": "#/$defs/cli", "properties": {"executable": {"type": "string", "pattern": "^/.*/runpodctl$"}}},
+    "cli": {
+      "type": "object",
+      "required": ["enabled", "executable"],
+      "properties": {
+        "enabled": {"const": true},
+        "executable": {"type": "string", "minLength": 1},
+        "timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 120, "default": 30}
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "profiles": {
+            "contains": {
+              "properties": {"provider": {"const": "gcp"}},
+              "required": ["provider"]
+            }
+          }
+        },
+        "required": ["profiles"]
+      },
+      "then": {"properties": {"hostSecretRefs": {"required": ["cloud-management/gcp-wif-credential-config"]}}}
+    },
+    {
+      "if": {
+        "properties": {
+          "profiles": {
+            "contains": {
+              "properties": {"provider": {"const": "runpod"}},
+              "required": ["provider"]
+            }
+          }
+        },
+        "required": ["profiles"]
+      },
+      "then": {"properties": {"hostSecretRefs": {"required": ["cloud-management/runpod-api-key"]}}}
+    }
+  ],
+  "additionalProperties": false
+}

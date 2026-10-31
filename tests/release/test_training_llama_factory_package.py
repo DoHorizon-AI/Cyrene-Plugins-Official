@@ -71,7 +71,7 @@ def _create_repository(root: Path) -> None:
     _write(root / release.PRODUCER_PATH, "# source-bound producer fixture\n")
     _write(
         root / f"{release.RUNTIME_PROJECT}/pyproject.toml",
-        '[project]\nname = "cyrene-plugin-runtime"\nversion = "0.2.0"\n',
+        '[project]\nname = "cyrene-plugin-runtime"\nversion = "0.2.2"\n',
     )
     runtime_root = root / release.RUNTIME_SOURCE
     _write(runtime_root / "__init__.py", '"""Runtime package."""\n')
@@ -85,11 +85,11 @@ def _create_repository(root: Path) -> None:
 
 def _create_preparer_wheel(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
-    metadata_root = "cyrene_plugin_runtime-0.2.0.dist-info"
+    metadata_root = "cyrene_plugin_runtime-0.2.2.dist-info"
     with zipfile.ZipFile(path, "w", compression=zipfile.ZIP_STORED) as archive:
         archive.writestr(
             f"{metadata_root}/METADATA",
-            "Metadata-Version: 2.1\nName: cyrene-plugin-runtime\nVersion: 0.2.0\n",
+            "Metadata-Version: 2.1\nName: cyrene-plugin-runtime\nVersion: 0.2.2\n",
         )
         archive.writestr(
             f"{metadata_root}/WHEEL", "Wheel-Version: 1.0\nTag: py3-none-any\n"
@@ -208,7 +208,8 @@ class TrainingPluginReleaseTests(unittest.TestCase):
                 verified["dependency_lock"].read_bytes(),
             )
             self.assertIn("src/cyrene_plugin_runtime/bootstrap.py", archive.namelist())
-            self.assertIn("llama_factory.py", archive.namelist())
+            self.assertIn("src/llama_factory.py", archive.namelist())
+            self.assertNotIn("llama_factory.py", archive.namelist())
 
     def test_source_sha_binds_metadata_without_changing_identical_package_bytes(
         self,

@@ -17,6 +17,7 @@ pub mod proto {
 }
 
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
@@ -38,10 +39,18 @@ use cyrene_plugin_contracts::computer_runtime_v1::{
     ListDirRequest, ListDirResponse,
 };
 
-async fn start_packaged_runtime() -> (Child, DirectPluginRuntimeClient<Channel>) {
+async fn start_packaged_runtime() -> (
+    Child,
+    DirectPluginRuntimeClient<Channel>,
+    tempfile::TempDir,
+    SocketAddr,
+) {
+    let artifact_root = tempfile::tempdir().expect("temporary artifact root");
     let mut child = Command::new(env!("CARGO_BIN_EXE_cyrene-plugin-server"))
         .args(["--host", "127.0.0.1", "--port", "0"])
         .env("CYRENE_ACCEPTANCE_SECRET_TOKEN", "must-not-leak")
+        .env("CYRENE_COMPUTER_WORKSPACE_ROOT", env!("CARGO_MANIFEST_DIR"))
+        .env("CYRENE_COMPUTER_ARTIFACT_ROOT", artifact_root.path())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
         .kill_on_drop(true)
@@ -66,7 +75,8 @@ async fn start_packaged_runtime() -> (Child, DirectPluginRuntimeClient<Channel>)
     let client = DirectPluginRuntimeClient::connect(format!("http://{address}"))
         .await
         .expect("connect to packaged server");
-    (child, client)
+    let address = address.parse().expect("server announced socket address");
+    (child, client, artifact_root, address)
 }
 
 async fn invoke(
@@ -179,8 +189,32 @@ fn grandchild_pid_file(directory: &tempfile::TempDir) -> PathBuf {
 }
 
 #[tokio::test]
+async fn test_packaged_runner_health_check_mode_uses_h2c_without_secrets() {
+    let (_server, _client, _artifact_root, address) = start_packaged_runtime().await;
+    let port = address.port().to_string();
+    let output = Command::new(env!("CARGO_BIN_EXE_cyrene-plugin-server"))
+        .args([
+            "--health-check",
+            "--host",
+            "127.0.0.1",
+            "--port",
+            port.as_str(),
+        ])
+        .output()
+        .await
+        .expect("run the built-in gRPC health check");
+    assert!(
+        output.status.success(),
+        "health check failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(String::from_utf8_lossy(&output.stdout)
+        .contains("[CYRENE_HEALTHCHECK_OK] plugin_id=cyrene.tools.computer-runtime"));
+}
+
+#[tokio::test]
 async fn test_packaged_runtime_start_dispatch_and_bounded_filesystem() {
-    let (_server, mut client) = start_packaged_runtime().await;
+    let (_server, mut client, _artifact_root, _addr) = start_packaged_runtime().await;
 
     // install/start + direct dispatch
     // 中文：安装／启动并通过 DirectPluginRuntime 分派。
@@ -273,7 +307,7 @@ async fn test_packaged_runtime_start_dispatch_and_bounded_filesystem() {
 
 #[tokio::test]
 async fn test_packaged_runtime_environment_filtering_and_artifact_roundtrip() {
-    let (_server, mut client) = start_packaged_runtime().await;
+    let (_server, mut client, _artifact_root, _addr) = start_packaged_runtime().await;
 
     // Host secrets never reach the managed command; requested names carrying
     // sensitive patterns are stripped; benign requested names pass through.
@@ -371,7 +405,7 @@ async fn test_packaged_runtime_environment_filtering_and_artifact_roundtrip() {
 async fn test_packaged_runtime_timeout_kills_the_process_group() {
     let directory = tempfile::tempdir().unwrap();
     let pid_file = grandchild_pid_file(&directory);
-    let (_server, mut client) = start_packaged_runtime().await;
+    let (_server, mut client, _artifact_root, _addr) = start_packaged_runtime().await;
 
     let response = run_command(
         &mut client,
@@ -396,7 +430,7 @@ async fn test_packaged_runtime_timeout_kills_the_process_group() {
 async fn test_packaged_runtime_stream_cancellation_kills_the_process_group() {
     let directory = tempfile::tempdir().unwrap();
     let pid_file = grandchild_pid_file(&directory);
-    let (_server, mut client) = start_packaged_runtime().await;
+    let (_server, mut client, _artifact_root, _addr) = start_packaged_runtime().await;
 
     let mut payload = Vec::new();
     command(

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.providers.cloud-resources",
+  "name": "Cloud Resource Observation Provider",
+  "version": "0.1.0",
+  "licenseExpression": "Apache-2.0",
+  "description": "Fixed, read-only Azure VM, Google Compute Engine, Hugging Face, Tailscale, and Runpod resource observations.",
+  "kind": "capability-plugin",
+  "capabilities": ["tool.provider.v1"],
+  "supportedServices": ["Cyrene-Exchange"],
+  "methods": [
+    {"capability": "tool.provider.v1", "name": "list_tools", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "tool.provider.v1", "name": "call_tool", "interfaceVersion": "1", "executionMode": "service"}
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "cloud_resources_provider.plugin:CloudResourcesProvider",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": ["-B", "src/cyrene_plugin_runtime/bootstrap.py", "--entrypoint", "cloud_resources_provider.plugin:CloudResourcesProvider"]
+    }
+  },
+  "compatibility": {"platformVersion": ">=0.1.0", "requiresPython": ">=3.11"},
+  "configuration": {"schemaRef": "configuration.schema.json"},
+  "secrets": {
+    "requiredSecretRefs": ["cloud-resources/exchange-verification-key"],
+    "optionalSecretRefs": [
+      "cloud-resources/gcp-service-account-json",
+      "cloud-resources/hf-read-token",
+      "cloud-resources/tailscale-client-secret",
+      "cloud-resources/runpod-api-key"
+    ]
+  },
+  "state": {"isStateful": false, "storageCategory": "stateless", "retentionPolicyOnUninstall": "retain"}
+}

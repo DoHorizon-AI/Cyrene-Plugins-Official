@@ -107,10 +107,16 @@ class GenerationConfig:
     timeout_seconds: float = 30.0
 
     @classmethod
-    def from_settings(cls, settings: Mapping[str, str]) -> GenerationConfig:
+    def from_settings(
+        cls, settings: Mapping[str, str]
+    ) -> GenerationConfig | None:
         """Read the provider endpoint from the standard Plugin binding config.
 
-        中文:从标准 Plugin binding 配置中读取 Provider endpoint。
+        An empty configuration means the optional provider is not configured;
+        any non-empty configuration must describe a complete provider binding.
+
+        中文:从标准 Plugin binding 配置中读取 Provider endpoint。空配置表示可选
+        Provider 尚未配置；非空配置必须提供完整的 Provider binding。
         """
 
         binding_id = settings.get("binding_id")
@@ -123,6 +129,8 @@ class GenerationConfig:
             raise ValueError(f"config must contain valid JSON: {error}") from error
         if not isinstance(config, Mapping):
             raise TypeError("config must be a JSON object")
+        if not config:
+            return None
         endpoint = _required_text(config.get("model_endpoint"), "config.model_endpoint")
         model = _required_text(config.get("model"), "config.model")
         temperature = _finite_number(
@@ -160,7 +168,7 @@ class DatasetGenerationPlugin:
     """
 
     plugin_id = "cyrene.tools.dataset-generation"
-    version = "0.2.0"
+    version = "0.2.2"
     capabilities = (CAPABILITY_ID,)
 
     def __init__(self, config: GenerationConfig | None = None) -> None:

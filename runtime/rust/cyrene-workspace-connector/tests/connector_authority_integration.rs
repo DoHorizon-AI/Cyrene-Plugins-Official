@@ -7,15 +7,19 @@ use cyrene_plugin_contracts::workspace_authority_v2::{
     workspace_authority_service_server::{
         WorkspaceAuthorityService, WorkspaceAuthorityServiceServer,
     },
-    AcknowledgeDeliveryRequest, AcknowledgeDeliveryResponse, ApproveAndEnqueueInvocationRequest,
-    ApproveAndEnqueueInvocationResponse, ApprovedInvocation, CanonicalInvocationEnvelope,
-    CatalogSnapshotRequest, CatalogSnapshotResponse, ClaimInvocationsRequest,
-    ClaimInvocationsResponse, ExecutionCredential, ExecutionOutcomeStatus, IdempotencySemantics,
-    InvocationState, NegotiateVersionRequest, NegotiateVersionResponse,
-    SubmitInvocationResultRequest, SubmitInvocationResultResponse,
-    ValidateExecutionAuthorizationRequest, ValidateExecutionAuthorizationResponse,
-    VerifyIdentityRequest, VerifyIdentityResponse, WaitInvocationResultRequest,
-    WaitInvocationResultResponse,
+    AcknowledgeDeliveryRequest, AcknowledgeDeliveryResponse,
+    ApproveAndEnqueueDelegatedInvocationRequest, ApproveAndEnqueueDelegatedInvocationResponse,
+    ApproveAndEnqueueInvocationRequest, ApproveAndEnqueueInvocationResponse, ApprovedInvocation,
+    CanonicalInvocationEnvelope, CatalogSnapshotRequest, CatalogSnapshotResponse,
+    ClaimInvocationsRequest, ClaimInvocationsResponse, CreateDelegationRequest,
+    CreateDelegationResponse, ExecutionCredential, ExecutionOutcomeStatus, GetDelegationRequest,
+    GetDelegationResponse, GetProductInvocationStatusRequest, GetProductInvocationStatusResponse,
+    IdempotencySemantics, InvocationState, NegotiateVersionRequest, NegotiateVersionResponse,
+    RevokeDelegationRequest, RevokeDelegationResponse, SubmitInvocationResultRequest,
+    SubmitInvocationResultResponse, ValidateExecutionAuthorizationRequest,
+    ValidateExecutionAuthorizationResponse, ValidateProductExecutionAuthorizationRequest,
+    ValidateProductExecutionAuthorizationResponse, VerifyIdentityRequest, VerifyIdentityResponse,
+    WaitInvocationResultRequest, WaitInvocationResultResponse,
 };
 use cyrene_plugin_contracts::workspace_product_v2::ProductApiInvocationV2;
 use cyrene_workspace_client_sdk::AuthorityClient;
@@ -50,6 +54,60 @@ struct MockAuthorityService {
 
 #[tonic::async_trait]
 impl WorkspaceAuthorityService for MockAuthorityService {
+    async fn create_delegation(
+        &self,
+        _request: Request<CreateDelegationRequest>,
+    ) -> Result<Response<CreateDelegationResponse>, Status> {
+        Err(Status::unimplemented(
+            "delegation creation is outside this TCK mock",
+        ))
+    }
+
+    async fn revoke_delegation(
+        &self,
+        _request: Request<RevokeDelegationRequest>,
+    ) -> Result<Response<RevokeDelegationResponse>, Status> {
+        Err(Status::unimplemented(
+            "delegation revocation is outside this TCK mock",
+        ))
+    }
+
+    async fn get_delegation(
+        &self,
+        _request: Request<GetDelegationRequest>,
+    ) -> Result<Response<GetDelegationResponse>, Status> {
+        Err(Status::unimplemented(
+            "delegation lookup is outside this Connector mock",
+        ))
+    }
+
+    async fn approve_and_enqueue_delegated_invocation(
+        &self,
+        _request: Request<ApproveAndEnqueueDelegatedInvocationRequest>,
+    ) -> Result<Response<ApproveAndEnqueueDelegatedInvocationResponse>, Status> {
+        Err(Status::unimplemented(
+            "delegated enqueue is outside this TCK mock",
+        ))
+    }
+
+    async fn validate_product_execution_authorization(
+        &self,
+        _request: Request<ValidateProductExecutionAuthorizationRequest>,
+    ) -> Result<Response<ValidateProductExecutionAuthorizationResponse>, Status> {
+        Err(Status::unimplemented(
+            "Product workload authorization is outside this Connector mock",
+        ))
+    }
+
+    async fn get_product_invocation_status(
+        &self,
+        _request: Request<GetProductInvocationStatusRequest>,
+    ) -> Result<Response<GetProductInvocationStatusResponse>, Status> {
+        Err(Status::unimplemented(
+            "Product invocation status is outside this Connector mock",
+        ))
+    }
+
     async fn negotiate_version(
         &self,
         _request: Request<NegotiateVersionRequest>,
@@ -57,6 +115,9 @@ impl WorkspaceAuthorityService for MockAuthorityService {
         Ok(Response::new(NegotiateVersionResponse {
             selected_version: 2,
             supported_versions: vec![2],
+            selected_features: Vec::new(),
+            supported_features: vec!["delegated_invocations_v1".to_string()],
+            managed_workload_feature_token: Vec::new(),
         }))
     }
 
@@ -224,6 +285,10 @@ fn approved(invocation_id: &str, key: &str, endpoint: &str) -> ApprovedInvocatio
             seconds: now + 300,
             nanos: 0,
         }),
+        authorization_source: 0,
+        delegation_id: String::new(),
+        delegation_generation: 0,
+        delegation_audience: String::new(),
     };
     let invocation_digest =
         Sha256::digest(envelope.invocation.as_ref().unwrap().encode_to_vec()).to_vec();
@@ -256,6 +321,10 @@ fn approved(invocation_id: &str, key: &str, endpoint: &str) -> ApprovedInvocatio
         issued_at: envelope.issued_at,
         expires_at: envelope.expires_at,
         authority_signature: vec![9; 64],
+        authorization_source: envelope.authorization_source,
+        delegation_id: envelope.delegation_id.clone(),
+        delegation_generation: envelope.delegation_generation,
+        delegation_audience: envelope.delegation_audience.clone(),
     };
     // The test authority returns the exact canonical data expected from redemption.
     ApprovedInvocation {

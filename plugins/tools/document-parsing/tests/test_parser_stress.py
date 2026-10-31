@@ -5,17 +5,11 @@ from __future__ import annotations
 import hashlib
 import json
 import zipfile
-from io import BytesIO
 from pathlib import Path
-
 from typing import Any
 
-import pytest
 from document_parsing import (
     DocumentParsingPlugin,
-    MAX_SOURCE_BYTES,
-    MAX_OOXML_ENTRIES,
-    MAX_OOXML_EXPANDED_BYTES,
     TypedPayload,
 )
 
@@ -123,7 +117,11 @@ def test_scanned_raster_pdf_no_silent_success(tmp_path: Path) -> None:
     assert ok
     # Must report limitation or warnings that no text was found - NO silent fake success
     warnings = res.get("warnings", [])
-    assert any("Native PDF parsing does not run OCR" in w or "no addressable content blocks" in w for w in warnings)
+    assert any(
+        "Native PDF parsing does not run OCR" in w
+        or "no addressable content blocks" in w
+        for w in warnings
+    )
     assert res.get("block_count", 0) == 0
 
 
@@ -158,7 +156,7 @@ def test_unicode_and_emojis_preserved(tmp_path: Path) -> None:
 </w:document>""",
         )
 
-    ok, res = _run_plugin(tmp_path, docx_file, DOCX_MEDIA_TYPE)
+    ok, _res = _run_plugin(tmp_path, docx_file, DOCX_MEDIA_TYPE)
     assert ok
     blocks_data = json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
     all_text = " ".join(b["text"] for b in blocks_data["blocks"])
@@ -197,7 +195,7 @@ def test_formula_and_math_symbols(tmp_path: Path) -> None:
 </w:document>""",
         )
 
-    ok, res = _run_plugin(tmp_path, docx_file, DOCX_MEDIA_TYPE)
+    ok, _res = _run_plugin(tmp_path, docx_file, DOCX_MEDIA_TYPE)
     assert ok
     blocks_data = json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
     all_text = " ".join(b["text"] for b in blocks_data["blocks"])
@@ -246,19 +244,25 @@ def test_complex_table_extraction(tmp_path: Path) -> None:
 </w:document>""",
         )
 
-    ok, res = _run_plugin(tmp_path, docx_file, DOCX_MEDIA_TYPE)
+    ok, _res = _run_plugin(tmp_path, docx_file, DOCX_MEDIA_TYPE)
     assert ok
     blocks_data = json.loads((tmp_path / "blocks.json").read_text(encoding="utf-8"))
     table_blocks = [b for b in blocks_data["blocks"] if b["kind"] == "table"]
     assert len(table_blocks) == 1
-    assert "Header A" in table_blocks[0]["text"] or "DOCX table" in table_blocks[0]["text"] or "Val" in table_blocks[0]["text"]
+    assert (
+        "Header A" in table_blocks[0]["text"]
+        or "DOCX table" in table_blocks[0]["text"]
+        or "Val" in table_blocks[0]["text"]
+    )
 
 
 def test_filename_directory_traversal_rejected(tmp_path: Path) -> None:
     """Filename containing directory traversal sequences must be rejected."""
     good_file = tmp_path / "good.pdf"
     good_file.write_bytes(b"%PDF-1.4\n%%EOF\n")
-    ok, res = _run_plugin(tmp_path, good_file, PDF_MEDIA_TYPE, filename="../../etc/shadow")
+    ok, res = _run_plugin(
+        tmp_path, good_file, PDF_MEDIA_TYPE, filename="../../etc/shadow"
+    )
     assert not ok
     assert "filename must be a basename" in str(res)
 

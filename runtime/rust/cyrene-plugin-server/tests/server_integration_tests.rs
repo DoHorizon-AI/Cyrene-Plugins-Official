@@ -31,10 +31,16 @@ use cyrene_agent_runtime::adapter::{snapshot_tool_catalog, SnapshotToolProvider}
 use cyrene_agent_runtime::engine::cancel::CancellationToken;
 use cyrene_agent_runtime::engine::turn_loop::CyreneNativeAgentLoop;
 use cyrene_agent_runtime::tck::MockModelProvider;
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+use cyrene_computer_runtime::{
+    ComputerExecutionBackend, ComputerRuntimeLimits, ComputerRuntimeService,
+};
 use cyrene_mcp_provider::{McpServerConfig, McpToolProvider};
 use cyrene_plugin_contracts::agent_runtime_v1::{
     agent_run_response, AgentRunRequest, AgentRunResponse,
 };
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+use cyrene_plugin_contracts::computer_runtime_v1::CommandExecutionRequest;
 use cyrene_plugin_contracts::computer_runtime_v1::{
     create_artifact_response, get_artifact_response, list_dir_response, ComputerErrorCode,
     CreateArtifactRequest, CreateArtifactResponse, GetArtifactRequest, GetArtifactResponse,
@@ -96,12 +102,38 @@ async fn start_server(
     (client, addr)
 }
 
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+async fn start_server_with_small_client_window(
+    service: DirectPluginRuntimeServiceImpl,
+) -> (DirectPluginRuntimeClient<Channel>, SocketAddr) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    let incoming = TcpListenerStream::new(listener);
+    tokio::spawn(async move {
+        Server::builder()
+            .add_service(DirectPluginRuntimeServer::new(service))
+            .serve_with_incoming(incoming)
+            .await
+            .unwrap();
+    });
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    let endpoint = tonic::transport::Endpoint::from_shared(format!("http://{addr}"))
+        .unwrap()
+        .initial_stream_window_size(Some(1024))
+        .initial_connection_window_size(Some(1024));
+    let client = DirectPluginRuntimeClient::connect(endpoint).await.unwrap();
+    (client, addr)
+}
+
 #[tokio::test]
 async fn test_production_host_does_not_advertise_simulated_capabilities() {
     let (mut client, _addr) = start_production_server().await;
 
     let health = client.health(HealthRequest {}).await.unwrap().into_inner();
-    assert_eq!(health.capabilities, vec!["computer.runtime.v1"]);
+    assert_eq!(
+        health.capabilities,
+        vec!["computer.runtime.v1", "tool.provider.v1"]
+    );
 
     let request = AgentRunRequest::default();
     let response = client
@@ -132,7 +164,7 @@ async fn test_r08_health_check() {
     let resp = client.health(HealthRequest {}).await.unwrap().into_inner();
 
     assert_eq!(resp.status, health_response::Status::Serving as i32);
-    assert_eq!(resp.plugin_id, "cyrene.plugin.rust.server");
+    assert_eq!(resp.plugin_id, "cyrene.tools.computer-runtime");
     assert_eq!(resp.plugin_version, "0.1.0");
     assert_eq!(
         resp.capabilities,
@@ -140,8 +172,80 @@ async fn test_r08_health_check() {
             "agent.runtime.v1".to_string(),
             "memory.provider.v1".to_string(),
             "computer.runtime.v1".to_string(),
+            "tool.provider.v1".to_string(),
         ]
     );
+}
+
+#[tokio::test]
+async fn test_fixed_computer_tools_are_listed_and_execute_through_existing_runtime() {
+    let (mut client, _addr) = start_production_server().await;
+    let list = ListToolsRequest { binding_id: None };
+    let response = client
+        .invoke(DirectInvocationRequest {
+            capability: "tool.provider.v1".into(),
+            method: "list_tools".into(),
+            interface_version: "1".into(),
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest".into(),
+            payload: list.encode_to_vec(),
+            request_id: "computer-catalog".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let Some(InvocationResult::Payload(payload)) = response.result else {
+        panic!("computer tool catalog should be returned as a payload");
+    };
+    let catalog = ListToolsResponse::decode(&payload.value[..]).unwrap();
+    let Some(list_tools_response::Result::Catalog(catalog)) = catalog.result else {
+        panic!("computer tool catalog should be available without MCP");
+    };
+    assert_eq!(catalog.tools.len(), 4);
+    assert!(catalog
+        .tools
+        .iter()
+        .all(|tool| tool.binding_id == "computer-runtime"));
+
+    let call = CallToolRequest {
+        binding_id: "computer-runtime".into(),
+        provider_tool_id: "computer.command.execute".into(),
+        arguments_json: r#"{"command":"printf direct-plugin-ok"}"#.into(),
+        catalog_version: Some(catalog.catalog_version),
+    };
+    let response = client
+        .invoke(DirectInvocationRequest {
+            capability: "tool.provider.v1".into(),
+            method: "call_tool".into(),
+            interface_version: "1".into(),
+            payload_type_url: "type.cyrene.io/cyrene.tool.provider.v1.CallToolRequest".into(),
+            payload: call.encode_to_vec(),
+            request_id: "computer-command".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+    let Some(InvocationResult::Payload(payload)) = response.result else {
+        panic!("computer tool call should return a payload");
+    };
+    let call_response = CallToolResponse::decode(&payload.value[..]).unwrap();
+    let Some(call_tool_response::Result::Outcome(outcome)) = call_response.result else {
+        panic!("computer command should return a domain outcome");
+    };
+    assert!(!outcome.is_error);
+    let Some(cyrene_plugin_contracts::tool_provider_v1::tool_content_part::Content::Json(result)) =
+        outcome
+            .content
+            .first()
+            .and_then(|part| part.content.as_ref())
+    else {
+        panic!("computer command result should be JSON");
+    };
+    let result: serde_json::Value = serde_json::from_str(&result.json).unwrap();
+    assert_eq!(result["exit_code"], 0);
+    assert_eq!(result["stdout"], "direct-plugin-ok");
+    assert_eq!(result["resource_usage"], serde_json::Value::Null);
 }
 
 #[tokio::test]
@@ -715,7 +819,7 @@ fn fake_mcp_server_config() -> McpServerConfig {
 }
 
 #[tokio::test]
-async fn test_w3_tool_provider_without_bindings_fails_closed() {
+async fn test_computer_tool_provider_is_available_without_mcp_bindings() {
     let (mut client, _addr) = start_production_server().await;
 
     let mut buf = Vec::new();
@@ -737,12 +841,18 @@ async fn test_w3_tool_provider_without_bindings_fails_closed() {
         .unwrap()
         .into_inner();
 
-    match response.result.unwrap() {
-        InvocationResult::Error(error) => assert_eq!(error.code, Code::Unavailable as i32),
-        InvocationResult::Payload(_) => {
-            panic!("an unconfigured tool provider must fail closed")
-        }
-    }
+    let Some(InvocationResult::Payload(payload)) = response.result else {
+        panic!("the fixed computer tool provider should be available without MCP bindings");
+    };
+    let list_response = ListToolsResponse::decode(&payload.value[..]).unwrap();
+    let Some(list_tools_response::Result::Catalog(catalog)) = list_response.result else {
+        panic!("the computer catalog should be returned");
+    };
+    assert_eq!(catalog.tools.len(), 4);
+    assert!(catalog
+        .tools
+        .iter()
+        .all(|tool| tool.binding_id == "computer-runtime"));
 }
 
 #[tokio::test]
@@ -779,8 +889,10 @@ async fn test_w3_mcp_tool_provider_dispatch() {
         list_tools_response::Result::Catalog(catalog) => catalog,
         list_tools_response::Result::Error(error) => panic!("list_tools error: {error:?}"),
     };
-    assert_eq!(catalog.tools.len(), 3);
-    assert!(catalog.catalog_version.starts_with("sha256:"));
+    assert_eq!(catalog.tools.len(), 7);
+    assert!(catalog
+        .catalog_version
+        .starts_with("computer-runtime-v1-four-tools+sha256:"));
     assert!(catalog
         .tools
         .iter()
@@ -1024,4 +1136,178 @@ async fn test_r09_fail_closed_guarantees() {
         }
         InvocationResult::Payload(_) => panic!("Expected fail-closed error for corrupted payload"),
     }
+}
+
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+#[tokio::test]
+async fn test_computer_stream_reports_missing_mxc_receipt_before_end() {
+    use std::os::unix::fs::PermissionsExt;
+
+    let workspace = tempfile::tempdir().unwrap();
+    let artifacts = tempfile::tempdir().unwrap();
+    let helper_dir = tempfile::tempdir().unwrap();
+    let helper_path = helper_dir.path().join("cyrene-mxc-exec");
+    std::fs::write(
+        &helper_path,
+        b"#!/bin/sh\nif [ \"$1\" = \"--probe\" ]; then echo 'CYRENE_MXC_PROBE_OK backend=mxc sdk=1.0.1 containment=bubblewrap bwrap=0.13.1'; exit 0; fi\nexit 0\n",
+    )
+    .unwrap();
+    std::fs::set_permissions(&helper_path, std::fs::Permissions::from_mode(0o700)).unwrap();
+    let computer = Arc::new(
+        ComputerRuntimeService::with_execution_backend(
+            vec![workspace.path().to_path_buf()],
+            artifacts.path().to_path_buf(),
+            ComputerRuntimeLimits::default(),
+            ComputerExecutionBackend::MicrosoftMxc,
+            Some(helper_path),
+        )
+        .expect("the injected helper passes the controlled startup probe"),
+    );
+    let service = DirectPluginRuntimeServiceImpl::with_computer_runtime_for_tests(computer);
+    let (mut client, _) = start_server(service).await;
+    let payload = CommandExecutionRequest {
+        command: "echo command-output-must-not-imply-success".into(),
+        cwd: Some(workspace.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(5_000),
+        max_output_bytes: None,
+    }
+    .encode_to_vec();
+    let mut stream = client
+        .invoke_stream(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "execute_command_stream".into(),
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest"
+                .into(),
+            payload,
+            request_id: "mxc-missing-receipt-stream".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    let mut errors = 0;
+    let mut ended = false;
+    while let Some(item) = stream.message().await.unwrap() {
+        match item.event {
+            Some(proto::direct_stream_item::Event::Error(error)) => {
+                errors += 1;
+                assert_eq!(error.code, Code::ExecutionFailed as i32);
+                assert_eq!(error.domain_code, "COMPUTER_STREAM_EXECUTION_ERROR");
+                assert!(error.message.contains("terminal receipt"));
+            }
+            Some(proto::direct_stream_item::Event::Payload(payload)) => {
+                let event =
+                    cyrene_plugin_contracts::computer_runtime_v1::CommandStreamEvent::decode(
+                        payload.value.as_slice(),
+                    )
+                    .unwrap();
+                assert!(!matches!(
+                    event.event,
+                    Some(
+                        cyrene_plugin_contracts::computer_runtime_v1::command_stream_event::Event::ExitEvidence(_)
+                    )
+                ));
+            }
+            Some(proto::direct_stream_item::Event::End(_)) => ended = true,
+            None => panic!("stream item must have a terminal event"),
+        }
+    }
+    assert_eq!(errors, 1, "emit one explicit error, without a duplicate");
+    assert!(
+        ended,
+        "the stream still closes with its structural End item"
+    );
+}
+
+#[cfg(all(feature = "mxc", target_os = "linux"))]
+#[tokio::test]
+async fn test_computer_grpc_stream_reserves_error_and_end_while_client_pauses_reads() {
+    let workspace = tempfile::tempdir().unwrap();
+    let artifacts = tempfile::tempdir().unwrap();
+    let limits = ComputerRuntimeLimits {
+        command_default_timeout_ms: 1_000,
+        command_max_timeout_ms: 1_000,
+        ..ComputerRuntimeLimits::default()
+    };
+    let computer = Arc::new(
+        ComputerRuntimeService::with_execution_backend(
+            vec![workspace.path().to_path_buf()],
+            artifacts.path().to_path_buf(),
+            limits.clone(),
+            ComputerExecutionBackend::Managed,
+            None,
+        )
+        .unwrap(),
+    );
+    let service = DirectPluginRuntimeServiceImpl::with_computer_runtime_and_limits_for_tests(
+        computer, limits,
+    );
+    let (mut client, _) = start_server_with_small_client_window(service).await;
+    let payload = CommandExecutionRequest {
+        command: "head -c 65536 /dev/zero | tr '\\0' x; head -c 65536 /dev/zero | tr '\\0' y >&2"
+            .into(),
+        cwd: Some(workspace.path().to_string_lossy().into_owned()),
+        env: HashMap::new(),
+        timeout_ms: Some(1_000),
+        max_output_bytes: None,
+    }
+    .encode_to_vec();
+    let mut stream = client
+        .invoke_stream(DirectInvocationRequest {
+            interface_version: "1".into(),
+            capability: "computer.runtime.v1".into(),
+            method: "execute_command_stream".into(),
+            payload_type_url: "type.cyrene.io/cyrene.computer.runtime.v1.CommandExecutionRequest"
+                .into(),
+            payload,
+            request_id: "computer-stream-paused-reader".into(),
+            stream_mode: DirectStreamMode::Invocation as i32,
+        })
+        .await
+        .unwrap()
+        .into_inner();
+
+    // Leave the real gRPC consumer idle until the bounded relay reaches its
+    // downstream deadline, then resume and verify its reserved terminal slots.
+    tokio::time::sleep(Duration::from_millis(1_300)).await;
+
+    let mut payload_count = 0;
+    let mut timeout_errors = 0;
+    let mut terminal_error_seen = false;
+    let mut ended = false;
+    tokio::time::timeout(Duration::from_secs(3), async {
+        while let Some(item) = stream.message().await.unwrap() {
+            match item.event {
+                Some(proto::direct_stream_item::Event::Error(error)) => {
+                    timeout_errors += 1;
+                    terminal_error_seen = true;
+                    assert_eq!(error.code, Code::DeadlineExceeded as i32);
+                    assert_eq!(error.domain_code, "COMPUTER_STREAM_TIMEOUT");
+                    assert!(error.message.contains("downstream backpressure"));
+                }
+                Some(proto::direct_stream_item::Event::Payload(_)) => {
+                    assert!(!terminal_error_seen, "progress must precede terminal error");
+                    payload_count += 1;
+                }
+                Some(proto::direct_stream_item::Event::End(_)) => {
+                    assert!(terminal_error_seen, "End must follow the terminal error");
+                    ended = true;
+                    break;
+                }
+                None => panic!("stream item must contain an event"),
+            }
+        }
+    })
+    .await
+    .expect("resumed gRPC stream should drain its queued terminal result");
+
+    assert!(
+        payload_count > 0,
+        "the paused stream should retain progress"
+    );
+    assert_eq!(timeout_errors, 1, "emit exactly one reserved timeout error");
+    assert!(ended, "reserved End must follow the error");
 }

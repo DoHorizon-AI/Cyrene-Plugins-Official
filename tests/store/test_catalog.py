@@ -5,6 +5,7 @@
 
 from __future__ import annotations
 
+import json
 import sys
 import unittest
 from pathlib import Path
@@ -35,7 +36,35 @@ class PluginCatalogTest(unittest.TestCase):
     and catalog export format and field integrity.
     """
 
-    EXPECTED_PLUGIN_COUNT = 17
+    EXPECTED_PLUGIN_COUNT = 26
+    EXPECTED_PLUGIN_IDS: ClassVar[set[str]] = {
+        "cyrene.accounts.account-center",
+        "cyrene.connectors.email-notification",
+        "cyrene.connectors.im",
+        "cyrene.connectors.onebot-v11",
+        "cyrene.connectors.teams",
+        "cyrene.connectors.wecom",
+        "cyrene.evaluation.evaluator-pack",
+        "cyrene.evaluation.exact-match",
+        "cyrene.evaluation.llm-judge",
+        "cyrene.models.hf-analyzer",
+        "cyrene.policy.compat-rules",
+        "cyrene.providers.cloud-resources",
+        "cyrene.providers.cloud-management",
+        "cyrene.providers.github-issues",
+        "cyrene.providers.huggingface",
+        "cyrene.providers.azure-devops-observation",
+        "cyrene.providers.microsoft-graph",
+        "cyrene.providers.model-api-connector",
+        "cyrene.serving.vllm-runtime",
+        "cyrene.tools.computer-runtime",
+        "cyrene.tools.dataset-generation",
+        "cyrene.tools.dataset-preparation",
+        "cyrene.tools.dataset-validator",
+        "cyrene.tools.document-parsing",
+        "cyrene.tools.knowledge-preparation",
+        "cyrene.training.llama-factory",
+    }
     EXPECTED_DATA_TOOLS_METADATA: ClassVar[dict[str, tuple[str, str]]] = {
         "cyrene.tools.document-parsing": ("Document Parsing", "document.parsing.v1"),
         "cyrene.tools.knowledge-preparation": (
@@ -45,6 +74,55 @@ class PluginCatalogTest(unittest.TestCase):
         "cyrene.tools.dataset-generation": (
             "Dataset Generation",
             "dataset.generation.v1",
+        ),
+    }
+    EXPECTED_INTEGRATION_METADATA: ClassVar[
+        dict[str, tuple[str, str, tuple[str, ...]]]
+    ] = {
+        "cyrene.accounts.account-center": (
+            "Cyrene Account Center",
+            "account.center.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.azure-devops-observation": (
+            "Azure DevOps Observation Provider",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.microsoft-graph": (
+            "Microsoft Graph Provider",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.github-issues": (
+            "GitHub Issues Provider",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.cloud-resources": (
+            "Cloud Resource Observation Provider",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.cloud-management": (
+            "Cloud Management Provider",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.providers.huggingface": (
+            "Hugging Face Hub Provider",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.connectors.email-notification": (
+            "Independent SMTP Email Notification Connector",
+            "tool.provider.v1",
+            ("Cyrene-Exchange",),
+        ),
+        "cyrene.connectors.teams": (
+            "Cyrene Microsoft Teams Connector",
+            "message.connector.v1",
+            ("Cyrene-Exchange", "Cyrene-Navigator"),
         ),
     }
     REQUIRED_METADATA_FIELDS: ClassVar[set[str]] = {
@@ -65,8 +143,8 @@ class PluginCatalogTest(unittest.TestCase):
     def setUp(self) -> None:
         self.catalog = load_catalog(root_dir=REPO_ROOT)
 
-    def test_discover_all_17_plugins_and_metadata_extraction(self) -> None:
-        """1. Test discovery of all 17 official plugins and verify metadata extraction."""
+    def test_discover_all_26_plugins_and_metadata_extraction(self) -> None:
+        """1. Discover the 26 expected plugins and verify their published metadata."""
         manifests = discover_plugin_manifests(REPO_ROOT)
         self.assertEqual(
             len(manifests),
@@ -76,6 +154,7 @@ class PluginCatalogTest(unittest.TestCase):
 
         plugin_ids: set[str] = set()
         data_tools_ids: set[str] = set()
+        integration_ids: set[str] = set()
         for manifest_path in manifests:
             meta = parse_plugin_manifest(manifest_path, root=REPO_ROOT)
 
@@ -113,13 +192,24 @@ class PluginCatalogTest(unittest.TestCase):
                 self.assertEqual(meta["capabilities"], [expected_capability])
                 self.assertEqual(meta["supportedServices"], ["Cyrene-Catalyst"])
                 data_tools_ids.add(meta["id"])
+            expected_integration = self.EXPECTED_INTEGRATION_METADATA.get(meta["id"])
+            if expected_integration is not None:
+                expected_name, expected_capability, expected_services = expected_integration
+                self.assertEqual(meta["name"], expected_name)
+                self.assertEqual(meta["language"], "python")
+                self.assertEqual(meta["kind"], "capability-plugin")
+                self.assertEqual(meta["capabilities"], [expected_capability])
+                self.assertEqual(meta["supportedServices"], list(expected_services))
+                integration_ids.add(meta["id"])
 
         self.assertEqual(
             len(plugin_ids),
             self.EXPECTED_PLUGIN_COUNT,
-            "All 17 discovered plugins must have unique IDs",
+            "All discovered plugins must have unique IDs",
         )
+        self.assertEqual(plugin_ids, self.EXPECTED_PLUGIN_IDS)
         self.assertEqual(data_tools_ids, set(self.EXPECTED_DATA_TOOLS_METADATA))
+        self.assertEqual(integration_ids, set(self.EXPECTED_INTEGRATION_METADATA))
 
     def test_profile_filtering(self) -> None:
         """2. Test profile filtering (reactor filters out 4 plugins, echo filters out 3 plugins)."""
@@ -170,13 +260,13 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(empty_plugins), 0)
 
     def test_language_filtering(self) -> None:
-        """3. Test language filtering across python (14), rust (1), and csharp (2)."""
-        # Python: 14 plugins
+        """3. Test language filtering across python (23), rust (1), and csharp (2)."""
+        # Python: 23 plugins, including Teams, Cloud Management, and HF providers.
         python_plugins = list_plugins(language="python", catalog=self.catalog)
         self.assertEqual(
             len(python_plugins),
-            14,
-            f"Expected 14 Python plugins, got {len(python_plugins)}",
+            23,
+            f"Expected 23 Python plugins, got {len(python_plugins)}",
         )
         for p in python_plugins:
             self.assertEqual(p["language"], "python")
@@ -203,7 +293,7 @@ class PluginCatalogTest(unittest.TestCase):
         for p in csharp_plugins:
             self.assertEqual(p["language"], "csharp")
 
-        # Sum of languages must equal total 17 plugins
+        # Sum of languages must equal the total plugin count.
         self.assertEqual(
             len(python_plugins) + len(rust_plugins) + len(csharp_plugins),
             self.EXPECTED_PLUGIN_COUNT,
@@ -214,7 +304,38 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(list_plugins(language="c#", catalog=self.catalog)), 2)
         self.assertEqual(len(list_plugins(language="dotnet", catalog=self.catalog)), 2)
         self.assertEqual(len(list_plugins(language="RUST", catalog=self.catalog)), 1)
-        self.assertEqual(len(list_plugins(language="Python", catalog=self.catalog)), 14)
+        self.assertEqual(len(list_plugins(language="Python", catalog=self.catalog)), 23)
+
+    def test_computer_runtime_methods_are_scoped_to_their_capability(self) -> None:
+        """Multi-capability runtime methods must remain explicitly attributable."""
+        manifest_path = (
+            REPO_ROOT / "plugins/tools/computer-runtime/plugin.manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        methods_by_capability = {
+            capability: sorted(
+                method["name"]
+                for method in manifest["methods"]
+                if method["capability"] == capability
+            )
+            for capability in manifest["capabilities"]
+        }
+
+        self.assertEqual(
+            methods_by_capability,
+            {
+                "computer.runtime.v1": [
+                    "CreateArtifact",
+                    "ExecuteCommand",
+                    "ExecuteCommandStream",
+                    "GetArtifact",
+                    "ListDir",
+                    "ReadFile",
+                    "WriteFile",
+                ],
+                "tool.provider.v1": ["call_tool", "list_tools"],
+            },
+        )
 
     def test_export_format_and_field_integrity(self) -> None:
         """4. Test plugins-catalog.json export format, schemaVersion, and field integrity."""
@@ -301,11 +422,30 @@ class PluginCatalogTest(unittest.TestCase):
             self.assertIn(s, by_service)
 
         # 2. Check canonical counts per service
-        self.assertEqual(len(by_service["Cyrene-Navigator"]), 5)
+        self.assertEqual(len(by_service["Cyrene-Navigator"]), 6)
         self.assertEqual(len(by_service["Cyrene-Echo"]), 3)
         self.assertEqual(len(by_service["Cyrene-Reactor"]), 3)
         self.assertEqual(len(by_service["Cyrene-Yield"]), 3)
-        self.assertEqual(len(by_service["Cyrene-Exchange"]), 4)
+        self.assertEqual(len(by_service["Cyrene-Exchange"]), 14)
+        self.assertEqual(
+            set(by_service["Cyrene-Exchange"]),
+            {
+                "cyrene.accounts.account-center",
+                "cyrene.connectors.email-notification",
+                "cyrene.connectors.im",
+                "cyrene.connectors.onebot-v11",
+                "cyrene.connectors.teams",
+                "cyrene.connectors.wecom",
+                "cyrene.providers.cloud-management",
+                "cyrene.providers.cloud-resources",
+                "cyrene.providers.github-issues",
+                "cyrene.providers.huggingface",
+                "cyrene.providers.azure-devops-observation",
+                "cyrene.providers.microsoft-graph",
+                "cyrene.providers.model-api-connector",
+                "cyrene.tools.computer-runtime",
+            },
+        )
         self.assertEqual(len(by_service["Cyrene-Catalyst"]), 5)
         self.assertEqual(
             set(by_service["Cyrene-Catalyst"]),
@@ -321,11 +461,12 @@ class PluginCatalogTest(unittest.TestCase):
 
         # 3. Check specific plugins under Cyrene-Navigator
         navigator_plugins = list_plugins(service="Cyrene-Navigator", catalog=self.catalog)
-        self.assertEqual(len(navigator_plugins), 5)
+        self.assertEqual(len(navigator_plugins), 6)
         navigator_ids = {p["id"] for p in navigator_plugins}
         expected_navigator_ids = {
             "cyrene.connectors.im",
             "cyrene.connectors.onebot-v11",
+            "cyrene.connectors.teams",
             "cyrene.connectors.wecom",
             "cyrene.providers.model-api-connector",
             "cyrene.tools.computer-runtime",
@@ -337,8 +478,8 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual({p["id"] for p in api_navigator}, expected_navigator_ids)
 
         # 4. Check case-insensitivity and prefix stripping
-        self.assertEqual(len(list_plugins(service="cyrene-navigator", catalog=self.catalog)), 5)
-        self.assertEqual(len(list_plugins(service="navigator", catalog=self.catalog)), 5)
+        self.assertEqual(len(list_plugins(service="cyrene-navigator", catalog=self.catalog)), 6)
+        self.assertEqual(len(list_plugins(service="navigator", catalog=self.catalog)), 6)
         self.assertEqual(len(list_plugins(service="echo", catalog=self.catalog)), 3)
         self.assertEqual(len(list_plugins(service="CYRENE-ECHO", catalog=self.catalog)), 3)
 

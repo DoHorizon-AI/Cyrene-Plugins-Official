@@ -1,0 +1,92 @@
+{
+  "record_type": "package_descriptor",
+  "spec_version": "0.1",
+  "package": {
+    "manifest_ref": "plugin.manifest.json",
+    "id": "cyrene.connectors.teams",
+    "version": "0.1.0",
+    "lineage": "cyrene.connectors.teams"
+  },
+  "capabilities": [
+    {
+      "id": "message.connector.v1",
+      "interface_version": "1"
+    }
+  ],
+  "capability": {
+    "id": "message.connector.v1",
+    "interface_version": "1"
+  },
+  "connector": {
+    "family": "teams",
+    "type": "msteams"
+  },
+  "profiles": [
+    {
+      "name": "msteams-channel",
+      "connector": {
+        "family": "teams",
+        "type": "msteams",
+        "compatibility_profile": null
+      },
+      "runtime": {
+        "kind": "direct-plugin-runtime",
+        "external": {
+          "required": false,
+          "kind": "teams-cloud-service",
+          "artifact_ref": null
+        }
+      }
+    }
+  ],
+  "implementation": {
+    "artifact": {
+      "status": "NOT_PUBLISHED"
+    },
+    "entrypoint": "teams_connector.plugin:TeamsConnectorPlugin"
+  },
+  "dependencies": {
+    "lock": {
+      "status": "NOT_PUBLISHED"
+    }
+  },
+  "configuration": {
+    "schema_ref": "configuration.schema.json",
+    "digest": null
+  },
+  "runtime": {
+    "kind": "python-package",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "entrypoint": "teams_connector.plugin:TeamsConnectorPlugin"
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "capability_interface": [
+      "message.connector.v1@1"
+    ],
+    "os": [
+      "linux"
+    ],
+    "architectures": [
+      "x86_64",
+      "aarch64"
+    ]
+  },
+  "integrity": {
+    "artifact_digest": null,
+    "archive_digest": null,
+    "signature_ref": null
+  },
+  "lifecycle": {
+    "rollback_identity": "cyrene.connectors.teams@0.1.0",
+    "cache_identity": "cyrene.connectors.teams@0.1.0"
+  },
+  "provenance": {
+    "source_repository": "Cyrene-Plugins-Official",
+    "source_revision": null,
+    "builder": null,
+    "sbom_ref": null,
+    "attestation_ref": null
+  },
+  "publication_status": "CANDIDATE"
+}

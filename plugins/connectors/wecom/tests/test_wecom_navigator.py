@@ -5,9 +5,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -21,6 +24,66 @@ from wecom_connector import (
 )
 from wecom_connector.errors import ConnectorError
 from wecom_connector.navigator import NavigatorIntegrationConfig
+
+_NAVIGATOR_PROJECTION_PATH = (
+    Path(__file__).parent / "fixtures" / "navigator_notification_finish_projection.json"
+)
+
+
+def _navigator_finish_outcomes() -> list[str]:
+    """Verify the pinned Navigator contract projection and return its outcomes."""
+
+    fixture = json.loads(_NAVIGATOR_PROJECTION_PATH.read_text(encoding="utf-8"))
+    if fixture.get("schemaVersion") != 1:
+        raise AssertionError(
+            "Navigator contract projection schema version is unsupported"
+        )
+    projection = fixture.get("projection")
+    source = fixture.get("source")
+    if not isinstance(projection, dict) or not isinstance(source, dict):
+        raise AssertionError("Navigator contract projection is incomplete")
+    canonical_projection = json.dumps(
+        projection, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    if hashlib.sha256(canonical_projection).hexdigest() != fixture.get(
+        "projectionSha256"
+    ):
+        raise AssertionError("Navigator contract projection digest does not match")
+
+    pinned_path = os.environ.get("CYRENE_NAVIGATOR_OPENAPI")
+    if pinned_path:
+        contract_path = Path(pinned_path)
+        if not contract_path.is_file():
+            raise AssertionError("Pinned Navigator OpenAPI source is missing")
+    else:
+        worktree = Path(__file__).resolve().parents[5]
+        sibling_path = worktree / "navigator/contracts/product/v1/work.openapi.json"
+        contract_path = sibling_path if sibling_path.is_file() else None
+
+    if contract_path is not None:
+        source_bytes = contract_path.read_bytes()
+        if hashlib.sha256(source_bytes).hexdigest() != source.get("sha256"):
+            raise AssertionError(
+                "Navigator OpenAPI source differs from its pinned digest"
+            )
+        contract = json.loads(source_bytes)
+        outcomes = contract["components"]["schemas"]["NotificationFinish"][
+            "properties"
+        ]["outcome"]["enum"]
+        if outcomes != projection.get("allowed_values"):
+            raise AssertionError(
+                "Navigator outcome enum differs from the pinned projection"
+            )
+
+    values = projection.get("allowed_values")
+    if not isinstance(values, list) or not all(
+        isinstance(value, str) for value in values
+    ):
+        raise AssertionError("Navigator contract projection has invalid outcome values")
+    return values
+
+
+_NAVIGATOR_FINISH_OUTCOMES = _navigator_finish_outcomes()
 
 
 class FakeNavigatorHandler(BaseHTTPRequestHandler):
@@ -94,6 +157,9 @@ class FakeOutboxHandler(BaseHTTPRequestHandler):
                 self.timeline.append("start")
                 response = {"started": True}
             elif self.path.endswith("/finish"):
+                if payload.get("outcome") not in _NAVIGATOR_FINISH_OUTCOMES:
+                    self.send_error(422)
+                    return
                 self.transitions.append(("finish", payload))
                 self.timeline.append("finish")
                 response = {"finished": True}
@@ -174,11 +240,11 @@ def inbound_message(sender_id: str = "member-trusted") -> InboundMessage:
         content="brief.pdf",
         raw_payload={
             "body": {
-                "msg_id": "message-001",
-                "chat_id": "trusted-chat",
-                "chat_type": "single",
-                "from": {"user_id": sender_id, "name": "Trusted Member"},
-                "msg_type": "file",
+                "msgid": "message-001",
+                "chatid": "trusted-chat",
+                "chattype": "single",
+                "from": {"userid": sender_id, "name": "Trusted Member"},
+                "msgtype": "file",
                 "file": {
                     "media_id": "media-001",
                     "file_name": "brief.pdf",
@@ -220,8 +286,7 @@ def test_local_navigator_task_intake_is_scoped_and_idempotent(
     assert first["navigator_receipt"]["duplicate"] is False
     assert second["navigator_receipt"]["duplicate"] is True
     assert (
-        first["navigator_receipt"]["eventId"]
-        == second["navigator_receipt"]["eventId"]
+        first["navigator_receipt"]["eventId"] == second["navigator_receipt"]["eventId"]
     )
     assert len(FakeNavigatorHandler.records) == 1
     path, payload = next(iter(FakeNavigatorHandler.seen))
@@ -277,6 +342,32 @@ def test_untrusted_sender_never_reaches_navigator(fake_navigator: str) -> None:
     connector.close()
 
 
+def test_integration_binding_can_disable_direct_navigator_forwarding(
+    fake_navigator: str,
+) -> None:
+    value = navigator_config(fake_navigator)
+    value["forward_inbound"] = False
+    navigator = NavigatorIntegrationConfig.from_mapping(
+        value, binding_id="wecom-binding"
+    )
+    connector = WeComConnector(
+        WeComInstanceConfig(
+            binding_id="wecom-binding",
+            mode="bot",
+            bot_id="bot-1",
+            bot_secret="secret-1",
+            navigator=navigator,
+        )
+    )
+
+    result = connector.publish_inbound_message(inbound_message())
+
+    assert navigator.forward_inbound is False
+    assert result["navigator_receipt"] is None
+    assert FakeNavigatorHandler.records == []
+    connector.close()
+
+
 def test_navigator_config_rejects_non_loopback_and_missing_trust(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -315,7 +406,7 @@ def test_navigator_binding_and_trusted_account_must_match_activation(
 
 @pytest.mark.parametrize(
     ("vendor_errcode", "expected_outcome"),
-    [(0, "delivered"), (45009, "failed"), (None, "uncertain")],
+    [(0, "uncertain"), (45009, "failed"), (None, "uncertain")],
 )
 def test_outbox_marks_started_then_records_vendor_receipt_without_retry(
     fake_outbox: str,
@@ -368,7 +459,7 @@ def test_outbox_marks_started_then_records_vendor_receipt_without_retry(
             transport.push_inbound(
                 {"headers": {"req_id": req_id}, "errcode": 0, "errmsg": "ok"}
             )
-        elif command == "aibot_send":
+        elif command == "aibot_send_msg":
             with FakeOutboxHandler.lock:
                 FakeOutboxHandler.timeline.append("send")
             if vendor_errcode is not None:
@@ -393,6 +484,18 @@ def test_outbox_marks_started_then_records_vendor_receipt_without_retry(
             "finish",
         ]
         assert finish["outcome"] == expected_outcome
+        allowed_outcomes = _navigator_finish_outcomes()
+        if allowed_outcomes is None:
+            pytest.skip(
+                "Navigator OpenAPI contract is absent from this package-only checkout"
+            )
+        assert finish["outcome"] in allowed_outcomes
+        if vendor_errcode == 0:
+            result = finish["result"]
+            assert result["status"] == "uncertain"
+            assert result["submission_status"] == "accepted"
+            assert result["transportRequestId"].startswith("send-")
+            assert result["vendorMessageRef"] == "vendor-message-001"
         assert FakeOutboxHandler.timeline == ["start", "send", "finish"]
         claim = FakeOutboxHandler.claims[0]
         assert claim["type"] == "wecom.message"
@@ -401,15 +504,17 @@ def test_outbox_marks_started_then_records_vendor_receipt_without_retry(
         send_body = next(
             message["body"]
             for message in transport.sent_messages
-            if message.get("cmd") == "aibot_send"
+            if message.get("cmd") == "aibot_send_msg"
         )
-        assert send_body["chat_id"] == "trusted-chat"
-        assert send_body["chat_type"] == "single"
+        assert send_body["chatid"] == "trusted-chat"
         assert send_body["text"]["content"] == "Task completed: answer"
         assert worker.poll_once() == 0
-        assert sum(
-            message.get("cmd") == "aibot_send"
-            for message in transport.sent_messages
-        ) == 1
+        assert (
+            sum(
+                message.get("cmd") == "aibot_send_msg"
+                for message in transport.sent_messages
+            )
+            == 1
+        )
     finally:
         connector.close()

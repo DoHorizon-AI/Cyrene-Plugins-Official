@@ -166,7 +166,7 @@ jobs:
             "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-linux-x86_64.zip"
             "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-descriptor.json"
             "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-requirements.lock"
-            "cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
+            "cyrene_plugin_runtime-0.2.2-py3-none-any.whl"
             "cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-release.json"
           )
           for asset in "${assets[@]}"; do
@@ -219,7 +219,7 @@ jobs:
             "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-linux-x86_64.zip"
             "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-descriptor.json"
             "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-requirements.lock"
-            "$PUBLISH_DIR/cyrene_plugin_runtime-0.2.0-py3-none-any.whl"
+            "$PUBLISH_DIR/cyrene_plugin_runtime-0.2.2-py3-none-any.whl"
             "$PUBLISH_DIR/cyrene.training.llama-factory-${TRAINING_PACKAGE_VERSION}-package-release.json"
           )
           for asset in \

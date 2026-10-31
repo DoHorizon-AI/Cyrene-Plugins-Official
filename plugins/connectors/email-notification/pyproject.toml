@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-email-notification-connector"
+version = "0.1.0"
+description = "Fixed SMTP email notifications for Cyrene integration support"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-integration-contracts>=0.1,<0.2",
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "jsonschema>=4.23,<5",
+  "protobuf>=4.21,<5",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "ruff>=0.5,<1"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.connectors.email-notification" = [
+  "plugin.manifest.json",
+  "configuration.schema.json",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+cyrene-integration-contracts = { path = "../../../sdk/python/cyrene_integration_contracts" }
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["src/email_notification_connector/_generated"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

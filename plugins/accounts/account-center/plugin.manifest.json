@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.accounts.account-center",
+  "name": "Cyrene Account Center",
+  "version": "0.2.0",
+  "description": "Private, actor-scoped external account links and provider credential leases.",
+  "license": "MIT",
+  "kind": "capability-plugin",
+  "capabilities": ["account.center.v1"],
+  "supportedServices": ["Cyrene-Exchange"],
+  "methods": [
+    {"name": "begin_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkSessionResponse"},
+    {"name": "complete_github_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteGitHubLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedAccountResponse"},
+    {"name": "observe_wecom_challenge", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ObserveWeComChallengeRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ObserveWeComChallengeResponse"},
+    {"name": "confirm_wecom_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ConfirmWeComLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedAccountResponse"},
+    {"name": "list_links", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ListLinksRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ListLinksResponse"},
+    {"name": "get_authorization", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/GetAuthorizationRequest", "outputSchema": "contracts/v1/schema.json#/$defs/AuthorizationResponse"},
+    {"name": "unlink", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/UnlinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/UnlinkResponse"},
+    {"name": "create_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CreateCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/CredentialLeaseResponse"},
+    {"name": "redeem_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RedeemCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/RedeemCredentialLeaseResponse"},
+    {"name": "resolve_linked_sender", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ResolveLinkedSenderRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ResolveLinkedSenderResponse"},
+    {"name": "link_github_app_installation", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/LinkGitHubAppInstallationRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "link_huggingface_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/LinkHuggingFaceProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "rotate_huggingface_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RotateHuggingFaceProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "begin_huggingface_renewal", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginHuggingFaceRenewalRequest", "outputSchema": "contracts/v1/schema.json#/$defs/HuggingFaceRenewalSession"},
+    {"name": "poll_huggingface_renewal", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/PollHuggingFaceRenewalRequest", "outputSchema": "contracts/v1/schema.json#/$defs/HuggingFaceRenewalSession"},
+    {"name": "register_host_identity_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RegisterHostIdentityProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ProviderProfile"},
+    {"name": "list_provider_profiles", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/ListProviderProfilesRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ListProviderProfilesResponse"},
+    {"name": "unlink_provider_profile", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/UnlinkProviderProfileRequest", "outputSchema": "contracts/v1/schema.json#/$defs/UnlinkProviderProfileResponse"},
+    {"name": "create_provider_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CreateProviderCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/ProviderCredentialLease"},
+    {"name": "redeem_provider_credential_lease", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/RedeemProviderCredentialLeaseRequest", "outputSchema": "contracts/v1/schema.json#/$defs/RedeemCredentialLeaseResponse"},
+    {"name": "begin_microsoft_graph_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginMicrosoftGraphLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphOAuthSession"},
+    {"name": "complete_microsoft_graph_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteMicrosoftGraphLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "begin_microsoft_graph_scope_upgrade", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginMicrosoftGraphScopeUpgradeRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphOAuthSession"},
+    {"name": "complete_microsoft_graph_scope_upgrade", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteMicrosoftGraphLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "update_microsoft_graph_v2_scope", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphV2ScopeUpdateRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphV2ScopeUpdateResponse"},
+    {"name": "begin_azure_devops_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginAzureDevOpsLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphOAuthSession"},
+    {"name": "complete_azure_devops_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteAzureDevOpsLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"}
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "account_center.plugin:AccountCenterPlugin",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {"executable": "prepared-runtime", "args": ["-B", "src/cyrene_plugin_runtime/bootstrap.py", "--entrypoint", "account_center.plugin:AccountCenterPlugin"]}
+  },
+  "compatibility": {"platformVersion": ">=0.1.0", "requiresPython": ">=3.11", "os": ["linux"]},
+  "secrets": {
+    "requiredSecretRefs": [
+      "account-center/encryption-key",
+      "account-center/caller-hmac-keys/exchange",
+      "account-center/caller-hmac-keys/github-provider"
+    ],
+    "optionalSecretRefs": [
+      "account-center/caller-hmac-keys/callback",
+      "account-center/caller-hmac-keys/wecom",
+      "account-center/caller-hmac-keys/huggingface-provider",
+      "account-center/caller-hmac-keys/microsoft-graph-callback",
+      "account-center/caller-hmac-keys/microsoft-graph-provider",
+      "account-center/caller-hmac-keys/azure-devops-provider",
+      "github-app/client-secret",
+      "github-app/private-key",
+      "huggingface/fine-grained-token",
+      "huggingface/connector-token",
+      "microsoft-graph/client-secret"
+    ]
+  },
+  "state": {"isStateful": true, "storageCategory": "relational", "migrationSupported": true, "downgradeSupported": false, "retentionPolicyOnUninstall": "prompt"},
+  "profiles": ["core", "all"]
+}

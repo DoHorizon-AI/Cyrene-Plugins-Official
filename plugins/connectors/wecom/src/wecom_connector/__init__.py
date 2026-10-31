@@ -14,7 +14,9 @@ from .bot_client import (
     InboundMessage,
     ScriptedWsTransport,
     WeComBotClient,
+    WeComBotReceipt,
     WeComBotRequestError,
+    WeComBotUncertainError,
     WeComWsTransport,
 )
 from .bot_runtime import WeComBotRuntime
@@ -75,8 +77,10 @@ __all__ = [
     "UrllibWeComTransport",
     "VENDOR",
     "WeComBotClient",
+    "WeComBotReceipt",
     "WeComBotRequestError",
     "WeComBotRuntime",
+    "WeComBotUncertainError",
     "WeComCliClient",
     "WeComCliError",
     "WeComCliStatus",

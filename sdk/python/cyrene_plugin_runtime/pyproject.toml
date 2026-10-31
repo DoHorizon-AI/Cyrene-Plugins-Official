@@ -4,13 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-plugin-runtime"
-version = "0.2.0"
+version = "0.2.2"
 description = "Plugin-owned direct data-plane runtime for one configured capability instance"
 requires-python = ">=3.11"
 dependencies = [
     "grpcio>=1.62.3,<1.84",
     "protobuf>=4.25.1,<8",
 ]
+
+[project.optional-dependencies]
+test = ["cryptography>=44,<51"]
 
 [project.scripts]
 cyrene-plugin-runtime = "cyrene_plugin_runtime.server:main"
