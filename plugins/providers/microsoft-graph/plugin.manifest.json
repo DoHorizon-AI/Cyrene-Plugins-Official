@@ -4,7 +4,7 @@
   "name": "Microsoft Graph Provider",
   "version": "0.2.0",
   "licenseExpression": "Apache-2.0",
-  "description": "Actor-scoped Planner, To Do, calendar, free/busy, and selected SharePoint metadata tools over fixed Microsoft Graph v1.0 routes.",
+  "description": "Actor-scoped Planner, To Do, calendar, free/busy, selected SharePoint metadata, and opt-in Mail operations over fixed Microsoft Graph v1.0 routes.",
   "kind": "capability-plugin",
   "capabilities": ["tool.provider.v1"],
   "supportedServices": ["Cyrene-Exchange"],

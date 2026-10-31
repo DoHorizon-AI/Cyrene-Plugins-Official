@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "cyrene-microsoft-graph-provider"
 version = "0.2.0"
-description = "Actor-scoped Planner, To Do, calendar, and selected SharePoint metadata tools for Cyrene"
+description = "Actor-scoped Planner, To Do, calendar, selected SharePoint metadata, and opt-in Mail tools for Cyrene"
 requires-python = ">=3.11"
 dependencies = [
   "cyrene-account-center-contracts>=0.1,<0.2",

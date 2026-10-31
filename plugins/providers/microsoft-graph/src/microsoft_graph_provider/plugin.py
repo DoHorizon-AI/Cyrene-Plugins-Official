@@ -77,6 +77,18 @@ _LIST_ARGUMENTS = {
         "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
     },
 }
+_MAIL_RECIPIENTS = {
+    "type": "array",
+    "minItems": 1,
+    "maxItems": 50,
+    "items": {"type": "string", "format": "email", "minLength": 3, "maxLength": 320},
+}
+_MAIL_DRAFT_CHANGES = {
+    "subject": {"type": "string", "minLength": 1, "maxLength": 255},
+    "body_text": {"type": "string", "maxLength": 65536},
+    "to_recipients": dict(_MAIL_RECIPIENTS),
+    "cc_recipients": dict(_MAIL_RECIPIENTS),
+}
 _UPDATE_FIELDS = {
     "title": {"type": "string", "minLength": 1, "maxLength": 255},
     "due_date_time": {"type": "string", "minLength": 1, "maxLength": 64},
@@ -433,6 +445,127 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         },
     },
     {
+        "provider_tool_id": "microsoft_graph.mail.folders.list",
+        "display_name": "List Microsoft Mail Folders",
+        "description": (
+            "Read one bounded page of visible folder metadata for the signed-in user's mailbox."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": dict(_PAGE_ARGUMENTS),
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.mail.messages.list",
+        "display_name": "List Microsoft Mail Metadata",
+        "description": (
+            "Read bounded metadata only from one explicitly selected mail folder; message bodies "
+            "and attachments are never returned."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"folder_id": dict(_OPAQUE_ID), **_PAGE_ARGUMENTS},
+            "required": ["folder_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.mail.message.get",
+        "display_name": "Get Microsoft Mail Metadata",
+        "description": (
+            "Read metadata for one message in an explicitly selected folder, without its body "
+            "or attachments."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"folder_id": dict(_OPAQUE_ID), "message_id": dict(_OPAQUE_ID)},
+            "required": ["folder_id", "message_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.mail.drafts.list",
+        "display_name": "List Microsoft Draft Metadata",
+        "description": (
+            "Read one bounded page of draft metadata from the signed-in user's fixed Drafts folder."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": dict(_PAGE_ARGUMENTS),
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.mail.draft.create",
+        "display_name": "Create Microsoft Mail Draft",
+        "description": (
+            "Create one plain-text draft in the signed-in user's Drafts folder; ambiguous outcomes "
+            "are never replayed."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "subject": {"type": "string", "minLength": 1, "maxLength": 255},
+                "body_text": {"type": "string", "maxLength": 65536},
+                "to_recipients": dict(_MAIL_RECIPIENTS),
+                "cc_recipients": dict(_MAIL_RECIPIENTS),
+            },
+            "required": ["subject", "body_text"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.mail.draft.update",
+        "display_name": "Update Microsoft Mail Draft",
+        "description": (
+            "Update a draft in the signed-in user's fixed Drafts folder using its current ETag."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "message_id": dict(_OPAQUE_ID),
+                "if_match": dict(_ETAG),
+                "changes": {
+                    "type": "object",
+                    "properties": dict(_MAIL_DRAFT_CHANGES),
+                    "minProperties": 1,
+                    "additionalProperties": False,
+                },
+            },
+            "required": ["message_id", "if_match", "changes"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.mail.draft.delete",
+        "display_name": "Delete Microsoft Mail Draft",
+        "description": (
+            "Delete one draft in the signed-in user's fixed Drafts folder only when its current "
+            "ETag matches."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"message_id": dict(_OPAQUE_ID), "if_match": dict(_ETAG)},
+            "required": ["message_id", "if_match"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "microsoft_graph.mail.message.send",
+        "display_name": "Send Existing Microsoft Draft",
+        "description": (
+            "Send one verified draft from the signed-in user's fixed Drafts folder; Graph "
+            "acceptance is not delivery confirmation and ambiguous outcomes are never replayed."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {"message_id": dict(_OPAQUE_ID)},
+            "required": ["message_id"],
+            "additionalProperties": False,
+        },
+    },
+    {
         "provider_tool_id": "microsoft_graph.sharepoint.drives.list",
         "display_name": "List Selected SharePoint Document Libraries",
         "description": "Read document-library metadata for one selected site.",
@@ -465,7 +598,12 @@ _V2_TOOLS = frozenset(
     item["provider_tool_id"]
     for item in CANONICAL_TOOLS
     if item["provider_tool_id"].startswith(
-        ("microsoft_graph.todo.", "microsoft_graph.calendar.", "microsoft_graph.sharepoint.drive")
+        (
+            "microsoft_graph.todo.",
+            "microsoft_graph.calendar.",
+            "microsoft_graph.mail.",
+            "microsoft_graph.sharepoint.drive",
+        )
     )
 ) | {"microsoft_graph.planner.plans.list"}
 _V2_WRITE_TOOLS = frozenset(
@@ -476,6 +614,10 @@ _V2_WRITE_TOOLS = frozenset(
         "microsoft_graph.calendar.event.create",
         "microsoft_graph.calendar.event.update",
         "microsoft_graph.calendar.event.delete",
+        "microsoft_graph.mail.draft.create",
+        "microsoft_graph.mail.draft.update",
+        "microsoft_graph.mail.draft.delete",
+        "microsoft_graph.mail.message.send",
     }
 )
 _WRITE_TOOLS = frozenset(
@@ -502,6 +644,22 @@ _TOOL_FEATURES = {
         for tool_id in _V2_TOOLS
         if tool_id.startswith("microsoft_graph.sharepoint.drive")
     },
+    **{
+        tool_id: "mail_metadata_enabled"
+        for tool_id in _V2_TOOLS
+        if tool_id in {
+            "microsoft_graph.mail.folders.list",
+            "microsoft_graph.mail.messages.list",
+            "microsoft_graph.mail.message.get",
+        }
+    },
+    **{
+        tool_id: "mail_drafts_enabled"
+        for tool_id in _V2_TOOLS
+        if tool_id.startswith("microsoft_graph.mail.draft")
+        or tool_id == "microsoft_graph.mail.drafts.list"
+    },
+    "microsoft_graph.mail.message.send": "mail_send_enabled",
 }
 _LEASE_TARGET_ARGUMENTS: Mapping[str, frozenset[str]] = {
     "microsoft_graph.planner.plan.get": frozenset({"plan_id"}),
@@ -528,6 +686,14 @@ _LEASE_TARGET_ARGUMENTS: Mapping[str, frozenset[str]] = {
     "microsoft_graph.calendar.freebusy.get": frozenset({"schedules"}),
     "microsoft_graph.sharepoint.drives.list": frozenset({"site_id"}),
     "microsoft_graph.sharepoint.drive.items.list": frozenset({"site_id", "drive_id"}),
+    "microsoft_graph.mail.folders.list": frozenset(),
+    "microsoft_graph.mail.messages.list": frozenset({"folder_id"}),
+    "microsoft_graph.mail.message.get": frozenset({"folder_id", "message_id"}),
+    "microsoft_graph.mail.drafts.list": frozenset(),
+    "microsoft_graph.mail.draft.create": frozenset(),
+    "microsoft_graph.mail.draft.update": frozenset({"message_id"}),
+    "microsoft_graph.mail.draft.delete": frozenset({"message_id"}),
+    "microsoft_graph.mail.message.send": frozenset({"message_id"}),
 }
 
 
@@ -944,6 +1110,29 @@ def _valid_arguments(
             return False
         if "parent_item_id" in arguments and not _valid_opaque_id(arguments["parent_item_id"]):
             return False
+    if tool_id.startswith("microsoft_graph.mail."):
+        for field in ("folder_id", "message_id"):
+            if field in arguments and not _valid_opaque_id(arguments[field]):
+                return False
+        if tool_id == "microsoft_graph.mail.draft.create":
+            if not _valid_plain_text(arguments.get("subject"), 255):
+                return False
+            if not _valid_mail_body(arguments.get("body_text")):
+                return False
+            if any(
+                field in arguments and not _valid_mail_recipients(arguments[field])
+                for field in ("to_recipients", "cc_recipients")
+            ):
+                return False
+        if tool_id in {
+            "microsoft_graph.mail.draft.update",
+            "microsoft_graph.mail.draft.delete",
+        } and not _valid_etag(arguments.get("if_match")):
+            return False
+        if tool_id == "microsoft_graph.mail.draft.update" and not _valid_mail_draft_changes(
+            arguments.get("changes")
+        ):
+            return False
     if tool_id == "microsoft_graph.planner.task.create" and "due_date_time" in arguments:
         return _valid_datetime_text(arguments["due_date_time"])
     return True
@@ -975,6 +1164,54 @@ def _valid_plain_text(value: Any, maximum: int) -> bool:
         and 1 <= len(value) <= maximum
         and bool(value.strip())
         and not any(ord(char) < 32 for char in value)
+    )
+
+
+def _valid_mail_body(value: Any) -> bool:
+    """Accept bounded plain text while allowing ordinary message line breaks."""
+
+    return (
+        isinstance(value, str)
+        and len(value) <= 65_536
+        and not any(ord(char) < 32 and char not in "\r\n\t" for char in value)
+    )
+
+
+def _valid_mail_recipient(value: Any) -> bool:
+    """Validate one simple mailbox address without display-name syntax."""
+
+    return (
+        isinstance(value, str)
+        and 3 <= len(value) <= 320
+        and value.count("@") == 1
+        and re.fullmatch(r"[^@\s<>]+@[^@\s<>]+", value) is not None
+        and not any(ord(char) < 32 for char in value)
+    )
+
+
+def _valid_mail_recipients(value: Any) -> bool:
+    """Require a bounded recipient list with no case-insensitive duplicates."""
+
+    return (
+        isinstance(value, list)
+        and 1 <= len(value) <= 50
+        and all(_valid_mail_recipient(item) for item in value)
+        and len({item.casefold() for item in value}) == len(value)
+    )
+
+
+def _valid_mail_draft_changes(value: Any) -> bool:
+    """Validate the narrow update surface for an existing draft."""
+
+    if not isinstance(value, Mapping) or not value or set(value) - set(_MAIL_DRAFT_CHANGES):
+        return False
+    if "subject" in value and not _valid_plain_text(value["subject"], 255):
+        return False
+    if "body_text" in value and not _valid_mail_body(value["body_text"]):
+        return False
+    return all(
+        field not in value or _valid_mail_recipients(value[field])
+        for field in ("to_recipients", "cc_recipients")
     )
 
 
@@ -1254,18 +1491,19 @@ def _office_v2_profile_scope(value: Mapping[str, Any]) -> dict[str, Any]:
         or set(mail)
         != {"enabled", "folder_ids", "metadata_read", "body_read", "drafts_write", "send_enabled"}
         or any(
-            mail.get(key) is not expected
-            for key, expected in {
-                "enabled": False,
-                "metadata_read": False,
-                "body_read": False,
-                "drafts_write": False,
-                "send_enabled": False,
-            }.items()
+            not isinstance(mail.get(key), bool)
+            for key in ("enabled", "metadata_read", "body_read", "drafts_write", "send_enabled")
         )
-        or mail.get("folder_ids") != []
+        or mail.get("body_read") is not False
+        or not isinstance(mail.get("folder_ids"), list)
+        or len(mail["folder_ids"]) > 100
+        or any(not _valid_opaque_id(item) for item in mail["folder_ids"])
+        or len(mail["folder_ids"]) != len(set(mail["folder_ids"]))
+        or (not mail["metadata_read"] and mail["folder_ids"])
+        or mail["enabled"]
+        != (mail["metadata_read"] or mail["drafts_write"] or mail["send_enabled"])
     ):
-        raise ProfileScopeMismatch("Microsoft Graph mail features are not enabled in this release")
+        raise ProfileScopeMismatch("Office v2 Mail scope values are invalid")
     return dict(value)
 
 
@@ -1323,6 +1561,13 @@ def _authorize_profile(
             expected_scopes.add("Tasks.Read")
         if sharepoint["enabled"]:
             expected_scopes.add("Sites.Selected")
+        mail = scope["mail"]
+        if mail["drafts_write"]:
+            expected_scopes.add("Mail.ReadWrite")
+        elif mail["metadata_read"] or mail["send_enabled"]:
+            expected_scopes.add("Mail.ReadBasic")
+        if mail["send_enabled"]:
+            expected_scopes.add("Mail.Send")
         if calendar["events_write"]:
             expected_scopes.add("Calendars.ReadWrite")
         elif calendar["events_read"] or calendar["freebusy_read"]:
@@ -1392,6 +1637,35 @@ def _authorize_profile(
             if arguments.get("list_id") not in sharepoint["list_ids"]:
                 raise ProfileAuthorizationDenied("SharePoint list is not selected")
             return
+        if tool_id.startswith("microsoft_graph.mail."):
+            mail = scope["mail"]
+            if tool_id in {
+                "microsoft_graph.mail.folders.list",
+                "microsoft_graph.mail.messages.list",
+                "microsoft_graph.mail.message.get",
+            }:
+                if not mail["metadata_read"]:
+                    raise ProfileAuthorizationDenied("Mail metadata permission is not granted")
+                if tool_id != "microsoft_graph.mail.folders.list" and (
+                    arguments.get("folder_id") not in mail["folder_ids"]
+                ):
+                    raise ProfileAuthorizationDenied("Mail folder is not selected")
+                return
+            if tool_id in {
+                "microsoft_graph.mail.drafts.list",
+                "microsoft_graph.mail.draft.create",
+                "microsoft_graph.mail.draft.update",
+                "microsoft_graph.mail.draft.delete",
+            }:
+                if not mail["drafts_write"]:
+                    raise ProfileAuthorizationDenied("Mail draft permission is not granted")
+                return
+            if tool_id == "microsoft_graph.mail.message.send":
+                if not mail["send_enabled"]:
+                    raise ProfileAuthorizationDenied("Mail send permission is not granted")
+                if not {"Mail.Send"}.issubset(set(profile.oauth_scopes)):
+                    raise ProfileScopeMismatch("Mail send scope is unavailable")
+                return
         raise ProfileAuthorizationDenied("Microsoft Graph operation is not enabled")
     expected_scopes = {"User.Read", "Tasks.Read"}
     if scope["planner"]["tasks_write"]:
@@ -1440,6 +1714,7 @@ def _target(
             "microsoft_graph.planner.plans.list",
             "microsoft_graph.todo.lists.list",
             "microsoft_graph.calendar.calendars.list",
+            "microsoft_graph.mail.folders.list",
         }:
             return target
         if tool_id.startswith("microsoft_graph.todo."):
@@ -1458,6 +1733,19 @@ def _target(
                 result["event_id"] = str(arguments["event_id"])
             if "transaction_id" in arguments:
                 result["transaction_id"] = str(arguments["transaction_id"])
+            return result
+        if tool_id.startswith("microsoft_graph.mail."):
+            if tool_id == "microsoft_graph.mail.messages.list":
+                return {**target, "folder_id": str(arguments["folder_id"])}
+            if tool_id == "microsoft_graph.mail.message.get":
+                return {
+                    **target,
+                    "folder_id": str(arguments["folder_id"]),
+                    "message_id": str(arguments["message_id"]),
+                }
+            result = {**target, "folder_id": "drafts"}
+            if "message_id" in arguments:
+                result["message_id"] = str(arguments["message_id"])
             return result
         if tool_id.startswith("microsoft_graph.sharepoint."):
             result = {**target, "site_id": str(arguments["site_id"])}
@@ -1677,6 +1965,47 @@ def _run_tool(
             str(arguments["event_id"]),
             str(arguments["if_match"]),
         )
+    if tool_id == "microsoft_graph.mail.folders.list":
+        return session.list_mail_folders(
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.mail.messages.list":
+        return session.list_mail_messages(
+            str(arguments["folder_id"]),
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.mail.message.get":
+        return session.get_mail_message(
+            str(arguments["folder_id"]), str(arguments["message_id"])
+        )
+    if tool_id == "microsoft_graph.mail.drafts.list":
+        return session.list_mail_drafts(
+            page_size=int(arguments.get("page_size", settings.max_page_size)),
+            page_cursor=str(arguments["page_cursor"]) if "page_cursor" in arguments else None,
+        )
+    if tool_id == "microsoft_graph.mail.draft.create":
+        return session.create_mail_draft(
+            str(arguments["subject"]),
+            str(arguments["body_text"]),
+            to_recipients=(
+                list(arguments["to_recipients"]) if "to_recipients" in arguments else None
+            ),
+            cc_recipients=(
+                list(arguments["cc_recipients"]) if "cc_recipients" in arguments else None
+            ),
+        )
+    if tool_id == "microsoft_graph.mail.draft.update":
+        return session.update_mail_draft(
+            str(arguments["message_id"]), str(arguments["if_match"]), arguments["changes"]
+        )
+    if tool_id == "microsoft_graph.mail.draft.delete":
+        return session.delete_mail_draft(
+            str(arguments["message_id"]), str(arguments["if_match"])
+        )
+    if tool_id == "microsoft_graph.mail.message.send":
+        return session.send_mail_draft(str(arguments["message_id"]))
     if tool_id == "microsoft_graph.sharepoint.drives.list":
         return session.list_sharepoint_drives(
             str(arguments["site_id"]),

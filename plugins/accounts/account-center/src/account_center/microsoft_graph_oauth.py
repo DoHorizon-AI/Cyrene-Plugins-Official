@@ -42,6 +42,9 @@ ALLOWED_GRAPH_SCOPES = frozenset(
         "Sites.Selected",
         "Calendars.ReadBasic",
         "Calendars.ReadWrite",
+        "Mail.ReadBasic",
+        "Mail.ReadWrite",
+        "Mail.Send",
     }
 )
 MAX_TOKEN_LIFETIME_SECONDS = 86_400

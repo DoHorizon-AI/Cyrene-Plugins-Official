@@ -60,13 +60,24 @@
       "type": "object",
       "required": ["enabled", "folder_ids", "metadata_read", "body_read", "drafts_write", "send_enabled"],
       "properties": {
-        "enabled": {"const": false},
+        "enabled": {"type": "boolean"},
         "folder_ids": {"type": "array", "maxItems": 100, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 512, "pattern": "^[A-Za-z0-9._!~+=-]{1,512}$"}},
-        "metadata_read": {"const": false},
+        "metadata_read": {"type": "boolean"},
         "body_read": {"const": false},
-        "drafts_write": {"const": false},
-        "send_enabled": {"const": false}
+        "drafts_write": {"type": "boolean"},
+        "send_enabled": {"type": "boolean"}
       },
+      "allOf": [
+        {"if": {"properties": {"metadata_read": {"const": false}}, "required": ["metadata_read"]}, "then": {"properties": {"folder_ids": {"maxItems": 0}}}},
+        {"oneOf": [
+          {"properties": {"enabled": {"const": false}, "folder_ids": {"maxItems": 0}, "metadata_read": {"const": false}, "drafts_write": {"const": false}, "send_enabled": {"const": false}}},
+          {"properties": {"enabled": {"const": true}}, "anyOf": [
+            {"properties": {"metadata_read": {"const": true}}},
+            {"properties": {"drafts_write": {"const": true}}},
+            {"properties": {"send_enabled": {"const": true}}}
+          ]}
+        ]}
+      ],
       "additionalProperties": false
     }
   },

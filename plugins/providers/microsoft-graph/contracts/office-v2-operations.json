@@ -7,9 +7,9 @@
     "todo": "officeV2.todo_enabled",
     "calendar": "officeV2.calendar_enabled",
     "sharepointDriveMetadata": "officeV2.sharepoint_drive_metadata_enabled",
-    "mailMetadata": false,
-    "mailDrafts": false,
-    "mailSend": false
+    "mailMetadata": "officeV2.mail_metadata_enabled",
+    "mailDrafts": "officeV2.mail_drafts_enabled",
+    "mailSend": "officeV2.mail_send_enabled"
   },
   "hostToProviderFeatureFlagMap": {
     "plannerEnabled": "officeV2.planner_enabled",
@@ -26,17 +26,10 @@
     "plannerAndTodo": "Tasks.ReadWrite when any selected task feature writes; otherwise Tasks.Read when any selected task feature reads; omit when neither reads nor writes.",
     "sharepoint": "Sites.Selected only when a host-selected site is enabled; explicit site resource grant remains required.",
     "calendar": "Calendars.ReadWrite when event writes are enabled; otherwise Calendars.ReadBasic when event or free/busy reads are enabled; omit when calendar features are disabled.",
-    "mail": "No Mail.* scopes are permitted in this release."
+    "mail": "Add Mail.ReadBasic when metadata or send preflight is enabled unless Mail.ReadWrite is enabled for drafts; Mail.ReadWrite covers basic reads; add Mail.Send only for explicit send. Send-only therefore uses Mail.ReadBasic and Mail.Send. Never request Mail.Read or body-reading permission."
   },
-  "oauthScopeDerivation": {
-    "oidcScopes": ["openid", "profile", "offline_access"],
-    "always": ["User.Read"],
-    "plannerAndTodo": "Tasks.ReadWrite when any selected task feature writes; otherwise Tasks.Read when any selected task feature reads; omit when neither reads nor writes.",
-    "sharepoint": "Sites.Selected only when a host-selected site is enabled; explicit site resource grant remains required.",
-    "calendar": "Calendars.ReadWrite when event writes are enabled; otherwise Calendars.ReadBasic when event or free/busy reads are enabled; omit when calendar features are disabled.",
-    "mail": "No Mail.* scopes are permitted in this release."
-  },
-  "selectionSemantics": "A discovery call returns only the signed-in actor's metadata. Empty plan, task-list, or calendar target arrays authorize only their corresponding list-discovery call; detail and write calls require an exact selected resource ID after a revision-checked scope update.",
+  "selectionSemantics": "Discovery returns only the signed-in actor metadata. Empty plan, task-list, calendar, or mail-folder selections authorize only their discovery call; detail and write calls require an exact selected resource after a revision-checked scope update. Draft operations always use the signed-in user's fixed Drafts folder.",
+  "mailLeaseTargets": {"folders.list":{"required":["tenant_id"]},"messages.list":{"required":["tenant_id","folder_id"]},"message.get":{"required":["tenant_id","folder_id","message_id"]},"drafts.list":{"required":["tenant_id","folder_id"],"folder_id":"drafts"},"draft.create":{"required":["tenant_id","folder_id"],"folder_id":"drafts"},"draft.update":{"required":["tenant_id","folder_id","message_id"],"folder_id":"drafts"},"draft.delete":{"required":["tenant_id","folder_id","message_id"],"folder_id":"drafts"},"message.send":{"required":["tenant_id","folder_id","message_id"],"folder_id":"drafts"}},
   "paging": {
     "defaultPageSize": 50,
     "maximumPageSize": 100,
@@ -76,14 +69,14 @@
     {"toolId":"microsoft_graph.calendar.event.create","operationId":"microsoft_graph.calendar.event.create","mutating":true,"status":"v2","args":{"required":["calendar_id","subject","start_date_time","end_date_time","transaction_id"],"optional":["location"]},"projection":"CONFIRMED or UNKNOWN and event metadata; no attendees"},
     {"toolId":"microsoft_graph.calendar.event.update","operationId":"microsoft_graph.calendar.event.update","mutating":true,"status":"v2","args":{"required":["calendar_id","event_id","if_match","changes"],"optional":[]},"projection":"CONFIRMED, RECONCILED or UNKNOWN and event metadata; no attendees"},
     {"toolId":"microsoft_graph.calendar.event.delete","operationId":"microsoft_graph.calendar.event.delete","mutating":true,"status":"v2","args":{"required":["calendar_id","event_id","if_match"],"optional":[]},"projection":"CONFIRMED or UNKNOWN and resource identity"},
-    {"toolId":"microsoft_graph.mail.folders.list","operationId":"microsoft_graph.mail.folders.list","mutating":false,"status":"deferred","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"folder metadata only; never enabled in this release"},
-    {"toolId":"microsoft_graph.mail.messages.list","operationId":"microsoft_graph.mail.messages.list","mutating":false,"status":"deferred","args":{"required":["folder_id"],"optional":["page_size","page_cursor"]},"projection":"mail metadata without body/bodyPreview/attachments; never enabled in this release"},
-    {"toolId":"microsoft_graph.mail.message.get","operationId":"microsoft_graph.mail.message.get","mutating":false,"status":"deferred","args":{"required":["folder_id","message_id"],"optional":[]},"projection":"mail metadata only; never enabled in this release"},
-    {"toolId":"microsoft_graph.mail.drafts.list","operationId":"microsoft_graph.mail.drafts.list","mutating":false,"status":"deferred","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"draft metadata only; never enabled in this release"},
-    {"toolId":"microsoft_graph.mail.draft.create","operationId":"microsoft_graph.mail.draft.create","mutating":true,"status":"deferred","args":{"required":["subject","body_text"],"optional":["to_recipients","cc_recipients"]},"projection":"draft metadata only; never enabled in this release"},
-    {"toolId":"microsoft_graph.mail.draft.update","operationId":"microsoft_graph.mail.draft.update","mutating":true,"status":"deferred","args":{"required":["message_id","if_match","changes"],"optional":[]},"projection":"draft metadata only; never enabled in this release"},
-    {"toolId":"microsoft_graph.mail.draft.delete","operationId":"microsoft_graph.mail.draft.delete","mutating":true,"status":"deferred","args":{"required":["message_id","if_match"],"optional":[]},"projection":"CONFIRMED or UNKNOWN; never enabled in this release"},
-    {"toolId":"microsoft_graph.mail.message.send","operationId":"microsoft_graph.mail.message.send","mutating":true,"status":"deferred","args":{"required":["message_id"],"optional":[]},"projection":"ACCEPTED or UNKNOWN; requires separate Mail.Send grant and explicit send flag; never enabled in this release"},
+    {"toolId":"microsoft_graph.mail.folders.list","operationId":"microsoft_graph.mail.folders.list","mutating":false,"status":"v2","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"folder ID, display name, parent ID, counts and hidden state only"},
+    {"toolId":"microsoft_graph.mail.messages.list","operationId":"microsoft_graph.mail.messages.list","mutating":false,"status":"v2","args":{"required":["folder_id"],"optional":["page_size","page_cursor"]},"projection":"selected-folder message metadata only; never body, bodyPreview or attachment data"},
+    {"toolId":"microsoft_graph.mail.message.get","operationId":"microsoft_graph.mail.message.get","mutating":false,"status":"v2","args":{"required":["folder_id","message_id"],"optional":[]},"projection":"selected-folder message metadata and ETag only; never body, bodyPreview or attachment data"},
+    {"toolId":"microsoft_graph.mail.drafts.list","operationId":"microsoft_graph.mail.drafts.list","mutating":false,"status":"v2","args":{"required":[],"optional":["page_size","page_cursor"]},"projection":"metadata-only drafts from the current user's fixed Drafts folder"},
+    {"toolId":"microsoft_graph.mail.draft.create","operationId":"microsoft_graph.mail.draft.create","mutating":true,"status":"v2","args":{"required":["subject","body_text"],"optional":["to_recipients","cc_recipients"]},"projection":"CONFIRMED with metadata, or UNKNOWN; body_text is write input only and ambiguous outcome is never replayed"},
+    {"toolId":"microsoft_graph.mail.draft.update","mutating":true,"status":"v2","args":{"required":["message_id","if_match","changes"],"optional":[]},"projection":"CONFIRMED with metadata, or UNKNOWN; ETag-protected update in fixed Drafts folder","operationId":"microsoft_graph.mail.draft.update"},
+    {"toolId":"microsoft_graph.mail.draft.delete","operationId":"microsoft_graph.mail.draft.delete","mutating":true,"status":"v2","args":{"required":["message_id","if_match"],"optional":[]},"projection":"CONFIRMED or UNKNOWN; ETag-protected delete in fixed Drafts folder"},
+    {"toolId":"microsoft_graph.mail.message.send","operationId":"microsoft_graph.mail.message.send","mutating":true,"status":"v2","args":{"required":["message_id"],"optional":[]},"projection":"ACCEPTED only for Graph HTTP 202, or UNKNOWN; verifies an existing Drafts-folder draft and never claims delivery or replays an ambiguous outcome"},
     {"toolId":"microsoft_graph.sharepoint.drives.list","operationId":"microsoft_graph.sharepoint.drives.list","mutating":false,"status":"v2","args":{"required":["site_id"],"optional":["page_size","page_cursor"]},"projection":"selected document library IDs and metadata only"},
     {"toolId":"microsoft_graph.sharepoint.drive.items.list","operationId":"microsoft_graph.sharepoint.drive.items.list","mutating":false,"status":"v2","args":{"required":["site_id","drive_id"],"optional":["parent_item_id","page_size","page_cursor"]},"projection":"selected item metadata and original links; no contents/download"}
   ]

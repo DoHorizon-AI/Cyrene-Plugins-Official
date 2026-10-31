@@ -908,15 +908,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/README.md",
-      "sha256": "c74c4b18259a1bcddab6078dcdd9c7da182eadfc4b2c3006b86389e564d29ab0",
-      "size_bytes": 16520
+      "sha256": "9e2dbf43b63d0bbe107dca226190318929269348844248b87bd4af118c484b50",
+      "size_bytes": 17736
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/contracts/v1/schema.json",
-      "sha256": "43eea98f355ca110af93f2febec5d990569473e5000d5c5477945bbb77d3164c",
-      "size_bytes": 29292
+      "sha256": "81051e07ca446bc0fd7b761e8930f8c9fd7c9e3928f683752846dc5a3e212be2",
+      "size_bytes": 29955
     },
     {
       "kind": "file",
@@ -985,8 +985,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/microsoft_graph_oauth.py",
-      "sha256": "6559cac6a9f0397c72b5883caf30a10c7d5bf9eb4438dd893d07dd878506e932",
-      "size_bytes": 25158
+      "sha256": "235cdda317009fb5a74c8d93de57e5634873fa9852973fdc1991d35598366680",
+      "size_bytes": 25231
     },
     {
       "kind": "file",
@@ -999,8 +999,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/plugin.py",
-      "sha256": "755c30d21c998286ab6ba9b9256fcd8656de29ece525512bd8a073ec8d7e9230",
-      "size_bytes": 230764
+      "sha256": "892538da74b55ce66cf018d590716d6ec9f65b37b20d591597a5ae132249ac33",
+      "size_bytes": 237741
     },
     {
       "kind": "file",
@@ -1048,15 +1048,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_microsoft_graph_oauth.py",
-      "sha256": "8374603e3a6c229dbfe6d36de88019b1a28fad91efa87e811f6e6c4eddf9376e",
-      "size_bytes": 20934
+      "sha256": "ab178f277d4c6b3748b75b27d4cce054be7a9f87d586c0c26d90bc1cd435da96",
+      "size_bytes": 21521
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "2862ed06c5199ad1f031ad0c70cb792b46ccf3102c8888d48d7f73e64558718f",
-      "size_bytes": 132738
+      "sha256": "96f665da54d17b6e2ff9ed77990d1cf0ca1b50215534cefe7b0e78521f19a36e",
+      "size_bytes": 146301
     },
     {
       "kind": "file",
@@ -3043,29 +3043,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/README.md",
-      "sha256": "d266d63b35260033333e96253ec74078da652aec248c87fd7710c84e91342465",
-      "size_bytes": 7706
+      "sha256": "80d4653e7fa3a61d7aeca8a1eafd4159839e80ef94a66792cd195b29da61db2d",
+      "size_bytes": 9667
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/configuration.schema.json",
-      "sha256": "4a8235dc167bcfce4bc3f9604afae4152c4970915d1edd322592279678a3eb24",
-      "size_bytes": 5736
+      "sha256": "50ef33f014a58af1d5c1313282c5b6dbbd9702b650813a7e66736ba4a0c6091a",
+      "size_bytes": 5326
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/contracts/office-v2-operations.json",
-      "sha256": "250625b60e933747be3a14d22eadd747418e94584afb16091845d8ddbaab4d3e",
-      "size_bytes": 12438
+      "sha256": "41c7eeaaa3cf1a6d7e8ab08205fc9d13e67ce6ce85ed6f8ccb69a15a8e000b08",
+      "size_bytes": 12891
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/contracts/office-v2-target-scope.schema.json",
-      "sha256": "1c6162a922211aae8629089f9c42ef78da9a1f50a6fd05b3e676efb64a5fb14d",
-      "size_bytes": 3649
+      "sha256": "a7097217ac809c723cf96567c0828fa826c2a90ceb6eaae1fb7e3a2cb398ef4b",
+      "size_bytes": 4334
     },
     {
       "kind": "file",
@@ -3078,15 +3078,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/plugin.manifest.json",
-      "sha256": "7c3860b37841cb2825804faed446ce2f6def46fee8c47f9611477e9971815c42",
-      "size_bytes": 1677
+      "sha256": "e67f78159148001aa866199081756b6fd286592c4bda11ef3e202a64d768da46",
+      "size_bytes": 1695
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/pyproject.toml",
-      "sha256": "0fc65862293bbd8f2c973d0d58fde1ca1e74475038b0f46748cbec10a541fe7a",
-      "size_bytes": 1338
+      "sha256": "74f315d4410e851086d7b72260bdf4150261318b3bcfeb0e3f9c6493c179176b",
+      "size_bytes": 1351
     },
     {
       "kind": "file",
@@ -3141,29 +3141,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/microsoft_graph_api.py",
-      "sha256": "76d267387ef3b6e2cbde3f6ee64cf300e9cc58e14431fa22e522acd15d9afd03",
-      "size_bytes": 92023
+      "sha256": "0afa6129ecc4f53ab621af7daf76da62e0cdf7ec777b145c556c0fb52201d02c",
+      "size_bytes": 107361
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/plugin.py",
-      "sha256": "709250d8fedc8653edb0702fd0ffed1c7e6850767b3df432481e61f0f27feaea",
-      "size_bytes": 77424
+      "sha256": "28c9de32b70a369df5815ec898e9e8f5df138b327a9019fb476e1d59bb9ed6c2",
+      "size_bytes": 91164
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/settings.py",
-      "sha256": "632e4070ac28074a332bc95f24ed93274f5ff60d4fe432ac71f2b62d77914ff1",
-      "size_bytes": 13155
+      "sha256": "9737e7b3bc5cf503679bc6bc3bc4907fcc203c0fff749bcc78ba2412a0ad3585",
+      "size_bytes": 12603
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/src/microsoft_graph_provider/trust.py",
-      "sha256": "7cbe8bce134b5072aaf17a07339daef2e86b8b3cb94a9a5362085bb6dc441a94",
-      "size_bytes": 5412
+      "sha256": "3a25f65dc95625c0ec5b4c7f363c831248b2599e7ee6d7b88fe81194486c4b2f",
+      "size_bytes": 5771
     },
     {
       "kind": "file",
@@ -3183,22 +3183,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_microsoft_graph_api.py",
-      "sha256": "4130a5b6cac2840d754d6d4bbda16cdc2ab5426a8d72fe72cf484f7d21090442",
-      "size_bytes": 25421
+      "sha256": "cbf05719707952895641a8e722a3a41795e9c9e91eb91c929104ebf68437e369",
+      "size_bytes": 36258
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_package_metadata.py",
-      "sha256": "e42771827ebcd6711b8bb2dbe5326d2b62ac53ff601497de2212d003f95c0612",
-      "size_bytes": 6236
+      "sha256": "0031c7689d65ece292ff42043e9bd7264bb0af39811141d0fabac42de34b4070",
+      "size_bytes": 10702
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/microsoft-graph/tests/test_provider.py",
-      "sha256": "87fd832a63217f01097622aee4ad7ea93029de1cea97710ce1011342364c64a4",
-      "size_bytes": 28175
+      "sha256": "b91e76c5e8dbfa72e8823e25d667dc77f7621a67e52c7efc2c1c48fc748d4d6b",
+      "size_bytes": 38131
     },
     {
       "kind": "file",
@@ -6753,15 +6753,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/__init__.py",
-      "sha256": "c40e20a276b102fa01fd20b643d1df0e0fd7808eb53894f99139c7ee680fa888",
-      "size_bytes": 2999
+      "sha256": "4e75fb071d3ec985fede6250c533ddff24e0fa9c684b326e7f809e6d94e0ef23",
+      "size_bytes": 3065
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/contracts.py",
-      "sha256": "d23f85fd64fc7cd66d78b2c70e5878af46ff82cae9872e7e92aab9e351a04d3f",
-      "size_bytes": 19552
+      "sha256": "6b171479cf5c223ef62cb9841f36c4e371be45912616f5c2e86db0b219031316",
+      "size_bytes": 21327
     },
     {
       "kind": "file",
@@ -6774,8 +6774,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/tests/test_signing.py",
-      "sha256": "53924431b9ace7dadb4e0a408d0a1b5cbc8e3a67893c273215a17c7ca3a8d94a",
-      "size_bytes": 16534
+      "sha256": "bdf265252df099243b0b536b475a211dcacf16ec65c74bebed22deea44295540",
+      "size_bytes": 18002
     },
     {
       "kind": "file",

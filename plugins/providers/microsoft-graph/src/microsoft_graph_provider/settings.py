@@ -268,19 +268,6 @@ def _office_v2_flags(value: Any) -> dict[str, bool]:
         raise ConfigurationError("officeV2 must contain the exact feature flag set")
     if any(not isinstance(flag, bool) for flag in value.values()):
         raise ConfigurationError("officeV2 feature flags must be boolean")
-    if any(
-        value[key]
-        for key in (
-            "mail_metadata_enabled",
-            "mail_drafts_enabled",
-            "mail_send_enabled",
-        )
-    ):
-        raise ConfigurationError("Microsoft Graph mail features are deferred")
-    if value["mail_send_enabled"] and not value["mail_drafts_enabled"]:
-        raise ConfigurationError("mail send requires the drafts feature")
-    if value["mail_drafts_enabled"] and not value["mail_metadata_enabled"]:
-        raise ConfigurationError("mail drafts require the metadata feature")
     return {key: value[key] for key in sorted(_OFFICE_V2_FLAGS)}
 
 

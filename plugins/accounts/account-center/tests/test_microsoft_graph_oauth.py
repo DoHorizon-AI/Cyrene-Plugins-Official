@@ -546,7 +546,7 @@ def test_graph_refresh_requires_verified_id_token_identity(
     assert token.identity.external_subject == f"{TENANT_ID}:{OBJECT_ID}"
 
 
-def test_office_v2_oauth_is_explicit_and_never_accepts_mail_scopes() -> None:
+def test_office_v2_oauth_accepts_only_explicit_mail_scopes() -> None:
     scopes = (
         "openid",
         "profile",
@@ -579,4 +579,19 @@ def test_office_v2_oauth_is_explicit_and_never_accepts_mail_scopes() -> None:
     authorization = parse_qs(urlparse(office_v2.authorization_url(**parameters)).query)
     assert set(authorization["scope"][0].split()) == set(scopes)
     with pytest.raises(MicrosoftGraphOAuthError, match="authorization_denied"):
-        office_v2.authorization_url(**{**parameters, "scopes": (*scopes, "Mail.ReadBasic")})
+        office_v2.authorization_url(**{**parameters, "scopes": (*scopes, "Mail.Read")})
+
+    send_only_scopes = (*scopes, "Mail.ReadBasic", "Mail.Send")
+    send_only = parse_qs(
+        urlparse(
+            office_v2.authorization_url(**{**parameters, "scopes": send_only_scopes})
+        ).query
+    )
+    assert set(send_only["scope"][0].split()) == set(send_only_scopes)
+    draft_and_send_scopes = (*scopes, "Mail.ReadWrite", "Mail.Send")
+    draft_and_send = parse_qs(
+        urlparse(
+            office_v2.authorization_url(**{**parameters, "scopes": draft_and_send_scopes})
+        ).query
+    )
+    assert set(draft_and_send["scope"][0].split()) == set(draft_and_send_scopes)
