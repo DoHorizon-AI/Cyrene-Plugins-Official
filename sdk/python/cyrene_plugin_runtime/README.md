@@ -58,6 +58,15 @@ with DirectPluginClient.for_local_connection_ref(connection_ref) as plugin:
 Product 在组合层拿到本地连接引用后，通过 SDK facade 直连插件。调用中不包含
 Platform binding id，业务负载也不会发送到 Platform 进程。
 
+Use `plugin.subscribe(capability=..., interface_version="1", request=filter_payload,
+cancel_event=stop_event)` for provider events. It selects subscription mode and
+preserves each payload's `event_type`. Close the iterator when stopping early;
+the native RPC is cancelled and the provider receives unsubscribe. Reconnection
+and authorization remain the host's responsibility.
+
+订阅使用 `plugin.subscribe`，保留事件类型。提前停止时须关闭迭代器，以取消原生 RPC
+并释放 provider 订阅；重连和授权仍由宿主负责。
+
 Plugin configuration remains environment or secret-provider input to the
 plugin process. The runtime never accepts a secret on its command line and does
 not log configuration values.
