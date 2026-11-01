@@ -11,11 +11,13 @@ capabilities:
         - plugins/accounts/account-center/contracts/v1/schema.json
     contract_methods:
       - begin_azure_devops_link
+      - begin_bilibili_link
       - begin_huggingface_renewal
       - begin_link
       - begin_microsoft_graph_link
       - begin_microsoft_graph_scope_upgrade
       - complete_azure_devops_link
+      - complete_bilibili_link
       - complete_github_link
       - complete_microsoft_graph_link
       - complete_microsoft_graph_scope_upgrade
@@ -45,11 +47,13 @@ capabilities:
         publication: published
         methods:
           - begin_azure_devops_link
+          - begin_bilibili_link
           - begin_huggingface_renewal
           - begin_link
           - begin_microsoft_graph_link
           - begin_microsoft_graph_scope_upgrade
           - complete_azure_devops_link
+          - complete_bilibili_link
           - complete_github_link
           - complete_microsoft_graph_link
           - complete_microsoft_graph_scope_upgrade
@@ -860,6 +864,19 @@ capabilities:
       - call_tool
       - list_tools
     implementations:
+      - ref: cyrene.connectors.bilibili
+        source: plugins/connectors/bilibili/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
       - ref: cyrene.connectors.email-notification
         source: plugins/connectors/email-notification/plugin.manifest.json
         kind: capability-plugin
@@ -1005,6 +1022,19 @@ capabilities:
         verified_at: 2026-10-24
       - ref: cyrene.tools.media
         source: plugins/tools/media/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
+      - ref: cyrene.tools.public-web
+        source: plugins/tools/public-web/plugin.manifest.json
         kind: capability-plugin
         language: python
         publication: published

@@ -427,6 +427,33 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
         vendored_sdks=(RUNTIME_SDK, TOOL_PROVIDER_SDK, INTEGRATION_SUPPORT_SDK),
         require_spdx_license=True,
     ),
+    "cyrene.tools.public-web": PackageSpec(
+        package_id="cyrene.tools.public-web",
+        component_id="cyrene-tools-public-web",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/tools/public-web",
+        requirements_input="tooling/release/requirements/public-web.in",
+        vendored_sdks=(
+            RUNTIME_SDK,
+            TOOL_PROVIDER_SDK,
+            INTEGRATION_SUPPORT_SDK,
+        ),
+        require_spdx_license=True,
+    ),
+    "cyrene.connectors.bilibili": PackageSpec(
+        package_id="cyrene.connectors.bilibili",
+        component_id="cyrene-connectors-bilibili",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/connectors/bilibili",
+        requirements_input="tooling/release/requirements/bilibili-connector.in",
+        vendored_sdks=(
+            RUNTIME_SDK,
+            ACCOUNT_CENTER_SDK,
+            TOOL_PROVIDER_SDK,
+            INTEGRATION_SUPPORT_SDK,
+        ),
+        require_spdx_license=True,
+    ),
 }
 
 PRODUCT_SERVICE_COMPONENTS = {
@@ -559,14 +586,21 @@ def _read_package_spec(
             raise PackageBuildError("each official package method must have a name")
         capability = method.get("capability", spec.primary_capability)
         if capability not in capabilities:
-            raise PackageBuildError("method capability is absent from the Plugin manifest")
+            raise PackageBuildError(
+                "method capability is absent from the Plugin manifest"
+            )
         expected_version = (
             MODEL_METHOD_VERSIONS.get(name)
             if capability == "model.provider.v1"
             else "1"
         )
-        if expected_version is None or method.get("interfaceVersion") != expected_version:
-            raise PackageBuildError("Plugin method differs from its supported interface version")
+        if (
+            expected_version is None
+            or method.get("interfaceVersion") != expected_version
+        ):
+            raise PackageBuildError(
+                "Plugin method differs from its supported interface version"
+            )
     runtime = manifest.get("runtime")
     if not isinstance(runtime, dict):
         raise PackageBuildError("Plugin manifest runtime is missing")
@@ -811,6 +845,45 @@ def _wheel_metadata(payload: bytes, filename: str) -> tuple[str, str]:
             f"wheel WHEEL metadata tags do not match its filename: {filename}"
         )
     return canonicalize_name(name), version
+
+
+def _wheel_license_metadata(
+    payload: bytes, filename: str
+) -> tuple[str | None, str | None, list[str]]:
+    """Read license declarations and retained notices from the exact wheel."""
+
+    try:
+        with zipfile.ZipFile(BytesIO(payload)) as archive:
+            metadata_names = [
+                item
+                for item in archive.namelist()
+                if item.endswith(".dist-info/METADATA")
+            ]
+            if len(metadata_names) != 1:
+                raise PackageBuildError(
+                    f"wheel must contain one METADATA file: {filename}"
+                )
+            metadata = BytesParser().parsebytes(archive.read(metadata_names[0]))
+            license_files = sorted(
+                item
+                for item in archive.namelist()
+                if ".dist-info/licenses/" in item and not item.endswith("/")
+            )
+    except (OSError, UnicodeError, zipfile.BadZipFile) as error:
+        raise PackageBuildError(
+            f"invalid wheel license metadata: {filename}"
+        ) from error
+    expression = metadata.get("License-Expression")
+    license_text = metadata.get("License")
+    return (
+        expression.strip()
+        if isinstance(expression, str) and expression.strip()
+        else None,
+        license_text.strip()
+        if isinstance(license_text, str) and license_text.strip()
+        else None,
+        license_files,
+    )
 
 
 def _wheelhouse_entries(lock_bytes: bytes, wheel_paths: list[Path]) -> dict[str, bytes]:
@@ -1338,6 +1411,14 @@ def _verify_lock_inputs(spec: PackageSpec, source_files: dict[str, bytes]) -> li
         for requirement in input_requirements
     }
     input_comments = input_bytes.decode("utf-8")
+    unpublished_cyrene_pins = {
+        name for name in pin_versions if name.startswith("cyrene-")
+    }.difference(source_dependency_by_name)
+    if unpublished_cyrene_pins:
+        raise PackageBuildError(
+            "runtime lock may not resolve unpublished Cyrene distributions from a package registry: "
+            + ", ".join(sorted(unpublished_cyrene_pins))
+        )
     matched_source_dependencies: set[str] = set()
     for requirement in project_requirements:
         name = canonicalize_name(requirement.name)
@@ -1576,18 +1657,42 @@ def _sbom_document(
     source_files: dict[str, bytes],
     sdk_files: dict[str, dict[str, bytes]],
     pins: list[str],
+    wheelhouse_entries: dict[str, bytes],
 ) -> dict[str, Any]:
     package_ref = (
         f"pkg:pypi/{canonicalize_name(package['distribution'])}@{package['version']}"
     )
     components: list[dict[str, Any]] = []
     dependency_refs: list[str] = []
+    try:
+        wheelhouse_manifest = json.loads(
+            wheelhouse_entries[WHEELHOUSE_MANIFEST].decode("utf-8")
+        )
+        wheel_records = {
+            canonicalize_name(item["name"]): item["filename"]
+            for item in wheelhouse_manifest["wheels"]
+        }
+    except (KeyError, TypeError, UnicodeError, json.JSONDecodeError) as error:
+        raise PackageBuildError("SBOM source wheelhouse manifest is invalid") from error
     for pin in pins:
         match = LOCK_PIN.fullmatch(pin)
         assert match is not None
         name, version = match.groups()
         reference = f"pkg:pypi/{canonicalize_name(name)}@{version}"
         dependency_refs.append(reference)
+        filename = wheel_records.get(canonicalize_name(name))
+        wheel = (
+            None
+            if filename is None
+            else wheelhouse_entries.get(f"wheelhouse/{filename}")
+        )
+        if wheel is None:
+            raise PackageBuildError(
+                f"SBOM wheel is missing for locked distribution: {name}"
+            )
+        license_expression, license_text, license_files = _wheel_license_metadata(
+            wheel, filename
+        )
         component: dict[str, Any] = {
             "type": "library",
             "name": canonicalize_name(name),
@@ -1595,6 +1700,26 @@ def _sbom_document(
             "purl": reference,
             "bom-ref": reference,
         }
+        if license_expression is not None:
+            component["licenses"] = [{"expression": license_expression}]
+        elif license_text is not None:
+            component["licenses"] = [{"license": {"name": license_text}}]
+        component["properties"] = [
+            {
+                "name": "cyrene:license:metadata",
+                "value": (
+                    f"License-Expression: {license_expression}"
+                    if license_expression is not None
+                    else f"License: {license_text}"
+                    if license_text is not None
+                    else "wheel metadata does not declare a license"
+                ),
+            },
+            {
+                "name": "cyrene:license:files",
+                "value": json.dumps(license_files, separators=(",", ":")),
+            },
+        ]
         source_dependency = next(
             (
                 item
@@ -1610,10 +1735,15 @@ def _sbom_document(
             component["externalReferences"] = [
                 {"type": "vcs", "url": source_dependency.repository}
             ]
-            component["properties"] = [
-                {"name": "cyrene:source:commit", "value": source_dependency.commit},
-                {"name": "cyrene:delivery", "value": "wheel-built-from-pinned-source"},
-            ]
+            component["properties"].extend(
+                [
+                    {"name": "cyrene:source:commit", "value": source_dependency.commit},
+                    {
+                        "name": "cyrene:delivery",
+                        "value": "wheel-built-from-pinned-source",
+                    },
+                ]
+            )
         components.append(component)
     for sdk in spec.vendored_sdks:
         version = tomllib.loads(source_files[sdk.project_path].decode("utf-8"))[
@@ -1640,17 +1770,16 @@ def _sbom_document(
                 "value": f"vendored-zip-src:{sdk.archive_root}",
             },
         ]
-        components.append(
-            {
-                "type": "library",
-                "name": sdk.distribution,
-                "version": version,
-                "purl": reference,
-                "bom-ref": reference,
-                "externalReferences": [{"type": "vcs", "url": SOURCE_REPOSITORY_URL}],
-                "properties": properties,
-            }
-        )
+        sdk_component: dict[str, Any] = {
+            "type": "library",
+            "name": sdk.distribution,
+            "version": version,
+            "purl": reference,
+            "bom-ref": reference,
+            "externalReferences": [{"type": "vcs", "url": SOURCE_REPOSITORY_URL}],
+            "properties": properties,
+        }
+        components.append(sdk_component)
     package_properties = [
         {"name": "cyrene:component-id", "value": spec.component_id},
         {"name": "cyrene:capability-id", "value": package["capability"]},
@@ -2053,7 +2182,14 @@ def build_release_artifacts(
         )
         source_dependency_records = _source_dependency_metadata(spec, source_files)
         sbom = _sbom_document(
-            package, spec, source_ref, source_sha, source_files, sdk_files, pins
+            package,
+            spec,
+            source_ref,
+            source_sha,
+            source_files,
+            sdk_files,
+            pins,
+            wheelhouse_entries,
         )
         sbom_path.write_bytes(_json_bytes(sbom))
         archive_records = [
@@ -2423,7 +2559,14 @@ def verify_release_artifacts(
     _validate_release_asset_metadata(metadata, paths, content_digest)
     sbom = _read_json(paths["sbom"])
     expected_sbom = _sbom_document(
-        package, spec, source_ref, source_sha, source_files, sdk_files, pins
+        package,
+        spec,
+        source_ref,
+        source_sha,
+        source_files,
+        sdk_files,
+        pins,
+        wheelhouse_entries,
     )
     if sbom != expected_sbom:
         raise PackageBuildError(

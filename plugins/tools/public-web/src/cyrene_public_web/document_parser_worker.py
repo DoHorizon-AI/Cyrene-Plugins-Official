@@ -1,4 +1,4 @@
-"""Isolated worker for the existing document-parsing package."""
+"""Isolated worker for the bundled public-web document parser adapter."""
 
 from __future__ import annotations
 
@@ -34,10 +34,10 @@ def main() -> int:
         return 2
     try:
         request = _read_request(request_path)
-        from document_parsing import DocumentParsingPlugin
+        from document_parser import parse_document
 
         with open(os.devnull, "w", encoding="utf-8") as sink, redirect_stdout(sink):
-            summary = DocumentParsingPlugin().parse_document(
+            summary = parse_document(
                 source_path=Path(request["source_path"]),
                 payload_path=Path(request["payload_path"]),
                 blocks_path=Path(request["blocks_path"]),

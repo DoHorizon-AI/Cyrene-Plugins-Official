@@ -127,6 +127,8 @@ on:
           - cyrene.providers.knowledge-retrieval
           - cyrene.providers.speech-sensevoice
           - cyrene.tools.media
+          - cyrene.tools.public-web
+          - cyrene.connectors.bilibili
 
 permissions:
   contents: read
@@ -222,6 +224,8 @@ jobs:
               "cyrene.providers.microsoft-graph",
               "cyrene.providers.azure-devops-observation",
               "cyrene.connectors.email-notification",
+              "cyrene.tools.public-web",
+              "cyrene.connectors.bilibili",
           }
           root = Path.cwd()
           for spec in PACKAGE_SPECS.values():

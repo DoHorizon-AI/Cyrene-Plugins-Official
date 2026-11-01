@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import hashlib
 import html
-import importlib.util
 import json
 import os
 import re
@@ -684,13 +683,10 @@ def _run_document_parser_worker(
     summary_path: Path,
     cancellation: Any,
 ) -> dict[str, Any]:
-    """Run the shared parser in a bounded child that can be killed on cancellation."""
+    """Run the bundled parser adapter in a bounded, cancellable child."""
 
-    try:
-        parser_spec = importlib.util.find_spec("document_parsing")
-    except (ImportError, ValueError):
-        parser_spec = None
-    if parser_spec is None or parser_spec.origin is None:
+    parser_module = Path(__file__).with_name("document_parser.py")
+    if parser_module.is_symlink() or not parser_module.is_file():
         raise PublicWebError("DOCUMENT_PARSER_UNAVAILABLE")
 
     deadline = time.monotonic() + DOCUMENT_PARSER_TIMEOUT_SECONDS
@@ -718,7 +714,6 @@ def _run_document_parser_worker(
             "HOME": str(home),
             "PYTHONNOUSERSITE": "1",
             "PYTHONUTF8": "1",
-            "PYTHONPATH": str(Path(parser_spec.origin).resolve().parent),
             "HF_HUB_OFFLINE": "1",
             "TRANSFORMERS_OFFLINE": "1",
         }

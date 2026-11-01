@@ -44,7 +44,13 @@ LOCK_ISOLATED_STARTUP_PACKAGES = frozenset(
         "cyrene.providers.knowledge-retrieval",
         "cyrene.providers.speech-sensevoice",
         "cyrene.tools.media",
+        "cyrene.tools.public-web",
+        "cyrene.connectors.bilibili",
     }
+)
+AETHER_PACKAGE_IDS = frozenset(
+    selection.CONVERSATION_ASSISTANT_PACKAGE_IDS
+    + selection.ADDITIONAL_OFFICIAL_PACKAGE_IDS
 )
 
 
@@ -125,20 +131,28 @@ def _read_hashed_runtime_lock(path: Path) -> dict[str, str]:
             continue
         if line.startswith("--hash="):
             digest = line.removeprefix("--hash=sha256:")
-            if current_name is None or len(digest) != 64 or any(
-                character not in "0123456789abcdef" for character in digest
+            if (
+                current_name is None
+                or len(digest) != 64
+                or any(character not in "0123456789abcdef" for character in digest)
             ):
-                raise AssertionError(f"invalid or misplaced package hash in {path}: {line}")
+                raise AssertionError(
+                    f"invalid or misplaced package hash in {path}: {line}"
+                )
             current_hashes += 1
             continue
         if current_name is not None and current_hashes == 0:
             raise AssertionError(f"package pin has no hashes in {path}: {current_name}")
         match = release.LOCK_PIN.fullmatch(line)
         if match is None:
-            raise AssertionError(f"package lock line is not exactly pinned in {path}: {line}")
+            raise AssertionError(
+                f"package lock line is not exactly pinned in {path}: {line}"
+            )
         current_name = release.canonicalize_name(match.group(1))
         if current_name in pins:
-            raise AssertionError(f"package lock repeats a distribution in {path}: {current_name}")
+            raise AssertionError(
+                f"package lock repeats a distribution in {path}: {current_name}"
+            )
         pins[current_name] = match.group(2)
         current_hashes = 0
     if current_name is None or current_hashes == 0:
@@ -175,7 +189,9 @@ class OfficialPluginPackageTests(unittest.TestCase):
     def test_runtime_version_and_mtls_test_dependency_are_consistent(self) -> None:
         """Keep the tested X.509 helper out of production runtime dependencies."""
 
-        project_path = self.repository / "sdk/python/cyrene_plugin_runtime/pyproject.toml"
+        project_path = (
+            self.repository / "sdk/python/cyrene_plugin_runtime/pyproject.toml"
+        )
         project = tomllib.loads(project_path.read_text(encoding="utf-8"))["project"]
 
         self.assertEqual(project["version"], release.PREPARER_VERSION)
@@ -190,8 +206,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
         )
         account_center_project = tomllib.loads(
             (
-                self.repository
-                / "plugins/accounts/account-center/pyproject.toml"
+                self.repository / "plugins/accounts/account-center/pyproject.toml"
             ).read_text(encoding="utf-8")
         )["project"]
         account_center_cryptography = next(
@@ -201,18 +216,23 @@ class OfficialPluginPackageTests(unittest.TestCase):
         )
         teams_cryptography = next(
             line.split("==", 1)[1]
-            for line in (
-                self.repository / "plugins/connectors/teams/requirements.lock"
-            ).read_text(encoding="utf-8").splitlines()
+            for line in (self.repository / "plugins/connectors/teams/requirements.lock")
+            .read_text(encoding="utf-8")
+            .splitlines()
             if line.startswith("cryptography==")
         )
-        self.assertTrue(account_center_cryptography.specifier.contains(teams_cryptography))
         self.assertTrue(
-            Requirement(project["optional-dependencies"]["test"][0])
-            .specifier.contains(teams_cryptography)
+            account_center_cryptography.specifier.contains(teams_cryptography)
+        )
+        self.assertTrue(
+            Requirement(project["optional-dependencies"]["test"][0]).specifier.contains(
+                teams_cryptography
+            )
         )
 
-    def test_office_provider_packages_have_explicit_sdk_and_license_mappings(self) -> None:
+    def test_office_provider_packages_have_explicit_sdk_and_license_mappings(
+        self,
+    ) -> None:
         """Register both Office observation providers with exact source-owned inputs."""
 
         expected = {
@@ -229,13 +249,21 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 {"grpcio", "httpx", "protobuf", "rfc8785"},
             ),
         }
-        for package_id, (component_id, source_dir, requirements_input, external) in expected.items():
+        for package_id, (
+            component_id,
+            source_dir,
+            requirements_input,
+            external,
+        ) in expected.items():
             with self.subTest(package_id=package_id):
                 spec = release.PACKAGE_SPECS[package_id]
                 self.assertEqual(spec.component_id, component_id)
                 self.assertEqual(spec.source_dir, source_dir)
                 self.assertEqual(spec.requirements_input, requirements_input)
-                self.assertEqual(spec.vendored_sdks, (release.RUNTIME_SDK, release.ACCOUNT_CENTER_SDK))
+                self.assertEqual(
+                    spec.vendored_sdks,
+                    (release.RUNTIME_SDK, release.ACCOUNT_CENTER_SDK),
+                )
                 self.assertTrue(spec.require_spdx_license)
 
                 manifest, _ = release._read_package_spec(self.repository, spec)
@@ -249,8 +277,108 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 }
                 self.assertEqual(names, external)
                 self.assertIn("cyrene-plugin-runtime==0.2.2", requirements)
-                self.assertIn("cyrene-account-center-contracts==0.1.3", requirements)
+                self.assertIn("cyrene-account-center-contracts==0.1.4", requirements)
                 release._verify_lock_inputs(spec, source_files)
+
+    def test_account_center_sdk_source_pins_match_every_registered_package(
+        self,
+    ) -> None:
+        """Keep every account-contract source comment aligned to SDK 0.1.4."""
+
+        sdk_project = tomllib.loads(
+            (self.repository / release.ACCOUNT_CENTER_SDK.project_path).read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(sdk_project["project"]["version"], "0.1.4")
+        bound_packages = [
+            spec
+            for spec in release.PACKAGE_SPECS.values()
+            if release.ACCOUNT_CENTER_SDK in spec.vendored_sdks
+        ]
+        self.assertEqual(
+            {spec.package_id for spec in bound_packages},
+            {
+                "cyrene.accounts.account-center",
+                "cyrene.providers.github-issues",
+                "cyrene.providers.microsoft-graph",
+                "cyrene.providers.azure-devops-observation",
+                "cyrene.providers.huggingface",
+                "cyrene.connectors.bilibili",
+            },
+        )
+        for spec in bound_packages:
+            with self.subTest(package=spec.package_id):
+                source_files, _ = release._source_files(self.repository, spec)
+                requirements = source_files[spec.requirements_input].decode("utf-8")
+                self.assertIn("cyrene-account-center-contracts==0.1.4", requirements)
+                self.assertNotIn("cyrene-account-center-contracts==0.1.3", requirements)
+                release._verify_lock_inputs(spec, source_files)
+
+    def test_public_web_and_bilibili_specs_close_dependencies_without_internal_wheels(
+        self,
+    ) -> None:
+        """Keep the parser source in public-web and reject unpublished Cyrene wheels."""
+
+        public_web = release.PACKAGE_SPECS["cyrene.tools.public-web"]
+        bilibili = release.PACKAGE_SPECS["cyrene.connectors.bilibili"]
+        self.assertEqual(
+            public_web.vendored_sdks,
+            (
+                release.RUNTIME_SDK,
+                release.TOOL_PROVIDER_SDK,
+                release.INTEGRATION_SUPPORT_SDK,
+            ),
+        )
+
+        source_files, sdk_files = release._source_files(self.repository, public_web)
+        public_project = tomllib.loads(
+            source_files[f"{public_web.source_dir}/pyproject.toml"].decode("utf-8")
+        )["project"]
+        public_requirements = {
+            release.canonicalize_name(Requirement(value).name)
+            for value in public_project["dependencies"]
+        }
+        self.assertNotIn("cyrene-document-parsing", public_requirements)
+        self.assertTrue(
+            {
+                "openpyxl",
+                "pillow",
+                "pypdfium2",
+                "python-docx",
+                "python-pptx",
+            }.issubset(public_requirements)
+        )
+        public_entries = release._package_entries(source_files, public_web, sdk_files)
+        self.assertIn("src/cyrene_public_web/document_parser.py", public_entries)
+        self.assertNotIn("src/document_parsing.py", public_entries)
+        self.assertNotIn("src/contracts/v1/schema.json", public_entries)
+        self.assertEqual(
+            public_entries["LICENSE"], (self.repository / "LICENSE").read_bytes()
+        )
+
+        for spec in (public_web, bilibili):
+            with self.subTest(package=spec.package_id):
+                package_sources, _ = release._source_files(self.repository, spec)
+                pins = release._verify_lock_inputs(spec, package_sources)
+                pinned_names = {
+                    release.canonicalize_name(line.split("==", 1)[0]) for line in pins
+                }
+                vendored_names = {
+                    release.canonicalize_name(sdk.distribution)
+                    for sdk in spec.vendored_sdks
+                }
+                self.assertFalse(pinned_names & vendored_names)
+
+        invalid_sources = dict(source_files)
+        invalid_sources[f"{public_web.source_dir}/requirements.lock"] += (
+            b"cyrene-document-parsing==0.2.1\n"
+        )
+        with self.assertRaisesRegex(
+            release.PackageBuildError,
+            "may not resolve unpublished Cyrene distributions",
+        ):
+            release._verify_lock_inputs(public_web, invalid_sources)
 
     def test_office_docker_locks_hash_every_exact_package_lock_pin(self) -> None:
         """Keep the Docker install lock fully hashed and aligned to package releases."""
@@ -258,16 +386,22 @@ class OfficialPluginPackageTests(unittest.TestCase):
         for package_id in selection.OFFICE_PILOT_PACKAGE_IDS:
             with self.subTest(package_id=package_id):
                 spec = release.PACKAGE_SPECS[package_id]
-                package_lock = (self.repository / spec.source_dir / "requirements.lock").read_bytes()
+                package_lock = (
+                    self.repository / spec.source_dir / "requirements.lock"
+                ).read_bytes()
                 package_pins = {
                     release.canonicalize_name(match.group(1)): match.group(2)
                     for line in release._lock_lines(package_lock, spec.source_dir)
                     if (match := release.LOCK_PIN.fullmatch(line)) is not None
                 }
-                docker_lock = self.repository / spec.source_dir / "docker-requirements.lock"
+                docker_lock = (
+                    self.repository / spec.source_dir / "docker-requirements.lock"
+                )
                 self.assertEqual(_read_hashed_runtime_lock(docker_lock), package_pins)
 
-    def test_office_provider_packages_build_and_start_from_locked_wheelhouses(self) -> None:
+    def test_office_provider_packages_build_and_start_from_locked_wheelhouses(
+        self,
+    ) -> None:
         """Build both source packages and list fixed tools from isolated ZIP runtimes."""
 
         for index, package_id in enumerate(selection.OFFICE_PILOT_PACKAGE_IDS):
@@ -301,9 +435,9 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 with zipfile.ZipFile(outputs["package"]) as archive:
                     archive.extractall(payload)
                 manifest = json.loads(
-                    (self.repository / spec.source_dir / "plugin.manifest.json").read_text(
-                        encoding="utf-8"
-                    )
+                    (
+                        self.repository / spec.source_dir / "plugin.manifest.json"
+                    ).read_text(encoding="utf-8")
                 )
                 python_executable = self._lock_bound_startup_python(
                     package_id=package_id,
@@ -315,10 +449,17 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     payload=payload,
                     entrypoint=manifest["runtime"]["entrypoint"],
                     capability=manifest["capabilities"][0],
-                    environment_overrides=self._package_activation_environment(package_id),
+                    environment_overrides=self._package_activation_environment(
+                        package_id
+                    ),
                     python_executable=python_executable,
                     package_id=package_id,
                 )
+                if package_id == "cyrene.tools.public-web":
+                    self._assert_packaged_public_web_tests(
+                        payload=payload,
+                        python_executable=python_executable,
+                    )
 
     def test_package_release_selection_preserves_push_scope_and_limits_dispatch(
         self,
@@ -441,7 +582,9 @@ class OfficialPluginPackageTests(unittest.TestCase):
         )
         filename = f"protobuf-4.25.9-cp312-cp312-{platform_tag}.whl"
         wheel_path = self.temp_root / filename
-        with zipfile.ZipFile(wheel_path, "w", compression=zipfile.ZIP_STORED) as archive:
+        with zipfile.ZipFile(
+            wheel_path, "w", compression=zipfile.ZIP_STORED
+        ) as archive:
             archive.writestr(
                 "protobuf-4.25.9.dist-info/METADATA",
                 "Metadata-Version: 2.1\nName: protobuf\nVersion: 4.25.9\n",
@@ -483,7 +626,10 @@ class OfficialPluginPackageTests(unittest.TestCase):
         spec = release.PACKAGE_SPECS["cyrene.providers.model-api-connector"]
         manifest, _ = release._read_package_spec(self.repository, spec)
         self.assertEqual(
-            {method["name"]: method["interfaceVersion"] for method in manifest["methods"]},
+            {
+                method["name"]: method["interfaceVersion"]
+                for method in manifest["methods"]
+            },
             {
                 "embeddings": "1",
                 "chat_completion": "1",
@@ -497,7 +643,9 @@ class OfficialPluginPackageTests(unittest.TestCase):
             with (
                 self.subTest(method=invalid["methods"][index]["name"]),
                 patch.object(release, "_read_json", return_value=invalid),
-                self.assertRaisesRegex(release.PackageBuildError, "supported interface version"),
+                self.assertRaisesRegex(
+                    release.PackageBuildError, "supported interface version"
+                ),
             ):
                 release._read_package_spec(self.repository, spec)
 
@@ -1072,6 +1220,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
         """
 
         cases: list[tuple[str, Path, str, str, str | None]] = []
+        package_preparer_wheels: dict[str, Path] = {}
         expected_target = release.TARGET
         self.assertEqual(
             expected_target["architecture"],
@@ -1100,9 +1249,12 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 channel="preview",
                 run_id="12345",
                 run_attempt=1,
-                preparer_wheel=self.wheel,
+                preparer_wheel=(
+                    None if package_id in AETHER_PACKAGE_IDS else self.wheel
+                ),
                 wheelhouse_source=wheelhouse_source,
             )
+            package_preparer_wheels[package_id] = outputs["preparer_wheel"]
             release.verify_release_artifacts(
                 root=self.repository,
                 output_dir=output_dir,
@@ -1170,6 +1322,70 @@ class OfficialPluginPackageTests(unittest.TestCase):
                         archive.namelist(),
                     )
                     self.assertIn("licenses/plugin/LICENSE", archive.namelist())
+                if package_id == "cyrene.tools.public-web":
+                    sbom = json.loads(outputs["sbom"].read_text(encoding="utf-8"))
+                    components = {item["name"]: item for item in sbom["components"]}
+                    self.assertNotIn("cyrene-document-parsing", components)
+                    unresolved_licenses = []
+                    for component in components.values():
+                        properties = {
+                            item["name"]: item["value"]
+                            for item in component.get("properties", [])
+                        }
+                        if (
+                            properties.get("cyrene:license:metadata")
+                            == ("wheel metadata does not declare a license")
+                            and json.loads(properties.get("cyrene:license:files", "[]"))
+                            == []
+                        ):
+                            unresolved_licenses.append(component["name"])
+                    self.assertEqual(unresolved_licenses, [])
+                    expected_metadata = {
+                        "openpyxl": "License: MIT",
+                        "python-docx": "License: MIT",
+                        "python-pptx": "License: MIT",
+                        "pillow": "License-Expression: MIT-CMU",
+                        "pypdfium2": (
+                            "License: BSD-3-Clause, Apache-2.0, dependency licenses"
+                        ),
+                    }
+                    for distribution, license_record in expected_metadata.items():
+                        with self.subTest(license_distribution=distribution):
+                            component = components[distribution]
+                            properties = {
+                                item["name"]: item["value"]
+                                for item in component["properties"]
+                            }
+                            self.assertEqual(
+                                properties["cyrene:license:metadata"], license_record
+                            )
+                            self.assertEqual(
+                                component["licenses"][0].get("expression")
+                                or component["licenses"][0]
+                                .get("license", {})
+                                .get("name"),
+                                license_record.split(": ", 1)[1],
+                            )
+                    pdfium_component = components["pypdfium2"]
+                    pdfium_properties = {
+                        item["name"]: item["value"]
+                        for item in pdfium_component["properties"]
+                    }
+                    pdfium_license_files = json.loads(
+                        pdfium_properties["cyrene:license:files"]
+                    )
+                    self.assertTrue(
+                        any(
+                            name.endswith("/Apache-2.0.txt")
+                            for name in pdfium_license_files
+                        )
+                    )
+                    self.assertTrue(
+                        any(
+                            name.endswith("/BSD-3-Clause.txt")
+                            for name in pdfium_license_files
+                        )
+                    )
             cases.append(
                 (
                     f"package {package_id}",
@@ -1227,6 +1443,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     package_id=package_id,
                     package_name=name,
                     payload=payload,
+                    preparer_wheel=package_preparer_wheels.get(package_id),
                 )
                 self._assert_clean_start(
                     name=name,
@@ -1398,6 +1615,120 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 "TEST_PACKAGE_MEDIA_KEY": (b"\x35" * 32).hex(),
                 "TEST_PACKAGE_MEDIA_STATE": str(self.temp_root / "media-state"),
                 "TEST_PACKAGE_MEDIA_BRIDGE": (b"\x36" * 32).hex(),
+            }
+
+        if package_id == "cyrene.tools.public-web":
+            configuration = {
+                "trusted_callers": [
+                    {
+                        "caller_workload": "navigator-package-test",
+                        "audience": "public-web-package-test",
+                        "organization_id": "org-package-test",
+                        "workspace_id": "workspace-package-test",
+                        "issuer": "https://identity.example.test",
+                        "verification_key_ref": "public-web/caller-verification-key",
+                    }
+                ],
+                "artifact_bridge_origin": "http://127.0.0.1:1",
+                "hostSecretRefs": {
+                    "public-web/caller-verification-key": "TEST_PACKAGE_PUBLIC_WEB_CALLER_KEY",
+                    "public-web/cursor-hmac-key": "TEST_PACKAGE_PUBLIC_WEB_CURSOR_KEY",
+                    "public-web/state-dir": "TEST_PACKAGE_PUBLIC_WEB_STATE",
+                    "public-web/artifact-bridge-token": "TEST_PACKAGE_PUBLIC_WEB_BRIDGE",
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "public-web-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_PUBLIC_WEB_CALLER_KEY": (b"\x75" * 32).hex(),
+                "TEST_PACKAGE_PUBLIC_WEB_CURSOR_KEY": (b"\x76" * 32).hex(),
+                "TEST_PACKAGE_PUBLIC_WEB_STATE": str(
+                    self.temp_root / "public-web-state"
+                ),
+                "TEST_PACKAGE_PUBLIC_WEB_BRIDGE": (b"\x77" * 32).hex(),
+            }
+
+        if package_id == "cyrene.connectors.bilibili":
+            configuration = {
+                "trusted_callers": [
+                    {
+                        "caller_workload": "navigator-package-test",
+                        "audience": "bilibili-package-test",
+                        "organization_id": "org-package-test",
+                        "workspace_id": "workspace-package-test",
+                        "issuer": "https://identity.example.test",
+                        "verification_key_ref": "bilibili/exchange-verification-key",
+                    }
+                ],
+                "account_center": {
+                    "binding_id": "account-center-package-test",
+                    "connection_ref": "grpc://127.0.0.1:1",
+                    "transport": "local",
+                    "caller_id": "cyrene.connectors.bilibili",
+                    "signing_key_ref": "bilibili/account-center-provider-signing-key",
+                },
+                "hostSecretRefs": {
+                    "bilibili/exchange-verification-key": "TEST_PACKAGE_BILIBILI_EXCHANGE_KEY",
+                    "bilibili/account-center-provider-signing-key": "TEST_PACKAGE_BILIBILI_ACCOUNT_KEY",
+                    "bilibili/state-dir": "TEST_PACKAGE_BILIBILI_STATE",
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "bilibili-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_BILIBILI_EXCHANGE_KEY": (b"\x78" * 32).hex(),
+                "TEST_PACKAGE_BILIBILI_ACCOUNT_KEY": (b"\x79" * 32).hex(),
+                "TEST_PACKAGE_BILIBILI_STATE": str(self.temp_root / "bilibili-state"),
+            }
+
+        if package_id == "cyrene.providers.knowledge-retrieval":
+            artifact_root = self.temp_root / "knowledge-retrieval-artifacts"
+            artifact_root.mkdir(mode=0o700)
+            bundle_path = artifact_root / "package-test.bundle"
+            bundle_bytes = b"offline package startup fixture"
+            bundle_path.write_bytes(bundle_bytes)
+            digest = training_release.sha256_bytes(bundle_bytes)
+            configuration = {
+                "artifact_root": str(artifact_root),
+                "trusted_caller": {
+                    "caller_workload": "navigator-package-test",
+                    "audience": "knowledge-retrieval-package-test",
+                    "issuer": "https://identity.example.test",
+                    "organization_id": "org-package-test",
+                    "workspace_id": "workspace-package-test",
+                    "verification_key_ref": "knowledge-retrieval/caller-context-verification-key",
+                },
+                "trusted_principals": [
+                    {
+                        "issuer": "https://identity.example.test",
+                        "subject": "navigator-package-test",
+                        "organization_id": "org-package-test",
+                        "workspace_id": "workspace-package-test",
+                        "principal_refs": ["principal-package-test"],
+                    }
+                ],
+                "bundle_registry": [
+                    {
+                        "library_selector": "package-test-library",
+                        "bundle_locator": bundle_path.name,
+                        "artifact_ref": {
+                            "uri": f"artifact://sha256/{digest.removeprefix('sha256:')}",
+                            "digest": digest,
+                            "size_bytes": len(bundle_bytes),
+                            "kind": "knowledge_bundle",
+                        },
+                    }
+                ],
+                "hostSecretRefs": {
+                    "knowledge-retrieval/caller-context-verification-key": (
+                        "TEST_PACKAGE_KNOWLEDGE_RETRIEVAL_CONTEXT_KEY"
+                    )
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "knowledge-retrieval-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_KNOWLEDGE_RETRIEVAL_CONTEXT_KEY": (b"\x7a" * 32).hex(),
             }
 
         if package_id == "cyrene.providers.cloud-resources":
@@ -1704,13 +2035,13 @@ class OfficialPluginPackageTests(unittest.TestCase):
         package_id: str | None,
         package_name: str,
         payload: Path,
+        preparer_wheel: Path | None = None,
     ) -> Path | None:
-        """Create a runtime from an isolated exact wheelhouse where pins differ.
+        """Install isolated locks and use the packaged preparer for Aether ZIPs.
 
-        Account Center, Graph, Azure DevOps, GitHub, WeCom, Cloud, Teams, and
-        Hugging Face have component-specific locks. These checks install each
-        ZIP's exact wheelhouse instead of merging provider dependency pins.
-        中文：为有独立依赖锁的 package 安装各自 ZIP 中的精确 wheelhouse。
+        All nine Aether packages are prepared by their packaged runtime wheel
+        using only their embedded offline wheelhouses before clean startup.
+        中文：Aether 九包通过打包的 preparer 使用离线 wheelhouse；其他锁隔离包直接按各自精确锁安装。
         """
 
         if package_id not in LOCK_ISOLATED_STARTUP_PACKAGES:
@@ -1722,6 +2053,13 @@ class OfficialPluginPackageTests(unittest.TestCase):
             (wheelhouse_path / "manifest.json").is_file(),
             f"{package_name} package wheelhouse is missing",
         )
+        if package_id in AETHER_PACKAGE_IDS:
+            self.assertIsNotNone(preparer_wheel)
+            return self._prepare_packaged_runtime(
+                package_root=payload,
+                package_name=package_name,
+                preparer_wheel=preparer_wheel,
+            )
         virtual_environment = self.temp_root / (
             "clean-start-runtime-" + package_name.replace(" ", "-")
         )
@@ -1765,6 +2103,121 @@ class OfficialPluginPackageTests(unittest.TestCase):
         )
         return python_executable
 
+    def _prepare_packaged_runtime(
+        self,
+        *,
+        package_root: Path,
+        package_name: str,
+        preparer_wheel: Path | None,
+    ) -> Path:
+        """Prepare a package runtime from its exact bundled wheelhouse."""
+
+        self.assertIsNotNone(preparer_wheel)
+        uv = shutil.which("uv")
+        self.assertIsNotNone(uv, "the pinned release build environment must provide uv")
+        preparer_target = self.temp_root / (
+            "packaged-preparer-" + package_name.replace(" ", "-")
+        )
+        subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "pip",
+                "install",
+                "--disable-pip-version-check",
+                "--no-deps",
+                "--target",
+                str(preparer_target),
+                str(preparer_wheel),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        runtime_root = self.temp_root / (
+            "prepared-runtime-" + package_name.replace(" ", "-")
+        )
+        empty_uv_cache = self.temp_root / (
+            "empty-uv-cache-" + package_name.replace(" ", "-")
+        )
+        empty_uv_cache.mkdir()
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PYTHONPATH": str(preparer_target),
+                "UV_CACHE_DIR": str(empty_uv_cache),
+                "UV_OFFLINE": "1",
+            }
+        )
+        lock_digest = training_release.sha256_file(package_root / "requirements.lock")
+        prepared = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "cyrene_plugin_runtime.dependency_preparer",
+                "--package-root",
+                str(package_root),
+                "--runtime-root",
+                str(runtime_root),
+                "--lock-digest",
+                lock_digest,
+                "--python",
+                sys.executable,
+                "--uv",
+                str(uv),
+            ],
+            cwd=self.temp_root,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=180,
+        )
+        self.assertEqual(
+            prepared.returncode,
+            0,
+            f"{package_name} offline dependency preparation failed:\n{prepared.stderr}",
+        )
+        self.assertEqual(
+            json.loads(prepared.stdout)["protocol"],
+            "cyrene.package-dependency-preparer.v1",
+        )
+        runtime_python = runtime_root / "bin/python"
+        self.assertTrue(runtime_python.is_file())
+        return runtime_python
+
+    def _assert_packaged_public_web_tests(
+        self, *, payload: Path, python_executable: Path | None
+    ) -> None:
+        """Run parser/provider tests from the extracted PackageSpec source tree."""
+
+        environment = os.environ.copy()
+        environment["PYTHONPATH"] = str(payload / "src")
+        environment["HF_HUB_OFFLINE"] = "1"
+        environment["TRANSFORMERS_OFFLINE"] = "1"
+        result = subprocess.run(
+            [
+                str(python_executable or sys.executable),
+                "-m",
+                "pytest",
+                "-c",
+                os.devnull,
+                "-q",
+                str(self.repository / "plugins/tools/public-web/tests"),
+            ],
+            cwd=self.repository,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=240,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            f"packaged public-web tests failed:\n{result.stdout}\n{result.stderr}",
+        )
+
     def _assert_clean_start(
         self,
         *,
@@ -1804,6 +2257,14 @@ class OfficialPluginPackageTests(unittest.TestCase):
             "TEST_PACKAGE_GRAPH_ACCOUNT_CENTER_KEY",
             "TEST_PACKAGE_ADO_EXCHANGE_KEY",
             "TEST_PACKAGE_ADO_ACCOUNT_CENTER_KEY",
+            "TEST_PACKAGE_PUBLIC_WEB_CALLER_KEY",
+            "TEST_PACKAGE_PUBLIC_WEB_CURSOR_KEY",
+            "TEST_PACKAGE_PUBLIC_WEB_STATE",
+            "TEST_PACKAGE_PUBLIC_WEB_BRIDGE",
+            "TEST_PACKAGE_BILIBILI_EXCHANGE_KEY",
+            "TEST_PACKAGE_BILIBILI_ACCOUNT_KEY",
+            "TEST_PACKAGE_BILIBILI_STATE",
+            "TEST_PACKAGE_KNOWLEDGE_RETRIEVAL_CONTEXT_KEY",
         ):
             environment.pop(variable, None)
         environment.update(environment_overrides or {})
@@ -1879,6 +2340,20 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     python_executable=python_executable,
                     package_id=package_id,
                 )
+            elif package_id in {
+                "cyrene.tools.public-web",
+                "cyrene.connectors.bilibili",
+                "cyrene.tools.media",
+                "cyrene.providers.knowledge-retrieval",
+            }:
+                self._assert_tool_provider_catalog(
+                    name=name,
+                    payload=payload,
+                    connection_ref=ready["connection_ref"],
+                    binding_id=environment["CYRENE_CAPABILITY_BINDING_ID"],
+                    python_executable=python_executable,
+                    package_id=package_id,
+                )
         finally:
             selector.close()
             if process.poll() is None:
@@ -1890,6 +2365,100 @@ class OfficialPluginPackageTests(unittest.TestCase):
                     process.wait(timeout=5)
             process.stdout.close()
             process.stderr.close()
+
+    def _assert_tool_provider_catalog(
+        self,
+        *,
+        name: str,
+        payload: Path,
+        connection_ref: str,
+        binding_id: str,
+        python_executable: Path | None,
+        package_id: str,
+    ) -> None:
+        """Invoke the packaged provider over a real local typed gRPC request."""
+
+        expected_tool_ids = {
+            "cyrene.tools.public-web": [
+                "web.search",
+                "web.open",
+                "document.read",
+            ],
+            "cyrene.connectors.bilibili": [
+                "bilibili.search",
+                "bilibili.user.find",
+                "bilibili.video.read",
+                "bilibili.comments.list",
+                "bilibili.dynamics.list",
+                "bilibili.dynamic.read",
+                "bilibili.dm.list",
+                "bilibili.dm.read",
+                "bilibili.comment.create",
+                "bilibili.dynamic.publish",
+                "bilibili.dm.send",
+            ],
+            "cyrene.tools.media": [
+                "media.asset.import",
+                "media.asset.search",
+                "media.asset.get",
+                "media.asset.delete",
+                "media.asset.restore",
+                "media.card.render",
+            ],
+            "cyrene.providers.knowledge-retrieval": ["knowledge.search"],
+        }[package_id]
+        script = """
+import json
+import sys
+
+sys.path.insert(0, sys.argv[1])
+from cyrene_plugin_runtime.client import DirectPayload, DirectPluginClient
+from cyrene_tool_provider_contracts import tool_provider_pb2 as wire
+
+request = wire.ListToolsRequest(binding_id=sys.argv[3])
+with DirectPluginClient.for_local_connection_ref(sys.argv[2]) as client:
+    response_payload = client.invoke(
+        capability="tool.provider.v1",
+        interface_version="1",
+        method="list_tools",
+        request=DirectPayload(
+            type_url="type.cyrene.io/cyrene.tool.provider.v1.ListToolsRequest",
+            value=request.SerializeToString(),
+        ),
+        deadline_seconds=10,
+        request_id="official-package-list-tools",
+    )
+response = wire.ListToolsResponse.FromString(response_payload.value)
+print(json.dumps({
+    "type_url": response_payload.type_url,
+    "tool_ids": [tool.provider_tool_id for tool in response.catalog.tools],
+}))
+"""
+        result = subprocess.run(
+            [
+                str(python_executable or sys.executable),
+                "-I",
+                "-c",
+                script,
+                str(payload / "src"),
+                connection_ref,
+                binding_id,
+            ],
+            cwd=self.temp_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=20,
+        )
+        self.assertEqual(
+            result.returncode, 0, f"{name} typed catalog failed: {result.stderr}"
+        )
+        catalog = json.loads(result.stdout)
+        self.assertEqual(
+            catalog["type_url"],
+            "type.cyrene.io/cyrene.tool.provider.v1.ListToolsResponse",
+        )
+        self.assertEqual(catalog["tool_ids"], expected_tool_ids)
 
     def _assert_email_tool_catalog(
         self,

@@ -10,15 +10,19 @@ refuse redirects and ambient proxy configuration.
 `document.read` accepts a public URL or an opaque attachment ID. Attachment
 resolution goes through the current task's authenticated Work bridge, which
 authorizes the original message/source before returning bytes. The plugin never
-accepts a file path. PDF and Office files use the existing `document.parsing.v1`
-library; HTML, text, Markdown, CSV, and supported images use its existing
-format-specific adapters. Results are returned as source-bound blocks with
+accepts a file path. Its isolated parser uses pinned local PDFium, Word, PowerPoint,
+and spreadsheet libraries plus the Python standard library. It extracts searchable
+PDF text and Office/text content without loading a model. Images and PDF pages with
+no text layer return an explicit OCR-unavailable diagnostic; the parser never
+returns fabricated OCR text. Results are returned as source-bound blocks with
 bounded cursors, content digests, and parser diagnostics.
 
 Document parsing runs in at most two isolated workers, each with a 90-second
 wall-clock limit. Cancellation and timeout terminate the worker process group;
 the source, request, and parser outputs live only in a private temporary
 directory. The child receives no caller, search, or artifact bridge secrets.
+The package lock contains the complete external wheel closure; the parser does not
+resolve an unpublished Cyrene distribution from a package registry.
 
 The plugin does not invent search results when no backend is configured. Search
 and document results are bounded and cite a stable `source_ref`; changing the

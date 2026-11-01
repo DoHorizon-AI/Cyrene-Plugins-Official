@@ -38,8 +38,8 @@ class OfficialPackageSelectionTests(unittest.TestCase):
         package_ids = [row["package_id"] for row in matrix["include"]]
 
         self.assertEqual(package_ids, list(selection.ALL_PACKAGE_IDS))
-        self.assertEqual(len(package_ids), 22)
-        self.assertEqual(len(set(package_ids)), 22)
+        self.assertEqual(len(package_ids), 24)
+        self.assertEqual(len(set(package_ids)), 24)
         self.assertEqual(publish_mode, "none")
 
     def test_conversation_assistant_set_is_explicit_and_immutable(self) -> None:
@@ -163,6 +163,23 @@ class OfficialPackageSelectionTests(unittest.TestCase):
         """Each office provider can be selected without widening the pilot set."""
 
         for package_id in selection.OFFICE_PILOT_PACKAGE_IDS:
+            with self.subTest(package_id=package_id):
+                matrix, publish_mode = selection.select_package_release(
+                    "workflow_dispatch", package_id
+                )
+                self.assertEqual(
+                    [row["package_id"] for row in matrix["include"]], [package_id]
+                )
+                self.assertEqual(publish_mode, "immutable")
+
+    def test_public_web_and_bilibili_are_single_package_immutable_dispatches(self) -> None:
+        """Expose the final migrated packages through exact immutable choices."""
+
+        self.assertEqual(
+            selection.ADDITIONAL_OFFICIAL_PACKAGE_IDS,
+            ("cyrene.tools.public-web", "cyrene.connectors.bilibili"),
+        )
+        for package_id in selection.ADDITIONAL_OFFICIAL_PACKAGE_IDS:
             with self.subTest(package_id=package_id):
                 matrix, publish_mode = selection.select_package_release(
                     "workflow_dispatch", package_id

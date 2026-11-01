@@ -90,6 +90,13 @@ class _Handler(BaseHTTPRequestHandler):
             body = b"first document block\nsecond document block\n"
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
+        elif self.path == "/document-invalid.docx":
+            body = b"not a ZIP package"
+            self.send_response(200)
+            self.send_header(
+                "Content-Type",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            )
         else:
             self.send_response(404)
             body = b"missing"
@@ -140,7 +147,7 @@ class _FakeParser:
         kwargs["blocks_path"].write_text(
             json.dumps(
                 {
-                    "schema_version": "cyrene.document.blocks.v1",
+                    "schema_version": "cyrene.public-web.document-blocks.v1",
                     "source_ref": source_ref,
                     "source_digest": source_digest,
                     "blocks": blocks,
@@ -330,7 +337,7 @@ def test_document_read_reuses_parser_and_returns_source_locators(tmp_path, peer)
     assert second["next_cursor"] is None
 
 
-def test_document_read_calls_existing_document_parser_for_text(tmp_path, peer):
+def test_document_read_uses_bundled_parser_adapter_for_text(tmp_path, peer):
     provider = PublicWebProvider(settings=_settings(tmp_path, peer))
     is_error, result = _invoke(
         provider,
@@ -343,6 +350,17 @@ def test_document_read_calls_existing_document_parser_for_text(tmp_path, peer):
         "first document block",
         "second document block",
     ]
+
+
+def test_document_read_returns_typed_failure_for_invalid_office_input(tmp_path, peer):
+    provider = PublicWebProvider(settings=_settings(tmp_path, peer))
+    is_error, result = _invoke(
+        provider,
+        "document.read",
+        {"url": peer.origin + "/document-invalid.docx", "limit": 10},
+    )
+    assert is_error is True
+    assert result["error"]["code"] == "PARSER_FAILURE"
 
 
 def test_document_read_artifact_uses_only_task_resolver(tmp_path, peer):

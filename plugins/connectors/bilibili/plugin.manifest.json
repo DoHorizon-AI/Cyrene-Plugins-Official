@@ -39,7 +39,7 @@
   },
   "state": {
     "isStateful": true,
-    "storageCategory": "persistent",
+    "storageCategory": "relational",
     "retentionPolicyOnUninstall": "retain"
   }
 }

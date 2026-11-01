@@ -62,7 +62,9 @@ following fixed selections:
 | `authorization-cloud-v1` | Cloud Resources, Email Notification, WeCom | Immutable package releases |
 | `teams-cloud-v1` | Teams, Cloud Management, Hugging Face, Account Center, GitHub Issues | Immutable package releases |
 | `office-pilot` | Microsoft Graph, Azure DevOps Observation | Immutable package releases |
-| Pull request | All 15 unique package IDs | Build and test only; no publication |
+| `conversation-assistant` | Model API Connector, Memory SQLite, Memory PGVector, Knowledge Graph, Knowledge Retrieval, SenseVoice Speech, Media | Immutable package releases |
+| Single package | Public Web Tools or Bilibili Connector | Immutable package release |
+| Pull request | All 24 unique package IDs | Build and test only; no publication |
 
 Manual dispatch can also select one fixed package ID; legacy packages retain draft
 mode, while the other package IDs publish immutable releases. The named sets are
@@ -129,7 +131,9 @@ Plugin ZIP。自动 push 保持现有 `legacy5` draft 发布。手动 dispatch �
 | `authorization-cloud-v1` | Cloud Resources、Email Notification、WeCom | 不可变 package release |
 | `teams-cloud-v1` | Teams、Cloud Management、Hugging Face、Account Center、GitHub Issues | 不可变 package release |
 | `office-pilot` | Microsoft Graph、Azure DevOps Observation | 不可变 package release |
-| Pull request | 全部 15 个唯一 package ID | 仅构建与测试，不发布 |
+| `conversation-assistant` | Model API Connector、Memory SQLite、Memory PGVector、Knowledge Graph、Knowledge Retrieval、SenseVoice Speech、Media | 不可变 package release |
+| 单个 package | Public Web Tools 或 Bilibili Connector | 不可变 package release |
+| Pull request | 全部 24 个唯一 package ID | 仅构建与测试，不发布 |
 
 手动 dispatch 也可以选择一个固定 package ID；legacy package 保持 draft 模式，其他 package
 会发布不可变 release。命名集合均为固定 allowlist。不可变发布会将 ZIP、wheelhouse、SBOM、attestations 以及

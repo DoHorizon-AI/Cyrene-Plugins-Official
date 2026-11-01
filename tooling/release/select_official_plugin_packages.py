@@ -49,6 +49,10 @@ CONVERSATION_ASSISTANT_PACKAGE_IDS = (
     "cyrene.providers.speech-sensevoice",
     "cyrene.tools.media",
 )
+ADDITIONAL_OFFICIAL_PACKAGE_IDS = (
+    "cyrene.tools.public-web",
+    "cyrene.connectors.bilibili",
+)
 ALL_PACKAGE_IDS = LEGACY_PACKAGE_IDS + tuple(
     dict.fromkeys(
         INTEGRATION_V1_PACKAGE_IDS
@@ -56,6 +60,17 @@ ALL_PACKAGE_IDS = LEGACY_PACKAGE_IDS + tuple(
         + TEAMS_CLOUD_V1_PACKAGE_IDS
         + OFFICE_PILOT_PACKAGE_IDS
         + CONVERSATION_ASSISTANT_PACKAGE_IDS
+        + ADDITIONAL_OFFICIAL_PACKAGE_IDS
+    )
+)
+IMMUTABLE_PACKAGE_IDS = tuple(
+    dict.fromkeys(
+        INTEGRATION_V1_PACKAGE_IDS
+        + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
+        + TEAMS_CLOUD_V1_PACKAGE_IDS
+        + OFFICE_PILOT_PACKAGE_IDS
+        + CONVERSATION_ASSISTANT_PACKAGE_IDS
+        + ADDITIONAL_OFFICIAL_PACKAGE_IDS
     )
 )
 PACKAGE_NAMES = {
@@ -81,6 +96,8 @@ PACKAGE_NAMES = {
     "cyrene.providers.knowledge-retrieval": "knowledge-retrieval",
     "cyrene.providers.speech-sensevoice": "speech-sensevoice",
     "cyrene.tools.media": "media",
+    "cyrene.tools.public-web": "public-web",
+    "cyrene.connectors.bilibili": "bilibili-connector",
 }
 PACKAGE_SET_CHOICES = (
     "legacy5",
@@ -137,12 +154,7 @@ def select_package_release(
             selected = (selection,)
             publish_mode = (
                 "immutable"
-                if selection
-                in INTEGRATION_V1_PACKAGE_IDS
-                + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
-                + TEAMS_CLOUD_V1_PACKAGE_IDS
-                + OFFICE_PILOT_PACKAGE_IDS
-                + CONVERSATION_ASSISTANT_PACKAGE_IDS
+                if selection in IMMUTABLE_PACKAGE_IDS
                 else "draft"
             )
         else:

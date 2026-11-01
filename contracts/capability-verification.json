@@ -697,6 +697,43 @@
           "notes": "This record covers component behavior only. Fixture embeddings, inference engines or caller bindings are not a Product acceptance claim. Official package installation and Navigator/DSH integration are separate gates."
         }
       ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.tools.public-web",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / source-bound package ZIP installed from its exact offline wheelhouse with synthetic host activation",
+          "command": "python -m unittest discover -s tests/release -p 'test_official_plugin_package.py'",
+          "result": "Package ZIP verified and installed with PYTHONPATH unset; the provider started and returned its typed tool catalog over local DirectPluginRuntime gRPC",
+          "notes": "REAL: exact locked wheel closure and local runtime RPC. SIMULATED: host identity, keys, and artifact bridge. NOT_RUN: external search service, public website fetches, Product callers, and Navigator/DSH integration. The unlicensed document-parsing component source is not bundled."
+        },
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 prepared from the public-web PackageSpec ZIP and exact offline wheelhouse",
+          "command": "runtime/bin/python -m pytest -q plugins/tools/public-web/tests",
+          "result": "32 passed; isolated worker extracted real TXT, Markdown, CSV, searchable PDF, DOCX, PPTX, and XLSX content; image text remained explicitly unavailable",
+          "notes": "REAL: parser behavior through the packaged worker with PYTHONPATH unset in child processes. SIMULATED: local files, caller identity, and artifact bridge. NOT_RUN: external public sites and OCR/model inference. The exact wheel SBOM has license metadata or retained license files for every external wheel."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.connectors.bilibili",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / source-bound package ZIP installed from its exact offline wheelhouse with synthetic host activation",
+          "command": "python -m unittest discover -s tests/release -p 'test_official_plugin_package.py'",
+          "result": "Package ZIP verified and installed with PYTHONPATH unset; the provider started and returned its typed tool catalog over local DirectPluginRuntime gRPC",
+          "notes": "REAL: exact locked wheel closure and local runtime RPC. SIMULATED: trusted caller and Account Center binding. NOT_RUN: external Bilibili traffic, account linking, QR login, credentials, and writes; real account tests remain deferred."
+        }
+      ]
     }
   ]
 }
