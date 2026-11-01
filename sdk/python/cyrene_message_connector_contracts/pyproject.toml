@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-message-connector-contracts"
+version = "0.1.0"
+description = "Plugins-owned message.connector.v1 consumer bindings and codec"
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = ["protobuf>=4.25.9,<5"]
+
+[project.optional-dependencies]
+bindings = ["grpcio-tools==1.62.3"]
+test = ["pytest>=8,<10", "ruff>=0.9,<1"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cyrene_message_connector_contracts = ["py.typed", "schemas/*.json"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = ["src/cyrene_message_connector_contracts/_generated/message_connector_pb2.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
