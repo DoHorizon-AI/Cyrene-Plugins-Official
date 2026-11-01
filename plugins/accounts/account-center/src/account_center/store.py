@@ -10,14 +10,14 @@ import os
 import sqlite3
 import time
 import uuid
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 
 from .models import AccountCenterError, Anchor
 
-SCHEMA_VERSION = 10
+SCHEMA_VERSION = 11
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 
@@ -555,7 +555,50 @@ class AccountStore:
                     "CREATE INDEX IF NOT EXISTS bilibili_link_session_profile "
                     "ON bilibili_link_sessions(profile_ref,status,expires_at)"
                 )
-            db.execute("PRAGMA user_version = 10")
+            if current < 11:
+                # People directory: addresses an operator declared for a person.
+                # Nothing here carries credentials.
+                db.execute(
+                    "CREATE TABLE IF NOT EXISTS workspace_people ("
+                    "person_ref TEXT PRIMARY KEY,organization_id TEXT NOT NULL,"
+                    "workspace_id TEXT,issuer TEXT NOT NULL,subject TEXT,mail TEXT,"
+                    "display_name TEXT,created_by_issuer TEXT NOT NULL,"
+                    "created_by_subject TEXT NOT NULL,created_at INTEGER NOT NULL,"
+                    "updated_at INTEGER NOT NULL,"
+                    "CHECK(subject IS NOT NULL OR mail IS NOT NULL))"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS workspace_person_subject "
+                    "ON workspace_people(organization_id,ifnull(workspace_id,''),issuer,subject) "
+                    "WHERE subject IS NOT NULL"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS workspace_person_mail "
+                    "ON workspace_people(organization_id,ifnull(workspace_id,''),mail) "
+                    "WHERE mail IS NOT NULL"
+                )
+                db.execute(
+                    "CREATE TABLE IF NOT EXISTS account_handles ("
+                    "handle_ref TEXT PRIMARY KEY,"
+                    "person_ref TEXT NOT NULL REFERENCES workspace_people(person_ref),"
+                    "organization_id TEXT NOT NULL,workspace_id TEXT,"
+                    "provider TEXT NOT NULL CHECK(provider IN "
+                    "('github','huggingface','azure_devops','wecom','qq','bilibili')),"
+                    "handle TEXT NOT NULL,handle_key TEXT NOT NULL,"
+                    "status TEXT NOT NULL CHECK(status IN ('active','retracted')),"
+                    "declared_by_issuer TEXT NOT NULL,declared_by_subject TEXT NOT NULL,"
+                    "created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL)"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS account_handle_owner "
+                    "ON account_handles(organization_id,ifnull(workspace_id,''),provider,handle_key) "
+                    "WHERE status='active'"
+                )
+                db.execute(
+                    "CREATE INDEX IF NOT EXISTS account_handle_person "
+                    "ON account_handles(person_ref,status)"
+                )
+            db.execute("PRAGMA user_version = 11")
             if 0 < current < SCHEMA_VERSION:
                 # FK checks are connection-local and were disabled only to allow
                 # the parent-table rebuild. Check all rows before commit so a
@@ -2024,6 +2067,201 @@ class AccountStore:
                 (organization_id, workspace_id, limit + 1),
             ).fetchall()
         return list(accounts), list(profiles)
+
+    def list_workspace_people(
+        self, organization_id: str, workspace_id: str | None, *, limit: int
+    ) -> tuple[list[sqlite3.Row], list[sqlite3.Row]]:
+        """Return declared people and their active handles for one workspace.
+
+        At most ``limit + 1`` rows per table are read so the caller can fail
+        closed instead of truncating. 中文：最多读取 limit+1 行，超限由调用方拒绝。
+        """
+
+        with self._connect() as db:
+            people = db.execute(
+                "SELECT person_ref,issuer,subject,mail,display_name FROM workspace_people "
+                "WHERE organization_id=? AND workspace_id IS ? "
+                "ORDER BY created_at,person_ref LIMIT ?",
+                (organization_id, workspace_id, limit + 1),
+            ).fetchall()
+            handles = db.execute(
+                "SELECT person_ref,provider,handle,updated_at FROM account_handles "
+                "WHERE organization_id=? AND workspace_id IS ? AND status='active' "
+                "ORDER BY created_at,handle_ref LIMIT ?",
+                (organization_id, workspace_id, limit + 1),
+            ).fetchall()
+        return list(people), list(handles)
+
+    def declare_account_handle(
+        self,
+        *,
+        anchor: Anchor,
+        subject: str | None,
+        mail: str | None,
+        display_name: str | None,
+        provider: str,
+        handle: str,
+        key: str,
+        now: int,
+        command: tuple[str, Callable[[dict[str, Any]], bytes]] | None = None,
+    ) -> dict[str, Any]:
+        """Attach one declared handle to a person, creating the person if new.
+
+        A person is found by identity subject or by mail. Two different people
+        matching the two keys, or a conflicting stored identity, fail closed with
+        ``person_conflict``; a handle already held by someone else fails with
+        ``handle_owned``. Re-declaring the same handle for the same person is a
+        no-op. When ``command`` is given, its replay response is stored in the
+        same transaction. 中文：同一账号只能属于一个人；冲突时整笔回滚。
+        """
+
+        scope = (anchor.organization_id, anchor.workspace_id)
+        with self.transaction() as db:
+            by_subject = None
+            if subject is not None:
+                by_subject = db.execute(
+                    "SELECT * FROM workspace_people WHERE organization_id=? "
+                    "AND workspace_id IS ? AND issuer=? AND subject=?",
+                    (*scope, anchor.issuer, subject),
+                ).fetchone()
+            by_mail = None
+            if mail is not None:
+                by_mail = db.execute(
+                    "SELECT * FROM workspace_people WHERE organization_id=? "
+                    "AND workspace_id IS ? AND mail=?",
+                    (*scope, mail),
+                ).fetchone()
+            if (
+                by_subject is not None
+                and by_mail is not None
+                and by_subject["person_ref"] != by_mail["person_ref"]
+            ):
+                raise AccountCenterError("person_conflict")
+            person = by_subject if by_subject is not None else by_mail
+            if person is None:
+                person_ref = str(uuid.uuid4())
+                db.execute(
+                    "INSERT INTO workspace_people(person_ref,organization_id,workspace_id,"
+                    "issuer,subject,mail,display_name,created_by_issuer,created_by_subject,"
+                    "created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        person_ref,
+                        *scope,
+                        anchor.issuer,
+                        subject,
+                        mail,
+                        display_name,
+                        anchor.issuer,
+                        anchor.subject,
+                        now,
+                        now,
+                    ),
+                )
+            else:
+                person_ref = person["person_ref"]
+                if (subject is not None and person["subject"] not in (None, subject)) or (
+                    mail is not None and person["mail"] not in (None, mail)
+                ):
+                    raise AccountCenterError("person_conflict")
+                merged = (
+                    person["subject"] or subject,
+                    person["mail"] or mail,
+                    display_name or person["display_name"],
+                )
+                if merged != (person["subject"], person["mail"], person["display_name"]):
+                    db.execute(
+                        "UPDATE workspace_people SET subject=?,mail=?,display_name=?,"
+                        "updated_at=? WHERE person_ref=?",
+                        (*merged, now, person_ref),
+                    )
+            existing = db.execute(
+                "SELECT handle_ref,person_ref,handle FROM account_handles "
+                "WHERE organization_id=? AND workspace_id IS ? AND provider=? "
+                "AND handle_key=? AND status='active'",
+                (*scope, provider, key),
+            ).fetchone()
+            if existing is not None:
+                if existing["person_ref"] != person_ref:
+                    raise AccountCenterError("handle_owned")
+                result = {
+                    "person_ref": person_ref,
+                    "handle_ref": existing["handle_ref"],
+                    "provider": provider,
+                    "handle": existing["handle"],
+                    "source": "declared",
+                    "created": False,
+                }
+            else:
+                handle_ref = str(uuid.uuid4())
+                db.execute(
+                    "INSERT INTO account_handles(handle_ref,person_ref,organization_id,"
+                    "workspace_id,provider,handle,handle_key,status,declared_by_issuer,"
+                    "declared_by_subject,created_at,updated_at) "
+                    "VALUES(?,?,?,?,?,?,?,'active',?,?,?,?)",
+                    (
+                        handle_ref,
+                        person_ref,
+                        *scope,
+                        provider,
+                        handle,
+                        key,
+                        anchor.issuer,
+                        anchor.subject,
+                        now,
+                        now,
+                    ),
+                )
+                result = {
+                    "person_ref": person_ref,
+                    "handle_ref": handle_ref,
+                    "provider": provider,
+                    "handle": handle,
+                    "source": "declared",
+                    "created": True,
+                }
+            if command is not None:
+                key_hash, encode = command
+                self._complete_command_in_transaction(db, key_hash, encode({"value": result}))
+            return result
+
+    def retract_account_handle(
+        self,
+        *,
+        anchor: Anchor,
+        provider: str,
+        key: str,
+        now: int,
+        command: tuple[str, Callable[[dict[str, Any]], bytes]] | None = None,
+    ) -> dict[str, Any]:
+        """Retire one active declared handle; the row stays for audit.
+
+        中文：撤回后记录保留用于审计，同一账号之后可以重新声明。
+        """
+
+        with self.transaction() as db:
+            row = db.execute(
+                "SELECT handle_ref,person_ref,handle FROM account_handles "
+                "WHERE organization_id=? AND workspace_id IS ? AND provider=? "
+                "AND handle_key=? AND status='active'",
+                (anchor.organization_id, anchor.workspace_id, provider, key),
+            ).fetchone()
+            if row is None:
+                raise AccountCenterError("handle_not_found")
+            db.execute(
+                "UPDATE account_handles SET status='retracted',updated_at=? "
+                "WHERE handle_ref=?",
+                (now, row["handle_ref"]),
+            )
+            result = {
+                "retracted": True,
+                "person_ref": row["person_ref"],
+                "provider": provider,
+                "handle": row["handle"],
+            }
+            if command is not None:
+                key_hash, encode = command
+                self._complete_command_in_transaction(db, key_hash, encode({"value": result}))
+            return result
 
     def list_provider_profiles(self, anchor: Anchor) -> list[sqlite3.Row]:
         """Return metadata-only profiles owned by the exact actor/workspace."""

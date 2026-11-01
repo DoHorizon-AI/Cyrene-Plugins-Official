@@ -571,37 +571,190 @@ def _link_github_as(harness: Harness, actor: dict[str, Any], subject: str) -> st
     return completed["account_ref"]
 
 
-def test_list_workspace_links_returns_metadata_for_every_owner_in_one_workspace(
+def _declare(harness: Harness, key: str, **fields: Any) -> dict[str, Any]:
+    """Declare one handle; ``key`` is the caller's idempotency key."""
+
+    return harness.call("declare_account_handle", {**fields, "idempotency_key": key})
+
+
+def _find(harness: Harness, **filters: Any) -> dict[str, Any]:
+    return harness.call("find_people", filters)
+
+
+def test_declared_handles_answer_who_owns_an_account_and_what_a_person_has(
     tmp_path: Path,
 ) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    first = _declare(
+        harness,
+        "k1",
+        provider="github",
+        handle="Octocat",
+        subject="user-43",
+        mail="Ada@Example.com",
+        display_name="Ada Lovelace",
+    )
+    assert first["created"] is True
+    assert first["source"] == "declared"
+    assert first["handle"] == "Octocat"
+    # Found by mail alone: it is the same person, not a second one.
+    second = _declare(harness, "k2", provider="huggingface", handle="ada-hf", mail="ada@example.com")
+    assert second["person_ref"] == first["person_ref"]
+    third = _declare(
+        harness, "k3", provider="wecom", handle="ada.l", subject="user-43", mail="ada@example.com"
+    )
+    assert third["person_ref"] == first["person_ref"]
+
+    # Account -> person, case-insensitively for GitHub.
+    owner = _find(harness, provider="github", handle="octocat")
+    assert owner["truncated"] is False
+    assert len(owner["people"]) == 1
+    person = owner["people"][0]
+    assert person["person_ref"] == first["person_ref"]
+    assert person["issuer"] == ACTOR["issuer"]
+    assert person["subject"] == "user-43"
+    assert person["mail"] == "ada@example.com"
+    assert person["display_name"] == "Ada Lovelace"
+    # Person -> accounts.
+    assert [(a["provider"], a["handle"]) for a in person["accounts"]] == [
+        ("github", "Octocat"),
+        ("huggingface", "ada-hf"),
+        ("wecom", "ada.l"),
+    ]
+    for filters in ({"mail": "ADA@example.com"}, {"subject": "user-43"}, {"name": "lovelace"}):
+        assert [p["person_ref"] for p in _find(harness, **filters)["people"]] == [
+            first["person_ref"]
+        ]
+    assert _find(harness, provider="github", handle="someone-else")["people"] == []
+    assert _find(harness, name="nobody")["people"] == []
+    assert len(_find(harness)["people"]) == 1
+
+
+def test_declared_person_joins_the_owners_verified_links(tmp_path: Path) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    harness.link_github()
+    # Before anyone declares anything, a verified owner is still listed by identity.
+    lone = _find(harness)["people"]
+    assert [(p["person_ref"], p["subject"], p["display_name"]) for p in lone] == [
+        (None, "user-42", None)
+    ]
+
+    _declare(harness, "k1", provider="huggingface", handle="derek-hf", subject="user-42", display_name="Derek")
+    people = _find(harness, subject="user-42")["people"]
+    assert len(people) == 1
+    assert people[0]["person_ref"] is not None
+    assert people[0]["display_name"] == "Derek"
+    assert [
+        (a["source"], a["provider"], a["handle"], a["external_subject"], a["status"])
+        for a in people[0]["accounts"]
+    ] == [
+        ("declared", "huggingface", "derek-hf", None, "active"),
+        ("verified", "github", None, "987654", "active"),
+    ]
+
+
+def test_declare_rejects_conflicts_and_bad_input_without_partial_writes(
+    tmp_path: Path,
+) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    _declare(harness, "k1", provider="github", handle="octocat", subject="user-43", mail="a@example.com")
+    _declare(harness, "k2", provider="qq", handle="123456", subject="user-44", mail="b@example.com")
+
+    # One handle belongs to one person; the failed attempt must not leave a person behind.
+    with pytest.raises(AccountCenterError, match="handle_owned"):
+        _declare(harness, "k3", provider="github", handle="OCTOCAT", subject="user-45")
+    assert _find(harness, subject="user-45")["people"] == []
+    # The two keys name two different people, or contradict the stored identity.
+    with pytest.raises(AccountCenterError, match="person_conflict"):
+        _declare(harness, "k4", provider="bilibili", handle="42", subject="user-43", mail="b@example.com")
+    with pytest.raises(AccountCenterError, match="person_conflict"):
+        _declare(harness, "k5", provider="bilibili", handle="42", subject="user-43", mail="c@example.com")
+
+    invalid = [
+        {"provider": "github", "handle": "octocat"},  # no subject or mail
+        {"provider": "github", "handle": "-bad-", "mail": "x@example.com"},
+        {"provider": "gitlab", "handle": "octocat", "mail": "x@example.com"},
+        {"provider": "azure", "handle": "octocat", "mail": "x@example.com"},
+        {"provider": "qq", "handle": "12", "mail": "x@example.com"},
+        {"provider": "github", "handle": "ok", "mail": "not-an-address"},
+        {"provider": "github", "handle": "ok", "mail": "x@example.com", "extra": 1},
+        {"provider": "github", "handle": "ok", "mail": None},
+    ]
+    for index, fields in enumerate(invalid):
+        with pytest.raises(AccountCenterError, match="invalid_request"):
+            _declare(harness, f"bad-{index}", **fields)
+    assert len(_find(harness)["people"]) == 2
+
+
+def test_declare_is_idempotent_and_retract_frees_the_handle(tmp_path: Path) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    fields = {"provider": "github", "handle": "Octocat", "subject": "user-43"}
+    first = _declare(harness, "k1", **fields)
+    assert _declare(harness, "k1", **fields) == first  # replay with the same key
+    again = _declare(harness, "k2", **fields)  # new key, same fact
+    assert again["created"] is False
+    assert again["handle_ref"] == first["handle_ref"]
+
+    retracted = harness.call(
+        "retract_account_handle",
+        {"provider": "github", "handle": "OCTOCAT", "idempotency_key": "r1"},
+    )
+    assert retracted == {
+        "retracted": True,
+        "person_ref": first["person_ref"],
+        "provider": "github",
+        "handle": "Octocat",
+    }
+    assert _find(harness, provider="github", handle="octocat")["people"] == []
+    # The person remains; only the account is gone.
+    assert _find(harness, subject="user-43")["people"][0]["accounts"] == []
+    with pytest.raises(AccountCenterError, match="handle_not_found"):
+        harness.call(
+            "retract_account_handle",
+            {"provider": "github", "handle": "octocat", "idempotency_key": "r2"},
+        )
+
+    # A retracted handle can be declared for someone else.
+    moved = _declare(harness, "k3", provider="github", handle="octocat", subject="user-44")
+    assert moved["created"] is True
+    assert moved["person_ref"] != first["person_ref"]
+    owner = _find(harness, provider="github", handle="octocat")["people"]
+    assert [p["subject"] for p in owner] == ["user-44"]
+
+
+def test_find_people_is_exchange_only_scoped_and_metadata_only(tmp_path: Path) -> None:
     harness = Harness(tmp_path / "accounts.sqlite")
     harness.link_github()
     second = {**ACTOR, "subject": "user-43"}
     second_ref = _link_github_as(harness, second, "555555")
-    _link_github_as(harness, {**ACTOR, "subject": "user-44", "workspace_id": "workspace-b"}, "666666")
+    elsewhere = {**ACTOR, "subject": "user-44", "workspace_id": "workspace-b"}
+    _link_github_as(harness, elsewhere, "666666")
     _link_github_as(harness, {**ACTOR, "subject": "user-45", "organization_id": "org-b"}, "777777")
+    _declare(harness, "k1", provider="qq", handle="123456", subject="user-43")
+    harness.call(
+        "declare_account_handle",
+        {"provider": "qq", "handle": "654321", "subject": "user-44", "idempotency_key": "k2"},
+        actor=elsewhere,
+    )
 
-    listed = harness.call("list_workspace_links", {})
-
-    def github_link(subject: str) -> dict[str, Any]:
-        return {
-            "kind": "account",
-            "provider": "github",
-            "status": "active",
-            "linked_at": 10_000,
-            "external_subject": subject,
-        }
-
-    assert listed == {
-        "members": [
-            {"issuer": ACTOR["issuer"], "subject": "user-42", "links": [github_link("987654")]},
-            {"issuer": ACTOR["issuer"], "subject": "user-43", "links": [github_link("555555")]},
-        ]
-    }
-    # Metadata only: no reference that could be replayed and no credential material.
+    listed = _find(harness)
+    assert [person["subject"] for person in listed["people"]] == ["user-42", "user-43"]
     rendered = json.dumps(listed)
-    for forbidden in ("account_ref", "profile_ref", "credential", "token", "refresh", second_ref):
+    for forbidden in ("account_ref", "profile_ref", "handle_ref", "credential", "token", "refresh", second_ref):
         assert forbidden not in rendered
+    assert "654321" not in rendered  # another workspace's declaration
+
+    with pytest.raises(AccountCenterError, match="untrusted_caller"):
+        harness.call("find_people", {}, caller=PROVIDER)
+    with pytest.raises(AccountCenterError, match="scope_mismatch"):
+        _find(harness, workspace_id="workspace-b")
+    for bad in ({"unexpected": True}, {"limit": 0}, {"limit": 501}, {"limit": True}, {"name": "a"}, {"handle": "octocat"}):
+        with pytest.raises(AccountCenterError, match="invalid_request"):
+            _find(harness, **bad)
+
+    page = _find(harness, limit=1)
+    assert len(page["people"]) == 1
+    assert page["truncated"] is True
 
     unlinked = harness.call(
         "unlink",
@@ -609,25 +762,23 @@ def test_list_workspace_links_returns_metadata_for_every_owner_in_one_workspace(
         actor=second,
     )
     assert unlinked == {"unlinked": True, "status": "unlinked"}
-    assert [
-        member["subject"] for member in harness.call("list_workspace_links", {})["members"]
-    ] == ["user-42"]
+    remaining = {p["subject"]: p["accounts"] for p in _find(harness)["people"]}
+    assert [a["source"] for a in remaining["user-43"]] == ["declared"]
 
 
-def test_list_workspace_links_is_exchange_only_and_workspace_scoped(
-    tmp_path: Path,
-) -> None:
-    harness = Harness(tmp_path / "accounts.sqlite")
-    harness.link_github()
-    with pytest.raises(AccountCenterError, match="untrusted_caller"):
-        harness.call("list_workspace_links", {}, caller=PROVIDER)
-    with pytest.raises(AccountCenterError, match="scope_mismatch"):
-        harness.call("list_workspace_links", {"workspace_id": "workspace-b"})
-    with pytest.raises(AccountCenterError, match="invalid_request"):
-        harness.call("list_workspace_links", {"unexpected": True})
-    assert harness.call("list_workspace_links", {"workspace_id": "workspace-a"}) == harness.call(
-        "list_workspace_links", {}
-    )
+def test_schema_v10_database_gains_the_people_tables(tmp_path: Path) -> None:
+    db_path = tmp_path / "accounts.sqlite"
+    Harness(db_path)
+    with sqlite3.connect(db_path) as db:
+        db.execute("DROP TABLE account_handles")
+        db.execute("DROP TABLE workspace_people")
+        db.execute("PRAGMA user_version=10")
+    store = AccountStore(db_path)
+    with store._connect() as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert {"workspace_people", "account_handles"} <= tables
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
 def test_wecom_challenge_requires_trusted_source_and_primary_confirmation(
@@ -1283,7 +1434,7 @@ def test_schema_v1_migration_preserves_legacy_data_and_fails_closed_on_wecom_tup
     store = AccountStore(db_path)
 
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
     links = store.list_accounts(ACTOR_ANCHOR(), ACTOR["workspace_id"])
     assert links[0]["source_authority"] == "wecom:tenant:9/bot/main"
     assert links[0]["status"] == "reauthorization_required"
@@ -1331,7 +1482,7 @@ def test_fresh_schema_ddl_rolls_back_as_one_transaction(
 
     store = AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
 
 
 def test_direct_runtime_rejects_duplicate_json_keys_and_wrong_type_url(

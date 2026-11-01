@@ -18,7 +18,7 @@ import sys
 import threading
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +26,7 @@ from urllib.parse import urlsplit
 
 from cyrene_plugin_runtime.configuration import read_environment_settings
 
+from . import people as people_directory
 from .github import (
     GitHubCredentialPersistenceError,
     GitHubCredentialPolicyError,
@@ -68,7 +69,9 @@ METHODS = (
     "observe_wecom_challenge",
     "confirm_wecom_link",
     "list_links",
-    "list_workspace_links",
+    "declare_account_handle",
+    "retract_account_handle",
+    "find_people",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -199,7 +202,9 @@ EXCHANGE_ONLY_METHODS = {
     "begin_link",
     "confirm_wecom_link",
     "list_links",
-    "list_workspace_links",
+    "declare_account_handle",
+    "retract_account_handle",
+    "find_people",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -244,6 +249,8 @@ SESSION_TTL_SECONDS = 600
 LEASE_TTL_SECONDS = 45
 MAX_WORKSPACE_LINKS = 5000
 IDEMPOTENT_METHODS = {
+    "declare_account_handle",
+    "retract_account_handle",
     "begin_link",
     "confirm_wecom_link",
     "unlink",
@@ -289,7 +296,9 @@ def _action_type_name(action: str, suffix: str) -> str:
         "observe_wecom_challenge": "ObserveWeComChallenge",
         "confirm_wecom_link": "ConfirmWeComLink",
         "list_links": "ListLinks",
-        "list_workspace_links": "ListWorkspaceLinks",
+        "declare_account_handle": "DeclareAccountHandle",
+        "retract_account_handle": "RetractAccountHandle",
+        "find_people": "FindPeople",
         "get_authorization": "GetAuthorization",
         "unlink": "Unlink",
         "create_credential_lease": "CreateCredentialLease",
@@ -713,8 +722,12 @@ class AccountCenterPlugin:
             return self._confirm_wecom_link(request, anchor, idempotency_key_hash)
         if method == "list_links":
             return self._list_links(request, anchor)
-        if method == "list_workspace_links":
-            return self._list_workspace_links(request, anchor)
+        if method == "declare_account_handle":
+            return self._declare_account_handle(request, anchor, idempotency_key_hash)
+        if method == "retract_account_handle":
+            return self._retract_account_handle(request, anchor, idempotency_key_hash)
+        if method == "find_people":
+            return self._find_people(request, anchor)
         if method == "get_authorization":
             return self._get_authorization(request, anchor)
         if method == "unlink":
@@ -1031,45 +1044,146 @@ class AccountCenterPlugin:
         )
         return response
 
-    def _list_workspace_links(
-        self, request: Mapping[str, Any], anchor: Anchor
-    ) -> dict[str, Any]:
-        """Return metadata-only links for every owner in the caller's workspace.
+    def _idempotency_command(
+        self, key_hash: str | None
+    ) -> tuple[str, Callable[[dict[str, Any]], bytes]] | None:
+        """Bind a replay encoder so the store can finish the command atomically."""
 
-        Exchange decides who may ask; this method only narrows the read to the
-        caller's exact organization and workspace and never selects credentials.
-        中文：仅返回调用者所在组织与工作空间内的关联元数据，不含任何凭据。
+        if key_hash is None:
+            return None
+        return key_hash, lambda value: self._encode_idempotency_response(key_hash, value)
+
+    def _declare_account_handle(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Record one address an operator declares for a person; no credentials.
+
+        The person is found by identity subject or mail and created when new. A
+        handle can belong to one person per workspace.
+        中文：记录管理员为某人声明的账号地址，不涉及任何凭据；同一账号只属一人。
         """
 
-        _require_fields(request, set(), {"workspace_id"})
+        _require_fields(
+            request, {"provider", "handle"}, {"subject", "mail", "display_name"}
+        )
+        provider = people_directory.normalize_provider(request["provider"])
+        handle, key = people_directory.normalize_handle(provider, request["handle"])
+        subject = (
+            people_directory.normalize_subject(request["subject"])
+            if "subject" in request
+            else None
+        )
+        mail = (
+            people_directory.normalize_mail(request["mail"]) if "mail" in request else None
+        )
+        display_name = (
+            people_directory.normalize_display_name(request["display_name"])
+            if "display_name" in request
+            else None
+        )
+        if subject is None and mail is None:
+            raise AccountCenterError("invalid_request")
+        return self._store.declare_account_handle(
+            anchor=anchor,
+            subject=subject,
+            mail=mail,
+            display_name=display_name,
+            provider=provider,
+            handle=handle,
+            key=key,
+            now=int(self._now()),
+            command=self._idempotency_command(idempotency_key_hash),
+        )
+
+    def _retract_account_handle(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Retire one declared handle so it can be declared again later."""
+
+        _require_fields(request, {"provider", "handle"})
+        provider = people_directory.normalize_provider(request["provider"])
+        _, key = people_directory.normalize_handle(provider, request["handle"])
+        return self._store.retract_account_handle(
+            anchor=anchor,
+            provider=provider,
+            key=key,
+            now=int(self._now()),
+            command=self._idempotency_command(idempotency_key_hash),
+        )
+
+    def _find_people(self, request: Mapping[str, Any], anchor: Anchor) -> dict[str, Any]:
+        """Answer who owns an account and which accounts a person has.
+
+        Declared handles and the owners' verified links are merged per person.
+        Every filter is optional and the filters are ANDed. The response carries
+        metadata only: no reference that could be replayed and no credentials.
+        中文：按账号找人或按人找账号；只返回元数据，不含可重放的引用或凭据。
+        """
+
+        _require_fields(
+            request,
+            set(),
+            {"workspace_id", "subject", "mail", "provider", "handle", "name", "limit"},
+        )
         workspace_id = request.get("workspace_id", anchor.workspace_id)
         if workspace_id != anchor.workspace_id:
             raise AccountCenterError("scope_mismatch")
+        subject = (
+            people_directory.normalize_subject(request["subject"])
+            if "subject" in request
+            else None
+        )
+        mail = (
+            people_directory.normalize_mail(request["mail"]) if "mail" in request else None
+        )
+        provider = (
+            people_directory.normalize_provider(
+                request["provider"], allowed=people_directory.FILTER_PROVIDERS
+            )
+            if "provider" in request
+            else None
+        )
+        handle = None
+        if "handle" in request:
+            if provider not in people_directory.HANDLE_PROVIDERS:
+                raise AccountCenterError("invalid_request")
+            handle, _ = people_directory.normalize_handle(provider, request["handle"])
+        name = None
+        if "name" in request:
+            name = people_directory.normalize_display_name(request["name"])
+            if len(name) < 2:
+                raise AccountCenterError("invalid_request")
+        limit = (
+            people_directory.normalize_limit(request["limit"])
+            if "limit" in request
+            else people_directory.DEFAULT_PEOPLE_LIMIT
+        )
         accounts, profiles = self._store.list_workspace_links(
             anchor.organization_id, workspace_id, limit=MAX_WORKSPACE_LINKS
         )
-        if len(accounts) + len(profiles) > MAX_WORKSPACE_LINKS:
+        declared, handles = self._store.list_workspace_people(
+            anchor.organization_id, workspace_id, limit=MAX_WORKSPACE_LINKS
+        )
+        if (
+            len(accounts) + len(profiles) + len(declared) + len(handles)
+            > MAX_WORKSPACE_LINKS
+        ):
             raise AccountCenterError("result_too_large")
-        owners: dict[tuple[str, str], list[dict[str, Any]]] = {}
-        for kind, rows in (("account", accounts), ("profile", profiles)):
-            for row in rows:
-                owners.setdefault(
-                    (row["anchor_issuer"], row["anchor_subject"]), []
-                ).append(
-                    {
-                        "kind": kind,
-                        "provider": row["provider"],
-                        "status": row["status"],
-                        "linked_at": row["linked_at"],
-                        "external_subject": row["external_subject"],
-                    }
-                )
-        return {
-            "members": [
-                {"issuer": issuer, "subject": subject, "links": owners[(issuer, subject)]}
-                for issuer, subject in sorted(owners)
-            ]
-        }
+        matched = people_directory.filter_people(
+            people_directory.assemble_people(declared, handles, accounts, profiles),
+            subject=subject,
+            mail=mail,
+            provider=provider,
+            handle=handle,
+            name=name,
+        )
+        return {"people": matched[:limit], "truncated": len(matched) > limit}
 
     def _list_links(self, request: Mapping[str, Any], anchor: Anchor) -> dict[str, Any]:
         _require_fields(request, set(), {"workspace_id"})

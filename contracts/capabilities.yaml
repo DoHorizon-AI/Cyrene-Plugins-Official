@@ -24,18 +24,20 @@ capabilities:
       - confirm_wecom_link
       - create_credential_lease
       - create_provider_credential_lease
+      - declare_account_handle
+      - find_people
       - get_authorization
       - link_github_app_installation
       - link_huggingface_profile
       - list_links
       - list_provider_profiles
-      - list_workspace_links
       - observe_wecom_challenge
       - poll_huggingface_renewal
       - redeem_credential_lease
       - redeem_provider_credential_lease
       - register_host_identity_profile
       - resolve_linked_sender
+      - retract_account_handle
       - rotate_huggingface_profile
       - unlink
       - unlink_provider_profile
@@ -61,18 +63,20 @@ capabilities:
           - confirm_wecom_link
           - create_credential_lease
           - create_provider_credential_lease
+          - declare_account_handle
+          - find_people
           - get_authorization
           - link_github_app_installation
           - link_huggingface_profile
           - list_links
           - list_provider_profiles
-          - list_workspace_links
           - observe_wecom_challenge
           - poll_huggingface_renewal
           - redeem_credential_lease
           - redeem_provider_credential_lease
           - register_host_identity_profile
           - resolve_linked_sender
+          - retract_account_handle
           - rotate_huggingface_profile
           - unlink
           - unlink_provider_profile

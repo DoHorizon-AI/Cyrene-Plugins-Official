@@ -992,7 +992,7 @@ def test_github_vendor_cli_lease_uses_profile_scope_and_empty_target(
         )
 
 
-def test_list_workspace_links_includes_profiles_of_every_owner_without_secrets(
+def test_find_people_merges_profile_links_with_declared_handles_without_secrets(
     tmp_path: Path,
 ) -> None:
     harness = ProfileHarness(tmp_path / "accounts.sqlite3")
@@ -1017,36 +1017,52 @@ def test_list_workspace_links_includes_profiles_of_every_owner_without_secrets(
             "account_id": str(90 + n),
             "login": f"globex-{n}",
         }
-
-    listed = harness.call("list_workspace_links", {})
-
-    assert [member["subject"] for member in listed["members"]] == ["user-derek", "user-other"]
-    profiles = {
-        member["subject"]: member["links"] for member in listed["members"]
-    }
-    assert profiles["user-derek"] == [
+    declared = harness.call(
+        "declare_account_handle",
         {
+            "provider": "huggingface",
+            "handle": "other-hf",
+            "subject": "user-other",
+            "display_name": "Other Owner",
+            "idempotency_key": "declare-other",
+        },
+    )
+
+    listed = harness.call("find_people", {})
+
+    # People sort by display name, then mail, then subject: "Other Owner" < "user-derek".
+    assert [person["subject"] for person in listed["people"]] == ["user-other", "user-derek"]
+    people = {person["subject"]: person for person in listed["people"]}
+    assert people["user-derek"]["person_ref"] is None
+    assert people["user-derek"]["accounts"] == [
+        {
+            "source": "verified",
             "kind": "profile",
             "provider": "github",
-            "status": "healthy",
-            "linked_at": 10_000,
+            "handle": None,
             "external_subject": "acme",
+            "status": "healthy",
+            "updated_at": 10_000,
         }
     ]
-    assert profiles["user-other"][0]["external_subject"] == "globex"
+    assert people["user-other"]["person_ref"] == declared["person_ref"]
+    assert [
+        (a["source"], a["kind"], a["provider"], a["handle"], a["external_subject"])
+        for a in people["user-other"]["accounts"]
+    ] == [
+        ("declared", "handle", "huggingface", "other-hf", None),
+        ("verified", "profile", "github", None, "globex"),
+    ]
     rendered = json.dumps(listed)
     for forbidden in ("profile_ref", "installation", "token", "target_scope", "credential"):
         assert forbidden not in rendered
     with pytest.raises(AccountCenterError, match="untrusted_caller"):
-        harness.call("list_workspace_links", {}, caller=GITHUB_PROVIDER)
-    unlinked = harness.call(
+        harness.call("find_people", {}, caller=GITHUB_PROVIDER)
+    harness.call(
         "unlink_provider_profile",
         {"profile_ref": "00000000-0000-4000-8000-000000000101"},
     )
-    assert unlinked["status"] == "unlinked"
-    assert [m["subject"] for m in harness.call("list_workspace_links", {})["members"]] == [
-        "user-other"
-    ]
+    assert [p["subject"] for p in harness.call("find_people", {})["people"]] == ["user-other"]
 
 
 def test_github_installation_cannot_be_claimed_by_a_second_owner(
@@ -2120,7 +2136,7 @@ def test_schema_v8_migration_preserves_provider_rows_with_foreign_key_children(
 
     assert snapshot() == before
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
@@ -4353,7 +4369,7 @@ def test_schema_v9_migration_enables_bilibili_without_orphaning_leases(tmp_path:
         db.execute("PRAGMA user_version=9")
     store = account_center_plugin_module.AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
         sql = db.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_profiles'"
