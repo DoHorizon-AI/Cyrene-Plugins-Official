@@ -175,7 +175,7 @@ class OpenAICompatibleUpstream:
             call.raise_if_closed()
             raw = response.read()
             call.raise_if_closed()
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, AttributeError, http.client.HTTPException) as error:
             if call.closed:
                 raise ProviderCancelled("upstream request was cancelled") from error
             raise UpstreamFailure(f"upstream read failed: {error}") from error
@@ -203,7 +203,7 @@ class OpenAICompatibleUpstream:
             if len(raw) > MAX_EMBEDDING_RESPONSE_BYTES:
                 raise UpstreamFailure("upstream embedding response exceeds the maximum size")
             call.raise_if_closed()
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, AttributeError, http.client.HTTPException) as error:
             if call.closed:
                 raise ProviderCancelled("upstream request was cancelled") from error
             raise UpstreamFailure(f"upstream read failed: {error}") from error
@@ -337,7 +337,7 @@ class OpenAICompatibleUpstream:
             # `http.client` 会丢弃自己对 socket 的引用。
             call.attach_socket(connection.sock)
             response = connection.getresponse()
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, AttributeError, http.client.HTTPException) as error:
             call.close()
             if call.closed:
                 raise ProviderCancelled("upstream request was cancelled") from error

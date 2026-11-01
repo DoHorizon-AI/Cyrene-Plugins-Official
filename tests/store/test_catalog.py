@@ -36,9 +36,10 @@ class PluginCatalogTest(unittest.TestCase):
     and catalog export format and field integrity.
     """
 
-    EXPECTED_PLUGIN_COUNT = 26
+    EXPECTED_PLUGIN_COUNT = 34
     EXPECTED_PLUGIN_IDS: ClassVar[set[str]] = {
         "cyrene.accounts.account-center",
+        "cyrene.connectors.bilibili",
         "cyrene.connectors.email-notification",
         "cyrene.connectors.im",
         "cyrene.connectors.onebot-v11",
@@ -54,8 +55,13 @@ class PluginCatalogTest(unittest.TestCase):
         "cyrene.providers.github-issues",
         "cyrene.providers.huggingface",
         "cyrene.providers.azure-devops-observation",
+        "cyrene.providers.knowledge-graph",
+        "cyrene.providers.knowledge-retrieval",
+        "cyrene.providers.memory-pgvector",
+        "cyrene.providers.memory-sqlite",
         "cyrene.providers.microsoft-graph",
         "cyrene.providers.model-api-connector",
+        "cyrene.providers.speech-sensevoice",
         "cyrene.serving.vllm-runtime",
         "cyrene.tools.computer-runtime",
         "cyrene.tools.dataset-generation",
@@ -63,6 +69,8 @@ class PluginCatalogTest(unittest.TestCase):
         "cyrene.tools.dataset-validator",
         "cyrene.tools.document-parsing",
         "cyrene.tools.knowledge-preparation",
+        "cyrene.tools.media",
+        "cyrene.tools.public-web",
         "cyrene.training.llama-factory",
     }
     EXPECTED_DATA_TOOLS_METADATA: ClassVar[dict[str, tuple[str, str]]] = {
@@ -143,8 +151,8 @@ class PluginCatalogTest(unittest.TestCase):
     def setUp(self) -> None:
         self.catalog = load_catalog(root_dir=REPO_ROOT)
 
-    def test_discover_all_26_plugins_and_metadata_extraction(self) -> None:
-        """1. Discover the 26 expected plugins and verify their published metadata."""
+    def test_discover_all_34_plugins_and_metadata_extraction(self) -> None:
+        """1. Discover the 34 expected plugins and verify their published metadata."""
         manifests = discover_plugin_manifests(REPO_ROOT)
         self.assertEqual(
             len(manifests),
@@ -260,13 +268,13 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(empty_plugins), 0)
 
     def test_language_filtering(self) -> None:
-        """3. Test language filtering across python (23), rust (1), and csharp (2)."""
-        # Python: 23 plugins, including Teams, Cloud Management, and HF providers.
+        """3. Test language filtering across python (31), rust (1), and csharp (2)."""
+        # Python: 31 plugins, including Teams, Cloud Management, and HF providers.
         python_plugins = list_plugins(language="python", catalog=self.catalog)
         self.assertEqual(
             len(python_plugins),
-            23,
-            f"Expected 23 Python plugins, got {len(python_plugins)}",
+            31,
+            f"Expected 31 Python plugins, got {len(python_plugins)}",
         )
         for p in python_plugins:
             self.assertEqual(p["language"], "python")
@@ -304,7 +312,7 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual(len(list_plugins(language="c#", catalog=self.catalog)), 2)
         self.assertEqual(len(list_plugins(language="dotnet", catalog=self.catalog)), 2)
         self.assertEqual(len(list_plugins(language="RUST", catalog=self.catalog)), 1)
-        self.assertEqual(len(list_plugins(language="Python", catalog=self.catalog)), 23)
+        self.assertEqual(len(list_plugins(language="Python", catalog=self.catalog)), 31)
 
     def test_computer_runtime_methods_are_scoped_to_their_capability(self) -> None:
         """Multi-capability runtime methods must remain explicitly attributable."""
@@ -422,11 +430,11 @@ class PluginCatalogTest(unittest.TestCase):
             self.assertIn(s, by_service)
 
         # 2. Check canonical counts per service
-        self.assertEqual(len(by_service["Cyrene-Navigator"]), 6)
+        self.assertEqual(len(by_service["Cyrene-Navigator"]), 14)
         self.assertEqual(len(by_service["Cyrene-Echo"]), 3)
         self.assertEqual(len(by_service["Cyrene-Reactor"]), 3)
         self.assertEqual(len(by_service["Cyrene-Yield"]), 3)
-        self.assertEqual(len(by_service["Cyrene-Exchange"]), 14)
+        self.assertEqual(len(by_service["Cyrene-Exchange"]), 15)
         self.assertEqual(
             set(by_service["Cyrene-Exchange"]),
             {
@@ -443,6 +451,7 @@ class PluginCatalogTest(unittest.TestCase):
                 "cyrene.providers.azure-devops-observation",
                 "cyrene.providers.microsoft-graph",
                 "cyrene.providers.model-api-connector",
+                "cyrene.providers.speech-sensevoice",
                 "cyrene.tools.computer-runtime",
             },
         )
@@ -461,15 +470,23 @@ class PluginCatalogTest(unittest.TestCase):
 
         # 3. Check specific plugins under Cyrene-Navigator
         navigator_plugins = list_plugins(service="Cyrene-Navigator", catalog=self.catalog)
-        self.assertEqual(len(navigator_plugins), 6)
+        self.assertEqual(len(navigator_plugins), 14)
         navigator_ids = {p["id"] for p in navigator_plugins}
         expected_navigator_ids = {
+            "cyrene.connectors.bilibili",
             "cyrene.connectors.im",
             "cyrene.connectors.onebot-v11",
             "cyrene.connectors.teams",
             "cyrene.connectors.wecom",
+            "cyrene.providers.knowledge-graph",
+            "cyrene.providers.knowledge-retrieval",
+            "cyrene.providers.memory-pgvector",
+            "cyrene.providers.memory-sqlite",
             "cyrene.providers.model-api-connector",
+            "cyrene.providers.speech-sensevoice",
             "cyrene.tools.computer-runtime",
+            "cyrene.tools.media",
+            "cyrene.tools.public-web",
         }
         self.assertEqual(navigator_ids, expected_navigator_ids)
 
@@ -478,8 +495,8 @@ class PluginCatalogTest(unittest.TestCase):
         self.assertEqual({p["id"] for p in api_navigator}, expected_navigator_ids)
 
         # 4. Check case-insensitivity and prefix stripping
-        self.assertEqual(len(list_plugins(service="cyrene-navigator", catalog=self.catalog)), 6)
-        self.assertEqual(len(list_plugins(service="navigator", catalog=self.catalog)), 6)
+        self.assertEqual(len(list_plugins(service="cyrene-navigator", catalog=self.catalog)), 14)
+        self.assertEqual(len(list_plugins(service="navigator", catalog=self.catalog)), 14)
         self.assertEqual(len(list_plugins(service="echo", catalog=self.catalog)), 3)
         self.assertEqual(len(list_plugins(service="CYRENE-ECHO", catalog=self.catalog)), 3)
 

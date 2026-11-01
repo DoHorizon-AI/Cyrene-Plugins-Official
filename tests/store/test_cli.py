@@ -54,6 +54,7 @@ DATA_TOOLS_PLUGIN_METADATA: dict[str, dict[str, object]] = {
 }
 EXPECTED_PLUGIN_IDS: set[str] = {
     "cyrene.accounts.account-center",
+    "cyrene.connectors.bilibili",
     "cyrene.connectors.email-notification",
     "cyrene.connectors.im",
     "cyrene.connectors.onebot-v11",
@@ -69,8 +70,13 @@ EXPECTED_PLUGIN_IDS: set[str] = {
     "cyrene.providers.github-issues",
     "cyrene.providers.huggingface",
     "cyrene.providers.azure-devops-observation",
+    "cyrene.providers.knowledge-graph",
+    "cyrene.providers.knowledge-retrieval",
+    "cyrene.providers.memory-pgvector",
+    "cyrene.providers.memory-sqlite",
     "cyrene.providers.microsoft-graph",
     "cyrene.providers.model-api-connector",
+    "cyrene.providers.speech-sensevoice",
     "cyrene.serving.vllm-runtime",
     "cyrene.tools.computer-runtime",
     "cyrene.tools.dataset-generation",
@@ -78,6 +84,8 @@ EXPECTED_PLUGIN_IDS: set[str] = {
     "cyrene.tools.dataset-validator",
     "cyrene.tools.document-parsing",
     "cyrene.tools.knowledge-preparation",
+    "cyrene.tools.media",
+    "cyrene.tools.public-web",
     "cyrene.training.llama-factory",
 }
 
@@ -236,11 +244,11 @@ class TestCatalogCliExecution:
     """Tests `catalog list` and `catalog show` CLI commands."""
 
     def test_catalog_list_all(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test `catalog list` returns all 26 expected official plugins."""
+        """Test `catalog list` returns all 34 expected official plugins."""
         rc = main(["catalog", "list"])
         assert rc == 0
         captured = capsys.readouterr()
-        assert "Cyrene Plugin Catalog (26 plugins):" in captured.out
+        assert "Cyrene Plugin Catalog (34 plugins):" in captured.out
         assert "cyrene.connectors.im" in captured.out
         assert "cyrene.tools.computer-runtime" in captured.out
         assert "cyrene.providers.cloud-resources" in captured.out
@@ -279,11 +287,11 @@ class TestCatalogCliExecution:
         assert "cyrene.tools.dataset-generation" in captured.out
 
     def test_catalog_list_service_filter(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test `catalog list --service Cyrene-Navigator` filters to 6 plugins."""
+        """Test `catalog list --service Cyrene-Navigator` filters to 14 plugins."""
         rc = main(["catalog", "list", "--service", "Cyrene-Navigator"])
         assert rc == 0
         captured = capsys.readouterr()
-        assert "Cyrene Plugin Catalog (6 plugins):" in captured.out
+        assert "Cyrene Plugin Catalog (14 plugins):" in captured.out
         assert "cyrene.connectors.im" in captured.out
         assert "cyrene.connectors.onebot-v11" in captured.out
         assert "cyrene.connectors.wecom" in captured.out
@@ -323,7 +331,7 @@ class TestCatalogCliExecution:
         captured = capsys.readouterr()
         data = json.loads(captured.out)
         assert isinstance(data, list)
-        assert len(data) == 26
+        assert len(data) == 34
         plugin_ids = {p["id"] for p in data}
         assert plugin_ids == EXPECTED_PLUGIN_IDS
         assert "cyrene.serving.vllm-runtime" in plugin_ids
@@ -348,6 +356,7 @@ class TestCatalogCliExecution:
             "cyrene.providers.azure-devops-observation",
             "cyrene.providers.microsoft-graph",
             "cyrene.providers.model-api-connector",
+            "cyrene.providers.speech-sensevoice",
             "cyrene.tools.computer-runtime",
         }
 
@@ -634,6 +643,6 @@ class TestExecutableEntryPoint:
         assert proc.returncode == 0
         data = json.loads(proc.stdout)
         assert isinstance(data, list)
-        assert len(data) == 26
+        assert len(data) == 34
         assert {plugin["id"] for plugin in data} == EXPECTED_PLUGIN_IDS
         _assert_data_tools_plugin_metadata(data)

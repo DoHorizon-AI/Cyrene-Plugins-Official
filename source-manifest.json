@@ -3946,8 +3946,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/upstream.py",
-      "sha256": "6baedfe3e0f4148860e9939424804172ad3935eebea7b5de3c952222023ca8a2",
-      "size_bytes": 14953
+      "sha256": "e98ca9b1b199af84eec2d1060e4bdd99148bb40c8e276d964c1ec423cd4f5f4d",
+      "size_bytes": 15082
     },
     {
       "kind": "file",
@@ -8650,15 +8650,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_catalog.py",
-      "sha256": "71212954c2747760c54aa9e6f245569f15510070597852d1567ea8f0a728625c",
-      "size_bytes": 20828
+      "sha256": "45a3f1d378fe1ba7c04447c89b939360e94e5b66398c100f92f67a171ee3ce49",
+      "size_bytes": 21572
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/store/test_cli.py",
-      "sha256": "b5ab6a9579707bc9ecf972255d3276b22dc3936c0f59d3f5c8f34347e72c3d8c",
-      "size_bytes": 28575
+      "sha256": "8c35cc5360b461dc12d037c69728b600cc239c4160272972648a0350e947b74c",
+      "size_bytes": 28922
     },
     {
       "kind": "file",
