@@ -93,6 +93,19 @@ GITHUB_TYPED_TARGET_CASES = [
         },
     ),
     (
+        "github.commits.compare",
+        {
+            **GITHUB_TARGET,
+            "base_sha": "A" * 40,
+            "head_sha": "b" * 40,
+        },
+        {
+            **GITHUB_TARGET,
+            "base_sha": "A" * 40,
+            "head_sha": "b" * 40,
+        },
+    ),
+    (
         "github.branch.get",
         {**GITHUB_TARGET, "branch": "cyrene/assistant/task-1"},
         {**GITHUB_TARGET, "branch": "cyrene/assistant/task-1"},
@@ -812,6 +825,7 @@ def test_github_profile_operation_catalog_is_closed_for_typed_tools(
     allowed = account_center_plugin_module.PROVIDER_OPERATIONS_BY_PROVIDER["github"]
     expected_typed = {case[0] for case in GITHUB_TYPED_TARGET_CASES}
     assert expected_typed.issubset(allowed)
+    assert "github.commits.compare" in allowed
     assert "github.actions.run.get" not in allowed
 
     with pytest.raises(AccountCenterError, match="authorization_denied"):
@@ -882,6 +896,8 @@ def test_typed_github_app_leases_bind_exact_locator_digest_and_one_use(
         invalid_locator["run_id"] = "0"
     elif "head_branch" in target:
         invalid_locator["head_branch"] = "../develop"
+    elif operation == "github.commits.compare":
+        invalid_locator["base_sha"] = "a" * 39
     else:
         invalid_locator = {}
     if invalid_locator:
@@ -905,6 +921,8 @@ def test_typed_github_app_leases_bind_exact_locator_digest_and_one_use(
             "arguments_sha256": _digest(arguments),
         },
     )
+    if operation == "github.commits.compare":
+        assert lease["target"]["base_sha"] == "a" * 40
     redemption = {
         "lease_ref": lease["lease_ref"],
         "profile_ref": profile_ref,

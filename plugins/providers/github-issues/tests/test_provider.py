@@ -26,6 +26,8 @@ from github_issues_provider.account_center import (
 )
 from github_issues_provider.github_api import (
     MAX_ACTION_WORKFLOW_RUNS,
+    MAX_PULL_REQUEST_BATCH_PAGES,
+    MAX_PULL_REQUEST_PAGE_SIZE,
     MAX_RESPONSE_BYTES,
     GitHubApi,
     GitHubApiFailure,
@@ -219,6 +221,34 @@ class FakeGitHubApi:
         self.calls.append(("pull_request", args))
         return {"pull_request": {"number": args[1], "state": "OPEN"}}
 
+    def compare_commits(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("compare_commits", args))
+        return {
+            "base_sha": args[1].lower(),
+            "head_sha": args[2].lower(),
+            "merge_base_sha": args[1].lower(),
+            "comparison_status": "AHEAD",
+            "base_is_ancestor_of_head": True,
+            "ahead_by": 1,
+            "behind_by": 0,
+            "total_commits": 1,
+            "verified": True,
+        }
+
+    def list_pull_requests(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append(("pull_requests", (*args, kwargs)))
+        return {
+            "pull_requests": [],
+            "page_cursor": kwargs.get("page_cursor") or "1",
+            "pages_read": 1,
+            "complete": True,
+            "truncated": False,
+            "has_more": False,
+            "next_cursor": None,
+            "next_cursor_source": None,
+            "result_limit_reached": False,
+        }
+
     def search_issues(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         self.calls.append(("issues_search", (*args, kwargs)))
         return {
@@ -373,6 +403,7 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
         "github.branches.list",
         "github.pull_requests.list",
         "github.pull_request.get",
+        "github.commits.compare",
         "github.actions.runs.list",
         "github.ci.status",
         "github.issues.search",
@@ -391,6 +422,26 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
     schemas = [json.loads(tool.input_schema_json) for tool in catalog.tools]
     assert all(schema["additionalProperties"] is False for schema in schemas)
     assert schemas[2]["properties"]["state"]["enum"] == ["OPEN", "CLOSED"]
+    pull_requests_tool = next(
+        tool for tool in catalog.tools if tool.provider_tool_id == "github.pull_requests.list"
+    )
+    pull_requests_schema = json.loads(pull_requests_tool.input_schema_json)
+    assert "page_cursor" in pull_requests_schema["properties"]
+    assert "page_cursor" not in pull_requests_schema["required"]
+    assert pull_requests_schema["properties"]["page_cursor"]["pattern"] == (
+        "^(?:[1-9][0-9]{0,2}|1000)$"
+    )
+    compare_tool = next(
+        tool for tool in catalog.tools if tool.provider_tool_id == "github.commits.compare"
+    )
+    compare_schema = json.loads(compare_tool.input_schema_json)
+    assert compare_schema["required"] == [
+        "repository_id",
+        "repository",
+        "base_sha",
+        "head_sha",
+    ]
+    assert compare_schema["additionalProperties"] is False
     workflow_runs_tool = next(
         tool for tool in catalog.tools if tool.provider_tool_id == "github.actions.runs.list"
     )
@@ -428,6 +479,92 @@ def test_repository_list_dispatch_accepts_schema_without_required_fields() -> No
     ]
     assert len(account.calls) == 1
     assert api.calls[0][0] == "repositories"
+    assert "installation-token-must-not-escape" not in json.dumps(result)
+
+
+def test_pull_request_list_keeps_state_only_calls_on_first_page_and_accepts_cursor() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    repository = settings.repositories[0]
+    profile_ref = "00000000-0000-4000-8000-000000000001"
+
+    first_page_error, first_page = invoke_tool(
+        provider,
+        settings,
+        "github.pull_requests.list",
+        {
+            "repository_id": repository.repository_id,
+            "repository": repository.slug,
+            "state": "ALL",
+        },
+        profile_ref=profile_ref,
+    )
+    second_page_error, second_page = invoke_tool(
+        provider,
+        settings,
+        "github.pull_requests.list",
+        {
+            "repository_id": repository.repository_id,
+            "repository": repository.slug,
+            "state": "ALL",
+            "page_cursor": "2",
+        },
+        lease_ref="22345678-1234-1234-1234-123456789abc",
+        profile_ref=profile_ref,
+    )
+
+    assert first_page_error is False
+    assert first_page["page_cursor"] == "1"
+    assert first_page["complete"] is True
+    assert api.calls[0][1][-1]["page_cursor"] is None
+    assert second_page_error is False
+    assert second_page["page_cursor"] == "2"
+    assert len(api.calls) == 2
+    assert api.calls[0][0] == "pull_requests"
+    assert api.calls[0][1][-1]["page_cursor"] is None
+    assert api.calls[1][1][-1]["page_cursor"] == "2"
+
+
+def test_compare_commits_dispatch_binds_exact_shas_to_read_only_target() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    repository = settings.repositories[0]
+    base_sha = "A" * 40
+    head_sha = "b" * 40
+    arguments = {
+        "repository_id": repository.repository_id,
+        "repository": repository.slug,
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+    }
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "github.commits.compare",
+        arguments,
+        profile_ref="00000000-0000-4000-8000-000000000001",
+    )
+
+    assert is_error is False
+    assert result["base_is_ancestor_of_head"] is True
+    assert result["base_sha"] == base_sha.lower()
+    assert result["head_sha"] == head_sha
+    assert api.calls[0] == (
+        "compare_commits",
+        (repository, base_sha, head_sha, "installation-token-must-not-escape"),
+    )
+    assert account.calls[0][0]["operation_id"] == "github.commits.compare"
+    assert account.calls[0][0]["target"] == {
+        "repository_id": repository.repository_id,
+        "repository": repository.slug,
+        "base_sha": base_sha.lower(),
+        "head_sha": head_sha,
+    }
     assert "installation-token-must-not-escape" not in json.dumps(result)
 
 
@@ -965,9 +1102,29 @@ def test_github_write_scope_is_rejected_before_lease(
             },
             "00000000-0000-4000-8000-000000000001",
         ),
+        (
+            "github.commits.compare",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "base_sha": "a" * 39,
+                "head_sha": "b" * 40,
+            },
+            "00000000-0000-4000-8000-000000000001",
+        ),
+        (
+            "github.pull_requests.list",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "state": "ALL",
+                "page_cursor": "1001",
+            },
+            "00000000-0000-4000-8000-000000000001",
+        ),
     ],
 )
-def test_non_string_state_values_are_rejected_without_escaping_validation(
+def test_invalid_state_or_cursor_values_are_rejected_without_provider_access(
     tool_id: str,
     arguments: Mapping[str, Any],
     profile_ref: str | None,
@@ -1276,7 +1433,9 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
             )
         if path.endswith("/branches?per_page=100"):
             return HttpResponse(200, {}, b'[{"name":"main","commit":{"sha":"abc1234567890"}}]')
-        if path.endswith("/pulls?state=open&per_page=100"):
+        if path.endswith(
+            f"/pulls?state=open&per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page=1"
+        ):
             return HttpResponse(
                 200,
                 {},
@@ -1312,11 +1471,15 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert api.list_repositories("token")["repositories"][0]["repository_id"] == "12345"
     assert api.get_repository(repository, "token")["default_branch"] == "main"
     assert api.list_branches(repository, "token")["branches"][0]["name"] == "main"
-    listed_pull_request = api.list_pull_requests(repository, "OPEN", "token")[
-        "pull_requests"
-    ][0]
+    pull_request_page = api.list_pull_requests(repository, "OPEN", "token")
+    listed_pull_request = pull_request_page["pull_requests"][0]
     assert listed_pull_request["number"] == 4
     assert listed_pull_request["merge_status"] == "OPEN"
+    assert pull_request_page["page_cursor"] == "1"
+    assert pull_request_page["complete"] is True
+    assert pull_request_page["truncated"] is False
+    assert pull_request_page["has_more"] is False
+    assert pull_request_page["next_cursor"] is None
     assert "merged" not in listed_pull_request
     assert "merged_at" not in listed_pull_request
     assert "merge_commit_sha" not in listed_pull_request
@@ -1336,6 +1499,450 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert all(
         path.startswith(("/repos/owner/project", "/installation/repositories")) for path in observed
     )
+
+
+def test_pull_request_pages_stay_under_response_cap_and_report_next_cursor() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    synthetic = [
+        {
+            "number": index + 1,
+            "state": "closed",
+            "title": f"Synthetic pull request {index + 1}",
+            "body": "x" * 18_000,
+            "head": {"sha": f"{index + 1:040x}", "ref": f"feature-{index + 1}"},
+            "base": {"sha": "b" * 40, "ref": "develop"},
+        }
+        for index in range(100)
+    ]
+    legacy_body = json.dumps(synthetic, separators=(",", ":")).encode()
+    returned_items = synthetic[:25]
+    page_one_body = json.dumps(
+        returned_items[:MAX_PULL_REQUEST_PAGE_SIZE], separators=(",", ":")
+    ).encode()
+    assert MAX_RESPONSE_BYTES < len(legacy_body) < 2_000_000
+    assert len(page_one_body) < MAX_RESPONSE_BYTES
+    observed_paths: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        assert method == "GET"
+        assert host == "api.github.com"
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        observed_paths.append(path)
+        page = 1 if path.endswith("page=1") else 2 if path.endswith("page=2") else None
+        assert page is not None
+        start = (page - 1) * MAX_PULL_REQUEST_PAGE_SIZE
+        selected = returned_items[start : start + MAX_PULL_REQUEST_PAGE_SIZE]
+        response_body = json.dumps(selected, separators=(",", ":")).encode()
+        assert len(response_body) <= MAX_RESPONSE_BYTES
+        response_headers = (
+            {
+                "link": (
+                    "<https://api.github.com/repositories/12345/pulls?state=all&"
+                    f"per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page={page + 1}>; rel=\"next\""
+                )
+            }
+            if page == 1
+            else {}
+        )
+        return HttpResponse(200, response_headers, response_body)
+
+    api = GitHubApi(settings, transport=transport)
+    first = api.list_pull_requests(repository, "ALL", "token", page_cursor="1")
+    second = api.list_pull_requests(repository, "ALL", "token", page_cursor="2")
+
+    assert observed_paths == [
+        f"/repos/owner/project/pulls?state=all&per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page=1",
+        f"/repos/owner/project/pulls?state=all&per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page=2",
+    ]
+    assert first["page_cursor"] == "1"
+    assert len(first["pull_requests"]) == MAX_PULL_REQUEST_PAGE_SIZE
+    assert first["complete"] is False
+    assert first["truncated"] is True
+    assert first["has_more"] is True
+    assert first["next_cursor"] == "2"
+    assert first["next_cursor_source"] == "github_link"
+    assert first["result_limit_reached"] is False
+    assert second["page_cursor"] == "2"
+    assert len(second["pull_requests"]) == 5
+    assert second["complete"] is False
+    assert second["truncated"] is True
+    assert second["has_more"] is False
+    assert second["next_cursor"] is None
+
+
+def test_state_only_pull_request_list_batches_five_pages_with_a_hard_result_cap() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    synthetic = [
+        {
+            "number": index + 1,
+            "state": "closed",
+            "title": f"Synthetic pull request {index + 1}",
+            "body": "x" * 18_000,
+            "head": {"sha": f"{index + 1:040x}", "ref": f"feature-{index + 1}"},
+            "base": {"sha": "b" * 40, "ref": "develop"},
+        }
+        for index in range(120)
+    ]
+    legacy_body = json.dumps(synthetic[:100], separators=(",", ":")).encode()
+    assert len(legacy_body) > MAX_RESPONSE_BYTES
+    observed_pages: list[int] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        assert method == "GET"
+        assert host == "api.github.com"
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        page = int(path.rsplit("page=", 1)[1])
+        observed_pages.append(page)
+        start = (page - 1) * MAX_PULL_REQUEST_PAGE_SIZE
+        selected = synthetic[start : start + MAX_PULL_REQUEST_PAGE_SIZE]
+        response_body = json.dumps(selected, separators=(",", ":")).encode()
+        assert len(response_body) <= MAX_RESPONSE_BYTES
+        response_headers = {
+            "link": (
+                "<https://api.github.com/repositories/12345/pulls?state=all&"
+                f"per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page={page + 1}>; rel=\"next\""
+            )
+        }
+        return HttpResponse(200, response_headers, response_body)
+
+    result = GitHubApi(settings, transport=transport).list_pull_requests(
+        repository, "ALL", "token"
+    )
+
+    assert observed_pages == list(range(1, MAX_PULL_REQUEST_BATCH_PAGES + 1))
+    assert len(result["pull_requests"]) == 100
+    assert result["pages_read"] == MAX_PULL_REQUEST_BATCH_PAGES
+    assert result["complete"] is False
+    assert result["truncated"] is True
+    assert result["has_more"] is True
+    assert result["next_cursor"] == "6"
+    assert result["result_limit_reached"] is True
+    assert len(json.dumps(result, separators=(",", ":")).encode()) < MAX_RESPONSE_BYTES
+
+
+def test_state_only_pull_request_batch_fails_on_a_later_page_error() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    pull_requests = [
+        {
+            "number": index + 1,
+            "state": "closed",
+            "title": f"Synthetic pull request {index + 1}",
+            "body": "",
+            "head": {"sha": f"{index + 1:040x}", "ref": "feature"},
+            "base": {"sha": "b" * 40, "ref": "develop"},
+        }
+        for index in range(MAX_PULL_REQUEST_PAGE_SIZE)
+    ]
+    requested_pages: list[int] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        page = int(path.rsplit("page=", 1)[1])
+        requested_pages.append(page)
+        if page == 1:
+            return HttpResponse(
+                200,
+                {
+                    "link": (
+                        "<https://api.github.com/repositories/12345/pulls?state=all&"
+                        f"per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page=2>; rel=\"next\""
+                    )
+                },
+                json.dumps(pull_requests).encode(),
+            )
+        return HttpResponse(206, {}, b"[]")
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+    assert requested_pages == [1, 2]
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        (
+            "<https://example.invalid/repositories/12345/pulls?state=all&"
+            'per_page=20&page=2>; rel="next"'
+        ),
+        (
+            "<https://api.github.com/repositories/99999/pulls?state=all&"
+            'per_page=20&page=2>; rel="next"'
+        ),
+        (
+            "<https://api.github.com/repositories/12345/pulls?state=all&"
+            'per_page=100&page=2>; rel="next"'
+        ),
+        (
+            "<https://api.github.com/repositories/12345/pulls?state=all&"
+            'per_page=20&page=3>; rel="next"'
+        ),
+    ],
+)
+def test_pull_request_list_rejects_untrusted_or_inconsistent_next_link(link: str) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    pull_request = {
+        "number": 1,
+        "state": "closed",
+        "title": "Synthetic",
+        "body": "",
+        "head": {"sha": "a" * 40, "ref": "feature"},
+        "base": {"sha": "b" * 40, "ref": "develop"},
+    }
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        return HttpResponse(200, {"link": link}, json.dumps([pull_request]).encode())
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+
+
+@pytest.mark.parametrize("status", [202, 206])
+def test_pull_request_list_rejects_non_200_success_as_incomplete(status: int) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        return HttpResponse(status, {}, b"[]")
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_ancestor"),
+    [("ahead", True), ("identical", True), ("behind", False), ("diverged", False)],
+)
+def test_compare_commits_uses_exact_git_objects_and_verified_compare_response(
+    status: str, expected_ancestor: bool
+) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = base_sha if status == "identical" else "b" * 40
+    merge_base_sha = (
+        base_sha
+        if status in {"ahead", "identical"}
+        else head_sha if status == "behind" else "c" * 40
+    )
+    observed: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        assert method == "GET"
+        assert host == "api.github.com"
+        observed.append(path)
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path == f"/repos/owner/project/git/commits/{base_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path == f"/repos/owner/project/git/commits/{head_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": head_sha}).encode())
+        if path == (
+            f"/repos/owner/project/compare/{base_sha}...{head_sha}?per_page=1&page=1"
+        ):
+            result = {
+                "url": (
+                    "https://api.github.com/repos/owner/project/compare/"
+                    f"{base_sha}...{head_sha}"
+                ),
+                "base_commit": {"sha": base_sha},
+                "merge_base_commit": {"sha": merge_base_sha},
+                "status": status,
+                "ahead_by": 0 if status in {"identical", "behind"} else 1,
+                "behind_by": 0 if status in {"identical", "ahead"} else 1,
+                "total_commits": 0 if status in {"identical", "behind"} else 1,
+                "commits": [{"sha": head_sha}],
+                "files": [{"filename": "synthetic.txt", "patch": "synthetic"}],
+            }
+            return HttpResponse(200, {}, json.dumps(result).encode())
+        raise AssertionError(path)
+
+    result = GitHubApi(settings, transport=transport).compare_commits(
+        repository, base_sha, head_sha, "token"
+    )
+
+    assert observed == [
+        "/repos/owner/project",
+        f"/repos/owner/project/git/commits/{base_sha}",
+        f"/repos/owner/project/git/commits/{head_sha}",
+        f"/repos/owner/project/compare/{base_sha}...{head_sha}?per_page=1&page=1",
+    ]
+    assert result == {
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+        "merge_base_sha": merge_base_sha,
+        "comparison_status": status.upper(),
+        "base_is_ancestor_of_head": expected_ancestor,
+        "ahead_by": 0 if status in {"identical", "behind"} else 1,
+        "behind_by": 0 if status in {"identical", "ahead"} else 1,
+        "total_commits": 0 if status in {"identical", "behind"} else 1,
+        "verified": True,
+    }
+
+
+def test_compare_commits_rejects_wrong_commit_readback_before_comparison() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    observed: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed.append(path)
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith(f"/git/commits/{base_sha}"):
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path.endswith(f"/git/commits/{head_sha}"):
+            return HttpResponse(200, {}, json.dumps({"sha": "c" * 40}).encode())
+        raise AssertionError("comparison must not run after a mismatched SHA readback")
+
+    with pytest.raises(GitHubApiFailure, match="COMMIT_IDENTITY_MISMATCH"):
+        GitHubApi(settings, transport=transport).compare_commits(
+            repository, base_sha, head_sha, "token"
+        )
+    assert not any("/compare/" in path for path in observed)
+
+
+def test_compare_commits_rejects_compare_url_for_different_head() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path == f"/repos/owner/project/git/commits/{base_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path == f"/repos/owner/project/git/commits/{head_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": head_sha}).encode())
+        if "/compare/" in path:
+            result = {
+                "url": (
+                    "https://api.github.com/repos/owner/project/compare/"
+                    f"{base_sha}...{'c' * 40}"
+                ),
+                "base_commit": {"sha": base_sha},
+                "merge_base_commit": {"sha": base_sha},
+                "status": "ahead",
+                "ahead_by": 1,
+                "behind_by": 0,
+                "total_commits": 1,
+            }
+            return HttpResponse(200, {}, json.dumps(result).encode())
+        raise AssertionError(path)
+
+    with pytest.raises(GitHubApiFailure, match="COMMIT_IDENTITY_MISMATCH"):
+        GitHubApi(settings, transport=transport).compare_commits(
+            repository, base_sha, head_sha, "token"
+        )
+
+
+def test_compare_commits_keeps_the_fixed_response_size_limit() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path == f"/repos/owner/project/git/commits/{base_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path == f"/repos/owner/project/git/commits/{head_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": head_sha}).encode())
+        if "/compare/" in path:
+            result = {
+                "url": (
+                    "https://api.github.com/repos/owner/project/compare/"
+                    f"{base_sha}...{head_sha}"
+                ),
+                "base_commit": {"sha": base_sha},
+                "merge_base_commit": {"sha": base_sha},
+                "status": "ahead",
+                "ahead_by": 1,
+                "behind_by": 0,
+                "total_commits": 1,
+                "files": [{"patch": "x" * MAX_RESPONSE_BYTES}],
+            }
+            return HttpResponse(200, {}, json.dumps(result).encode())
+        raise AssertionError(path)
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).compare_commits(
+            repository, base_sha, head_sha, "token"
+        )
 
 
 def _pull_request_projection_input(
@@ -1619,6 +2226,52 @@ def test_ci_status_reports_incomplete_check_run_pages_instead_of_implying_green(
     assert result["check_runs_total_count"] == 101
     assert result["complete"] is False
     assert result["truncated"] is True
+
+
+def test_ci_pending_without_status_contexts_does_not_claim_required_contexts_are_missing() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith(
+            "/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/status?per_page=100"
+        ):
+            return HttpResponse(200, {}, b'{"state":"pending","total_count":0,"statuses":[]}')
+        if path.endswith(
+            "/commits/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/check-runs?per_page=100"
+        ):
+            checks = [
+                {"name": "unit", "status": "completed", "conclusion": "success"},
+                {"name": "optional-smoke", "status": "completed", "conclusion": "skipped"},
+            ]
+            return HttpResponse(
+                200,
+                {},
+                json.dumps({"total_count": len(checks), "check_runs": checks}).encode(),
+            )
+        raise AssertionError(path)
+
+    result = GitHubApi(settings, transport=transport).get_ci_status(
+        repository, "a" * 40, "token"
+    )
+
+    assert result["state"] == "PENDING"
+    assert result["statuses"] == []
+    assert result["status_contexts_present"] is False
+    assert result["status_contexts_complete"] is True
+    assert result["check_runs_complete"] is True
+    assert result["check_runs_terminal"] is True
+    assert result["required_contexts_verified"] is False
+    assert "no status contexts" in result["state_note"]
+    assert "required branch-protection contexts were not queried" in result["state_note"]
 
 
 def _workflow_run_response(

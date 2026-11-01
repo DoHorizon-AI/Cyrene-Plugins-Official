@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from urllib.parse import quote, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 from .settings import ProviderSettings, Repository
 
@@ -26,6 +26,9 @@ MAX_ACTIONS_LOG_BYTES = 2_000_000
 MAX_ACTIONS_LOG_EXCERPT_BYTES = 20_000
 # Keep run summaries within the fixed-host transport's 1 MB response bound | 控制列表响应大小。
 MAX_ACTION_WORKFLOW_RUNS = 30
+MAX_PULL_REQUEST_PAGE_SIZE = 20
+MAX_PULL_REQUEST_PAGE_NUMBER = 1000
+MAX_PULL_REQUEST_BATCH_PAGES = 5
 _ACTIONS_LOG_HOST = re.compile(r"productionresultssa[0-9]{1,3}\.blob\.core\.windows\.net\Z")
 TASK_BRANCH_PREFIX = "cyrene/assistant/"
 
@@ -538,15 +541,90 @@ class GitHubApi:
         return _draft_pull_request_result(readback)
 
     def list_pull_requests(
-        self, repository: Repository, state: str, token: str
+        self, repository: Repository, state: str, token: str, *, page_cursor: str | None = None
     ) -> dict[str, Any]:
-        """Read a bounded pull-request page with a fixed state query value."""
+        """Read a bounded PR batch, or one explicit page for a newer tool catalog."""
 
         self._verify_configured_repository(repository, token)
-        query = urlencode({"state": state.lower(), "per_page": 100})
-        path = f"{self._repository_path(repository)}/pulls?{query}"
-        values = _json_array(self._request("GET", path, token, None))
-        return {"pull_requests": [_pull_request_projection(item) for item in values]}
+        if state not in {"OPEN", "CLOSED", "ALL"}:
+            raise GitHubApiFailure("INVALID_ARGUMENTS")
+        if (
+            page_cursor is not None
+            and (
+                not isinstance(page_cursor, str)
+                or re.fullmatch(r"[1-9][0-9]{0,3}", page_cursor) is None
+                or int(page_cursor) > MAX_PULL_REQUEST_PAGE_NUMBER
+            )
+        ):
+            raise GitHubApiFailure("INVALID_ARGUMENTS")
+        first_page = int(page_cursor) if page_cursor is not None else 1
+        batch_mode = page_cursor is None
+        page_count = MAX_PULL_REQUEST_BATCH_PAGES if batch_mode else 1
+        pull_requests: list[dict[str, Any]] = []
+        pages_read = 0
+        next_cursor: str | None = None
+        next_cursor_source: str | None = None
+        has_more = False
+        page_number = first_page
+
+        for _ in range(page_count):
+            query = urlencode(
+                {
+                    "state": state.lower(),
+                    "per_page": MAX_PULL_REQUEST_PAGE_SIZE,
+                    "page": page_number,
+                }
+            )
+            path = f"{self._repository_path(repository)}/pulls?{query}"
+            response = self._request("GET", path, token, None)
+            if response.status != 200:
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            values = _json_array(response)
+            if len(values) > MAX_PULL_REQUEST_PAGE_SIZE:
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            next_cursor = _next_pull_request_cursor(
+                response.headers,
+                repository=repository,
+                state=state,
+                current_page=page_number,
+            )
+            has_more = next_cursor is not None
+            next_cursor_source = "github_link" if has_more else None
+            if not has_more and len(values) == MAX_PULL_REQUEST_PAGE_SIZE:
+                # A full page without a next link is ambiguous; request one more
+                # bounded page instead of claiming the list is complete.
+                has_more = True
+                next_cursor_source = "full_page_boundary"
+                if page_number < MAX_PULL_REQUEST_PAGE_NUMBER:
+                    next_cursor = str(page_number + 1)
+            if has_more and page_number >= MAX_PULL_REQUEST_PAGE_NUMBER:
+                next_cursor = None
+            pull_requests.extend(_pull_request_projection(item) for item in values)
+            pages_read += 1
+            if not has_more:
+                next_cursor = None
+                break
+            if batch_mode:
+                if next_cursor is None:
+                    break
+                page_number = int(next_cursor)
+
+        page_limit_reached = has_more and page_number >= MAX_PULL_REQUEST_PAGE_NUMBER
+        result_limit_reached = page_limit_reached or (
+            has_more and batch_mode and pages_read >= page_count
+        )
+        complete = first_page == 1 and not has_more
+        return {
+            "pull_requests": pull_requests,
+            "page_cursor": str(first_page),
+            "pages_read": pages_read,
+            "complete": complete,
+            "truncated": not complete,
+            "has_more": has_more,
+            "next_cursor": None if page_limit_reached else next_cursor,
+            "next_cursor_source": next_cursor_source,
+            "result_limit_reached": result_limit_reached,
+        }
 
     def get_pull_request(
         self, repository: Repository, pull_number: int, token: str
@@ -562,6 +640,106 @@ class GitHubApi:
         if result["number"] != pull_number:
             raise GitHubApiFailure("PULL_REQUEST_IDENTITY_MISMATCH")
         return {"pull_request": result}
+
+    def compare_commits(
+        self,
+        repository: Repository,
+        base_sha: str,
+        head_sha: str,
+        token: str,
+    ) -> dict[str, Any]:
+        """Report GitHub's ancestry relation for two exact commit IDs."""
+
+        if any(
+            not isinstance(value, str) or re.fullmatch(r"[0-9a-fA-F]{40}", value) is None
+            for value in (base_sha, head_sha)
+        ):
+            raise GitHubApiFailure("INVALID_ARGUMENTS")
+        self._verify_configured_repository(repository, token)
+        base = base_sha.lower()
+        head = head_sha.lower()
+        self._read_git_commit_sha(repository, base, token)
+        self._read_git_commit_sha(repository, head, token)
+
+        compare_path = (
+            f"{self._repository_path(repository)}/compare/{quote(base, safe='')}..."
+            f"{quote(head, safe='')}?{urlencode({'per_page': 1, 'page': 1})}"
+        )
+        compare_response = self._request("GET", compare_path, token, None)
+        if compare_response.status != 200:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        comparison = _json_object(compare_response)
+        compare_url = comparison.get("url")
+        if not isinstance(compare_url, str):
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        try:
+            parsed_url = urlsplit(compare_url)
+            parsed_port = parsed_url.port
+        except ValueError as error:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE") from error
+        expected_path = (
+            f"{self._repository_path(repository)}/compare/{base}...{head}"
+        )
+        if (
+            parsed_url.scheme != "https"
+            or parsed_url.hostname is None
+            or parsed_url.hostname.lower() != GITHUB_HOST
+            or parsed_port not in (None, 443)
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or parsed_url.path.casefold() != expected_path.casefold()
+            or parsed_url.query
+            or parsed_url.fragment
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+
+        base_commit = comparison.get("base_commit")
+        merge_base_commit = comparison.get("merge_base_commit")
+        returned_base = base_commit.get("sha") if isinstance(base_commit, Mapping) else None
+        merge_base = (
+            merge_base_commit.get("sha")
+            if isinstance(merge_base_commit, Mapping)
+            else None
+        )
+        if (
+            not isinstance(returned_base, str)
+            or returned_base.lower() != base
+            or not isinstance(merge_base, str)
+            or re.fullmatch(r"[0-9a-fA-F]{40}", merge_base) is None
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+
+        status = comparison.get("status")
+        if status not in {"ahead", "behind", "identical", "diverged"}:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        ahead_by = _non_negative_int(comparison.get("ahead_by"))
+        behind_by = _non_negative_int(comparison.get("behind_by"))
+        total_commits = _non_negative_int(comparison.get("total_commits"))
+        normalized_merge_base = merge_base.lower()
+        if (
+            (status == "ahead" and (base == head or normalized_merge_base != base))
+            or (status == "behind" and (base == head or normalized_merge_base != head))
+            or (
+                status == "identical"
+                and not (base == head == normalized_merge_base)
+            )
+            or (
+                status == "diverged"
+                and normalized_merge_base in {base, head}
+            )
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+        return {
+            "base_sha": base,
+            "head_sha": head,
+            "merge_base_sha": normalized_merge_base,
+            "comparison_status": status.upper(),
+            "base_is_ancestor_of_head": status in {"ahead", "identical"},
+            "ahead_by": ahead_by,
+            "behind_by": behind_by,
+            "total_commits": total_commits,
+            "verified": True,
+        }
 
     def find_draft_pull_request(
         self, repository: Repository, head_branch: str, base_branch: str, token: str
@@ -1207,10 +1385,33 @@ class GitHubApi:
         state = status.get("state")
         if state not in {"pending", "success", "failure", "error"}:
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
-        complete = (
-            statuses_total_count == len(contexts)
-            and check_runs_total_count == len(check_runs)
+        statuses_complete = statuses_total_count == len(contexts)
+        check_runs_complete = check_runs_total_count == len(check_runs)
+        check_runs_terminal = (
+            check_runs_complete
+            and bool(projected_checks)
+            and all(item["status"] == "COMPLETED" for item in projected_checks)
         )
+        complete = statuses_complete and check_runs_complete
+        state_note = None
+        if state == "pending" and not projected_contexts:
+            if not statuses_complete:
+                state_note = (
+                    "The combined commit-status API reports PENDING and returned no status "
+                    "contexts in this incomplete response. Required branch-protection contexts "
+                    "were not queried."
+                )
+            elif check_runs_terminal:
+                state_note = (
+                    "The combined commit-status API reports PENDING but returned no status "
+                    "contexts. All returned check runs are terminal; required branch-protection "
+                    "contexts were not queried."
+                )
+            else:
+                state_note = (
+                    "The combined commit-status API reports PENDING and returned no status "
+                    "contexts. Required branch-protection contexts were not queried."
+                )
         return {
             "commit_sha": commit_sha,
             "state": state.upper(),
@@ -1218,6 +1419,12 @@ class GitHubApi:
             "statuses": projected_contexts,
             "check_runs_total_count": check_runs_total_count,
             "check_runs": projected_checks,
+            "status_contexts_present": bool(projected_contexts),
+            "status_contexts_complete": statuses_complete,
+            "check_runs_complete": check_runs_complete,
+            "check_runs_terminal": check_runs_terminal,
+            "required_contexts_verified": False,
+            "state_note": state_note,
             "complete": complete,
             "truncated": not complete,
         }
@@ -1229,6 +1436,8 @@ class GitHubApi:
 
         path = f"/repos/{quote(repository.owner, safe='')}/{quote(repository.name, safe='')}"
         response = self._request("GET", path, token, None)
+        if response.status != 200:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         value = _json_object(response)
         if (
             str(value.get("id")) != repository.repository_id
@@ -1239,6 +1448,28 @@ class GitHubApi:
         if default_branch is not None and not isinstance(default_branch, str):
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         return default_branch
+
+    def _read_git_commit_sha(
+        self, repository: Repository, commit_sha: str, token: str
+    ) -> str:
+        """Read an exact Git commit object and require its SHA to match the path."""
+
+        path = (
+            f"{self._repository_path(repository)}/git/commits/"
+            f"{quote(commit_sha, safe='')}"
+        )
+        response = self._request("GET", path, token, None)
+        if response.status != 200:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        value = _json_object(response)
+        returned_sha = value.get("sha")
+        if (
+            not isinstance(returned_sha, str)
+            or re.fullmatch(r"[0-9a-fA-F]{40}", returned_sha) is None
+            or returned_sha.lower() != commit_sha.lower()
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+        return returned_sha.lower()
 
     @staticmethod
     def _issue_path(repository: Repository, issue_number: int) -> str:
@@ -1355,6 +1586,71 @@ class GitHubApi:
             raise GitHubApiFailure("REPOSITORY_IDENTITY_MISMATCH")
         # Issue GET/PATCH often omit nested repository; the API path was built
         # from configured owner/name and the lease is separately repo-ID bound.
+
+
+def _next_pull_request_cursor(
+    headers: Mapping[str, str],
+    *,
+    repository: Repository,
+    state: str,
+    current_page: int,
+) -> str | None:
+    """Validate GitHub's fixed-host next link and return only its page number."""
+
+    link = headers.get("link") or headers.get("Link")
+    if link is None:
+        return None
+    if not isinstance(link, str):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    if not link:
+        return None
+
+    next_cursor: str | None = None
+    for segment in link.split(","):
+        match = re.fullmatch(r'\s*<([^<>]+)>\s*;\s*rel="?([a-z]+)"?\s*', segment)
+        if match is None:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        if match.group(2) != "next":
+            continue
+        if next_cursor is not None:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        try:
+            parsed = urlsplit(match.group(1))
+            parsed_port = parsed.port
+            query = parse_qs(parsed.query, strict_parsing=True)
+        except ValueError as error:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE") from error
+        expected_paths = {
+            f"{GitHubApi._repository_path(repository)}/pulls",
+            f"/repositories/{quote(repository.repository_id, safe='')}/pulls",
+        }
+        page_values = query.get("page", [])
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname is None
+            or parsed.hostname.lower() != GITHUB_HOST
+            or parsed_port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in expected_paths
+            or set(query) != {"page", "per_page", "state"}
+            or query.get("per_page") != [str(MAX_PULL_REQUEST_PAGE_SIZE)]
+            or query.get("state") != [state.lower()]
+            or len(page_values) != 1
+            or re.fullmatch(r"[1-9][0-9]{0,3}", page_values[0]) is None
+            or int(page_values[0]) != current_page + 1
+        ):
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        next_cursor = page_values[0]
+    return next_cursor
+
+
+def _non_negative_int(value: Any) -> int:
+    """Require a bounded-comparison count from GitHub without bool coercion."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return value
 
 
 def _json_object(response: HttpResponse) -> dict[str, Any]:
