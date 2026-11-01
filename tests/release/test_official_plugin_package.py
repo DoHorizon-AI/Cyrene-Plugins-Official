@@ -224,6 +224,19 @@ class OfficialPluginPackageTests(unittest.TestCase):
         self.assertTrue(
             account_center_cryptography.specifier.contains(teams_cryptography)
         )
+        public_web_project = tomllib.loads(
+            (
+                self.repository / "plugins/tools/public-web/pyproject.toml"
+            ).read_text(encoding="utf-8")
+        )["project"]
+        public_web_cryptography = next(
+            Requirement(value)
+            for value in public_web_project["dependencies"]
+            if Requirement(value).name.lower() == "cryptography"
+        )
+        self.assertTrue(
+            public_web_cryptography.specifier.contains(teams_cryptography)
+        )
         self.assertTrue(
             Requirement(project["optional-dependencies"]["test"][0]).specifier.contains(
                 teams_cryptography

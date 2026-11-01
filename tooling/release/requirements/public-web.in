@@ -3,7 +3,7 @@
 # Vendored source: cyrene-plugin-runtime==0.2.2.
 # Vendored source: cyrene-tool-provider-contracts==0.1.0.
 # Vendored source: cyrene-integration-contracts==0.1.0.
-cryptography>=42,<47
+cryptography>=44,<51
 grpcio==1.62.3
 httpx>=0.28,<0.29
 jsonschema>=4.23,<5

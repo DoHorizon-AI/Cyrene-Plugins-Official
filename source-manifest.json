@@ -4653,7 +4653,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/tools/public-web/pyproject.toml",
-      "sha256": "86bf49b65894a115787501d1c7fc0ef0f713814fbe71a9586308e763d65906a8",
+      "sha256": "ed4ed18923ab6e8552bf92df973911fce8cb12be227c5d8f443e61e250a932ec",
       "size_bytes": 1388
     },
     {
@@ -8615,8 +8615,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "e85416cad3f5628cb0e1ae1679ab701284550c46f5bc022f296520a837f08079",
-      "size_bytes": 116477
+      "sha256": "c2ac2aaf279e4b2a943915bb5c277ff8c57f80e5b3c1726b9af0f401a7a2c729",
+      "size_bytes": 116990
     },
     {
       "kind": "file",
@@ -8846,7 +8846,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/requirements/public-web.in",
-      "sha256": "e11ab955ef295865b24a1610ddf6e37aff61b06b46ddd2aa0fcc10edc52537b4",
+      "sha256": "9ea6647f73a562d5a47c4eb2684ac5f13b904926a26689ca417869b2472047de",
       "size_bytes": 475
     },
     {
