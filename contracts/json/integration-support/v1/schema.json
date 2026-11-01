@@ -38,8 +38,8 @@
       "type": "object",
       "required": ["method", "operation_id", "caller_workload", "audience", "issuer", "subject", "organization_id", "workspace_id", "binding_id", "request_id", "issued_at", "expires_at", "payload_sha256", "signature"],
       "properties": {
-        "method": {"type": "string", "enum": ["wecom_authorization_health", "wecom_reauthorization_start", "wecom_reauthorization_status", "cloud_resources_query", "cloud_authorization_health", "cloud_provider_health", "cloud_resources_list", "cloud_resource_get", "cloud_resource_create", "cloud_resource_deploy", "cloud_resource_start", "cloud_resource_stop", "cloud_resource_restart", "cloud_resource_update", "cloud_resource_delete", "cloud_operation_status", "cloud_operation_logs", "cloud_operation_cancel", "cloud_vendor_cli", "github_vendor_cli", "hf_vendor_cli", "email_notification_send", "email_connection_health"]},
-        "operation_id": {"type": "string", "enum": ["wecom.authorization.health.read", "wecom.authorization.renewal.start", "wecom.authorization.renewal.status", "cloud.resources.query", "cloud.authorization.health.read", "cloud.provider.health.read", "cloud.resources.list", "cloud.resource.get", "cloud.resource.create", "cloud.resource.deploy", "cloud.resource.start", "cloud.resource.stop", "cloud.resource.restart", "cloud.resource.update", "cloud.resource.delete", "cloud.operation.status.read", "cloud.operation.logs.read", "cloud.operation.cancel", "cloud.vendor.cli.execute", "github.vendor.cli.execute", "huggingface.vendor.cli.execute", "email.notification.send", "email.connection.health.read"]},
+        "method": {"type": "string", "enum": ["wecom_authorization_health", "wecom_reauthorization_start", "wecom_reauthorization_status", "cloud_resources_query", "cloud_authorization_health", "cloud_provider_health", "cloud_resources_list", "cloud_resource_get", "cloud_resource_create", "cloud_resource_deploy", "cloud_resource_start", "cloud_resource_stop", "cloud_resource_restart", "cloud_resource_update", "cloud_resource_delete", "cloud_operation_status", "cloud_operation_logs", "cloud_operation_cancel", "cloud_vendor_cli", "github_vendor_cli", "hf_vendor_cli", "email_notification_send", "email_connection_health", "media.asset.import", "media.asset.search", "media.asset.get", "media.asset.delete", "media.asset.restore", "media.card.render", "knowledge.search", "knowledge.read", "web.search", "web.open", "document.read", "bilibili.auth.qr.begin", "bilibili.auth.qr.status", "bilibili.search", "bilibili.user.find", "bilibili.video.read", "bilibili.comments.list", "bilibili.dynamics.list", "bilibili.dynamic.read", "bilibili.dm.list", "bilibili.dm.read", "bilibili.comment.create", "bilibili.dynamic.publish", "bilibili.dm.send"]},
+        "operation_id": {"type": "string", "enum": ["wecom.authorization.health.read", "wecom.authorization.renewal.start", "wecom.authorization.renewal.status", "cloud.resources.query", "cloud.authorization.health.read", "cloud.provider.health.read", "cloud.resources.list", "cloud.resource.get", "cloud.resource.create", "cloud.resource.deploy", "cloud.resource.start", "cloud.resource.stop", "cloud.resource.restart", "cloud.resource.update", "cloud.resource.delete", "cloud.operation.status.read", "cloud.operation.logs.read", "cloud.operation.cancel", "cloud.vendor.cli.execute", "github.vendor.cli.execute", "huggingface.vendor.cli.execute", "email.notification.send", "email.connection.health.read", "media.asset.import", "media.asset.search", "media.asset.get", "media.asset.delete", "media.asset.restore", "media.card.render", "knowledge.search", "knowledge.read", "web.search", "web.open", "document.read", "bilibili.auth.qr.begin", "bilibili.auth.qr.status", "bilibili.search", "bilibili.user.find", "bilibili.video.read", "bilibili.comments.list", "bilibili.dynamics.list", "bilibili.dynamic.read", "bilibili.dm.list", "bilibili.dm.read", "bilibili.comment.create", "bilibili.dynamic.publish", "bilibili.dm.send"]},
         "caller_workload": {"type": "string", "minLength": 1, "maxLength": 200},
         "audience": {"type": "string", "minLength": 1, "maxLength": 200},
         "issuer": {"type": "string", "minLength": 1, "maxLength": 500},
@@ -77,7 +77,31 @@
         {"if": {"properties": {"method": {"const": "github_vendor_cli"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "github.vendor.cli.execute"}}}},
         {"if": {"properties": {"method": {"const": "hf_vendor_cli"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "huggingface.vendor.cli.execute"}}}},
         {"if": {"properties": {"method": {"const": "email_notification_send"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.notification.send"}}}},
-        {"if": {"properties": {"method": {"const": "email_connection_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.connection.health.read"}}}}
+        {"if": {"properties": {"method": {"const": "email_connection_health"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "email.connection.health.read"}}}},
+        {"if": {"properties": {"method": {"const": "media.asset.import"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "media.asset.import"}}}},
+        {"if": {"properties": {"method": {"const": "media.asset.search"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "media.asset.search"}}}},
+        {"if": {"properties": {"method": {"const": "media.asset.get"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "media.asset.get"}}}},
+        {"if": {"properties": {"method": {"const": "media.asset.delete"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "media.asset.delete"}}}},
+        {"if": {"properties": {"method": {"const": "media.asset.restore"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "media.asset.restore"}}}},
+        {"if": {"properties": {"method": {"const": "media.card.render"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "media.card.render"}}}},
+        {"if": {"properties": {"method": {"const": "knowledge.search"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "knowledge.search"}}}},
+        {"if": {"properties": {"method": {"const": "knowledge.read"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "knowledge.read"}}}},
+        {"if": {"properties": {"method": {"const": "web.search"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "web.search"}}}},
+        {"if": {"properties": {"method": {"const": "web.open"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "web.open"}}}},
+        {"if": {"properties": {"method": {"const": "document.read"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "document.read"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.auth.qr.begin"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.auth.qr.begin"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.auth.qr.status"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.auth.qr.status"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.search"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.search"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.user.find"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.user.find"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.video.read"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.video.read"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.comments.list"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.comments.list"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.dynamics.list"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.dynamics.list"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.dynamic.read"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.dynamic.read"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.dm.list"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.dm.list"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.dm.read"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.dm.read"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.comment.create"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.comment.create"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.dynamic.publish"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.dynamic.publish"}}}},
+        {"if": {"properties": {"method": {"const": "bilibili.dm.send"}}, "required": ["method"]}, "then": {"properties": {"operation_id": {"const": "bilibili.dm.send"}}}}
       ]
     },
     "CapabilityAuthorizationHealth": {
@@ -299,6 +323,13 @@
         {"properties": {"caller_context": {"properties": {"method": {"const": "email_connection_health"}, "operation_id": {"const": "email.connection.health.read"}}}, "arguments": {"$ref": "#/$defs/EmailConnectionHealthArguments"}}}
       ]
     },
+    "ConversationToolEnvelope": {
+      "description": "Fixed conversation tools; each provider validates its own exact argument schema after signature verification.",
+      "allOf": [
+        {"$ref": "#/$defs/ToolEnvelopeBase"},
+        {"properties": {"caller_context": {"properties": {"method": {"enum": ["media.asset.import", "media.asset.search", "media.asset.get", "media.asset.delete", "media.asset.restore", "media.card.render", "knowledge.search", "knowledge.read", "web.search", "web.open", "document.read", "bilibili.auth.qr.begin", "bilibili.auth.qr.status", "bilibili.search", "bilibili.user.find", "bilibili.video.read", "bilibili.comments.list", "bilibili.dynamics.list", "bilibili.dynamic.read", "bilibili.dm.list", "bilibili.dm.read", "bilibili.comment.create", "bilibili.dynamic.publish", "bilibili.dm.send"]}}}, "arguments": {"type": "object"}}}
+      ]
+    },
     "ToolEnvelope": {
       "oneOf": [
         {"$ref": "#/$defs/WeComAuthorizationHealthEnvelope"},
@@ -310,7 +341,8 @@
         {"$ref": "#/$defs/GitHubVendorCliEnvelope"},
         {"$ref": "#/$defs/HuggingFaceVendorCliEnvelope"},
         {"$ref": "#/$defs/EmailNotificationSendEnvelope"},
-        {"$ref": "#/$defs/EmailConnectionHealthEnvelope"}
+        {"$ref": "#/$defs/EmailConnectionHealthEnvelope"},
+        {"$ref": "#/$defs/ConversationToolEnvelope"}
       ]
     }
   }
