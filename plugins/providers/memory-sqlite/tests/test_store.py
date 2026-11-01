@@ -165,6 +165,11 @@ def test_zero_vectors_and_wrong_embedding_profiles_fail_closed(tmp_path: Path) -
                 "tenant-a",
                 _item("large-float", embedding=(1.0e50, 0.0, 0.0)),
             )
+        with pytest.raises(ValueError, match="float32 encoding"):
+            store.store(
+                "tenant-a",
+                _item("underflow", embedding=(1.0e-50, 0.0, 0.0)),
+            )
         with pytest.raises(ValueError, match="zero vectors"):
             store.recall(
                 tenant_id="tenant-a",

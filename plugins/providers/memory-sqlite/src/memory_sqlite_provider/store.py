@@ -569,7 +569,11 @@ def _validated_vector(values: Sequence[float], dimensions: int | None = None) ->
 
 def _pack_vector(values: Sequence[float], dimensions: int | None = None) -> bytes:
     vector = _validated_vector(values, dimensions)
-    return struct.pack(f"<{len(vector)}f", *vector)
+    packed = struct.pack(f"<{len(vector)}f", *vector)
+    quantized = struct.unpack(f"<{len(vector)}f", packed)
+    if any(not math.isfinite(value) for value in quantized) or not any(quantized):
+        raise ValueError("embedding becomes invalid after float32 encoding")
+    return packed
 
 
 def _unpack_vector(value: bytes, dimensions: int) -> tuple[float, ...]:
