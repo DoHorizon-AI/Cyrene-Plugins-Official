@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.bilibili/configuration.schema.json",
+  "title": "Bilibili connector binding",
+  "type": "object",
+  "required": ["trusted_callers", "account_center", "hostSecretRefs"],
+  "properties": {
+    "trusted_callers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": [
+          "caller_workload",
+          "audience",
+          "organization_id",
+          "workspace_id",
+          "issuer",
+          "verification_key_ref"
+        ],
+        "properties": {
+          "caller_workload": {"type": "string", "minLength": 1, "maxLength": 256},
+          "audience": {"type": "string", "minLength": 1, "maxLength": 256},
+          "organization_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "workspace_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "issuer": {"type": "string", "minLength": 1, "maxLength": 512},
+          "verification_key_ref": {"const": "bilibili/exchange-verification-key"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "account_center": {
+      "type": "object",
+      "required": ["binding_id", "connection_ref", "caller_id", "signing_key_ref"],
+      "properties": {
+        "binding_id": {"type": "string", "minLength": 1, "maxLength": 256},
+        "connection_ref": {"type": "string", "minLength": 1, "maxLength": 512},
+        "transport": {"type": "string", "enum": ["local", "mtls"], "default": "local"},
+        "caller_id": {"const": "cyrene.connectors.bilibili"},
+        "signing_key_ref": {"const": "bilibili/account-center-provider-signing-key"},
+        "mtls": {
+          "type": "object",
+          "properties": {
+            "root_cert_ref": {"const": "bilibili/account-center-root-certificate"},
+            "client_cert_ref": {"const": "bilibili/account-center-client-certificate"},
+            "client_key_ref": {"const": "bilibili/account-center-client-key"}
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "timeout_seconds": {"type": "number", "minimum": 1, "maximum": 30, "default": 12},
+    "max_page_size": {"type": "integer", "minimum": 1, "maximum": 50, "default": 20},
+    "hostSecretRefs": {
+      "type": "object",
+      "required": ["bilibili/exchange-verification-key", "bilibili/account-center-provider-signing-key", "bilibili/state-dir"],
+      "properties": {
+        "bilibili/exchange-verification-key": {"$ref": "#/$defs/envName"},
+        "bilibili/account-center-provider-signing-key": {"$ref": "#/$defs/envName"},
+        "bilibili/state-dir": {"$ref": "#/$defs/envName"},
+        "bilibili/account-center-root-certificate": {"$ref": "#/$defs/envName"},
+        "bilibili/account-center-client-certificate": {"$ref": "#/$defs/envName"},
+        "bilibili/account-center-client-key": {"$ref": "#/$defs/envName"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {"envName": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}}
+}
