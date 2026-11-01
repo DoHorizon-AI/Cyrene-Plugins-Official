@@ -101,6 +101,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
             -e sdk/python/cyrene_memory_provider_contracts \
+            -e sdk/python/cyrene_message_connector_contracts \
             -e sdk/python/cyrene_tool_provider_contracts \
             -e sdk/python/cyrene_knowledge_graph_contracts \
             -e sdk/python/cyrene_speech_provider_contracts \
@@ -153,6 +154,7 @@ jobs:
             --exclude '**/_generated/**' \
             sdk/python/cyrene_model_provider_contracts/src \
             sdk/python/cyrene_memory_provider_contracts/src \
+            sdk/python/cyrene_message_connector_contracts/src \
             sdk/python/cyrene_tool_provider_contracts/src \
             sdk/python/cyrene_knowledge_graph_contracts/src \
             sdk/python/cyrene_speech_provider_contracts/src \
@@ -218,6 +220,7 @@ jobs:
             sdk/python/cyrene_plugin_runtime/tests \
             sdk/python/cyrene_model_provider_contracts/tests \
             sdk/python/cyrene_memory_provider_contracts/tests \
+            sdk/python/cyrene_message_connector_contracts/tests \
             sdk/python/cyrene_tool_provider_contracts/tests \
             sdk/python/cyrene_knowledge_graph_contracts/tests \
             sdk/python/cyrene_speech_provider_contracts/tests \

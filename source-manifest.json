@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "3888e5ca7778e4b983c834b6c3fc392fa45cf8017cbb142e00e051f44bc414b9",
-      "size_bytes": 44027
+      "sha256": "9167b1319aab4876aeed536fa08c6f474a65ae2f6636a5b28efbd698c2f9b42c",
+      "size_bytes": 44220
     },
     {
       "kind": "file",
@@ -7109,6 +7109,118 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/README.md",
+      "sha256": "cab5cf58c6c5d393c0c7b3eab4e7087bcfbca0ddd9dbabbd12cbe4cf4410815c",
+      "size_bytes": 2355
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/generate_bindings.py",
+      "sha256": "07219c7b22b00cbef58a43791090bd33db1bb2a0eadc79b6aab7c78ec13822da",
+      "size_bytes": 2647
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/pyproject.toml",
+      "sha256": "22a8a769c7c26a8f5cc54d778b6578b628af65d1f2dd21feb967c6ac114acea1",
+      "size_bytes": 926
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/README.md",
+      "sha256": "858768112cd10cc565c42a5e3d20a447b568b35a5f5db6eb74181b128a00adfc",
+      "size_bytes": 316
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/README.md",
+      "sha256": "f16e60a276b8e441f3bff41ca0c2c9ce35e45b6aa64e1adde4932ffb6b9b6cd8",
+      "size_bytes": 468
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/__init__.py",
+      "sha256": "b339d0263a2481ae65a24bbaf3304c0d1dfd2bef3755be58468c0372e65ab246",
+      "size_bytes": 2093
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/_generated/README.md",
+      "sha256": "98d0a4d2d04767ee29c53ed2eae471402de656475f9a0a47441c721feeea251c",
+      "size_bytes": 386
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/_generated/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/_generated/message_connector_pb2.py",
+      "sha256": "2236b0ac3215bfaa1be71e0ffecaacd697264c01b8af981356640f9e62f4dd17",
+      "size_bytes": 6945
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/codec.py",
+      "sha256": "bf7716cfeb161611e95bde41ee3fdc3c4d3d2a941cb0e317badad14dfcc386d4",
+      "size_bytes": 5740
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/schemas/README.md",
+      "sha256": "66e78dad741e383380c0f0c1aba89b7ba68d208a68551ceea1690fa44bc866bf",
+      "size_bytes": 410
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/schemas/inbound_request.schema.json",
+      "sha256": "9393a0341bdbdb112a55f9bccd028848d5ee2a3a5fe1a641cc97b14f74c22a2e",
+      "size_bytes": 993
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/schemas/request_response.schema.json",
+      "sha256": "1ac2e62deb044d3f5184961688baabffdbed8181be5f1206a5560bb09c4bbe85",
+      "size_bytes": 1324
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/validation.py",
+      "sha256": "af2eb082a2a2def915323166772aac42578c3b98112a3c718bd3a3b9981caea1",
+      "size_bytes": 13847
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/tests/test_codec.py",
+      "sha256": "f3ea80e05170df3cbca9baef42e97d642508d6a51a2c93898786288bb700af61",
+      "size_bytes": 8252
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/README.md",
       "sha256": "e2f6f83c415bb740d8dbcd585d6c75016ad6ba99954a4269227ea511d64a9bac",
       "size_bytes": 1193
@@ -7180,8 +7292,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/README.md",
-      "sha256": "86594fb0e5ddaedbfd18824f59d0f24f70188b6b326c16d2515261a1740ada35",
-      "size_bytes": 7290
+      "sha256": "00316c0ff4694f0ee829a5c778c2938fbd42ac12ed2ad6ebdd46690a173f8fc7",
+      "size_bytes": 7844
     },
     {
       "kind": "file",
@@ -7243,8 +7355,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/client.py",
-      "sha256": "2dfd7f32a1a0ffc20fbbeeb154c326fc0e9a83f50040b3f5306d8b014d84eb77",
-      "size_bytes": 11747
+      "sha256": "319b751af53fb1a7ad6cbe13ae97952e27d7a8849e944414824df83eb606d148",
+      "size_bytes": 13680
     },
     {
       "kind": "file",
@@ -7336,6 +7448,13 @@
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_direct_runtime.py",
       "sha256": "6b5fd22674adbbdc72d08229ea15c94c8d88bae29ded7d5b2b121304f73e07b3",
       "size_bytes": 22624
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_product_subscriptions.py",
+      "sha256": "1ce48de383a1ca2aacea71c09febba7a2437807a68902c64c6be7d2efedadd37",
+      "size_bytes": 3935
     },
     {
       "kind": "file",
