@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.media/configuration.schema.json",
+  "title": "Media library actor binding",
+  "type": "object",
+  "required": ["trusted_callers", "artifact_bridge_origin", "hostSecretRefs"],
+  "properties": {
+    "trusted_callers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": [
+          "caller_workload",
+          "audience",
+          "organization_id",
+          "workspace_id",
+          "issuer",
+          "verification_key_ref"
+        ],
+        "properties": {
+          "caller_workload": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:/-]{1,256}$"
+          },
+          "audience": {"type": "string", "minLength": 1, "maxLength": 256},
+          "organization_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "workspace_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._~-]{1,256}$"
+          },
+          "issuer": {"type": "string", "minLength": 1, "maxLength": 512},
+          "verification_key_ref": {
+            "const": "media-library/caller-verification-key"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "artifact_bridge_origin": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^http://(127\\.0\\.0\\.1|localhost|\\[::1\\]):[0-9]{1,5}$",
+      "maxLength": 2048
+    },
+    "timeout_seconds": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 30,
+      "default": 8
+    },
+    "hostSecretRefs": {
+      "type": "object",
+      "required": [
+        "media-library/caller-verification-key",
+        "media-library/state-dir",
+        "media-library/artifact-bridge-token"
+      ],
+      "properties": {
+        "media-library/caller-verification-key": {"$ref": "#/$defs/envName"},
+        "media-library/state-dir": {"$ref": "#/$defs/envName"},
+        "media-library/artifact-bridge-token": {"$ref": "#/$defs/envName"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "envName": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}
+  }
+}
