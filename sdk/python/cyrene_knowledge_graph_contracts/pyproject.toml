@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-knowledge-graph-contracts"
+version = "0.1.0"
+description = "Plugins-owned knowledge.graph.v1 Python bindings and codec"
+requires-python = ">=3.11"
+dependencies = ["protobuf>=4.25.9,<5"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+cyrene_knowledge_graph_contracts = ["py.typed"]

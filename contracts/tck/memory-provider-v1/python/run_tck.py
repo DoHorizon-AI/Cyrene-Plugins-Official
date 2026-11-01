@@ -15,21 +15,54 @@ sys.path.insert(0, str(repo / "sdk/python/cyrene_memory_provider_contracts/src")
 
 from cyrene.memory.provider.v1 import memory_provider_pb2 as pb2
 from cyrene_memory_provider_contracts import (
+    DeleteMemoryRequest,
+    DeleteMemoryResponse,
     ExportMemoryRequest,
     ExportMemoryResponse,
+    GetMemoryRequest,
+    GetMemoryResponse,
+    ImportMemoryRequest,
+    ImportMemoryResponse,
+    MemoryError,
+    MemoryErrorCode,
     MemoryItem,
+    MemoryMatch,
+    PruneMemoryRequest,
+    PruneMemoryResponse,
     RecallMemoryRequest,
+    RecallMemoryResponse,
     StoreMemoryRequest,
+    StoreMemoryResponse,
+    decode_delete_request,
+    decode_delete_response,
     decode_export_batch_request,
     decode_export_batch_response,
+    decode_get_request,
+    decode_get_response,
+    decode_import_batch_request,
+    decode_import_batch_response,
     decode_memory_item,
+    decode_prune_request,
+    decode_prune_response,
     decode_recall_request,
+    decode_recall_response,
     decode_store_request,
+    decode_store_response,
+    encode_delete_request,
+    encode_delete_response,
     encode_export_batch_request,
     encode_export_batch_response,
+    encode_get_request,
+    encode_get_response,
+    encode_import_batch_request,
+    encode_import_batch_response,
     encode_memory_item,
+    encode_prune_request,
+    encode_prune_response,
     encode_recall_request,
+    encode_recall_response,
     encode_store_request,
+    encode_store_response,
 )
 
 item = MemoryItem(
@@ -65,6 +98,23 @@ assert encode_store_request(store) == expected_store.SerializeToString(
     deterministic=True
 )
 assert decode_store_request(expected_store.SerializeToString()) == store
+store_response = StoreMemoryResponse(item_id="memory-1")
+expected_store_response = pb2.StoreMemoryResponse(item_id="memory-1")
+assert encode_store_response(store_response) == expected_store_response.SerializeToString(
+    deterministic=True
+)
+assert decode_store_response(expected_store_response.SerializeToString()) == store_response
+
+get_request = GetMemoryRequest(tenant_id="tenant-a", item_id="memory-1")
+expected_get = pb2.GetMemoryRequest(tenant_id="tenant-a", item_id="memory-1")
+assert encode_get_request(get_request) == expected_get.SerializeToString(deterministic=True)
+assert decode_get_request(expected_get.SerializeToString()) == get_request
+get_response = GetMemoryResponse(item=item)
+expected_get_response = pb2.GetMemoryResponse(item=expected_item)
+assert encode_get_response(get_response) == expected_get_response.SerializeToString(
+    deterministic=True
+)
+assert decode_get_response(expected_get_response.SerializeToString()) == get_response
 
 recall = RecallMemoryRequest(
     tenant_id="tenant-a",
@@ -88,6 +138,45 @@ assert encode_recall_request(recall) == expected_recall.SerializeToString(
     deterministic=True
 )
 assert decode_recall_request(expected_recall.SerializeToString()) == recall
+recall_response = RecallMemoryResponse(matches=(MemoryMatch(item=item, score=0.75),))
+expected_recall_response = pb2.RecallMemoryResponse(
+    matches=pb2.RecallBatch(matches=[pb2.MemoryMatch(item=expected_item, score=0.75)])
+)
+assert encode_recall_response(recall_response) == expected_recall_response.SerializeToString(
+    deterministic=True
+)
+assert decode_recall_response(expected_recall_response.SerializeToString()) == recall_response
+
+delete_request = DeleteMemoryRequest(tenant_id="tenant-a", item_id="memory-1")
+expected_delete = pb2.DeleteMemoryRequest(tenant_id="tenant-a", item_id="memory-1")
+assert encode_delete_request(delete_request) == expected_delete.SerializeToString(
+    deterministic=True
+)
+assert decode_delete_request(expected_delete.SerializeToString()) == delete_request
+delete_response = DeleteMemoryResponse(deleted=False)
+expected_delete_response = pb2.DeleteMemoryResponse(deleted=False)
+assert encode_delete_response(delete_response) == expected_delete_response.SerializeToString(
+    deterministic=True
+)
+assert decode_delete_response(expected_delete_response.SerializeToString()) == delete_response
+
+prune_request = PruneMemoryRequest(
+    tenant_id="tenant-a", before_timestamp_ms=1726000000000
+)
+expected_prune = pb2.PruneMemoryRequest(
+    tenant_id=prune_request.tenant_id,
+    before_timestamp_ms=prune_request.before_timestamp_ms,
+)
+assert encode_prune_request(prune_request) == expected_prune.SerializeToString(
+    deterministic=True
+)
+assert decode_prune_request(expected_prune.SerializeToString()) == prune_request
+prune_response = PruneMemoryResponse(pruned_count=7)
+expected_prune_response = pb2.PruneMemoryResponse(pruned_count=7)
+assert encode_prune_response(prune_response) == expected_prune_response.SerializeToString(
+    deterministic=True
+)
+assert decode_prune_response(expected_prune_response.SerializeToString()) == prune_response
 
 export_request = ExportMemoryRequest(
     tenant_id="tenant-a", limit=50, page_token="cursor-2"
@@ -114,6 +203,33 @@ assert encode_export_batch_response(
 assert (
     decode_export_batch_response(expected_export_response.SerializeToString())
     == export_response
+)
+
+import_request = ImportMemoryRequest(tenant_id="tenant-a", items=(item,), overwrite=True)
+expected_import = pb2.ImportMemoryRequest(
+    tenant_id=import_request.tenant_id,
+    items=[expected_item],
+    overwrite=True,
+)
+assert encode_import_batch_request(import_request) == expected_import.SerializeToString(
+    deterministic=True
+)
+assert decode_import_batch_request(expected_import.SerializeToString()) == import_request
+import_response = ImportMemoryResponse(imported_count=1)
+expected_import_response = pb2.ImportMemoryResponse(imported_count=1)
+assert encode_import_batch_response(import_response) == expected_import_response.SerializeToString(
+    deterministic=True
+)
+assert decode_import_batch_response(expected_import_response.SerializeToString()) == import_response
+
+memory_error = MemoryError(
+    code=MemoryErrorCode.NOT_FOUND, message="missing", retryable=False
+)
+expected_error_response = pb2.GetMemoryResponse(
+    error=pb2.MemoryError(code=pb2.MEMORY_ERROR_CODE_NOT_FOUND, message="missing")
+)
+assert encode_get_response(GetMemoryResponse(error=memory_error)) == (
+    expected_error_response.SerializeToString(deterministic=True)
 )
 
 print("memory.provider.v1 Python SDK/generated binding TCK: PASS")

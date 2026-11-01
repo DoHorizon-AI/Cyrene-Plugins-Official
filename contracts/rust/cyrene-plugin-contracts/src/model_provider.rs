@@ -1,7 +1,8 @@
 //! Stable identifiers for the canonical `model.provider.v1` payloads.
 //!
 //! Interface version 1 remains the compatible text/embedding surface; the
-//! additive `chat_completion_v2` method carries structured tool metadata.
+//! additive `chat_completion_v2` method carries structured tool metadata and
+//! `chat_completion_v3` carries typed multimodal content.
 
 /// Canonical capability identifier used by direct Plugin bindings.
 pub const CAPABILITY_ID: &str = "model.provider.v1";
@@ -15,6 +16,10 @@ pub const CHAT_COMPLETION_METHOD: &str = "chat_completion";
 pub const CHAT_COMPLETION_V2_METHOD: &str = "chat_completion_v2";
 /// Canonical structured-chat interface version.
 pub const CHAT_COMPLETION_V2_INTERFACE_VERSION: &str = "2";
+/// Typed multimodal chat-completion method.
+pub const CHAT_COMPLETION_V3_METHOD: &str = "chat_completion_v3";
+/// Typed multimodal chat-completion interface version.
+pub const CHAT_COMPLETION_V3_INTERFACE_VERSION: &str = "3";
 
 /// Standard protobuf `Any` type URL for an embedding request.
 pub const EMBEDDINGS_REQUEST_TYPE_URL: &str =
@@ -28,3 +33,6 @@ pub const CHAT_COMPLETION_REQUEST_TYPE_URL: &str =
 /// Standard protobuf `Any` type URL for a chat-completion result.
 pub const CHAT_COMPLETION_RESPONSE_TYPE_URL: &str =
     "type.cyrene.io/cyrene.model.provider.v1.ChatCompletionResponse";
+/// Standard protobuf `Any` type URL for a typed multimodal chat request.
+pub const CHAT_COMPLETION_V3_REQUEST_TYPE_URL: &str =
+    "type.cyrene.io/cyrene.model.provider.v1.ChatCompletionRequestV3";

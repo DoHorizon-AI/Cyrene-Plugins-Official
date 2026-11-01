@@ -14,9 +14,11 @@
 pub mod agent_runtime;
 pub mod computer_runtime;
 pub mod direct_plugin_runtime;
+pub mod knowledge_graph;
 pub mod memory_provider;
 pub mod message_connector;
 pub mod model_provider;
+pub mod speech_provider;
 pub mod tool_provider;
 
 pub mod google {
@@ -67,6 +69,20 @@ pub mod cyrene {
         pub mod provider {
             pub mod v1 {
                 tonic::include_proto!("cyrene.memory.provider.v1");
+            }
+        }
+    }
+    pub mod knowledge {
+        pub mod graph {
+            pub mod v1 {
+                tonic::include_proto!("cyrene.knowledge.graph.v1");
+            }
+        }
+    }
+    pub mod speech {
+        pub mod provider {
+            pub mod v1 {
+                tonic::include_proto!("cyrene.speech.provider.v1");
             }
         }
     }
@@ -137,10 +153,12 @@ pub mod cyrene {
 // Convenient top-level re-exports preserving existing consumers:
 pub use cyrene::agent::runtime::v1 as agent_runtime_v1;
 pub use cyrene::computer::runtime::v1 as computer_runtime_v1;
+pub use cyrene::knowledge::graph::v1 as knowledge_graph_v1;
 pub use cyrene::memory::provider::v1 as memory_provider_v1;
 pub use cyrene::message::connector::v1 as message_connector_v1;
 pub use cyrene::model::provider::v1 as model_provider_v1;
 pub use cyrene::plugin::runtime::v1 as direct_plugin_runtime_v1;
+pub use cyrene::speech::provider::v1 as speech_provider_v1;
 pub use cyrene::tool::provider::v1 as tool_provider_v1;
 pub use cyrene::workspace::authority::v1 as workspace_authority_v1;
 pub use cyrene::workspace::authority::v2 as workspace_authority_v2;

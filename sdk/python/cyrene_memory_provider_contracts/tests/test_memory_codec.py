@@ -1,19 +1,23 @@
 """Contract round trips for the memory.provider.v1 Python codec."""
 
+import pytest
 from cyrene_memory_provider_contracts import (
     METHOD_EXPORT_BATCH,
     ExportMemoryRequest,
     ExportMemoryResponse,
+    MemoryCodecError,
     MemoryItem,
     RecallMemoryRequest,
     StoreMemoryRequest,
     decode_export_batch_request,
     decode_export_batch_response,
     decode_recall_request,
+    decode_response,
     decode_store_request,
     encode_export_batch_request,
     encode_export_batch_response,
     encode_recall_request,
+    encode_response,
     encode_store_request,
 )
 
@@ -59,3 +63,12 @@ def test_export_codec_supports_cursor_pages_and_empty_page() -> None:
         decode_export_batch_response(encode_export_batch_response(response)) == response
     )
     assert METHOD_EXPORT_BATCH == "export_batch"
+
+
+def test_generic_codec_rejects_responses_without_a_oneof_result() -> None:
+    from cyrene_memory_provider_contracts import StoreMemoryResponse
+
+    with pytest.raises(MemoryCodecError, match="select exactly one result"):
+        encode_response("store", StoreMemoryResponse())
+    with pytest.raises(MemoryCodecError, match="select exactly one result"):
+        decode_response("store", b"")

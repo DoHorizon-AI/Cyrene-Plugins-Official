@@ -16,7 +16,10 @@ use cyrene_plugin_contracts::{
         CAPABILITY_ID, INTERFACE_VERSION, METHOD_DELETE, METHOD_EXPORT_BATCH, METHOD_GET,
         METHOD_IMPORT_BATCH, METHOD_PRUNE, METHOD_RECALL, METHOD_STORE, RECALL_REQUEST_TYPE_URL,
     },
-    memory_provider_v1::{MemoryErrorCode, MemoryItem, RecallMemoryRequest, StoreMemoryRequest},
+    memory_provider_v1::{
+        export_memory_response, ExportBatch, ExportMemoryRequest, ExportMemoryResponse,
+        MemoryErrorCode, MemoryItem, RecallMemoryRequest, StoreMemoryRequest,
+    },
 };
 use prost::Message;
 use std::collections::HashMap;
@@ -92,6 +95,27 @@ fn recall_memory_request_enforces_score_and_filter_bounds() {
     let decoded = RecallMemoryRequest::decode(bytes.as_slice()).expect("decode recall");
     assert_eq!(decoded.min_similarity, Some(0.85));
     assert_eq!(decoded.top_k, Some(10));
+}
+
+#[test]
+fn memory_export_cursor_fields_support_bounded_complete_exports() {
+    let request = ExportMemoryRequest {
+        tenant_id: "tenant-corp-01".to_string(),
+        scope: Some("conversation".to_string()),
+        limit: Some(100),
+        page_token: Some("cursor-2".to_string()),
+    };
+    let decoded = ExportMemoryRequest::decode(request.encode_to_vec().as_slice()).unwrap();
+    assert_eq!(decoded, request);
+
+    let response = ExportMemoryResponse {
+        result: Some(export_memory_response::Result::Batch(ExportBatch {
+            items: vec![],
+            next_page_token: "cursor-3".to_string(),
+        })),
+    };
+    let decoded = ExportMemoryResponse::decode(response.encode_to_vec().as_slice()).unwrap();
+    assert_eq!(decoded, response);
 }
 
 #[test]

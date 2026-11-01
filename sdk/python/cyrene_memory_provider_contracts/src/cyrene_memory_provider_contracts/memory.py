@@ -724,6 +724,23 @@ RESPONSE_CODECS = {
     METHOD_EXPORT_BATCH: (encode_export_batch_response, decode_export_batch_response),
     METHOD_IMPORT_BATCH: (encode_import_batch_response, decode_import_batch_response),
 }
+_RESPONSE_VALUE_FIELDS = {
+    METHOD_STORE: "item_id",
+    METHOD_GET: "item",
+    METHOD_RECALL: "matches",
+    METHOD_DELETE: "deleted",
+    METHOD_PRUNE: "pruned_count",
+    METHOD_EXPORT_BATCH: "items",
+    METHOD_IMPORT_BATCH: "imported_count",
+}
+
+
+def _validate_response(method: str, response: object) -> None:
+    value_field = _RESPONSE_VALUE_FIELDS[method]
+    value = getattr(response, value_field, None)
+    error = getattr(response, "error", None)
+    if (value is None) == (error is None):
+        raise MemoryCodecError(f"{method} response must select exactly one result")
 
 
 def encode_request(method: str, request: object) -> bytes:
@@ -759,6 +776,7 @@ def encode_response(method: str, response: object) -> bytes:
     except KeyError as error:
         raise MemoryCodecError(f"unsupported memory method: {method}") from error
     try:
+        _validate_response(method, response)
         return encoder(response)  # type: ignore[arg-type]
     except AttributeError as error:
         raise MemoryCodecError(
@@ -773,7 +791,9 @@ def decode_response(method: str, payload: bytes) -> object:
         _, decoder = RESPONSE_CODECS[method]
     except KeyError as error:
         raise MemoryCodecError(f"unsupported memory method: {method}") from error
-    return decoder(payload)
+    response = decoder(payload)
+    _validate_response(method, response)
+    return response
 
 
 __all__ = [

@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: Apache-2.0
+// ┌───────────────────────────────────────────────────────────────────────┐
+// │ 📄 speech_provider.proto                                              │
+// │ Package: cyrene.speech.provider.v1                                   │
+// │ Role: Controlled-artifact speech transcription payload contract.     │
+// │                                                                       │
+// │ 协议职责：定义基于受控媒体制品的语音转写输入、结果和错误。            │
+// │ · 输入不接受任意 URL 或宿主文件路径；取消由 Direct Runtime 传播。      │
+// └───────────────────────────────────────────────────────────────────────┘
+syntax = "proto3";
+
+package cyrene.speech.provider.v1;
+
+option csharp_namespace = "Cyrene.Speech.Provider.V1";
+option java_multiple_files = true;
+option java_outer_classname = "SpeechProviderProto";
+option java_package = "io.cyrene.proto.speech.provider.v1";
+
+// Direct plugin invocation identifiers:
+//   capability ID: speech.provider.v1
+//   interface version: 1
+//   method: transcribe
+
+enum TranscriptionStatus {
+  TRANSCRIPTION_STATUS_UNSPECIFIED = 0;
+  TRANSCRIPTION_STATUS_SUCCEEDED = 1;
+  TRANSCRIPTION_STATUS_NO_SPEECH = 2;
+}
+
+enum SpeechErrorCode {
+  SPEECH_ERROR_CODE_UNSPECIFIED = 0;
+  SPEECH_ERROR_CODE_INVALID_INPUT = 1;
+  SPEECH_ERROR_CODE_UNSUPPORTED_MEDIA = 2;
+  SPEECH_ERROR_CODE_MODEL_UNAVAILABLE = 3;
+  SPEECH_ERROR_CODE_PROVIDER_FAILED = 4;
+  SPEECH_ERROR_CODE_QUOTA_EXCEEDED = 5;
+}
+
+message SpeechInput {
+  string mime_type = 1;
+  oneof source {
+    bytes data = 2;
+    string artifact_id = 3;
+  }
+}
+
+message TranscribeRequest {
+  SpeechInput input = 1;
+  optional string language_hint = 2;
+  optional string request_id = 3;
+}
+
+message TranscriptSegment {
+  uint64 start_ms = 1;
+  uint64 end_ms = 2;
+  string text = 3;
+}
+
+message TranscriptionResult {
+  TranscriptionStatus status = 1;
+  string text = 2;
+  optional string detected_language = 3;
+  optional uint64 duration_ms = 4;
+  optional string model = 5;
+  repeated TranscriptSegment segments = 6;
+}
+
+message SpeechError {
+  SpeechErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
+
+message TranscribeResponse {
+  oneof result {
+    TranscriptionResult transcription = 1;
+    SpeechError error = 2;
+  }
+}
