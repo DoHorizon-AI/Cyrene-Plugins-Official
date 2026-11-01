@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/speech.provider.v1.sensevoice/configuration.schema.json",
+  "title": "Local SenseVoice provider binding",
+  "type": "object",
+  "properties": {
+    "model_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]).+",
+      "description": "Absolute operator-provisioned SenseVoice ONNX model path."
+    },
+    "tokens_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048,
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]).+",
+      "description": "Absolute operator-provisioned tokens.txt path."
+    },
+    "model_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "default": "sensevoice-local"
+    },
+    "num_threads": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "default": 2
+    },
+    "max_input_bytes": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 26214400,
+      "default": 26214400
+    },
+    "max_duration_seconds": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 300,
+      "default": 300
+    },
+    "ffmpeg_path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "default": "ffmpeg"
+    }
+  },
+  "additionalProperties": false
+}
