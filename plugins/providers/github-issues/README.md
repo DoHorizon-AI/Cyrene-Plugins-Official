@@ -23,9 +23,23 @@ its watermark. GitHub's 1,000-result search ceiling is reported explicitly.
 The update window accepts UTC RFC3339 with `Z` or `+00:00`; the provider
 normalizes both bounds to the documented UTC offset syntax before sending the
 fixed search query.
-CI status returns context and check-run counts with `complete`/`truncated`;
-responses over the first 100 items are explicitly incomplete and cannot be
-treated as a green result.
+Pull-request listing requests at most 20 records per page to stay below the
+fixed 1 MB upstream response limit. `page_cursor` is optional and defaults to
+`1`; the response reports `complete`, `truncated`, and `next_cursor`. Continue
+only with the returned cursor. `complete` means the current response alone
+contains the full list; pages after page 1 remain `truncated` even when they
+have no next page. A full page without a valid next link is treated as
+ambiguous and gets a conservative next cursor rather than being called
+complete. An oversized or malformed upstream page remains an explicit provider
+error; it is never converted to an empty list. The former 100-record request
+exceeded the limit for this repository (about 1.85 MB).
+CI status returns the raw combined commit-status state and separate status
+context/check-run counts. `required_contexts_verified` is always false because
+this operation does not read branch protection. A raw `PENDING` value with no
+status contexts and terminal check runs is called out in `state_note`; it is
+not evidence that a required context is missing.
+Responses over the first 100 status or check-run items are explicitly
+incomplete and cannot be treated as a green result.
 Actions run lists request a fixed first page of at most 30 runs to stay within
 the provider transport's 1 MB response limit. The tool does not expose a page
 selector, so it returns this page only and reports `total_count`, `complete`,
@@ -104,8 +118,18 @@ Issue 搜索始终固定限定在配置仓库并排除 PR。state、labels、更
 GitHub 短时重定向到文档所列的 `productionresultssa*.blob.core.windows.net` 主机，
 下载时不携带 App token，日志摘录会尽力过滤常见凭据格式（最多 200 行、20,000 字节）；
 此过滤无法识别所有可能的密钥格式。
-CI 状态附带 status context/check-run 计数与 `complete`/`truncated`；超过首批 100 条时会
-明确标为不完整，不能当作 CI 全绿结果。
+PR 列表每页最多请求 20 条，避免超过固定的 1 MB 上游响应上限。`page_cursor` 可选，默认第 1 页；
+响应明确返回 `complete`、`truncated` 和 `next_cursor`，后续查询只能使用返回的 cursor。
+`complete` 表示当前这一条响应本身已包含全部 PR；即使后续页是最后一页，也仍为 `truncated`，
+因为它不包含前面页的数据。若满页响应没有可验证的 next link，会保守提供下一页 cursor，避免误报
+列表完整。
+上游单页超限或格式异常仍返回明确错误，绝不伪装成空列表。该仓库原先每次请求 100 条时响应约
+1.85 MB，会超过限制。
+CI 状态返回 GitHub combined commit-status 原始状态及 status context/check-run 独立计数。
+由于此操作不会读取分支保护规则，`required_contexts_verified` 始终为 false。当原始状态为
+`PENDING`、没有 status context 且所有 check run 均已终态时，`state_note` 会明确解释这些事实；
+这不能证明存在缺失的必需 context。status/check-run 超过首批 100 条仍会明确标为不完整，不能当作
+CI 全绿结果。
 Actions run 列表每次固定请求首批最多 30 条，以适配 provider transport 的 1 MB 响应上限。工具不
 接受页码参数，因此只返回这一页；结果通过 `total_count`、`complete` 和 `truncated` 说明是否还有
 更多 run。job 列表仍使用有界 `limit` 输入。
