@@ -7145,8 +7145,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/__init__.py",
-      "sha256": "b339d0263a2481ae65a24bbaf3304c0d1dfd2bef3755be58468c0372e65ab246",
-      "size_bytes": 2093
+      "sha256": "c8175a5e9de84ddb514093969acffc02763cc7f160b111b8e3dd9453dd5cd75e",
+      "size_bytes": 2509
     },
     {
       "kind": "file",
@@ -7453,8 +7453,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_product_subscriptions.py",
-      "sha256": "1ce48de383a1ca2aacea71c09febba7a2437807a68902c64c6be7d2efedadd37",
-      "size_bytes": 3935
+      "sha256": "ee9a9c6a8e287d7d5417e461a2345b2a4f24456fc5e5c6e06bf2da719a459c22",
+      "size_bytes": 3933
     },
     {
       "kind": "file",

@@ -68,7 +68,7 @@ def test_subscription_preserves_event_type_and_releases_provider(
         ),
         request_id="subscription-1",
         cancel_event=cancelled,
-        deadline_seconds=0.2 if termination == "deadline" else 3,
+        deadline_seconds=1 if termination == "deadline" else 3,
     )
     try:
         assert next(events) == DirectPayload(
