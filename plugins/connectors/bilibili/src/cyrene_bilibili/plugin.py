@@ -448,7 +448,11 @@ class BilibiliProvider:
                 receipt_id=receipt_id,
             )
             if state != "NEW":
-                return previous or {"status": state, "receipt_id": receipt_id}
+                replay = dict(previous or {"status": state, "receipt_id": receipt_id})
+                replay["operation_ref"] = idempotency_key
+                if replay.get("status") in {"UNKNOWN_RESULT", "REJECTED"}:
+                    replay.setdefault("error_code", str(replay["status"]))
+                return replay
         try:
             credential = self._account_center.redeem_provider_credential_lease(lease_payload, actor)
             if (
@@ -499,7 +503,12 @@ class BilibiliProvider:
                     credential.access_token,
                     credential.external_subject,
                 )
-            result = {"status": "SUCCEEDED", "receipt_id": receipt_id, **outcome}
+            result = {
+                "status": "SUCCEEDED",
+                "operation_ref": idempotency_key,
+                "receipt_id": receipt_id,
+                **outcome,
+            }
             self._store.finish_write(
                 scope_key=scope_key,
                 idempotency_key=idempotency_key,
@@ -510,7 +519,12 @@ class BilibiliProvider:
             return result
         except BilibiliFailure as error:
             status = "UNKNOWN_RESULT" if error.unknown_write else "REJECTED"
-            result = {"status": status, "receipt_id": receipt_id, "error_code": error.code}
+            result = {
+                "status": status,
+                "operation_ref": idempotency_key,
+                "receipt_id": receipt_id,
+                "error_code": error.code,
+            }
             if error.external_id is not None:
                 result["external_id"] = error.external_id
             self._store.finish_write(
@@ -527,11 +541,21 @@ class BilibiliProvider:
                 idempotency_key=idempotency_key,
                 receipt_id=receipt_id,
                 status="UNKNOWN_RESULT",
-                result={"status": "UNKNOWN_RESULT", "receipt_id": receipt_id},
+                result={
+                    "status": "UNKNOWN_RESULT",
+                    "operation_ref": idempotency_key,
+                    "receipt_id": receipt_id,
+                    "error_code": "CANCELLED_DURING_WRITE",
+                },
             )
             raise
         except Exception:
-            result = {"status": "UNKNOWN_RESULT", "receipt_id": receipt_id}
+            result = {
+                "status": "UNKNOWN_RESULT",
+                "operation_ref": idempotency_key,
+                "receipt_id": receipt_id,
+                "error_code": "PROVIDER_FAILURE",
+            }
             self._store.finish_write(
                 scope_key=scope_key,
                 idempotency_key=idempotency_key,

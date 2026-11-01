@@ -78,7 +78,7 @@ def test_write_receipt_is_scoped_and_exactly_idempotent(tmp_path) -> None:
         )
 
 
-def test_in_progress_replay_does_not_start_a_second_write(tmp_path) -> None:
+def test_in_progress_replay_is_unknown_and_does_not_start_a_second_write(tmp_path) -> None:
     store = ReceiptStore(tmp_path, b"s" * 32)
     scope = store.scope_key(_actor("actor-one"))
     key = "work-operation:00000000-0000-4000-8000-000000000001"
@@ -100,8 +100,12 @@ def test_in_progress_replay_does_not_start_a_second_write(tmp_path) -> None:
         arguments_sha256="a" * 64,
         receipt_id="00000000-0000-4000-8000-000000000021",
     ) == (
-        "IN_PROGRESS",
-        {"status": "IN_PROGRESS", "receipt_id": receipt},
+        "UNKNOWN_RESULT",
+        {
+            "status": "UNKNOWN_RESULT",
+            "receipt_id": receipt,
+            "error_code": "IN_PROGRESS",
+        },
     )
 
     with sqlite3.connect(tmp_path / "bilibili-state.sqlite3") as db:
@@ -118,11 +122,15 @@ def test_in_progress_replay_does_not_start_a_second_write(tmp_path) -> None:
         receipt_id="00000000-0000-4000-8000-000000000022",
     ) == (
         "UNKNOWN_RESULT",
-        {"status": "UNKNOWN_RESULT", "receipt_id": receipt},
+        {
+            "status": "UNKNOWN_RESULT",
+            "receipt_id": receipt,
+            "error_code": "UNKNOWN_RESULT",
+        },
     )
 
 
-def test_reopened_store_never_replays_stale_in_progress_mutation(tmp_path) -> None:
+def test_reopened_store_marks_old_in_progress_mutation_unknown(tmp_path, monkeypatch) -> None:
     store = ReceiptStore(tmp_path, b"s" * 32)
     scope = store.scope_key(_actor("actor-one"))
     key = "work-operation:00000000-0000-4000-8000-000000000001"
@@ -136,15 +144,17 @@ def test_reopened_store_never_replays_stale_in_progress_mutation(tmp_path) -> No
         arguments_sha256="a" * 64,
         receipt_id=receipt,
     )
+    created_at = time.time()
+    monkeypatch.setattr("cyrene_bilibili.receipts.time.time", lambda: created_at + 61)
     reopened = ReceiptStore(tmp_path, b"s" * 32)
-    assert (
-        reopened.start_write(
-            scope_key=scope,
-            idempotency_key=key,
-            profile_ref=profile,
-            tool_id="bilibili.dm.send",
-            arguments_sha256="a" * 64,
-            receipt_id="00000000-0000-4000-8000-000000000021",
-        )[0]
-        == "IN_PROGRESS"
+    state, result = reopened.start_write(
+        scope_key=scope,
+        idempotency_key=key,
+        profile_ref=profile,
+        tool_id="bilibili.dm.send",
+        arguments_sha256="a" * 64,
+        receipt_id="00000000-0000-4000-8000-000000000021",
     )
+    assert state == "UNKNOWN_RESULT"
+    assert result is not None
+    assert result["error_code"] == "UNKNOWN_RESULT"

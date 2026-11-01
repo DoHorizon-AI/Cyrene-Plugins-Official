@@ -253,6 +253,8 @@ def test_real_shared_tool_envelope_and_idempotent_write_replay(tmp_path) -> None
     assert replay_error is False
     assert first_result == replay_result
     assert first_result["status"] == "SUCCEEDED"
+    assert first_result["operation_ref"] == idem
+    assert first_result["receipt_id"]
     assert first_result["readback_verified"] is True
     assert "hello" not in json.dumps(first_result)
     assert api.send_count == 1

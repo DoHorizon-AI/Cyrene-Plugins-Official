@@ -200,7 +200,11 @@ class ReceiptStore:
                             "WHERE scope_key=? AND idempotency_key=? AND status='IN_PROGRESS'",
                             (
                                 json.dumps(
-                                    {"status": "UNKNOWN_RESULT", "receipt_id": row["receipt_id"]},
+                                    {
+                                        "status": "UNKNOWN_RESULT",
+                                        "receipt_id": row["receipt_id"],
+                                        "error_code": "UNKNOWN_RESULT",
+                                    },
                                     separators=(",", ":"),
                                 ),
                                 now,
@@ -212,11 +216,13 @@ class ReceiptStore:
                         return status, {
                             "status": "UNKNOWN_RESULT",
                             "receipt_id": str(row["receipt_id"]),
+                            "error_code": "UNKNOWN_RESULT",
                         }
                     else:
-                        return "IN_PROGRESS", {
-                            "status": "IN_PROGRESS",
+                        return "UNKNOWN_RESULT", {
+                            "status": "UNKNOWN_RESULT",
                             "receipt_id": str(row["receipt_id"]),
+                            "error_code": "IN_PROGRESS",
                         }
                 value = None if row["receipt_json"] is None else _parse_json(row["receipt_json"])
                 return status, value

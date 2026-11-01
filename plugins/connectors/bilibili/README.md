@@ -19,7 +19,10 @@ Each mutation records a digest-bound receipt before contacting Bilibili. A
 definite response is read back before it is reported as successful. A timeout,
 connection loss, or incomplete read-back produces a durable
 `UNKNOWN_RESULT`; the plugin does not replay that mutation. A repeat with the
-same signed request ID returns the existing receipt.
+same signed `operation_ref` (the host's `work-operation:<UUID>`) returns the
+existing receipt. A verified write result includes `operation_ref`, the private
+plugin `receipt_id`, an external ID, and a digest-only read-back proof; comment
+and message bodies are not copied into the receipt store.
 
 All Bilibili service hosts and paths are fixed in code. User arguments cannot
 provide URLs, cookies, file paths, executables, or arbitrary request headers.
