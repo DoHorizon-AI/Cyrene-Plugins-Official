@@ -266,16 +266,21 @@ def _parse_url(value: str, loopback_test_origins: frozenset[str]) -> _Target:
         raise PublicHttpError("INVALID_URL") from None
     sensitive_query_names = {
         "access_token",
+        "access-token",
         "authorization",
+        "auth_token",
+        "client_secret",
         "api_key",
         "apikey",
         "cookie",
         "password",
         "secret",
         "session",
+        "sessionid",
         "signature",
         "sig",
         "token",
+        "x-api-key",
     }
     if any(key.lower() in sensitive_query_names for key, _ in query_pairs):
         raise PublicHttpError("SENSITIVE_URL_REJECTED")

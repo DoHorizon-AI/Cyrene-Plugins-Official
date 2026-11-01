@@ -322,7 +322,7 @@ class PublicWebProvider:
             }:
                 rejected += 1
                 continue
-            title = _bounded_text(item.get("title"), 512)
+            title = _plain_result_text(_bounded_text(item.get("title"), 512), 512)
             raw_url = _bounded_text(item.get("url"), 4096)
             snippet = _plain_result_text(item.get("snippet"), 2000)
             try:
@@ -332,8 +332,10 @@ class PublicWebProvider:
             except PublicHttpError:
                 rejected += 1
                 continue
-            source = _bounded_text(item.get("source", ""), 256)
-            published_at = _bounded_text(item.get("published_at", ""), 64)
+            source = _plain_result_text(_bounded_text(item.get("source", ""), 256), 256)
+            published_at = _plain_result_text(
+                _bounded_text(item.get("published_at", ""), 64), 64
+            )
             source_ref = _source_ref(
                 {
                     "url": canonical_url,

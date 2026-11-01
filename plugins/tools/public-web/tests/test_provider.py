@@ -266,7 +266,7 @@ def test_web_search_returns_sanitized_results_and_actor_bound_cursor(tmp_path, p
     provider = PublicWebProvider(settings=_settings(tmp_path, peer), document_parser=_FakeParser())
     first_error, first = _invoke(provider, "web.search", {"query": "public test", "limit": 1})
     assert first_error is False
-    assert first["items"][0]["title"] == "<b>first</b> result"
+    assert first["items"][0]["title"] == "first result"
     assert first["items"][0]["snippet"] == "visible snippet"
     assert first["items"][0]["source_ref"].startswith("sha256:")
     assert first["next_cursor"]

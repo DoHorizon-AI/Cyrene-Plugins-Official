@@ -142,6 +142,8 @@ def test_private_dns_answer_is_rejected_before_connect(monkeypatch) -> None:
 def test_secret_query_parameters_and_userinfo_are_rejected(peer_origin) -> None:
     for url in (
         "https://example.com/page?access_token=secret",
+        "https://example.com/page?X-API-Key=secret",
+        "https://example.com/page?client_secret=secret",
         "https://user:pass@example.com/page",
     ):
         with pytest.raises(PublicHttpError, match="INVALID_URL|SENSITIVE_URL_REJECTED"):
