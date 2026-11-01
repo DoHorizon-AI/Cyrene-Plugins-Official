@@ -25,8 +25,9 @@ normalizes both bounds to the documented UTC offset syntax before sending the
 fixed search query.
 Pull-request listing requests at most 20 records per page to stay below the
 fixed 1 MB upstream response limit. `page_cursor` is optional and defaults to
-`1`; the response reports `complete`, `truncated`, and `next_cursor`. Continue
-only with the returned cursor. `complete` means the current response alone
+`1`; the response reports `complete`, `truncated`, `has_more`, and `next_cursor`.
+Continue only when `has_more` is true and `next_cursor` is non-null; stop when
+the cursor is null and report `result_limit_reached` when true. `complete` means the current response alone
 contains the full list; pages after page 1 remain `truncated` even when they
 have no next page. A full page without a valid next link is treated as
 ambiguous and gets a conservative next cursor rather than being called
@@ -64,6 +65,15 @@ must contain exactly 40 hexadecimal characters. GitHub notes that
 `merge_commit_sha` may be a test merge commit before the PR is merged, so this
 field never establishes merge status by itself. See the [GitHub pull request
 REST API](https://docs.github.com/en/rest/pulls/pulls).
+
+`github.commits.compare` accepts only exact 40-character commit SHAs. It reads
+both Git commit objects, then verifies GitHub's compare URL, base SHA, and merge
+base before returning the ancestry relation and counts. `ahead` and `identical`
+mean the base is an ancestor of the head; `behind` and `diverged` mean it is
+not. The result omits commit messages and file details. GitHub can include up
+to 300 changed-file entries in a compare response, so the existing 1 MB
+response limit still applies and an oversized response fails explicitly. See
+the [GitHub Compare two commits REST API](https://docs.github.com/en/rest/commits/commits#compare-two-commits).
 
 Writes require the dedicated assistant task namespace and exact SHA preconditions
 where the GitHub API supports them. Branch deletion checks the expected SHA
@@ -119,7 +129,8 @@ GitHub 短时重定向到文档所列的 `productionresultssa*.blob.core.windows
 下载时不携带 App token，日志摘录会尽力过滤常见凭据格式（最多 200 行、20,000 字节）；
 此过滤无法识别所有可能的密钥格式。
 PR 列表每页最多请求 20 条，避免超过固定的 1 MB 上游响应上限。`page_cursor` 可选，默认第 1 页；
-响应明确返回 `complete`、`truncated` 和 `next_cursor`，后续查询只能使用返回的 cursor。
+响应明确返回 `complete`、`truncated`、`has_more` 和 `next_cursor`；仅当 `has_more=true` 且
+`next_cursor` 非空时继续，cursor 为空时停止，并在 `result_limit_reached=true` 时明确报告页数上限。
 `complete` 表示当前这一条响应本身已包含全部 PR；即使后续页是最后一页，也仍为 `truncated`，
 因为它不包含前面页的数据。若满页响应没有可验证的 next link，会保守提供下一页 cursor，避免误报
 列表完整。
@@ -142,6 +153,11 @@ PR projection 保留 GitHub 的 `state`，并增加 `merge_status`：`OPEN`、`C
 足够合并事实时为 `UNKNOWN`。merge SHA 必须恰好是 40 位十六进制。GitHub 说明 PR 合并前
 `merge_commit_sha` 可能指向测试 merge commit，因此不能单独据此判断是否已合并。详见
 [GitHub Pull Request REST API](https://docs.github.com/en/rest/pulls/pulls)。
+`github.commits.compare` 只接受精确的 40 位 commit SHA。provider 先分别读取两个 Git commit
+对象，再核对 GitHub compare 响应里的 URL、base SHA 和 merge-base，随后才返回祖先关系和计数。
+`ahead`/`identical` 表示 base 是 head 的祖先；`behind`/`diverged` 表示不是。结果不包含 commit
+message 和文件详情。GitHub compare 响应可含最多 300 个变更文件条目，因此仍受现有 1 MB 响应限制；
+超限时明确失败。详见 [GitHub Compare two commits REST API](https://docs.github.com/en/rest/commits/commits#compare-two-commits)。
 
 写入要求使用专属 assistant 任务分支，并在 API 支持时绑定精确 SHA。删除分支前会重新读取并
 核对 expected SHA 和当前默认分支，但 GitHub 没有原子化的条件删除 API；宿主必须对同一仓库和

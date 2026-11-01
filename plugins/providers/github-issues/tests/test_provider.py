@@ -220,6 +220,20 @@ class FakeGitHubApi:
         self.calls.append(("pull_request", args))
         return {"pull_request": {"number": args[1], "state": "OPEN"}}
 
+    def compare_commits(self, *args: Any) -> dict[str, Any]:
+        self.calls.append(("compare_commits", args))
+        return {
+            "base_sha": args[1].lower(),
+            "head_sha": args[2].lower(),
+            "merge_base_sha": args[1].lower(),
+            "comparison_status": "AHEAD",
+            "base_is_ancestor_of_head": True,
+            "ahead_by": 1,
+            "behind_by": 0,
+            "total_commits": 1,
+            "verified": True,
+        }
+
     def list_pull_requests(self, *args: Any, **kwargs: Any) -> dict[str, Any]:
         self.calls.append(("pull_requests", (*args, kwargs)))
         return {
@@ -387,6 +401,7 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
         "github.branches.list",
         "github.pull_requests.list",
         "github.pull_request.get",
+        "github.commits.compare",
         "github.actions.runs.list",
         "github.ci.status",
         "github.issues.search",
@@ -411,6 +426,20 @@ def test_catalog_has_exact_tools_and_closed_schemas() -> None:
     pull_requests_schema = json.loads(pull_requests_tool.input_schema_json)
     assert "page_cursor" in pull_requests_schema["properties"]
     assert "page_cursor" not in pull_requests_schema["required"]
+    assert pull_requests_schema["properties"]["page_cursor"]["pattern"] == (
+        "^(?:[1-9][0-9]{0,2}|1000)$"
+    )
+    compare_tool = next(
+        tool for tool in catalog.tools if tool.provider_tool_id == "github.commits.compare"
+    )
+    compare_schema = json.loads(compare_tool.input_schema_json)
+    assert compare_schema["required"] == [
+        "repository_id",
+        "repository",
+        "base_sha",
+        "head_sha",
+    ]
+    assert compare_schema["additionalProperties"] is False
     workflow_runs_tool = next(
         tool for tool in catalog.tools if tool.provider_tool_id == "github.actions.runs.list"
     )
@@ -493,6 +522,47 @@ def test_pull_request_list_keeps_state_only_calls_on_first_page_and_accepts_curs
     assert api.calls[0][0] == "pull_requests"
     assert api.calls[0][1][-1]["page_cursor"] == "1"
     assert api.calls[1][1][-1]["page_cursor"] == "2"
+
+
+def test_compare_commits_dispatch_binds_exact_shas_to_read_only_target() -> None:
+    settings = make_settings()
+    account = FakeAccountCenter()
+    api = FakeGitHubApi()
+    provider = GitHubIssuesProvider(settings=settings, account_center=account, github_api=api)
+    repository = settings.repositories[0]
+    base_sha = "A" * 40
+    head_sha = "b" * 40
+    arguments = {
+        "repository_id": repository.repository_id,
+        "repository": repository.slug,
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+    }
+
+    is_error, result = invoke_tool(
+        provider,
+        settings,
+        "github.commits.compare",
+        arguments,
+        profile_ref="00000000-0000-4000-8000-000000000001",
+    )
+
+    assert is_error is False
+    assert result["base_is_ancestor_of_head"] is True
+    assert result["base_sha"] == base_sha.lower()
+    assert result["head_sha"] == head_sha
+    assert api.calls[0] == (
+        "compare_commits",
+        (repository, base_sha, head_sha, "installation-token-must-not-escape"),
+    )
+    assert account.calls[0][0]["operation_id"] == "github.commits.compare"
+    assert account.calls[0][0]["target"] == {
+        "repository_id": repository.repository_id,
+        "repository": repository.slug,
+        "base_sha": base_sha.lower(),
+        "head_sha": head_sha,
+    }
+    assert "installation-token-must-not-escape" not in json.dumps(result)
 
 
 def test_rerun_tool_rejects_noncanonical_workflow_id_argument_name() -> None:
@@ -1030,6 +1100,16 @@ def test_github_write_scope_is_rejected_before_lease(
             "00000000-0000-4000-8000-000000000001",
         ),
         (
+            "github.commits.compare",
+            {
+                "repository_id": "12345",
+                "repository": "owner/project",
+                "base_sha": "a" * 39,
+                "head_sha": "b" * 40,
+            },
+            "00000000-0000-4000-8000-000000000001",
+        ),
+        (
             "github.pull_requests.list",
             {
                 "repository_id": "12345",
@@ -1542,6 +1622,218 @@ def test_pull_request_list_rejects_untrusted_or_inconsistent_next_link(link: str
     with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
         GitHubApi(settings, transport=transport).list_pull_requests(
             repository, "ALL", "token"
+        )
+
+
+@pytest.mark.parametrize("status", [202, 206])
+def test_pull_request_list_rejects_non_200_success_as_incomplete(status: int) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        return HttpResponse(status, {}, b"[]")
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_ancestor"),
+    [("ahead", True), ("identical", True), ("behind", False), ("diverged", False)],
+)
+def test_compare_commits_uses_exact_git_objects_and_verified_compare_response(
+    status: str, expected_ancestor: bool
+) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = base_sha if status == "identical" else "b" * 40
+    merge_base_sha = (
+        base_sha
+        if status in {"ahead", "identical"}
+        else head_sha if status == "behind" else "c" * 40
+    )
+    observed: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        assert method == "GET"
+        assert host == "api.github.com"
+        observed.append(path)
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path == f"/repos/owner/project/git/commits/{base_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path == f"/repos/owner/project/git/commits/{head_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": head_sha}).encode())
+        if path == (
+            f"/repos/owner/project/compare/{base_sha}...{head_sha}?per_page=1&page=1"
+        ):
+            result = {
+                "url": (
+                    "https://api.github.com/repos/owner/project/compare/"
+                    f"{base_sha}...{head_sha}"
+                ),
+                "base_commit": {"sha": base_sha},
+                "merge_base_commit": {"sha": merge_base_sha},
+                "status": status,
+                "ahead_by": 0 if status in {"identical", "behind"} else 1,
+                "behind_by": 0 if status in {"identical", "ahead"} else 1,
+                "total_commits": 0 if status in {"identical", "behind"} else 1,
+                "commits": [{"sha": head_sha}],
+                "files": [{"filename": "synthetic.txt", "patch": "synthetic"}],
+            }
+            return HttpResponse(200, {}, json.dumps(result).encode())
+        raise AssertionError(path)
+
+    result = GitHubApi(settings, transport=transport).compare_commits(
+        repository, base_sha, head_sha, "token"
+    )
+
+    assert observed == [
+        "/repos/owner/project",
+        f"/repos/owner/project/git/commits/{base_sha}",
+        f"/repos/owner/project/git/commits/{head_sha}",
+        f"/repos/owner/project/compare/{base_sha}...{head_sha}?per_page=1&page=1",
+    ]
+    assert result == {
+        "base_sha": base_sha,
+        "head_sha": head_sha,
+        "merge_base_sha": merge_base_sha,
+        "comparison_status": status.upper(),
+        "base_is_ancestor_of_head": expected_ancestor,
+        "ahead_by": 0 if status in {"identical", "behind"} else 1,
+        "behind_by": 0 if status in {"identical", "ahead"} else 1,
+        "total_commits": 0 if status in {"identical", "behind"} else 1,
+        "verified": True,
+    }
+
+
+def test_compare_commits_rejects_wrong_commit_readback_before_comparison() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+    observed: list[str] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        observed.append(path)
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path.endswith(f"/git/commits/{base_sha}"):
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path.endswith(f"/git/commits/{head_sha}"):
+            return HttpResponse(200, {}, json.dumps({"sha": "c" * 40}).encode())
+        raise AssertionError("comparison must not run after a mismatched SHA readback")
+
+    with pytest.raises(GitHubApiFailure, match="COMMIT_IDENTITY_MISMATCH"):
+        GitHubApi(settings, transport=transport).compare_commits(
+            repository, base_sha, head_sha, "token"
+        )
+    assert not any("/compare/" in path for path in observed)
+
+
+def test_compare_commits_rejects_compare_url_for_different_head() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path == f"/repos/owner/project/git/commits/{base_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path == f"/repos/owner/project/git/commits/{head_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": head_sha}).encode())
+        if "/compare/" in path:
+            result = {
+                "url": (
+                    "https://api.github.com/repos/owner/project/compare/"
+                    f"{base_sha}...{'c' * 40}"
+                ),
+                "base_commit": {"sha": base_sha},
+                "merge_base_commit": {"sha": base_sha},
+                "status": "ahead",
+                "ahead_by": 1,
+                "behind_by": 0,
+                "total_commits": 1,
+            }
+            return HttpResponse(200, {}, json.dumps(result).encode())
+        raise AssertionError(path)
+
+    with pytest.raises(GitHubApiFailure, match="COMMIT_IDENTITY_MISMATCH"):
+        GitHubApi(settings, transport=transport).compare_commits(
+            repository, base_sha, head_sha, "token"
+        )
+
+
+def test_compare_commits_keeps_the_fixed_response_size_limit() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    base_sha = "a" * 40
+    head_sha = "b" * 40
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        if path == f"/repos/owner/project/git/commits/{base_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": base_sha}).encode())
+        if path == f"/repos/owner/project/git/commits/{head_sha}":
+            return HttpResponse(200, {}, json.dumps({"sha": head_sha}).encode())
+        if "/compare/" in path:
+            result = {
+                "url": (
+                    "https://api.github.com/repos/owner/project/compare/"
+                    f"{base_sha}...{head_sha}"
+                ),
+                "base_commit": {"sha": base_sha},
+                "merge_base_commit": {"sha": base_sha},
+                "status": "ahead",
+                "ahead_by": 1,
+                "behind_by": 0,
+                "total_commits": 1,
+                "files": [{"patch": "x" * MAX_RESPONSE_BYTES}],
+            }
+            return HttpResponse(200, {}, json.dumps(result).encode())
+        raise AssertionError(path)
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).compare_commits(
+            repository, base_sha, head_sha, "token"
         )
 
 

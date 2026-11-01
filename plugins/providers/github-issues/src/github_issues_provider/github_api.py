@@ -568,6 +568,8 @@ class GitHubApi:
         )
         path = f"{self._repository_path(repository)}/pulls?{query}"
         response = self._request("GET", path, token, None)
+        if response.status != 200:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         values = _json_array(response)
         if len(values) > MAX_PULL_REQUEST_PAGE_SIZE:
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
@@ -613,6 +615,106 @@ class GitHubApi:
         if result["number"] != pull_number:
             raise GitHubApiFailure("PULL_REQUEST_IDENTITY_MISMATCH")
         return {"pull_request": result}
+
+    def compare_commits(
+        self,
+        repository: Repository,
+        base_sha: str,
+        head_sha: str,
+        token: str,
+    ) -> dict[str, Any]:
+        """Report GitHub's ancestry relation for two exact commit IDs."""
+
+        if any(
+            not isinstance(value, str) or re.fullmatch(r"[0-9a-fA-F]{40}", value) is None
+            for value in (base_sha, head_sha)
+        ):
+            raise GitHubApiFailure("INVALID_ARGUMENTS")
+        self._verify_configured_repository(repository, token)
+        base = base_sha.lower()
+        head = head_sha.lower()
+        self._read_git_commit_sha(repository, base, token)
+        self._read_git_commit_sha(repository, head, token)
+
+        compare_path = (
+            f"{self._repository_path(repository)}/compare/{quote(base, safe='')}..."
+            f"{quote(head, safe='')}?{urlencode({'per_page': 1, 'page': 1})}"
+        )
+        compare_response = self._request("GET", compare_path, token, None)
+        if compare_response.status != 200:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        comparison = _json_object(compare_response)
+        compare_url = comparison.get("url")
+        if not isinstance(compare_url, str):
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        try:
+            parsed_url = urlsplit(compare_url)
+            parsed_port = parsed_url.port
+        except ValueError as error:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE") from error
+        expected_path = (
+            f"{self._repository_path(repository)}/compare/{base}...{head}"
+        )
+        if (
+            parsed_url.scheme != "https"
+            or parsed_url.hostname is None
+            or parsed_url.hostname.lower() != GITHUB_HOST
+            or parsed_port not in (None, 443)
+            or parsed_url.username is not None
+            or parsed_url.password is not None
+            or parsed_url.path.casefold() != expected_path.casefold()
+            or parsed_url.query
+            or parsed_url.fragment
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+
+        base_commit = comparison.get("base_commit")
+        merge_base_commit = comparison.get("merge_base_commit")
+        returned_base = base_commit.get("sha") if isinstance(base_commit, Mapping) else None
+        merge_base = (
+            merge_base_commit.get("sha")
+            if isinstance(merge_base_commit, Mapping)
+            else None
+        )
+        if (
+            not isinstance(returned_base, str)
+            or returned_base.lower() != base
+            or not isinstance(merge_base, str)
+            or re.fullmatch(r"[0-9a-fA-F]{40}", merge_base) is None
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+
+        status = comparison.get("status")
+        if status not in {"ahead", "behind", "identical", "diverged"}:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        ahead_by = _non_negative_int(comparison.get("ahead_by"))
+        behind_by = _non_negative_int(comparison.get("behind_by"))
+        total_commits = _non_negative_int(comparison.get("total_commits"))
+        normalized_merge_base = merge_base.lower()
+        if (
+            (status == "ahead" and (base == head or normalized_merge_base != base))
+            or (status == "behind" and (base == head or normalized_merge_base != head))
+            or (
+                status == "identical"
+                and not (base == head == normalized_merge_base)
+            )
+            or (
+                status == "diverged"
+                and normalized_merge_base in {base, head}
+            )
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+        return {
+            "base_sha": base,
+            "head_sha": head,
+            "merge_base_sha": normalized_merge_base,
+            "comparison_status": status.upper(),
+            "base_is_ancestor_of_head": status in {"ahead", "identical"},
+            "ahead_by": ahead_by,
+            "behind_by": behind_by,
+            "total_commits": total_commits,
+            "verified": True,
+        }
 
     def find_draft_pull_request(
         self, repository: Repository, head_branch: str, base_branch: str, token: str
@@ -1309,6 +1411,8 @@ class GitHubApi:
 
         path = f"/repos/{quote(repository.owner, safe='')}/{quote(repository.name, safe='')}"
         response = self._request("GET", path, token, None)
+        if response.status != 200:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         value = _json_object(response)
         if (
             str(value.get("id")) != repository.repository_id
@@ -1319,6 +1423,28 @@ class GitHubApi:
         if default_branch is not None and not isinstance(default_branch, str):
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         return default_branch
+
+    def _read_git_commit_sha(
+        self, repository: Repository, commit_sha: str, token: str
+    ) -> str:
+        """Read an exact Git commit object and require its SHA to match the path."""
+
+        path = (
+            f"{self._repository_path(repository)}/git/commits/"
+            f"{quote(commit_sha, safe='')}"
+        )
+        response = self._request("GET", path, token, None)
+        if response.status != 200:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        value = _json_object(response)
+        returned_sha = value.get("sha")
+        if (
+            not isinstance(returned_sha, str)
+            or re.fullmatch(r"[0-9a-fA-F]{40}", returned_sha) is None
+            or returned_sha.lower() != commit_sha.lower()
+        ):
+            raise GitHubApiFailure("COMMIT_IDENTITY_MISMATCH")
+        return returned_sha.lower()
 
     @staticmethod
     def _issue_path(repository: Repository, issue_number: int) -> str:
@@ -1492,6 +1618,14 @@ def _next_pull_request_cursor(
             raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
         next_cursor = page_values[0]
     return next_cursor
+
+
+def _non_negative_int(value: Any) -> int:
+    """Require a bounded-comparison count from GitHub without bool coercion."""
+
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+    return value
 
 
 def _json_object(response: HttpResponse) -> dict[str, Any]:

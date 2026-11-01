@@ -157,7 +157,9 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         "display_name": "List GitHub Pull Requests",
         "description": (
             "List one bounded page of pull requests for one configured repository. Omit "
-            "page_cursor for the first page; follow next_cursor while truncated is true."
+            "page_cursor for the first page. Continue only when has_more is true and "
+            "next_cursor is non-null; stop when next_cursor is null and report "
+            "result_limit_reached when true."
         ),
         "input_schema": {
             "type": "object",
@@ -166,7 +168,7 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
                 "state": {"type": "string", "enum": ["OPEN", "CLOSED", "ALL"]},
                 "page_cursor": {
                     "type": "string",
-                    "pattern": "^[1-9][0-9]{0,3}$",
+                    "pattern": "^(?:[1-9][0-9]{0,2}|1000)$",
                     "description": "Optional page number from next_cursor; defaults to 1.",
                 },
             },
@@ -185,6 +187,24 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
                 "pull_number": {"type": "integer", "minimum": 1},
             },
             "required": ["repository_id", "repository", "pull_number"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "provider_tool_id": "github.commits.compare",
+        "display_name": "Compare GitHub Commits",
+        "description": (
+            "Verify the ancestry relation between two exact commit SHAs in one configured "
+            "repository; returns the comparison summary without diffs or file contents."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                **_REPOSITORY_PROPERTIES,
+                "base_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+                "head_sha": {"type": "string", "pattern": "^[0-9a-fA-F]{40}$"},
+            },
+            "required": ["repository_id", "repository", "base_sha", "head_sha"],
             "additionalProperties": False,
         },
     },
@@ -721,6 +741,13 @@ class GitHubIssuesProvider:
                 result = api.get_pull_request(
                     repository, int(arguments["pull_number"]), credential.access_token
                 )
+            elif tool_id == "github.commits.compare" and repository is not None:
+                result = api.compare_commits(
+                    repository,
+                    str(arguments["base_sha"]),
+                    str(arguments["head_sha"]),
+                    credential.access_token,
+                )
             elif tool_id == "github.actions.runs.list" and repository is not None:
                 result = api.list_workflow_runs(
                     repository,
@@ -1185,6 +1212,10 @@ def _valid_arguments(
             and re.fullmatch(r"[1-9][0-9]{0,3}", page_cursor) is not None
             and int(page_cursor) <= MAX_PULL_REQUEST_PAGE_NUMBER
         )
+    if tool_id == "github.commits.compare":
+        return _full_sha(arguments.get("base_sha")) and _full_sha(
+            arguments.get("head_sha")
+        )
     if tool_id == "github.branch.get":
         return _valid_branch_name(arguments.get("branch"))
     if tool_id == "github.branch.create":
@@ -1389,6 +1420,9 @@ def _github_target(
         target["issue_number"] = int(arguments["issue_number"])
     if tool_id == "github.pull_request.get":
         target["pull_number"] = int(arguments["pull_number"])
+    if tool_id == "github.commits.compare":
+        target["base_sha"] = str(arguments["base_sha"]).lower()
+        target["head_sha"] = str(arguments["head_sha"]).lower()
     if tool_id == "github.actions.runs.list":
         if "branch" in arguments:
             target["branch"] = str(arguments["branch"])
