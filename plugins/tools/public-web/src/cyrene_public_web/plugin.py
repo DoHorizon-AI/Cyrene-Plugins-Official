@@ -613,7 +613,6 @@ class PublicWebProvider:
                         parse_arguments,
                         request_path=staging / "request.json",
                         summary_path=summary_path,
-                        state_dir=self._settings.state_dir,
                         cancellation=cancellation,
                     )
                 else:
@@ -683,7 +682,6 @@ def _run_document_parser_worker(
     *,
     request_path: Path,
     summary_path: Path,
-    state_dir: Path,
     cancellation: Any,
 ) -> dict[str, Any]:
     """Run the shared parser in a bounded child that can be killed on cancellation."""
@@ -710,7 +708,7 @@ def _run_document_parser_worker(
         )
         with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
             stream.write(request)
-        home = state_dir / "parser-home"
+        home = request_path.parent / "home"
         home.mkdir(mode=0o700, exist_ok=True)
         home_mode = home.lstat().st_mode
         if not stat.S_ISDIR(home_mode) or stat.S_IMODE(home_mode) & 0o077:
