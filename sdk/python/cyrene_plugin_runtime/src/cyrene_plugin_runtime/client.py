@@ -204,6 +204,61 @@ class DirectPluginClient:
             中文:以有序方式产生类型化结果,直到 Endpoint 发出结束标记。
         """
 
+        yield from self._stream(
+            capability=capability,
+            interface_version=interface_version,
+            method=method,
+            request=request,
+            deadline_seconds=deadline_seconds,
+            cancel_event=cancel_event,
+            request_id=request_id,
+            stream_mode=wire.DIRECT_STREAM_MODE_INVOCATION,
+        )
+
+    def subscribe(
+        self,
+        *,
+        capability: str,
+        interface_version: str,
+        request: DirectPayload,
+        method: str = "subscribe",
+        deadline_seconds: float | None = None,
+        cancel_event: Event | None = None,
+        request_id: str | None = None,
+    ) -> Iterator[DirectPayload]:
+        """Subscribe to typed events until cancelled or the stream is closed.
+
+        The capability owns the filter payload and emitted event types. This
+        client does not retry or route subscriptions. Closing the iterator
+        cancels its native RPC, allowing the provider to release the subscription.
+        中文：仅传输订阅事件；重连策略由宿主负责，关闭迭代器会释放订阅。
+        """
+
+        yield from self._stream(
+            capability=capability,
+            interface_version=interface_version,
+            method=method,
+            request=request,
+            deadline_seconds=deadline_seconds,
+            cancel_event=cancel_event,
+            request_id=request_id,
+            stream_mode=wire.DIRECT_STREAM_MODE_SUBSCRIPTION,
+        )
+
+    def _stream(
+        self,
+        *,
+        capability: str,
+        interface_version: str,
+        method: str,
+        request: DirectPayload,
+        deadline_seconds: float | None,
+        cancel_event: Event | None,
+        request_id: str | None,
+        stream_mode: int,
+    ) -> Iterator[DirectPayload]:
+        """Share transport errors and cancellation across both streaming modes."""
+
         invocation = _invocation(
             capability=capability,
             interface_version=interface_version,
@@ -211,7 +266,7 @@ class DirectPluginClient:
             request=request,
             request_id=request_id,
         )
-        invocation.stream_mode = wire.DIRECT_STREAM_MODE_INVOCATION
+        invocation.stream_mode = stream_mode
         _validate_deadline(deadline_seconds)
         _raise_if_pre_cancelled(cancel_event)
         rpc = self._stub.InvokeStream(invocation, timeout=deadline_seconds)
@@ -244,6 +299,8 @@ class DirectPluginClient:
             _raise_transport_error(error)
             raise AssertionError("unreachable")
         finally:
+            if not saw_end:
+                rpc.cancel()
             completed.set()
             if watcher is not None:
                 watcher.join(timeout=0.2)
