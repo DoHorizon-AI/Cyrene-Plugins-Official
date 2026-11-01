@@ -7824,7 +7824,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/pyproject.toml",
-      "sha256": "448bc24b9de6a754778d6002a8c02eefc63aad6d0f8d617450c9376839dcaa0e",
+      "sha256": "99c0bb9b513332e5e4b30dc5e3231b1308139b714ad401c3dd68f73840388461",
       "size_bytes": 479
     },
     {
@@ -7838,15 +7838,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/__init__.py",
-      "sha256": "df668140da574c6e1ed618eb1cf34716b17213383ee7b59dab991b42b7ee698b",
-      "size_bytes": 3295
+      "sha256": "21f8e6eb68d5bb4b6d389e64c0d50c43a79f48d4553a44db44b8cde42893f8ec",
+      "size_bytes": 3479
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/contracts.py",
-      "sha256": "5905ef42e7d22b3325aaa83ab89be5412e45331ba5c8058826968737c5cb7213",
-      "size_bytes": 25826
+      "sha256": "0bf82beefc111f88ae75aad90002c172dc828fdc6bb80c36c27be537b7b145dc",
+      "size_bytes": 27030
     },
     {
       "kind": "file",
@@ -7861,6 +7861,13 @@
       "path": "sdk/python/cyrene_account_center_contracts/tests/test_bilibili_contracts.py",
       "sha256": "7796d2d23bb81a789cee3ce6985f6b1d07b167896c9cd7543e4b8c6ea4259708",
       "size_bytes": 2886
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/tests/test_people_contracts.py",
+      "sha256": "4c67120991ec3633b00012d65e2e2e3fea722d93479c0b81852e7863c1b9ddcb",
+      "size_bytes": 2229
     },
     {
       "kind": "file",
