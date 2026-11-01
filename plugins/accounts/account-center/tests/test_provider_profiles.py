@@ -19,6 +19,8 @@ from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import pytest
+from cyrene_account_center_contracts import canonical_json, sign_context
+
 from account_center import plugin as account_center_plugin_module
 from account_center.github import pkce_s256_challenge
 from account_center.github_app import GitHubAppError
@@ -44,7 +46,6 @@ from account_center.plugin import (
     AccountCenterPlugin,
     _validated_microsoft_graph_callback_uri,
 )
-from cyrene_account_center_contracts import canonical_json, sign_context
 
 EXCHANGE = "exchange-service"
 GITHUB_PROVIDER = "github-provider"
@@ -52,6 +53,7 @@ HF_PROVIDER = "huggingface-provider"
 GRAPH_PROVIDER = "microsoft-graph-provider"
 GRAPH_CALLBACK = "microsoft-entra-callback"
 ADO_PROVIDER = "azure-devops-observation-provider"
+BILIBILI_PROVIDER = "cyrene.connectors.bilibili"
 GRAPH_TENANT_ID = "11111111-2222-4333-8444-555555555555"
 GRAPH_OBJECT_ID = "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"
 OTHER_GRAPH_OBJECT_ID = "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff"
@@ -563,6 +565,7 @@ class ProfileHarness:
         *,
         caller: str = EXCHANGE,
         actor: Mapping[str, str | None] | None = None,
+        binding_id: str = "account-center-binding",
     ) -> dict[str, Any]:
         request = dict(payload)
         if method in {
@@ -575,6 +578,8 @@ class ProfileHarness:
             "begin_microsoft_graph_scope_upgrade",
             "update_microsoft_graph_v2_scope",
             "begin_azure_devops_link",
+            "begin_bilibili_link",
+            "complete_bilibili_link",
         }:
             request.setdefault("idempotency_key", f"idem-{method}-{self.sequence + 1}")
         self.sequence += 1
@@ -587,7 +592,7 @@ class ProfileHarness:
             subject=str(identity["subject"]),
             organization_id=str(identity["organization_id"]),
             workspace_id=identity["workspace_id"],
-            binding_id="account-center-binding",
+            binding_id=binding_id,
             request_id=f"00000000-0000-4000-8000-{self.sequence:012d}",
             operation_id=method,
             key=self.keys[caller],
@@ -603,6 +608,7 @@ class ProfileHarness:
         *,
         caller: str = EXCHANGE,
         actor: Mapping[str, str | None] | None = None,
+        binding_id: str = "account-center-binding",
     ) -> dict[str, Any]:
         request = dict(payload)
         self.sequence += 1
@@ -615,7 +621,7 @@ class ProfileHarness:
             subject=str(identity["subject"]),
             organization_id=str(identity["organization_id"]),
             workspace_id=identity["workspace_id"],
-            binding_id="account-center-binding",
+            binding_id=binding_id,
             request_id=f"00000000-0000-4000-8000-{self.sequence:012d}",
             operation_id=method,
             key=self.keys[caller],
@@ -2040,7 +2046,7 @@ def test_schema_v8_migration_preserves_provider_rows_with_foreign_key_children(
 
     assert snapshot() == before
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
@@ -4004,3 +4010,281 @@ def test_graph_refresh_is_serialized_and_unlink_revokes_local_material(
     assert stored_row["auth_status"] == "revoked"
     assert stored_row["credential_blob"] is None
     assert stored_row["credential_refresh_blob"] is None
+
+
+def _enable_bilibili_provider(harness: ProfileHarness) -> None:
+    """Register the fixed local provider identity and an isolated signing key."""
+
+    harness.keys[BILIBILI_PROVIDER] = b"b" * 32
+    harness.config["caller_keys"] = harness.keys
+    harness.config["bilibili_provider_caller_id"] = BILIBILI_PROVIDER
+    harness.plugin = harness._new_plugin()
+
+
+def _bilibili_cookie_json() -> str:
+    """Build a synthetic cookie jar for local Account Center boundary tests."""
+
+    return json.dumps(
+        {
+            "schemaVersion": 1,
+            "cookies": [
+                {
+                    "name": "SESSDATA",
+                    "value": "synthetic-sessdata-secret",
+                    "domain": ".bilibili.com",
+                    "path": "/",
+                    "expires_at": 20_000,
+                },
+                {
+                    "name": "bili_jct",
+                    "value": "synthetic-csrf-secret",
+                    "domain": ".bilibili.com",
+                    "path": "/",
+                    "expires_at": 18_000,
+                },
+                {
+                    "name": "DedeUserID",
+                    "value": "12345",
+                    "domain": ".bilibili.com",
+                    "path": "/",
+                    "expires_at": None,
+                },
+            ],
+        }
+    )
+
+
+def test_bilibili_account_link_encrypts_cookie_and_issues_exact_one_use_lease(
+    tmp_path: Path,
+) -> None:
+    """Bind a synthetic identity, then redeem one exact private cookie lease."""
+
+    db_path = tmp_path / "accounts.sqlite3"
+    harness = ProfileHarness(db_path)
+    _enable_bilibili_provider(harness)
+    profile_ref = "00000000-0000-4000-8000-000000000501"
+    session = harness.call(
+        "begin_bilibili_link",
+        {"profile_ref": profile_ref},
+        caller=BILIBILI_PROVIDER,
+    )
+    linked = harness.call(
+        "complete_bilibili_link",
+        {
+            "profile_ref": profile_ref,
+            "link_session_ref": session["link_session_ref"],
+            "external_subject": "12345",
+            "credential_json": _bilibili_cookie_json(),
+            "credential_expires_at": 18_000,
+        },
+        caller=BILIBILI_PROVIDER,
+    )
+
+    assert linked["provider"] == "bilibili"
+    assert linked["auth_mode"] == "session_cookie"
+    assert linked["external_subject"] == "12345"
+    assert linked["credential_revision"] == 1
+    assert not {"credential_json", "access_token", "cookie"} & linked.keys()
+    listed = harness.call("list_provider_profiles", {})["profiles"]
+    assert len(listed) == 1
+    assert listed[0]["target_scope"] == {"schema_version": 1, "account_id": "12345"}
+    assert "synthetic-sessdata-secret" not in json.dumps(listed)
+
+    with sqlite3.connect(db_path) as db:
+        stored = db.execute(
+            "SELECT auth_mode,credential_blob FROM provider_profiles WHERE profile_ref=?",
+            (profile_ref,),
+        ).fetchone()
+    assert stored is not None
+    assert stored[0] == "session_cookie"
+    assert b"synthetic-sessdata-secret" not in stored[1]
+    assert b"synthetic-csrf-secret" not in stored[1]
+
+    arguments = {"user_id": "12345", "text": "local fixture only"}
+    target = {"user_id": "12345"}
+    with pytest.raises(AccountCenterError, match="authorization_denied"):
+        harness.call(
+            "create_provider_credential_lease",
+            {
+                "profile_ref": profile_ref,
+                "operation_id": "bilibili.dynamic.publish",
+                "target": {"user_id": "54321"},
+                "arguments_sha256": _digest(arguments),
+            },
+        )
+    lease = harness.call(
+        "create_provider_credential_lease",
+        {
+            "profile_ref": profile_ref,
+            "operation_id": "bilibili.dynamic.publish",
+            "target": target,
+            "arguments_sha256": _digest(arguments),
+        },
+    )
+    redemption = {
+        "lease_ref": lease["lease_ref"],
+        "profile_ref": profile_ref,
+        "operation_id": "bilibili.dynamic.publish",
+        "target": target,
+        "arguments_sha256": _digest(arguments),
+    }
+    with pytest.raises(AccountCenterError, match="untrusted_caller"):
+        harness.call(
+            "redeem_provider_credential_lease",
+            redemption,
+            caller=BILIBILI_PROVIDER,
+            binding_id="different-binding",
+        )
+    material = harness.call(
+        "redeem_provider_credential_lease",
+        redemption,
+        caller=BILIBILI_PROVIDER,
+    )
+    assert material["token_type"] == "BilibiliCookieJar"
+    assert json.loads(material["access_token"])["cookies"]
+    with pytest.raises(AccountCenterError, match="lease_rejected"):
+        harness.call(
+            "redeem_provider_credential_lease",
+            redemption,
+            caller=BILIBILI_PROVIDER,
+        )
+
+
+def test_bilibili_link_session_is_bound_to_owner_binding_and_cookie_identity(
+    tmp_path: Path,
+) -> None:
+    """Reject foreign or cross-binding completion before consuming a QR session."""
+
+    harness = ProfileHarness(tmp_path / "accounts.sqlite3")
+    _enable_bilibili_provider(harness)
+    profile_ref = "00000000-0000-4000-8000-000000000502"
+    session = harness.call(
+        "begin_bilibili_link",
+        {"profile_ref": profile_ref},
+        caller=BILIBILI_PROVIDER,
+    )
+    completion = {
+        "profile_ref": profile_ref,
+        "link_session_ref": session["link_session_ref"],
+        "external_subject": "12345",
+        "credential_json": _bilibili_cookie_json(),
+        "credential_expires_at": 18_000,
+    }
+    stranger = {**ACTOR, "subject": "some-other-user"}
+    with pytest.raises(AccountCenterError, match="link_session_invalid"):
+        harness.call(
+            "complete_bilibili_link",
+            completion,
+            caller=BILIBILI_PROVIDER,
+            actor=stranger,
+        )
+    with pytest.raises(AccountCenterError, match="untrusted_caller"):
+        harness.call(
+            "complete_bilibili_link",
+            completion,
+            caller=BILIBILI_PROVIDER,
+            binding_id="another-binding",
+        )
+
+    wrong_jar = json.loads(_bilibili_cookie_json())
+    next(cookie for cookie in wrong_jar["cookies"] if cookie["name"] == "DedeUserID")[
+        "value"
+    ] = "99999"
+    wrong_identity = json.dumps(wrong_jar)
+    with pytest.raises(AccountCenterError, match="external_identity_mismatch"):
+        harness.call(
+            "complete_bilibili_link",
+            {
+                **completion,
+                "credential_json": wrong_identity,
+                "idempotency_key": "wrong-identity-attempt",
+            },
+            caller=BILIBILI_PROVIDER,
+        )
+
+    success = harness.call(
+        "complete_bilibili_link",
+        {**completion, "idempotency_key": "first-completion"},
+        caller=BILIBILI_PROVIDER,
+    )
+    with pytest.raises(AccountCenterError, match="link_session_invalid"):
+        harness.call(
+            "complete_bilibili_link",
+            {**completion, "idempotency_key": "second-completion"},
+            caller=BILIBILI_PROVIDER,
+        )
+    assert success["credential_revision"] == 1
+
+
+@pytest.mark.parametrize(
+    ("operation_id", "target"),
+    [
+        ("bilibili.search", {"search_type": "arbitrary"}),
+        ("bilibili.user.find", {"user_id": "１２３"}),
+        ("bilibili.user.find", {"user_id": "0"}),
+        ("bilibili.user.find", {"user_id": "0123"}),
+        ("bilibili.video.read", {"video_id": "https://www.bilibili.com/video/BV1234567890"}),
+        ("bilibili.dm.read", {"peer_user_id": "123", "message_id": "0"}),
+        (
+            "bilibili.comment.create",
+            {"video_id": "BV1234567890", "root_comment_id": "0", "parent_comment_id": "12"},
+        ),
+        ("bilibili.dm.send", {"peer_user_id": "123", "cookie": "model supplied"}),
+    ],
+)
+def test_bilibili_provider_targets_are_closed_and_ascii_decimal(
+    operation_id: str,
+    target: dict[str, Any],
+) -> None:
+    """Reject URL, credential, Unicode-numeric, and inconsistent comment locators."""
+
+    with pytest.raises(AccountCenterError, match="invalid_request"):
+        account_center_plugin_module._safe_provider_target("bilibili", operation_id, target)
+
+
+def test_bilibili_comment_target_allows_zero_only_for_top_level_comment_refs() -> None:
+    """Permit the platform's top-level marker only in root and parent comment IDs."""
+
+    assert account_center_plugin_module._safe_provider_target(
+        "bilibili",
+        "bilibili.comment.create",
+        {
+            "video_id": "BV1234567890",
+            "root_comment_id": "0",
+            "parent_comment_id": "0",
+        },
+    ) == {
+        "video_id": "BV1234567890",
+        "root_comment_id": "0",
+        "parent_comment_id": "0",
+    }
+
+
+@pytest.mark.parametrize("external_subject", ["0", "0123", "１２３"])
+def test_bilibili_external_subject_requires_positive_ascii_mid(
+    external_subject: str,
+) -> None:
+    """Reject noncanonical, zero, and Unicode-digit identities at the service boundary."""
+
+    with pytest.raises(AccountCenterError, match="invalid_request"):
+        account_center_plugin_module._safe_bilibili_external_subject(external_subject)
+
+
+def test_schema_v9_migration_enables_bilibili_without_orphaning_leases(tmp_path: Path) -> None:
+    """Upgrade the prior profile constraint and preserve its child lease table."""
+
+    db_path = tmp_path / "accounts.sqlite3"
+    ProfileHarness(db_path)
+    with sqlite3.connect(db_path) as db:
+        db.execute("PRAGMA user_version=9")
+    store = account_center_plugin_module.AccountStore(db_path)
+    with store._connect() as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+        sql = db.execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_profiles'"
+        ).fetchone()[0]
+        assert "'bilibili'" in sql
+        assert db.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='bilibili_link_sessions'"
+        ).fetchone() is not None

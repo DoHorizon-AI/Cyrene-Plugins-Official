@@ -17,7 +17,7 @@ from typing import Any
 
 from .models import AccountCenterError, Anchor
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 
@@ -283,7 +283,7 @@ class AccountStore:
                 "profile_ref TEXT PRIMARY KEY,anchor_issuer TEXT NOT NULL,"
                 "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
                 "provider TEXT NOT NULL CHECK(provider IN "
-                "('github','huggingface','azure','gcp','runpod','microsoft_graph','azure_devops')),"
+                "('github','huggingface','azure','gcp','runpod','microsoft_graph','azure_devops','bilibili')),"
                 "identity_ref TEXT NOT NULL,target_scope_json TEXT NOT NULL,"
                 "auth_status TEXT NOT NULL CHECK(auth_status IN "
                 "('unknown','configured','healthy','unavailable','reauthorization_required','revoked')),"
@@ -299,7 +299,7 @@ class AccountStore:
                 "CREATE UNIQUE INDEX IF NOT EXISTS provider_external_identity "
                 "ON provider_profiles(provider,identity_ref,organization_id) "
                 "WHERE status='active' AND provider IN "
-                "('github','huggingface','microsoft_graph')"
+                "('github','huggingface','microsoft_graph','bilibili')"
             )
             db.execute(
                 "CREATE TABLE IF NOT EXISTS provider_credential_leases ("
@@ -321,7 +321,7 @@ class AccountStore:
                     "ALTER TABLE provider_profiles ADD COLUMN auth_mode TEXT NOT NULL "
                     "DEFAULT 'legacy' CHECK(auth_mode IN "
                     "('legacy','fine_grained_token','device_oauth','github_app','host_identity',"
-                    "'delegated_oauth'))"
+                    "'delegated_oauth','session_cookie'))"
                 )
                 db.execute(
                     "ALTER TABLE provider_profiles ADD COLUMN credential_refresh_blob BLOB"
@@ -407,7 +407,7 @@ class AccountStore:
                     "profile_ref TEXT PRIMARY KEY,anchor_issuer TEXT NOT NULL,"
                     "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
                     "provider TEXT NOT NULL CHECK(provider IN "
-                    "('github','huggingface','azure','gcp','runpod','microsoft_graph','azure_devops')),"
+                    "('github','huggingface','azure','gcp','runpod','microsoft_graph','azure_devops','bilibili')),"
                     "identity_ref TEXT NOT NULL,target_scope_json TEXT NOT NULL,"
                     "auth_status TEXT NOT NULL CHECK(auth_status IN "
                     "('unknown','configured','healthy','unavailable','reauthorization_required','revoked')) ,"
@@ -415,7 +415,7 @@ class AccountStore:
                     "credential_secret_ref TEXT,status TEXT NOT NULL CHECK(status IN ('active','unlinked')) ,"
                     "created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,"
                     "auth_mode TEXT NOT NULL DEFAULT 'legacy' CHECK(auth_mode IN "
-                    "('legacy','fine_grained_token','device_oauth','github_app','host_identity','delegated_oauth')) ,"
+                    "('legacy','fine_grained_token','device_oauth','github_app','host_identity','delegated_oauth','session_cookie')) ,"
                     "credential_refresh_blob BLOB,credential_refresh_expires_at INTEGER,"
                     "oauth_client_id TEXT,oauth_scopes_json TEXT,refresh_claim_id TEXT,"
                     "refresh_claim_owner TEXT,refresh_claimed_at INTEGER,"
@@ -448,7 +448,7 @@ class AccountStore:
                     "CREATE UNIQUE INDEX provider_external_identity "
                     "ON provider_profiles(provider,identity_ref,organization_id) "
                     "WHERE status='active' AND provider IN "
-                    "('github','huggingface','microsoft_graph')"
+                    "('github','huggingface','microsoft_graph','bilibili')"
                 )
             db.execute(
                 "CREATE TABLE IF NOT EXISTS microsoft_entra_oauth_sessions ("
@@ -488,7 +488,74 @@ class AccountStore:
                 "OR existing.workspace_id IS NOT NEW.workspace_id)) "
                 "BEGIN SELECT RAISE(ABORT,'external_identity_owned'); END"
             )
-            db.execute("PRAGMA user_version = 9")
+            if current < 9:
+                db.execute("PRAGMA user_version = 9")
+            if current == 9:
+                # Rebuild the profile parent so existing v9 databases can accept
+                # the new provider and session-cookie auth mode without touching
+                # child lease rows.
+                db.execute(
+                    "CREATE TABLE provider_profiles_new ("
+                    "profile_ref TEXT PRIMARY KEY,anchor_issuer TEXT NOT NULL,"
+                    "anchor_subject TEXT NOT NULL,organization_id TEXT NOT NULL,workspace_id TEXT,"
+                    "provider TEXT NOT NULL CHECK(provider IN "
+                    "('github','huggingface','azure','gcp','runpod','microsoft_graph','azure_devops','bilibili')) ,"
+                    "identity_ref TEXT NOT NULL,target_scope_json TEXT NOT NULL,"
+                    "auth_status TEXT NOT NULL CHECK(auth_status IN "
+                    "('unknown','configured','healthy','unavailable','reauthorization_required','revoked')) ,"
+                    "external_subject TEXT,credential_blob BLOB,credential_expires_at INTEGER,"
+                    "credential_secret_ref TEXT,status TEXT NOT NULL CHECK(status IN ('active','unlinked')) ,"
+                    "created_at INTEGER NOT NULL,updated_at INTEGER NOT NULL,"
+                    "auth_mode TEXT NOT NULL DEFAULT 'legacy' CHECK(auth_mode IN "
+                    "('legacy','fine_grained_token','device_oauth','github_app','host_identity','delegated_oauth','session_cookie')) ,"
+                    "credential_refresh_blob BLOB,credential_refresh_expires_at INTEGER,"
+                    "oauth_client_id TEXT,oauth_scopes_json TEXT,refresh_claim_id TEXT,"
+                    "refresh_claim_owner TEXT,refresh_claimed_at INTEGER,"
+                    "credential_revision INTEGER NOT NULL DEFAULT 0,"
+                    "access_mode TEXT NOT NULL DEFAULT 'actor_owned' CHECK(access_mode IN "
+                    "('actor_owned','workspace_operator')) )"
+                )
+                profile_columns = (
+                    "profile_ref,anchor_issuer,anchor_subject,organization_id,workspace_id,"
+                    "provider,identity_ref,target_scope_json,auth_status,external_subject,"
+                    "credential_blob,credential_expires_at,credential_secret_ref,status,"
+                    "created_at,updated_at,auth_mode,credential_refresh_blob,"
+                    "credential_refresh_expires_at,oauth_client_id,oauth_scopes_json,"
+                    "refresh_claim_id,refresh_claim_owner,refresh_claimed_at,"
+                    "credential_revision,access_mode"
+                )
+                db.execute(
+                    f"INSERT INTO provider_profiles_new({profile_columns}) "
+                    f"SELECT {profile_columns} FROM provider_profiles"
+                )
+                db.execute("DROP TABLE provider_profiles")
+                db.execute("ALTER TABLE provider_profiles_new RENAME TO provider_profiles")
+                db.execute(
+                    "CREATE INDEX provider_profile_owner_scope ON provider_profiles("
+                    "anchor_issuer,anchor_subject,organization_id,workspace_id,status)"
+                )
+                db.execute(
+                    "CREATE UNIQUE INDEX provider_external_identity "
+                    "ON provider_profiles(provider,identity_ref,organization_id) "
+                    "WHERE status='active' AND provider IN "
+                    "('github','huggingface','microsoft_graph','bilibili')"
+                )
+            if current < 10:
+                db.execute(
+                    "CREATE TABLE IF NOT EXISTS bilibili_link_sessions ("
+                    "session_digest TEXT PRIMARY KEY,profile_ref TEXT NOT NULL,"
+                    "anchor_issuer TEXT NOT NULL,anchor_subject TEXT NOT NULL,"
+                    "organization_id TEXT NOT NULL,workspace_id TEXT,binding_id TEXT NOT NULL,"
+                    "caller_id TEXT NOT NULL,access_mode TEXT NOT NULL CHECK(access_mode IN "
+                    "('actor_owned','workspace_operator')),expires_at INTEGER NOT NULL,"
+                    "status TEXT NOT NULL CHECK(status IN ('pending','completed','cancelled')),"
+                    "created_at INTEGER NOT NULL,completed_at INTEGER)"
+                )
+                db.execute(
+                    "CREATE INDEX IF NOT EXISTS bilibili_link_session_profile "
+                    "ON bilibili_link_sessions(profile_ref,status,expires_at)"
+                )
+            db.execute("PRAGMA user_version = 10")
             if 0 < current < SCHEMA_VERSION:
                 # FK checks are connection-local and were disabled only to allow
                 # the parent-table rebuild. Check all rows before commit so a
@@ -614,6 +681,11 @@ class AccountStore:
                 "DELETE FROM provider_credential_leases WHERE expires_at < ? "
                 "OR redeemed_at IS NOT NULL",
                 (timestamp,),
+            )
+            db.execute(
+                "DELETE FROM bilibili_link_sessions WHERE expires_at < ? "
+                "OR (status!='pending' AND completed_at < ?)",
+                (timestamp - IDEMPOTENCY_RETENTION_SECONDS, timestamp - IDEMPOTENCY_RETENTION_SECONDS),
             )
             db.execute(
                 "DELETE FROM consumed_connector_grants WHERE expires_at < ?",
@@ -1658,6 +1730,264 @@ class AccountStore:
                     raise AccountCenterError("duplicate_provider_identity") from None
                 raise AccountCenterError("profile_ref_unavailable") from None
 
+    def begin_bilibili_link_session(
+        self,
+        *,
+        profile_ref: str,
+        session_digest: str,
+        anchor: Anchor,
+        binding_id: str,
+        caller_id: str,
+        access_mode: str,
+        expires_at: int,
+        now: int,
+    ) -> None:
+        """Persist one short-lived QR session under its verified owner and binding."""
+
+        if (
+            len(session_digest) != 64
+            or any(character not in "0123456789abcdef" for character in session_digest)
+            or not binding_id
+            or len(binding_id) > 200
+            or caller_id != "cyrene.connectors.bilibili"
+            or access_mode not in {"actor_owned", "workspace_operator"}
+            or (access_mode == "workspace_operator" and anchor.workspace_id is None)
+            or isinstance(expires_at, bool)
+            or not isinstance(expires_at, int)
+            or expires_at <= now
+            or expires_at - now > 600
+        ):
+            raise AccountCenterError("invalid_request")
+
+        with self.transaction() as db:
+            existing = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=?",
+                (profile_ref,),
+            ).fetchone()
+            if existing is not None:
+                if not self._owns_provider_profile(
+                    existing,
+                    anchor,
+                    allow_workspace_operator=access_mode == "workspace_operator",
+                ):
+                    raise AccountCenterError("profile_ref_unavailable")
+                if existing["provider"] != "bilibili":
+                    raise AccountCenterError("profile_provider_mismatch")
+                if existing["access_mode"] != access_mode:
+                    raise AccountCenterError("profile_unavailable")
+
+            pending = db.execute(
+                "SELECT * FROM bilibili_link_sessions WHERE profile_ref=? "
+                "AND status='pending'",
+                (profile_ref,),
+            ).fetchall()
+            for session in pending:
+                if (
+                    session["anchor_issuer"] != anchor.issuer
+                    or session["anchor_subject"] != anchor.subject
+                    or session["organization_id"] != anchor.organization_id
+                    or session["workspace_id"] != anchor.workspace_id
+                ):
+                    raise AccountCenterError("profile_ref_unavailable")
+            db.execute(
+                "UPDATE bilibili_link_sessions SET status='cancelled',completed_at=? "
+                "WHERE profile_ref=? AND status='pending'",
+                (now, profile_ref),
+            )
+            try:
+                db.execute(
+                    "INSERT INTO bilibili_link_sessions(session_digest,profile_ref,"
+                    "anchor_issuer,anchor_subject,organization_id,workspace_id,binding_id,"
+                    "caller_id,access_mode,expires_at,status,created_at) "
+                    "VALUES(?,?,?,?,?,?,?,?,?,?,'pending',?)",
+                    (
+                        session_digest,
+                        profile_ref,
+                        anchor.issuer,
+                        anchor.subject,
+                        anchor.organization_id,
+                        anchor.workspace_id,
+                        binding_id,
+                        caller_id,
+                        access_mode,
+                        expires_at,
+                        now,
+                    ),
+                )
+            except sqlite3.IntegrityError:
+                raise AccountCenterError("link_session_invalid") from None
+
+    def complete_bilibili_link_session(
+        self,
+        *,
+        profile_ref: str,
+        session_digest: str,
+        anchor: Anchor,
+        binding_id: str,
+        caller_id: str,
+        external_subject: str,
+        target_scope_json: str,
+        credential_blob: bytes,
+        credential_expires_at: int | None,
+        now: int,
+    ) -> dict[str, Any]:
+        """Consume one verified QR session and atomically store its encrypted cookie jar."""
+
+        if (
+            len(session_digest) != 64
+            or any(character not in "0123456789abcdef" for character in session_digest)
+            or caller_id != "cyrene.connectors.bilibili"
+            or not credential_blob
+            or not external_subject.isascii()
+            or not external_subject.isdecimal()
+            or not 1 <= len(external_subject) <= 20
+            or (
+                credential_expires_at is not None
+                and (
+                    isinstance(credential_expires_at, bool)
+                    or not isinstance(credential_expires_at, int)
+                    or credential_expires_at <= now
+                )
+            )
+        ):
+            raise AccountCenterError("invalid_request")
+
+        with self.transaction() as db:
+            session = db.execute(
+                "SELECT * FROM bilibili_link_sessions WHERE session_digest=?",
+                (session_digest,),
+            ).fetchone()
+            if (
+                session is None
+                or session["profile_ref"] != profile_ref
+                or session["anchor_issuer"] != anchor.issuer
+                or session["anchor_subject"] != anchor.subject
+                or session["organization_id"] != anchor.organization_id
+                or session["workspace_id"] != anchor.workspace_id
+                or session["binding_id"] != binding_id
+                or session["caller_id"] != caller_id
+                or session["status"] != "pending"
+                or session["expires_at"] <= now
+            ):
+                raise AccountCenterError("link_session_invalid")
+
+            access_mode = str(session["access_mode"])
+            existing = db.execute(
+                "SELECT * FROM provider_profiles WHERE profile_ref=?",
+                (profile_ref,),
+            ).fetchone()
+            if existing is not None:
+                if not self._owns_provider_profile(
+                    existing,
+                    anchor,
+                    allow_workspace_operator=access_mode == "workspace_operator",
+                ):
+                    raise AccountCenterError("profile_ref_unavailable")
+                if existing["provider"] != "bilibili":
+                    raise AccountCenterError("profile_provider_mismatch")
+                if existing["access_mode"] != access_mode:
+                    raise AccountCenterError("profile_unavailable")
+                if (
+                    existing["status"] == "active"
+                    and existing["external_subject"]
+                    and existing["external_subject"] != external_subject
+                ):
+                    raise AccountCenterError("external_identity_mismatch")
+
+            external = db.execute(
+                "SELECT * FROM provider_profiles WHERE provider='bilibili' "
+                "AND identity_ref=? AND organization_id=? AND status='active' "
+                "AND profile_ref!=?",
+                (external_subject, anchor.organization_id, profile_ref),
+            ).fetchone()
+            if external is not None:
+                if not self._owns_provider_profile(
+                    external,
+                    anchor,
+                    allow_workspace_operator=access_mode == "workspace_operator",
+                ):
+                    raise AccountCenterError("external_identity_owned")
+                raise AccountCenterError("duplicate_provider_identity")
+
+            if existing is None:
+                try:
+                    db.execute(
+                        "INSERT INTO provider_profiles(profile_ref,anchor_issuer,anchor_subject,"
+                        "organization_id,workspace_id,provider,identity_ref,target_scope_json,"
+                        "auth_status,external_subject,credential_blob,credential_expires_at,"
+                        "credential_secret_ref,status,created_at,updated_at,auth_mode,"
+                        "credential_refresh_blob,credential_refresh_expires_at,oauth_client_id,"
+                        "oauth_scopes_json,refresh_claim_id,refresh_claim_owner,refresh_claimed_at,"
+                        "credential_revision,access_mode) VALUES(?,?,?,?,?,'bilibili',?,?,'healthy',"
+                        "?,?,?,NULL,'active',?,?,'session_cookie',NULL,NULL,NULL,NULL,NULL,NULL,NULL,1,?)",
+                        (
+                            profile_ref,
+                            anchor.issuer,
+                            anchor.subject,
+                            anchor.organization_id,
+                            anchor.workspace_id,
+                            external_subject,
+                            target_scope_json,
+                            external_subject,
+                            credential_blob,
+                            credential_expires_at,
+                            now,
+                            now,
+                            access_mode,
+                        ),
+                    )
+                except sqlite3.IntegrityError:
+                    raise AccountCenterError("duplicate_provider_identity") from None
+                revision = 1
+            else:
+                revision = int(existing["credential_revision"]) + 1
+                db.execute(
+                    "UPDATE provider_profiles SET identity_ref=?,target_scope_json=?,"
+                    "auth_status='healthy',external_subject=?,credential_blob=?,"
+                    "credential_expires_at=?,credential_secret_ref=NULL,status='active',"
+                    "updated_at=?,auth_mode='session_cookie',credential_refresh_blob=NULL,"
+                    "credential_refresh_expires_at=NULL,oauth_client_id=NULL,oauth_scopes_json=NULL,"
+                    "refresh_claim_id=NULL,refresh_claim_owner=NULL,refresh_claimed_at=NULL,"
+                    "credential_revision=?,access_mode=? WHERE profile_ref=?",
+                    (
+                        external_subject,
+                        target_scope_json,
+                        external_subject,
+                        credential_blob,
+                        credential_expires_at,
+                        now,
+                        revision,
+                        access_mode,
+                        profile_ref,
+                    ),
+                )
+
+            changed = db.execute(
+                "UPDATE bilibili_link_sessions SET status='completed',completed_at=? "
+                "WHERE session_digest=? AND status='pending' AND expires_at>?",
+                (now, session_digest, now),
+            ).rowcount
+            if changed != 1:
+                raise AccountCenterError("link_session_invalid")
+            db.execute(
+                "UPDATE bilibili_link_sessions SET status='cancelled',completed_at=? "
+                "WHERE profile_ref=? AND session_digest!=? AND status='pending'",
+                (now, profile_ref, session_digest),
+            )
+            db.execute(
+                "DELETE FROM provider_credential_leases WHERE profile_ref=?",
+                (profile_ref,),
+            )
+            row = db.execute(
+                "SELECT profile_ref,provider,auth_status,external_subject,"
+                "credential_expires_at,auth_mode,access_mode,workspace_id,credential_revision "
+                "FROM provider_profiles WHERE profile_ref=? AND status='active'",
+                (profile_ref,),
+            ).fetchone()
+            if row is None:
+                raise AccountCenterError("storage_unavailable")
+            return dict(row)
+
     def list_provider_profiles(self, anchor: Anchor) -> list[sqlite3.Row]:
         """Return metadata-only profiles owned by the exact actor/workspace."""
 
@@ -2592,6 +2922,11 @@ class AccountStore:
                 (profile_ref,),
             )
             db.execute(
+                "UPDATE bilibili_link_sessions SET status='cancelled',completed_at=? "
+                "WHERE profile_ref=? AND status='pending'",
+                (now, profile_ref),
+            )
+            db.execute(
                 "UPDATE huggingface_device_renewal_sessions SET status='cancelled',"
                 "device_code_blob=NULL,user_code=NULL,verification_uri=NULL,poll_claim_id=NULL,"
                 "poll_claim_owner=NULL,poll_claimed_at=NULL,reason_code='profile_unlinked',"
@@ -2641,7 +2976,13 @@ class AccountStore:
                 )
                 or profile["auth_status"] != "healthy"
                 or profile["provider"]
-                not in {"github", "huggingface", "microsoft_graph", "azure_devops"}
+                not in {
+                    "github",
+                    "huggingface",
+                    "microsoft_graph",
+                    "azure_devops",
+                    "bilibili",
+                }
             ):
                 raise AccountCenterError("profile_unavailable")
             has_grant = grant_ref is not None

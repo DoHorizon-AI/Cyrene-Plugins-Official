@@ -90,6 +90,8 @@ METHODS = (
     "update_microsoft_graph_v2_scope",
     "begin_azure_devops_link",
     "complete_azure_devops_link",
+    "begin_bilibili_link",
+    "complete_bilibili_link",
 )
 PROVIDER_OPERATIONS = {
     "github.issue.get",
@@ -170,6 +172,19 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "azure_devops.deployments.list",
         "azure_devops.release_environment.get",
     },
+    "bilibili": {
+        "bilibili.search",
+        "bilibili.user.find",
+        "bilibili.video.read",
+        "bilibili.comments.list",
+        "bilibili.dynamics.list",
+        "bilibili.dynamic.read",
+        "bilibili.dm.list",
+        "bilibili.dm.read",
+        "bilibili.comment.create",
+        "bilibili.dynamic.publish",
+        "bilibili.dm.send",
+    },
 }
 CALLBACK_METHODS = {
     "complete_github_link",
@@ -219,6 +234,7 @@ PUBLIC_METHODS = {
 }
 REQUEST_TYPE_PREFIX = "type.googleapis.com/cyrene.account.center.v1."
 MICROSOFT_GRAPH_PROVIDER_CALLER_ID = "microsoft-graph-provider"
+BILIBILI_PROVIDER_CALLER_ID = "cyrene.connectors.bilibili"
 MAX_REQUEST_BYTES = 64 * 1024
 MAX_IDEMPOTENCY_RESPONSE_BYTES = 64 * 1024
 SESSION_TTL_SECONDS = 600
@@ -236,6 +252,8 @@ IDEMPOTENT_METHODS = {
     "begin_microsoft_graph_scope_upgrade",
     "update_microsoft_graph_v2_scope",
     "begin_azure_devops_link",
+    "begin_bilibili_link",
+    "complete_bilibili_link",
 }
 
 
@@ -289,6 +307,8 @@ def _action_type_name(action: str, suffix: str) -> str:
         "update_microsoft_graph_v2_scope": "UpdateMicrosoftGraphV2Scope",
         "begin_azure_devops_link": "BeginAzureDevOpsLink",
         "complete_azure_devops_link": "CompleteAzureDevOpsLink",
+        "begin_bilibili_link": "BeginBilibiliLink",
+        "complete_bilibili_link": "CompleteBilibiliLink",
     }
     return names[action] + suffix
 
@@ -420,6 +440,14 @@ class AccountCenterPlugin:
             raise AccountCenterError("configuration_unavailable")
         if azure_devops_provider_caller:
             self._provider_caller_ids["azure_devops"] = azure_devops_provider_caller
+        bilibili_provider_caller = selected.get("bilibili_provider_caller_id")
+        if bilibili_provider_caller is not None and (
+            not isinstance(bilibili_provider_caller, str)
+            or bilibili_provider_caller != BILIBILI_PROVIDER_CALLER_ID
+        ):
+            raise AccountCenterError("configuration_unavailable")
+        if bilibili_provider_caller:
+            self._provider_caller_ids["bilibili"] = bilibili_provider_caller
         provider_secrets = _mapping_config(selected, "provider_secrets")
         self._provider_secrets = {
             str(reference): str(secret)
@@ -444,6 +472,7 @@ class AccountCenterPlugin:
             callback_caller=self._github_callback_caller,
             microsoft_graph_callback_caller=self._microsoft_graph_callback_caller,
             microsoft_graph_provider_caller=microsoft_graph_provider_caller,
+            bilibili_provider_caller=bilibili_provider_caller,
             provider_caller=self._github_provider_caller,
             provider_callers=set(self._provider_caller_ids.values()),
             wecom_callers=set(self._wecom_sources),
@@ -583,7 +612,10 @@ class AccountCenterPlugin:
             request = require_object(envelope["payload"])
             context = require_object(envelope["trusted_context"], code="untrusted_caller")
             result = self.call(action, request, context)
-            response_name = _action_type_name(action, "Response")
+            response_name = {
+                "begin_bilibili_link": "BilibiliLinkSession",
+                "complete_bilibili_link": "LinkedProviderProfileResponse",
+            }.get(action, _action_type_name(action, "Response"))
             return True, DirectTypedPayload(
                 type_url=REQUEST_TYPE_PREFIX + response_name,
                 value=canonical_json(result),
@@ -720,6 +752,10 @@ class AccountCenterPlugin:
             return self._begin_azure_devops_link(request, anchor, idempotency_key_hash)
         if method == "complete_azure_devops_link":
             return self._complete_azure_devops_link(request)
+        if method == "begin_bilibili_link":
+            return self._begin_bilibili_link(request, anchor, caller_id, trusted)
+        if method == "complete_bilibili_link":
+            return self._complete_bilibili_link(request, anchor, caller_id, trusted)
         raise AccountCenterError("method_not_found")
 
     def _encode_idempotency_response(self, key_hash: str, value: Mapping[str, Any]) -> bytes:
@@ -1916,6 +1952,101 @@ class AccountCenterPlugin:
         except AccountCenterError:
             pass
 
+    def _begin_bilibili_link(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        caller_id: str,
+        trusted: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Start a provider-owned QR session without exposing its private reference."""
+
+        _require_fields(request, {"profile_ref"})
+        if caller_id != self._provider_caller_ids.get("bilibili"):
+            raise AccountCenterError("untrusted_caller")
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        now = int(self._now())
+        link_session_ref = str(uuid.uuid4())
+        expires_at = now + SESSION_TTL_SECONDS
+        self._store.begin_bilibili_link_session(
+            profile_ref=profile_ref,
+            session_digest=_digest_text(link_session_ref),
+            anchor=anchor,
+            binding_id=_required_text(trusted, "binding_id", maximum=200),
+            caller_id=caller_id,
+            access_mode=self._configured_profile_access_mode(profile_ref),
+            expires_at=expires_at,
+            now=now,
+        )
+        return {
+            "profile_ref": profile_ref,
+            "link_session_ref": link_session_ref,
+            "expires_at": expires_at,
+        }
+
+    def _complete_bilibili_link(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        caller_id: str,
+        trusted: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Consume one QR session and persist only the encrypted cookie jar."""
+
+        _require_fields(
+            request,
+            {
+                "profile_ref",
+                "link_session_ref",
+                "external_subject",
+                "credential_json",
+                "credential_expires_at",
+            },
+        )
+        if caller_id != self._provider_caller_ids.get("bilibili"):
+            raise AccountCenterError("untrusted_caller")
+        profile_ref = _opaque_profile_ref(request["profile_ref"])
+        link_session_ref = _uuid_text(request["link_session_ref"])
+        external_subject = _safe_bilibili_external_subject(request["external_subject"])
+        credential_json, credential_expires_at = _safe_bilibili_cookie_jar(
+            request["credential_json"],
+            external_subject=external_subject,
+            reported_expiry=request["credential_expires_at"],
+            now=int(self._now()),
+        )
+        if not self._provider_caller_ids.get("bilibili"):
+            raise AccountCenterError("provider_not_configured")
+        scope = {"schema_version": 1, "account_id": external_subject}
+        now = int(self._now())
+        profile = self._store.complete_bilibili_link_session(
+            profile_ref=profile_ref,
+            session_digest=_digest_text(link_session_ref),
+            anchor=anchor,
+            binding_id=_required_text(trusted, "binding_id", maximum=200),
+            caller_id=caller_id,
+            external_subject=external_subject,
+            target_scope_json=canonical_json(scope).decode("utf-8"),
+            credential_blob=self._encrypt_provider_token(
+                profile_ref,
+                credential_json,
+                credential_expires_at,
+                maximum_bytes=16_384,
+            ),
+            credential_expires_at=credential_expires_at,
+            now=now,
+        )
+        return {
+            "profile_ref": profile["profile_ref"],
+            "provider": "bilibili",
+            "auth_mode": "session_cookie",
+            "access_mode": profile["access_mode"],
+            "auth_status": profile["auth_status"],
+            "external_subject": profile["external_subject"],
+            "expires_at": profile["credential_expires_at"],
+            "workspace_id": profile["workspace_id"],
+            "credential_revision": profile["credential_revision"],
+        }
+
     def _begin_azure_devops_link(
         self,
         request: Mapping[str, Any],
@@ -2225,6 +2356,8 @@ class AccountCenterPlugin:
                 profile["oauth_scopes"] = sorted(
                     _safe_azure_devops_oauth_scopes(_json_array(row["oauth_scopes_json"]))
                 )
+            if row["provider"] == "bilibili":
+                profile["target_scope"] = _safe_bilibili_profile_scope(scope)
             profiles.append(profile)
         return {"profiles": profiles}
 
@@ -2390,7 +2523,7 @@ class AccountCenterPlugin:
         credential, expires_at = self._fresh_provider_credential(profile, anchor)
         response = {
             "access_token": credential,
-            "token_type": "Bearer",
+            "token_type": "BilibiliCookieJar" if provider == "bilibili" else "Bearer",
             "external_subject": profile["external_subject"] or profile["identity_ref"],
             "expires_at": expires_at,
         }
@@ -2422,6 +2555,22 @@ class AccountCenterPlugin:
             if profile["auth_mode"] == "device_oauth":
                 return self._fresh_huggingface_oauth_credential(profile, anchor)
             if profile["credential_blob"] is None:
+                raise AccountCenterError("credential_unavailable")
+            credential, expires_at = self._decrypt_provider_token(
+                profile_ref, bytes(profile["credential_blob"])
+            )
+            if expires_at is not None and expires_at <= int(self._now()):
+                self._store.update_provider_profile_auth_status(
+                    profile_ref,
+                    anchor,
+                    "reauthorization_required",
+                    now=int(self._now()),
+                    allow_workspace_operator=True,
+                )
+                raise AccountCenterError("credential_reauthorization_required")
+            return credential, expires_at
+        if profile["provider"] == "bilibili":
+            if profile["auth_mode"] != "session_cookie" or profile["credential_blob"] is None:
                 raise AccountCenterError("credential_unavailable")
             credential, expires_at = self._decrypt_provider_token(
                 profile_ref, bytes(profile["credential_blob"])
@@ -2979,11 +3128,16 @@ class AccountCenterPlugin:
             return
 
     def _encrypt_provider_token(
-        self, profile_ref: str, token: str, expires_at: int | None
+        self,
+        profile_ref: str,
+        token: str,
+        expires_at: int | None,
+        *,
+        maximum_bytes: int = 8192,
     ) -> bytes:
         """Encrypt an access token with profile-specific authenticated data."""
 
-        if not token or len(token) > 8192:
+        if not token or len(token.encode("utf-8")) > maximum_bytes:
             raise AccountCenterError("credential_unavailable")
         return encrypt(
             self._encryption_key,
@@ -3449,6 +3603,144 @@ def _numeric_id(value: Any) -> str:
     if not text.isdecimal() or int(text) < 1 or len(text) > 32:
         raise AccountCenterError("invalid_request")
     return text
+
+
+def _safe_bilibili_external_subject(value: Any) -> str:
+    """Require the decimal MID verified by the Bilibili navigation endpoint."""
+
+    if not isinstance(value, str) or re.fullmatch(r"[1-9][0-9]{0,19}", value) is None:
+        raise AccountCenterError("invalid_request")
+    return value
+
+
+def _safe_bilibili_numeric_id(value: Any, *, allow_zero: bool = False) -> str:
+    """Validate a decimal Bilibili object ID without coercing booleans or numbers."""
+
+    pattern = r"(?:0|[1-9][0-9]{0,19})" if allow_zero else r"[1-9][0-9]{0,19}"
+    if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
+        raise AccountCenterError("invalid_request")
+    return value
+
+
+def _safe_bilibili_video_id(value: Any) -> str:
+    """Accept only closed BVID and AVID representations."""
+
+    if not isinstance(value, str) or re.fullmatch(
+        r"(?:BV[0-9A-Za-z]{10}|av[1-9][0-9]{0,19})", value
+    ) is None:
+        raise AccountCenterError("invalid_request")
+    return value
+
+
+def _safe_bilibili_profile_scope(value: Any) -> dict[str, Any]:
+    """Validate the single-account scope retained by a linked Bilibili profile."""
+
+    if not isinstance(value, Mapping) or set(value) != {"schema_version", "account_id"}:
+        raise AccountCenterError("profile_unavailable")
+    if value.get("schema_version") != 1 or isinstance(value.get("schema_version"), bool):
+        raise AccountCenterError("profile_unavailable")
+    try:
+        account_id = _safe_bilibili_external_subject(value.get("account_id"))
+    except AccountCenterError:
+        raise AccountCenterError("profile_unavailable") from None
+    return {"schema_version": 1, "account_id": account_id}
+
+
+def _safe_bilibili_cookie_jar(
+    value: Any,
+    *,
+    external_subject: str,
+    reported_expiry: Any,
+    now: int,
+) -> tuple[str, int | None]:
+    """Validate a minimal Bilibili cookie jar before encrypting it at rest."""
+
+    if not isinstance(value, str):
+        raise AccountCenterError("credential_unavailable")
+    try:
+        if len(value.encode("utf-8")) > 16_384:
+            raise AccountCenterError("credential_unavailable")
+        jar = json.loads(value, object_pairs_hook=_reject_duplicate_pairs)
+    except (UnicodeEncodeError, ValueError, TypeError, json.JSONDecodeError):
+        raise AccountCenterError("credential_unavailable") from None
+    if not isinstance(jar, dict) or set(jar) != {"schemaVersion", "cookies"}:
+        raise AccountCenterError("credential_unavailable")
+    if jar.get("schemaVersion") != 1 or isinstance(jar.get("schemaVersion"), bool):
+        raise AccountCenterError("credential_unavailable")
+    cookies = jar.get("cookies")
+    allowed_names = {
+        "SESSDATA",
+        "bili_jct",
+        "DedeUserID",
+        "DedeUserID__ckMd5",
+        "sid",
+        "buvid3",
+        "buvid4",
+    }
+    if not isinstance(cookies, list) or not 2 <= len(cookies) <= len(allowed_names):
+        raise AccountCenterError("credential_unavailable")
+    seen: set[str] = set()
+    normalized: list[dict[str, Any]] = []
+    expiries: list[int] = []
+    required = {"SESSDATA", "bili_jct"}
+    for cookie in cookies:
+        if not isinstance(cookie, dict) or set(cookie) != {
+            "name",
+            "value",
+            "domain",
+            "path",
+            "expires_at",
+        }:
+            raise AccountCenterError("credential_unavailable")
+        name = cookie.get("name")
+        token = cookie.get("value")
+        expires_at = cookie.get("expires_at")
+        if (
+            not isinstance(name, str)
+            or name not in allowed_names
+            or name in seen
+            or not isinstance(token, str)
+            or re.fullmatch(r"[\x21-\x3A\x3C-\x7E]{1,4096}", token) is None
+            or cookie.get("domain") != ".bilibili.com"
+            or cookie.get("path") != "/"
+            or (
+                expires_at is not None
+                and (
+                    isinstance(expires_at, bool)
+                    or not isinstance(expires_at, int)
+                    or expires_at <= now
+                    or expires_at > 9_223_372_036_854_775_807
+                )
+            )
+        ):
+            raise AccountCenterError("credential_unavailable")
+        if name == "DedeUserID" and token != external_subject:
+            raise AccountCenterError("external_identity_mismatch")
+        seen.add(name)
+        if expires_at is not None:
+            expiries.append(expires_at)
+        normalized.append(
+            {
+                "name": name,
+                "value": token,
+                "domain": ".bilibili.com",
+                "path": "/",
+                "expires_at": expires_at,
+            }
+        )
+    if not required <= seen:
+        raise AccountCenterError("credential_unavailable")
+    expected_expiry = min(expiries) if expiries else None
+    if reported_expiry != expected_expiry or (
+        reported_expiry is not None
+        and (isinstance(reported_expiry, bool) or not isinstance(reported_expiry, int))
+    ):
+        raise AccountCenterError("credential_unavailable")
+    normalized.sort(key=lambda item: item["name"])
+    return (
+        canonical_json({"schemaVersion": 1, "cookies": normalized}).decode("utf-8"),
+        expected_expiry,
+    )
 
 
 def _safe_github_repositories(value: Any) -> list[dict[str, str]]:
@@ -4284,6 +4576,74 @@ def _safe_provider_target(provider: str, operation_id: str, value: Any) -> dict[
     target = require_object(value)
     if len(canonical_json(target)) > 8192:
         raise AccountCenterError("invalid_request")
+    if provider == "bilibili":
+        bilibili_fields = {
+            "bilibili.search": {"search_type"},
+            "bilibili.user.find": {"user_id"},
+            "bilibili.video.read": {"video_id"},
+            "bilibili.comments.list": {"video_id", "root_comment_id"},
+            "bilibili.dynamics.list": {"user_id"},
+            "bilibili.dynamic.read": {"dynamic_id"},
+            "bilibili.dm.list": {"peer_user_id"},
+            "bilibili.dm.read": {"peer_user_id", "message_id"},
+            "bilibili.comment.create": {
+                "video_id",
+                "root_comment_id",
+                "parent_comment_id",
+            },
+            "bilibili.dynamic.publish": {"user_id"},
+            "bilibili.dm.send": {"peer_user_id"},
+        }
+        bilibili_allowed = bilibili_fields.get(operation_id)
+        if bilibili_allowed is None or set(target) - bilibili_allowed:
+            raise AccountCenterError("invalid_request")
+        if operation_id == "bilibili.search":
+            if set(target) != {"search_type"} or target["search_type"] not in {
+                "video",
+                "user",
+                "article",
+            }:
+                raise AccountCenterError("invalid_request")
+            return {"search_type": target["search_type"]}
+        bilibili_required_fields = {
+            "bilibili.user.find": {"user_id"},
+            "bilibili.video.read": {"video_id"},
+            "bilibili.dynamics.list": {"user_id"},
+            "bilibili.dynamic.read": {"dynamic_id"},
+            "bilibili.dm.list": {"peer_user_id"},
+            "bilibili.dm.read": {"peer_user_id", "message_id"},
+            "bilibili.comment.create": {
+                "video_id",
+                "root_comment_id",
+                "parent_comment_id",
+            },
+            "bilibili.dynamic.publish": {"user_id"},
+            "bilibili.dm.send": {"peer_user_id"},
+        }
+        if operation_id in bilibili_required_fields and set(target) != bilibili_required_fields[
+            operation_id
+        ]:
+            raise AccountCenterError("invalid_request")
+        bilibili_normalized: dict[str, Any] = {}
+        numeric_fields = {"user_id", "peer_user_id", "message_id", "dynamic_id"}
+        for field in sorted(set(target) & numeric_fields):
+            bilibili_normalized[field] = _safe_bilibili_numeric_id(target[field])
+        if "video_id" in target:
+            bilibili_normalized["video_id"] = _safe_bilibili_video_id(target["video_id"])
+        if "root_comment_id" in target:
+            bilibili_normalized["root_comment_id"] = _safe_bilibili_numeric_id(
+                target["root_comment_id"], allow_zero=True
+            )
+        if "parent_comment_id" in target:
+            bilibili_normalized["parent_comment_id"] = _safe_bilibili_numeric_id(
+                target["parent_comment_id"], allow_zero=True
+            )
+        if operation_id == "bilibili.comment.create":
+            root = bilibili_normalized["root_comment_id"]
+            parent = bilibili_normalized["parent_comment_id"]
+            if (root == "0") != (parent == "0"):
+                raise AccountCenterError("invalid_request")
+        return bilibili_normalized
     if provider == "github":
         if operation_id == "github.vendor.cli.execute":
             if target:
@@ -4687,6 +5047,14 @@ def _provider_target_allowed(
 ) -> bool:
     """Check one target against the linked profile's explicit resource scope."""
 
+    if provider == "bilibili":
+        try:
+            profile_scope = _safe_bilibili_profile_scope(scope)
+        except AccountCenterError:
+            return False
+        if operation_id == "bilibili.dynamic.publish":
+            return target.get("user_id") == profile_scope["account_id"]
+        return operation_id in PROVIDER_OPERATIONS_BY_PROVIDER["bilibili"]
     if provider == "github":
         repositories = _safe_github_repositories(scope.get("repositories"))
         if operation_id == "github.vendor.cli.execute":
@@ -5127,6 +5495,7 @@ def _load_method_callers(
     callback_caller: str | None,
     microsoft_graph_callback_caller: str | None,
     microsoft_graph_provider_caller: str | None,
+    bilibili_provider_caller: str | None,
     provider_caller: str,
     provider_callers: set[str],
     wecom_callers: set[str],
@@ -5157,6 +5526,12 @@ def _load_method_callers(
         "observe_wecom_challenge": wecom_callers,
         "redeem_credential_lease": {provider_caller},
         "redeem_provider_credential_lease": provider_callers,
+        "begin_bilibili_link": (
+            {bilibili_provider_caller} if bilibili_provider_caller is not None else set()
+        ),
+        "complete_bilibili_link": (
+            {bilibili_provider_caller} if bilibili_provider_caller is not None else set()
+        ),
     }
     result: dict[str, set[str]] = {}
     for method in METHODS:
@@ -5201,6 +5576,7 @@ def _environment_config() -> dict[str, Any]:
             "microsoft_graph_callback_caller_id",
             "microsoft_graph_provider_caller_id",
             "azure_devops_provider_caller_id",
+            "bilibili_provider_caller_id",
             "github_client_id",
             "github_client_secret_ref",
             "encryption_key_ref",
@@ -5229,6 +5605,7 @@ def _environment_config() -> dict[str, Any]:
             "microsoft_graph_callback_caller_id",
             "microsoft_graph_provider_caller_id",
             "azure_devops_provider_caller_id",
+            "bilibili_provider_caller_id",
             "github_client_id",
             "github_client_secret_ref",
             "github_callback_caller_id",
