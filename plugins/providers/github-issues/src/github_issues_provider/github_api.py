@@ -15,7 +15,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
-from urllib.parse import quote, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 
 from .settings import ProviderSettings, Repository
 
@@ -24,6 +24,8 @@ GITHUB_API_VERSION = "2022-11-28"
 MAX_RESPONSE_BYTES = 1_000_000
 MAX_ACTIONS_LOG_BYTES = 2_000_000
 MAX_ACTIONS_LOG_EXCERPT_BYTES = 20_000
+MAX_PULL_REQUEST_PAGE_SIZE = 20
+MAX_PULL_REQUEST_BATCH_PAGES = 5
 _ACTIONS_LOG_HOST = re.compile(r"productionresultssa[0-9]{1,3}\.blob\.core\.windows\.net\Z")
 TASK_BRANCH_PREFIX = "cyrene/assistant/"
 
@@ -538,13 +540,67 @@ class GitHubApi:
     def list_pull_requests(
         self, repository: Repository, state: str, token: str
     ) -> dict[str, Any]:
-        """Read a bounded pull-request page with a fixed state query value."""
+        """Read up to five bounded PR pages through the legacy state-only call.
+
+        The result is complete only when GitHub reports no next page. The fixed
+        page-count limit is returned as explicit truncation metadata.
+
+        中文：保留旧的 state-only 调用，在内部最多读取五个有界页面；到达
+        上限后明确标记截断，不把部分结果报告为完整列表。
+        """
 
         self._verify_configured_repository(repository, token)
-        query = urlencode({"state": state.lower(), "per_page": 100})
-        path = f"{self._repository_path(repository)}/pulls?{query}"
-        values = _json_array(self._request("GET", path, token, None))
-        return {"pull_requests": [_pull_request_projection(item) for item in values]}
+        pull_requests: list[dict[str, Any]] = []
+        page_number = 1
+        pages_read = 0
+        has_more = False
+
+        for _ in range(MAX_PULL_REQUEST_BATCH_PAGES):
+            query = urlencode(
+                {
+                    "state": state.lower(),
+                    "per_page": MAX_PULL_REQUEST_PAGE_SIZE,
+                    "page": page_number,
+                }
+            )
+            path = f"{self._repository_path(repository)}/pulls?{query}"
+            response = self._request("GET", path, token, None)
+            if response.status != 200:
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            values = _json_array(response)
+            if len(values) > MAX_PULL_REQUEST_PAGE_SIZE:
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+
+            next_page = _next_pull_request_cursor(
+                response.headers,
+                repository=repository,
+                state=state,
+                current_page=page_number,
+            )
+            has_more = next_page is not None
+            if not has_more and len(values) == MAX_PULL_REQUEST_PAGE_SIZE:
+                # Without a next link, a full page is ambiguous; probe the next
+                # bounded page rather than claiming the repository list ended.
+                has_more = True
+                next_page = str(page_number + 1)
+
+            pull_requests.extend(_pull_request_projection(item) for item in values)
+            pages_read += 1
+            if not has_more:
+                break
+            if pages_read < MAX_PULL_REQUEST_BATCH_PAGES and next_page is not None:
+                page_number = int(next_page)
+
+        result_limit_reached = has_more and pages_read >= MAX_PULL_REQUEST_BATCH_PAGES
+        complete = not has_more
+        return {
+            "pull_requests": pull_requests,
+            "pages_read": pages_read,
+            "complete": complete,
+            "truncated": not complete,
+            "has_more": has_more,
+            "result_limit_reached": result_limit_reached,
+        }
 
     def get_pull_request(
         self, repository: Repository, pull_number: int, token: str
@@ -1377,6 +1433,62 @@ def _json_array(response: HttpResponse) -> list[dict[str, Any]]:
     if not isinstance(decoded, list) or any(not isinstance(item, dict) for item in decoded):
         raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
     return decoded
+
+
+def _next_pull_request_cursor(
+    headers: Mapping[str, str],
+    *,
+    repository: Repository,
+    state: str,
+    current_page: int,
+) -> str | None:
+    """Validate a fixed-host GitHub Link and return its sequential page number."""
+
+    link = headers.get("link") or headers.get("Link")
+    if link is None or link == "":
+        return None
+    if not isinstance(link, str):
+        raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+
+    next_page: str | None = None
+    for segment in link.split(","):
+        match = re.fullmatch(r'\s*<([^<>]+)>\s*;\s*rel="?([a-z]+)"?\s*', segment)
+        if match is None:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        if match.group(2) != "next":
+            continue
+        if next_page is not None:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        try:
+            parsed = urlsplit(match.group(1))
+            parsed_port = parsed.port
+            query = parse_qs(parsed.query, strict_parsing=True)
+        except ValueError as error:
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE") from error
+
+        expected_paths = {
+            f"{GitHubApi._repository_path(repository)}/pulls",
+            f"/repositories/{quote(repository.repository_id, safe='')}/pulls",
+        }
+        page_values = query.get("page", [])
+        if (
+            parsed.scheme != "https"
+            or parsed.hostname is None
+            or parsed.hostname.lower() != GITHUB_HOST
+            or parsed_port not in (None, 443)
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.path not in expected_paths
+            or set(query) != {"page", "per_page", "state"}
+            or query.get("per_page") != [str(MAX_PULL_REQUEST_PAGE_SIZE)]
+            or query.get("state") != [state.lower()]
+            or len(page_values) != 1
+            or re.fullmatch(r"[1-9][0-9]{0,3}", page_values[0]) is None
+            or int(page_values[0]) != current_page + 1
+        ):
+            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+        next_page = page_values[0]
+    return next_page
 
 
 def _repository_projection(

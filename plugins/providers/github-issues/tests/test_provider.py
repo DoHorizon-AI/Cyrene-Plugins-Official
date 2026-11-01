@@ -25,6 +25,9 @@ from github_issues_provider.account_center import (
     AccountCenterUnavailable,
 )
 from github_issues_provider.github_api import (
+    MAX_PULL_REQUEST_BATCH_PAGES,
+    MAX_PULL_REQUEST_PAGE_SIZE,
+    MAX_RESPONSE_BYTES,
     GitHubApi,
     GitHubApiFailure,
     HttpResponse,
@@ -1268,7 +1271,9 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
             )
         if path.endswith("/branches?per_page=100"):
             return HttpResponse(200, {}, b'[{"name":"main","commit":{"sha":"abc1234567890"}}]')
-        if path.endswith("/pulls?state=open&per_page=100"):
+        if path.endswith(
+            f"/pulls?state=open&per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page=1"
+        ):
             return HttpResponse(
                 200,
                 {},
@@ -1328,6 +1333,230 @@ def test_github_repository_branch_pull_and_ci_reads_use_fixed_allowlisted_paths(
     assert all(
         path.startswith(("/repos/owner/project", "/installation/repositories")) for path in observed
     )
+
+
+def test_state_only_pull_request_list_batches_five_bounded_pages() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    synthetic = [
+        {
+            "number": index + 1,
+            "state": "closed",
+            "title": f"Synthetic pull request {index + 1}",
+            "body": "x" * 18_000,
+            "head": {"sha": f"{index + 1:040x}", "ref": f"feature-{index + 1}"},
+            "base": {"sha": "b" * 40, "ref": "develop"},
+        }
+        for index in range(120)
+    ]
+    legacy_body = json.dumps(synthetic[:100], separators=(",", ":")).encode()
+    assert len(legacy_body) > MAX_RESPONSE_BYTES
+    requested_pages: list[int] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        assert method == "GET"
+        assert host == "api.github.com"
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        prefix = "/repos/owner/project/pulls?state=all&per_page=20&page="
+        assert path.startswith(prefix)
+        page = int(path.removeprefix(prefix))
+        requested_pages.append(page)
+        start = (page - 1) * MAX_PULL_REQUEST_PAGE_SIZE
+        selected = synthetic[start : start + MAX_PULL_REQUEST_PAGE_SIZE]
+        response_body = json.dumps(selected, separators=(",", ":")).encode()
+        assert len(response_body) <= MAX_RESPONSE_BYTES
+        link = {
+            "link": (
+                "<https://api.github.com/repositories/12345/pulls?state=all&"
+                f"per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page={page + 1}>; rel=\"next\""
+            )
+        }
+        return HttpResponse(200, link, response_body)
+
+    result = GitHubApi(settings, transport=transport).list_pull_requests(
+        repository, "ALL", "token"
+    )
+
+    assert requested_pages == list(range(1, MAX_PULL_REQUEST_BATCH_PAGES + 1))
+    assert len(result["pull_requests"]) == 100
+    assert result["pages_read"] == MAX_PULL_REQUEST_BATCH_PAGES
+    assert result["complete"] is False
+    assert result["truncated"] is True
+    assert result["has_more"] is True
+    assert result["result_limit_reached"] is True
+    assert "page_cursor" not in result
+    assert "next_cursor" not in result
+    assert len(json.dumps(result, separators=(",", ":")).encode()) < MAX_RESPONSE_BYTES
+
+
+@pytest.mark.parametrize(
+    ("status", "expected_error"),
+    [(206, "INVALID_PROVIDER_RESPONSE"), (503, "UPSTREAM_UNAVAILABLE")],
+)
+def test_state_only_pull_request_list_does_not_return_partial_results_on_later_failure(
+    status: int, expected_error: str
+) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    pull_requests = [
+        {
+            "number": index + 1,
+            "state": "closed",
+            "title": f"Synthetic pull request {index + 1}",
+            "body": "",
+            "head": {"sha": f"{index + 1:040x}", "ref": "feature"},
+            "base": {"sha": "b" * 40, "ref": "develop"},
+        }
+        for index in range(MAX_PULL_REQUEST_PAGE_SIZE)
+    ]
+    requested_pages: list[int] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        page = int(path.rsplit("page=", 1)[1])
+        requested_pages.append(page)
+        if page == 1:
+            return HttpResponse(
+                200,
+                {
+                    "link": (
+                        "<https://api.github.com/repositories/12345/pulls?state=all&"
+                        f"per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page=2>; rel=\"next\""
+                    )
+                },
+                json.dumps(pull_requests).encode(),
+            )
+        return HttpResponse(status, {}, b"[]")
+
+    with pytest.raises(GitHubApiFailure, match=expected_error):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+    assert requested_pages == [1, 2]
+
+
+def test_state_only_pull_request_list_rejects_an_oversized_page() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        return HttpResponse(200, {}, b"x" * (MAX_RESPONSE_BYTES + 1))
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+
+
+@pytest.mark.parametrize(
+    "link",
+    [
+        (
+            "<https://example.invalid/repositories/12345/pulls?state=all&"
+            'per_page=20&page=2>; rel="next"'
+        ),
+        (
+            "<https://api.github.com/repositories/99999/pulls?state=all&"
+            'per_page=20&page=2>; rel="next"'
+        ),
+        (
+            "<https://api.github.com/repositories/12345/pulls?state=all&"
+            'per_page=100&page=2>; rel="next"'
+        ),
+        (
+            "<https://api.github.com/repositories/12345/pulls?state=all&"
+            'per_page=20&page=3>; rel="next"'
+        ),
+    ],
+)
+def test_state_only_pull_request_list_rejects_untrusted_or_inconsistent_next_link(
+    link: str,
+) -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    pull_request = _pull_request_projection_input()
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        return HttpResponse(200, {"link": link}, json.dumps([pull_request]).encode())
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+
+
+def test_full_pull_request_page_without_link_is_not_reported_complete() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    page_one = [
+        _pull_request_projection_input(
+            state="closed",
+            number=index + 1,
+            head={"sha": f"{index + 1:040x}", "ref": "feature"},
+        )
+        for index in range(MAX_PULL_REQUEST_PAGE_SIZE)
+    ]
+    requested_pages: list[int] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        page = int(path.rsplit("page=", 1)[1])
+        requested_pages.append(page)
+        if page == 1:
+            return HttpResponse(200, {}, json.dumps(page_one).encode())
+        return HttpResponse(
+            200,
+            {},
+            json.dumps([_pull_request_projection_input(number=21)]).encode(),
+        )
+
+    result = GitHubApi(settings, transport=transport).list_pull_requests(
+        repository, "ALL", "token"
+    )
+
+    assert requested_pages == [1, 2]
+    assert len(result["pull_requests"]) == 21
+    assert result["complete"] is True
+    assert result["truncated"] is False
+    assert result["has_more"] is False
+    assert result["result_limit_reached"] is False
 
 
 def _pull_request_projection_input(
