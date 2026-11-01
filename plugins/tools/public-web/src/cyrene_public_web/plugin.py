@@ -4,10 +4,16 @@ from __future__ import annotations
 
 import hashlib
 import html
+import importlib.util
 import json
 import os
 import re
+import signal
+import stat
+import subprocess
+import sys
 import tempfile
+import threading
 import time
 from collections.abc import Mapping
 from pathlib import Path
@@ -45,6 +51,8 @@ MAX_SEARCH_QUERY_CHARS = 500
 MAX_SEARCH_BACKEND_CURSOR = 2048
 MAX_BLOCK_TEXT_CHARS = 12_000
 MAX_DOCUMENT_BLOCKS = 100_000
+DOCUMENT_PARSER_TIMEOUT_SECONDS = 90
+_PARSER_SLOTS = threading.BoundedSemaphore(2)
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _HTML_TYPES = frozenset({"text/html", "application/xhtml+xml"})
 _MEDIA_BY_EXTENSION = {
@@ -573,15 +581,6 @@ class PublicWebProvider:
     ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         _check_cancelled(cancellation)
         parser = self._document_parser
-        parser_error_type: type[BaseException] | None = None
-        if parser is None:
-            try:
-                from document_parsing import DocumentParsingPlugin, ParserExecutionError
-
-                parser = DocumentParsingPlugin()
-                parser_error_type = ParserExecutionError
-            except ImportError:
-                raise PublicWebError("DOCUMENT_PARSER_UNAVAILABLE") from None
         try:
             with tempfile.TemporaryDirectory(
                 prefix="public-web-", dir=self._settings.state_dir
@@ -598,16 +597,36 @@ class PublicWebProvider:
                 )
                 with os.fdopen(descriptor, "wb") as stream:
                     stream.write(source_bytes)
-                parse_summary = parser.parse_document(
-                    source_path=source_path,
-                    payload_path=payload_path,
-                    blocks_path=blocks_path,
-                    result_path=result_path,
-                    source_ref=source_ref,
-                    source_digest=source_digest,
-                    filename=filename,
-                    media_type=media_type,
-                )
+                parse_arguments = {
+                    "source_path": str(source_path),
+                    "payload_path": str(payload_path),
+                    "blocks_path": str(blocks_path),
+                    "result_path": str(result_path),
+                    "source_ref": source_ref,
+                    "source_digest": source_digest,
+                    "filename": filename,
+                    "media_type": media_type,
+                }
+                if parser is None:
+                    summary_path = staging / "summary.json"
+                    parse_summary = _run_document_parser_worker(
+                        parse_arguments,
+                        request_path=staging / "request.json",
+                        summary_path=summary_path,
+                        state_dir=self._settings.state_dir,
+                        cancellation=cancellation,
+                    )
+                else:
+                    parse_summary = parser.parse_document(
+                        source_path=source_path,
+                        payload_path=payload_path,
+                        blocks_path=blocks_path,
+                        result_path=result_path,
+                        source_ref=source_ref,
+                        source_digest=source_digest,
+                        filename=filename,
+                        media_type=media_type,
+                    )
                 _check_cancelled(cancellation)
                 raw_blocks = _read_json_file(blocks_path, MAX_DOCUMENT_BLOCKS_BYTES)
                 report = _read_json_file(result_path, MAX_DOCUMENT_BLOCKS_BYTES)
@@ -615,9 +634,7 @@ class PublicWebProvider:
             raise
         except PublicWebError:
             raise
-        except Exception as error:
-            if parser_error_type is not None and isinstance(error, parser_error_type):
-                raise PublicWebError("PARSER_FAILURE") from None
+        except Exception:
             raise PublicWebError("DOCUMENT_READ_FAILED") from None
         if (
             not isinstance(parse_summary, Mapping)
@@ -659,6 +676,145 @@ def _tool_response(value: str) -> TypedPayload:
     response.outcome.is_error = False
     response.outcome.content.add().json.json = value
     return encode_response(METHOD_CALL_TOOL, response)
+
+
+def _run_document_parser_worker(
+    arguments: Mapping[str, str],
+    *,
+    request_path: Path,
+    summary_path: Path,
+    state_dir: Path,
+    cancellation: Any,
+) -> dict[str, Any]:
+    """Run the shared parser in a bounded child that can be killed on cancellation."""
+
+    try:
+        parser_spec = importlib.util.find_spec("document_parsing")
+    except (ImportError, ValueError):
+        parser_spec = None
+    if parser_spec is None or parser_spec.origin is None:
+        raise PublicWebError("DOCUMENT_PARSER_UNAVAILABLE")
+
+    deadline = time.monotonic() + DOCUMENT_PARSER_TIMEOUT_SECONDS
+    while not _PARSER_SLOTS.acquire(timeout=0.05):
+        _check_cancelled(cancellation)
+        if time.monotonic() >= deadline:
+            raise PublicWebError("PARSER_BUSY", retryable=True)
+    try:
+        _check_cancelled(cancellation)
+        request = json.dumps(dict(arguments), ensure_ascii=False, separators=(",", ":"))
+        descriptor = os.open(
+            request_path,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0),
+            0o600,
+        )
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            stream.write(request)
+        home = state_dir / "parser-home"
+        home.mkdir(mode=0o700, exist_ok=True)
+        home_mode = home.lstat().st_mode
+        if not stat.S_ISDIR(home_mode) or stat.S_IMODE(home_mode) & 0o077:
+            raise PublicWebError("PARSER_CONFIGURATION_INVALID")
+        environment = {
+            "PATH": os.environ.get("PATH", ""),
+            "HOME": str(home),
+            "PYTHONNOUSERSITE": "1",
+            "PYTHONUTF8": "1",
+            "PYTHONPATH": str(Path(parser_spec.origin).resolve().parent),
+            "HF_HUB_OFFLINE": "1",
+            "TRANSFORMERS_OFFLINE": "1",
+        }
+        if os.name == "nt":
+            for name in ("SYSTEMROOT", "WINDIR", "TEMP", "TMP"):
+                if name in os.environ:
+                    environment[name] = os.environ[name]
+        worker = Path(__file__).with_name("document_parser_worker.py").resolve()
+        options: dict[str, Any] = {}
+        if os.name == "nt":
+            options["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+        else:
+            options["start_new_session"] = True
+        try:
+            process = subprocess.Popen(
+                [sys.executable, "-B", str(worker), str(request_path)],
+                cwd=str(request_path.parent),
+                env=environment,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                **options,
+            )
+        except OSError:
+            raise PublicWebError("PARSER_UNAVAILABLE", retryable=True) from None
+        remaining = max(0.0, deadline - time.monotonic())
+        _wait_for_parser_process(process, timeout_seconds=remaining, cancellation=cancellation)
+        if process.returncode != 0:
+            raise PublicWebError("PARSER_FAILURE")
+        return _read_json_file(summary_path, 64 * 1024)
+    finally:
+        _PARSER_SLOTS.release()
+
+
+def _wait_for_parser_process(
+    process: subprocess.Popen[bytes],
+    *,
+    timeout_seconds: float,
+    cancellation: Any,
+) -> None:
+    """Wait for a child within one total timeout, killing its process group if needed."""
+
+    deadline = time.monotonic() + timeout_seconds
+    while process.poll() is None:
+        if cancellation is not None:
+            try:
+                _check_cancelled(cancellation)
+            except InterruptedError:
+                _stop_parser_process(process)
+                raise
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            _stop_parser_process(process)
+            raise PublicWebError("PARSER_TIMEOUT", retryable=True)
+        try:
+            process.wait(timeout=min(0.05, remaining))
+        except subprocess.TimeoutExpired:
+            continue
+    if cancellation is not None:
+        try:
+            _check_cancelled(cancellation)
+        except InterruptedError:
+            _stop_parser_process(process)
+            raise
+
+
+def _stop_parser_process(process: subprocess.Popen[bytes]) -> None:
+    """Terminate an isolated parser process group, escalating to a hard kill."""
+
+    if process.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            process.terminate()
+        else:
+            os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=0.5)
+        return
+    except subprocess.TimeoutExpired:
+        pass
+    try:
+        if os.name == "nt":
+            process.kill()
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    try:
+        process.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        return
 
 
 def _tool_error(

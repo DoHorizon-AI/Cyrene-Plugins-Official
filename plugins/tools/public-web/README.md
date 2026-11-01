@@ -15,6 +15,11 @@ library; HTML, text, Markdown, CSV, and supported images use its existing
 format-specific adapters. Results are returned as source-bound blocks with
 bounded cursors, content digests, and parser diagnostics.
 
+Document parsing runs in at most two isolated workers, each with a 90-second
+wall-clock limit. Cancellation and timeout terminate the worker process group;
+the source, request, and parser outputs live only in a private temporary
+directory. The child receives no caller, search, or artifact bridge secrets.
+
 The plugin does not invent search results when no backend is configured. Search
 and document results are bounded and cite a stable `source_ref`; changing the
 URL, query, actor, workspace, or source bytes invalidates the signed pagination
