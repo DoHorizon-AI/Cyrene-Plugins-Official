@@ -2903,8 +2903,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/README.md",
-      "sha256": "30e44c084a680dee6c35b26822a9ed23e6c36ebb5cd65d79ace1947fde40a615",
-      "size_bytes": 13781
+      "sha256": "71a43d63e59d53aec46f6bfaec0485fe9ba2e172a7d0a4ec9d9ba219978d3a1b",
+      "size_bytes": 14098
     },
     {
       "kind": "file",
@@ -2987,15 +2987,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/github_api.py",
-      "sha256": "f361fc2946e7c779da2f0cc4a04757165a1c8c3164c2d818d3c2a4bbebaf8740",
-      "size_bytes": 90545
+      "sha256": "f477cbe0c3841174169c44158f1857fbabee1371aa6e6e1ce66da8f4017ee214",
+      "size_bytes": 91727
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/plugin.py",
-      "sha256": "07a85ce04b87c81f782d18ac754cc243ecd3ba72cdd8e70d626b832deaad808d",
-      "size_bytes": 63263
+      "sha256": "31a0b744c9265d1aef9e2795cb13292dcde7ee6a6b485fd96e58677c8a4a86b1",
+      "size_bytes": 63400
     },
     {
       "kind": "file",
@@ -3029,8 +3029,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/tests/test_provider.py",
-      "sha256": "4dbac3043c1968191602590fb15cd90a5706a394e0f8dec9c2b5898150748c41",
-      "size_bytes": 116987
+      "sha256": "07d444a996e0216e013956d3859edf50ddb0746283aa7c34ef7fd30b279b47b6",
+      "size_bytes": 121067
     },
     {
       "kind": "file",

@@ -28,6 +28,7 @@ MAX_ACTIONS_LOG_EXCERPT_BYTES = 20_000
 MAX_ACTION_WORKFLOW_RUNS = 30
 MAX_PULL_REQUEST_PAGE_SIZE = 20
 MAX_PULL_REQUEST_PAGE_NUMBER = 1000
+MAX_PULL_REQUEST_BATCH_PAGES = 5
 _ACTIONS_LOG_HOST = re.compile(r"productionresultssa[0-9]{1,3}\.blob\.core\.windows\.net\Z")
 TASK_BRANCH_PREFIX = "cyrene/assistant/"
 
@@ -540,65 +541,89 @@ class GitHubApi:
         return _draft_pull_request_result(readback)
 
     def list_pull_requests(
-        self,
-        repository: Repository,
-        state: str,
-        token: str,
-        *,
-        page_cursor: str = "1",
+        self, repository: Repository, state: str, token: str, *, page_cursor: str | None = None
     ) -> dict[str, Any]:
-        """Read one bounded PR page and report whether another page exists."""
+        """Read a bounded PR batch, or one explicit page for a newer tool catalog."""
 
         self._verify_configured_repository(repository, token)
         if state not in {"OPEN", "CLOSED", "ALL"}:
             raise GitHubApiFailure("INVALID_ARGUMENTS")
         if (
-            not isinstance(page_cursor, str)
-            or re.fullmatch(r"[1-9][0-9]{0,3}", page_cursor) is None
-            or int(page_cursor) > MAX_PULL_REQUEST_PAGE_NUMBER
+            page_cursor is not None
+            and (
+                not isinstance(page_cursor, str)
+                or re.fullmatch(r"[1-9][0-9]{0,3}", page_cursor) is None
+                or int(page_cursor) > MAX_PULL_REQUEST_PAGE_NUMBER
+            )
         ):
             raise GitHubApiFailure("INVALID_ARGUMENTS")
-        page_number = int(page_cursor)
-        query = urlencode(
-            {
-                "state": state.lower(),
-                "per_page": MAX_PULL_REQUEST_PAGE_SIZE,
-                "page": page_number,
-            }
-        )
-        path = f"{self._repository_path(repository)}/pulls?{query}"
-        response = self._request("GET", path, token, None)
-        if response.status != 200:
-            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
-        values = _json_array(response)
-        if len(values) > MAX_PULL_REQUEST_PAGE_SIZE:
-            raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
-        next_cursor = _next_pull_request_cursor(
-            response.headers,
-            repository=repository,
-            state=state,
-            current_page=page_number,
-        )
-        has_more = next_cursor is not None
-        next_cursor_source = "github_link" if has_more else None
-        if not has_more and len(values) == MAX_PULL_REQUEST_PAGE_SIZE:
-            # A full page without a next link is ambiguous; request one more
-            # bounded page instead of claiming the list is complete.
-            has_more = True
-            next_cursor_source = "full_page_boundary"
-            if page_number < MAX_PULL_REQUEST_PAGE_NUMBER:
-                next_cursor = str(page_number + 1)
+        first_page = int(page_cursor) if page_cursor is not None else 1
+        batch_mode = page_cursor is None
+        page_count = MAX_PULL_REQUEST_BATCH_PAGES if batch_mode else 1
+        pull_requests: list[dict[str, Any]] = []
+        pages_read = 0
+        next_cursor: str | None = None
+        next_cursor_source: str | None = None
+        has_more = False
+        page_number = first_page
+
+        for _ in range(page_count):
+            query = urlencode(
+                {
+                    "state": state.lower(),
+                    "per_page": MAX_PULL_REQUEST_PAGE_SIZE,
+                    "page": page_number,
+                }
+            )
+            path = f"{self._repository_path(repository)}/pulls?{query}"
+            response = self._request("GET", path, token, None)
+            if response.status != 200:
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            values = _json_array(response)
+            if len(values) > MAX_PULL_REQUEST_PAGE_SIZE:
+                raise GitHubApiFailure("INVALID_PROVIDER_RESPONSE")
+            next_cursor = _next_pull_request_cursor(
+                response.headers,
+                repository=repository,
+                state=state,
+                current_page=page_number,
+            )
+            has_more = next_cursor is not None
+            next_cursor_source = "github_link" if has_more else None
+            if not has_more and len(values) == MAX_PULL_REQUEST_PAGE_SIZE:
+                # A full page without a next link is ambiguous; request one more
+                # bounded page instead of claiming the list is complete.
+                has_more = True
+                next_cursor_source = "full_page_boundary"
+                if page_number < MAX_PULL_REQUEST_PAGE_NUMBER:
+                    next_cursor = str(page_number + 1)
+            if has_more and page_number >= MAX_PULL_REQUEST_PAGE_NUMBER:
+                next_cursor = None
+            pull_requests.extend(_pull_request_projection(item) for item in values)
+            pages_read += 1
+            if not has_more:
+                next_cursor = None
+                break
+            if batch_mode:
+                if next_cursor is None:
+                    break
+                page_number = int(next_cursor)
+
         page_limit_reached = has_more and page_number >= MAX_PULL_REQUEST_PAGE_NUMBER
-        complete = page_number == 1 and not has_more
+        result_limit_reached = page_limit_reached or (
+            has_more and batch_mode and pages_read >= page_count
+        )
+        complete = first_page == 1 and not has_more
         return {
-            "pull_requests": [_pull_request_projection(item) for item in values],
-            "page_cursor": page_cursor,
+            "pull_requests": pull_requests,
+            "page_cursor": str(first_page),
+            "pages_read": pages_read,
             "complete": complete,
             "truncated": not complete,
             "has_more": has_more,
             "next_cursor": None if page_limit_reached else next_cursor,
             "next_cursor_source": next_cursor_source,
-            "result_limit_reached": page_limit_reached,
+            "result_limit_reached": result_limit_reached,
         }
 
     def get_pull_request(

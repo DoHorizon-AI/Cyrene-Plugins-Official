@@ -24,16 +24,18 @@ The update window accepts UTC RFC3339 with `Z` or `+00:00`; the provider
 normalizes both bounds to the documented UTC offset syntax before sending the
 fixed search query.
 Pull-request listing requests at most 20 records per page to stay below the
-fixed 1 MB upstream response limit. `page_cursor` is optional and defaults to
-`1`; the response reports `complete`, `truncated`, `has_more`, and `next_cursor`.
+fixed 1 MB upstream response limit. Calls without `page_cursor` read up to five
+pages sequentially and return at most 100 recent PRs, preserving the older
+state-only call shape. A call with an explicit `page_cursor` reads one page.
+The response reports `complete`, `truncated`, `has_more`, and `next_cursor`.
 Continue only when `has_more` is true and `next_cursor` is non-null; stop when
-the cursor is null and report `result_limit_reached` when true. `complete` means the current response alone
-contains the full list; pages after page 1 remain `truncated` even when they
-have no next page. A full page without a valid next link is treated as
-ambiguous and gets a conservative next cursor rather than being called
-complete. An oversized or malformed upstream page remains an explicit provider
-error; it is never converted to an empty list. The former 100-record request
-exceeded the limit for this repository (about 1.85 MB).
+the cursor is null and report `result_limit_reached` when true. `complete` means
+the current response alone contains the full list; explicit pages after page 1
+remain `truncated` even when they have no next page. A full page without a
+valid next link is treated as ambiguous and gets a conservative next cursor
+rather than being called complete. An oversized or malformed upstream page
+remains an explicit provider error; it is never converted to an empty list. The
+former 100-record request exceeded the limit for this repository (about 1.85 MB).
 CI status returns the raw combined commit-status state and separate status
 context/check-run counts. `required_contexts_verified` is always false because
 this operation does not read branch protection. A raw `PENDING` value with no
@@ -128,12 +130,12 @@ Issue 搜索始终固定限定在配置仓库并排除 PR。state、labels、更
 GitHub 短时重定向到文档所列的 `productionresultssa*.blob.core.windows.net` 主机，
 下载时不携带 App token，日志摘录会尽力过滤常见凭据格式（最多 200 行、20,000 字节）；
 此过滤无法识别所有可能的密钥格式。
-PR 列表每页最多请求 20 条，避免超过固定的 1 MB 上游响应上限。`page_cursor` 可选，默认第 1 页；
+PR 列表每页最多请求 20 条，避免超过固定的 1 MB 上游响应上限。不带 `page_cursor` 的调用会按顺序
+最多读取 5 页、返回最近最多 100 条 PR，兼容旧的 state-only 调用格式。显式传入 `page_cursor` 时只读一页。
 响应明确返回 `complete`、`truncated`、`has_more` 和 `next_cursor`；仅当 `has_more=true` 且
 `next_cursor` 非空时继续，cursor 为空时停止，并在 `result_limit_reached=true` 时明确报告页数上限。
-`complete` 表示当前这一条响应本身已包含全部 PR；即使后续页是最后一页，也仍为 `truncated`，
-因为它不包含前面页的数据。若满页响应没有可验证的 next link，会保守提供下一页 cursor，避免误报
-列表完整。
+`complete` 表示当前这一条响应本身已包含全部 PR；显式读取后续页时，即使该页是最后一页也仍为 `truncated`，
+因为它不包含前面页的数据。若满页响应没有可验证的 next link，会保守提供下一页 cursor，避免误报列表完整。
 上游单页超限或格式异常仍返回明确错误，绝不伪装成空列表。该仓库原先每次请求 100 条时响应约
 1.85 MB，会超过限制。
 CI 状态返回 GitHub combined commit-status 原始状态及 status context/check-run 独立计数。

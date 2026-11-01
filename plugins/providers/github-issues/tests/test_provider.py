@@ -26,6 +26,7 @@ from github_issues_provider.account_center import (
 )
 from github_issues_provider.github_api import (
     MAX_ACTION_WORKFLOW_RUNS,
+    MAX_PULL_REQUEST_BATCH_PAGES,
     MAX_PULL_REQUEST_PAGE_SIZE,
     MAX_RESPONSE_BYTES,
     GitHubApi,
@@ -238,7 +239,8 @@ class FakeGitHubApi:
         self.calls.append(("pull_requests", (*args, kwargs)))
         return {
             "pull_requests": [],
-            "page_cursor": kwargs.get("page_cursor", "1"),
+            "page_cursor": kwargs.get("page_cursor") or "1",
+            "pages_read": 1,
             "complete": True,
             "truncated": False,
             "has_more": False,
@@ -516,11 +518,12 @@ def test_pull_request_list_keeps_state_only_calls_on_first_page_and_accepts_curs
     assert first_page_error is False
     assert first_page["page_cursor"] == "1"
     assert first_page["complete"] is True
+    assert api.calls[0][1][-1]["page_cursor"] is None
     assert second_page_error is False
     assert second_page["page_cursor"] == "2"
     assert len(api.calls) == 2
     assert api.calls[0][0] == "pull_requests"
-    assert api.calls[0][1][-1]["page_cursor"] == "1"
+    assert api.calls[0][1][-1]["page_cursor"] is None
     assert api.calls[1][1][-1]["page_cursor"] == "2"
 
 
@@ -1552,7 +1555,7 @@ def test_pull_request_pages_stay_under_response_cap_and_report_next_cursor() -> 
         return HttpResponse(200, response_headers, response_body)
 
     api = GitHubApi(settings, transport=transport)
-    first = api.list_pull_requests(repository, "ALL", "token")
+    first = api.list_pull_requests(repository, "ALL", "token", page_cursor="1")
     second = api.list_pull_requests(repository, "ALL", "token", page_cursor="2")
 
     assert observed_paths == [
@@ -1573,6 +1576,111 @@ def test_pull_request_pages_stay_under_response_cap_and_report_next_cursor() -> 
     assert second["truncated"] is True
     assert second["has_more"] is False
     assert second["next_cursor"] is None
+
+
+def test_state_only_pull_request_list_batches_five_pages_with_a_hard_result_cap() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    synthetic = [
+        {
+            "number": index + 1,
+            "state": "closed",
+            "title": f"Synthetic pull request {index + 1}",
+            "body": "x" * 18_000,
+            "head": {"sha": f"{index + 1:040x}", "ref": f"feature-{index + 1}"},
+            "base": {"sha": "b" * 40, "ref": "develop"},
+        }
+        for index in range(120)
+    ]
+    legacy_body = json.dumps(synthetic[:100], separators=(",", ":")).encode()
+    assert len(legacy_body) > MAX_RESPONSE_BYTES
+    observed_pages: list[int] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        assert method == "GET"
+        assert host == "api.github.com"
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        page = int(path.rsplit("page=", 1)[1])
+        observed_pages.append(page)
+        start = (page - 1) * MAX_PULL_REQUEST_PAGE_SIZE
+        selected = synthetic[start : start + MAX_PULL_REQUEST_PAGE_SIZE]
+        response_body = json.dumps(selected, separators=(",", ":")).encode()
+        assert len(response_body) <= MAX_RESPONSE_BYTES
+        response_headers = {
+            "link": (
+                "<https://api.github.com/repositories/12345/pulls?state=all&"
+                f"per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page={page + 1}>; rel=\"next\""
+            )
+        }
+        return HttpResponse(200, response_headers, response_body)
+
+    result = GitHubApi(settings, transport=transport).list_pull_requests(
+        repository, "ALL", "token"
+    )
+
+    assert observed_pages == list(range(1, MAX_PULL_REQUEST_BATCH_PAGES + 1))
+    assert len(result["pull_requests"]) == 100
+    assert result["pages_read"] == MAX_PULL_REQUEST_BATCH_PAGES
+    assert result["complete"] is False
+    assert result["truncated"] is True
+    assert result["has_more"] is True
+    assert result["next_cursor"] == "6"
+    assert result["result_limit_reached"] is True
+    assert len(json.dumps(result, separators=(",", ":")).encode()) < MAX_RESPONSE_BYTES
+
+
+def test_state_only_pull_request_batch_fails_on_a_later_page_error() -> None:
+    settings = make_settings()
+    repository = settings.repositories[0]
+    pull_requests = [
+        {
+            "number": index + 1,
+            "state": "closed",
+            "title": f"Synthetic pull request {index + 1}",
+            "body": "",
+            "head": {"sha": f"{index + 1:040x}", "ref": "feature"},
+            "base": {"sha": "b" * 40, "ref": "develop"},
+        }
+        for index in range(MAX_PULL_REQUEST_PAGE_SIZE)
+    ]
+    requested_pages: list[int] = []
+
+    def transport(
+        method: str,
+        host: str,
+        path: str,
+        headers: Mapping[str, str],
+        body: bytes | None,
+    ) -> HttpResponse:
+        if path == "/repos/owner/project":
+            return HttpResponse(200, {}, b'{"id":12345,"full_name":"owner/project"}')
+        page = int(path.rsplit("page=", 1)[1])
+        requested_pages.append(page)
+        if page == 1:
+            return HttpResponse(
+                200,
+                {
+                    "link": (
+                        "<https://api.github.com/repositories/12345/pulls?state=all&"
+                        f"per_page={MAX_PULL_REQUEST_PAGE_SIZE}&page=2>; rel=\"next\""
+                    )
+                },
+                json.dumps(pull_requests).encode(),
+            )
+        return HttpResponse(206, {}, b"[]")
+
+    with pytest.raises(GitHubApiFailure, match="INVALID_PROVIDER_RESPONSE"):
+        GitHubApi(settings, transport=transport).list_pull_requests(
+            repository, "ALL", "token"
+        )
+    assert requested_pages == [1, 2]
 
 
 @pytest.mark.parametrize(

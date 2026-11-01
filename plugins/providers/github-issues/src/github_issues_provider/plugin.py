@@ -156,10 +156,10 @@ CANONICAL_TOOLS: tuple[dict[str, Any], ...] = (
         "provider_tool_id": "github.pull_requests.list",
         "display_name": "List GitHub Pull Requests",
         "description": (
-            "List one bounded page of pull requests for one configured repository. Omit "
-            "page_cursor for the first page. Continue only when has_more is true and "
-            "next_cursor is non-null; stop when next_cursor is null and report "
-            "result_limit_reached when true."
+            "List recent pull requests for one configured repository. When page_cursor is "
+            "omitted, read up to 100 results across at most five bounded pages. When supplied, "
+            "read one page. Continue only when has_more is true and next_cursor is non-null; "
+            "stop when it is null and report result_limit_reached when true."
         ),
         "input_schema": {
             "type": "object",
@@ -735,7 +735,9 @@ class GitHubIssuesProvider:
                     repository,
                     str(arguments["state"]),
                     credential.access_token,
-                    page_cursor=str(arguments.get("page_cursor", "1")),
+                    page_cursor=(
+                        str(arguments["page_cursor"]) if "page_cursor" in arguments else None
+                    ),
                 )
             elif tool_id == "github.pull_request.get" and repository is not None:
                 result = api.get_pull_request(
