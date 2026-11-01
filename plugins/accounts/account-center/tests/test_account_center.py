@@ -15,10 +15,6 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import pytest
-from cyrene_account_center_contracts import sign_context
-from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, DirectPluginFailure
-from cyrene_plugin_runtime.server import load_entrypoint, serve
-
 from account_center import store as account_store_module
 from account_center.github import (
     GitHubIdentityVerificationError,
@@ -33,6 +29,9 @@ from account_center.plugin import (
 )
 from account_center.security import canonical_json, payload_digest
 from account_center.store import AccountStore
+from cyrene_account_center_contracts import sign_context
+from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, DirectPluginFailure
+from cyrene_plugin_runtime.server import load_entrypoint, serve
 
 EXCHANGE = "exchange-service"
 CALLBACK = "oauth-callback-service"

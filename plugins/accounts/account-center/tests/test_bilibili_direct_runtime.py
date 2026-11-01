@@ -13,6 +13,7 @@ from uuid import uuid4
 
 import httpx
 import pytest
+from account_center import plugin as account_center_plugin_module
 from cyrene_account_center_contracts import (
     BilibiliOperation,
     canonical_json,
@@ -20,8 +21,6 @@ from cyrene_account_center_contracts import (
 )
 from cyrene_plugin_runtime import DirectPayload, DirectPluginClient
 from cyrene_plugin_runtime.server import load_entrypoint, serve
-
-from account_center import plugin as account_center_plugin_module
 
 _ACCOUNT_CENTER = "account.center.v1"
 _REQUEST_PREFIX = "type.googleapis.com/cyrene.account.center.v1."

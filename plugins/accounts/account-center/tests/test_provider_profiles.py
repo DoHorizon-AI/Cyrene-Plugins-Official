@@ -19,8 +19,6 @@ from typing import Any, ClassVar
 from urllib.parse import parse_qs, urlencode, urlparse
 
 import pytest
-from cyrene_account_center_contracts import canonical_json, sign_context
-
 from account_center import plugin as account_center_plugin_module
 from account_center.github import pkce_s256_challenge
 from account_center.github_app import GitHubAppError
@@ -46,6 +44,7 @@ from account_center.plugin import (
     AccountCenterPlugin,
     _validated_microsoft_graph_callback_uri,
 )
+from cyrene_account_center_contracts import canonical_json, sign_context
 
 EXCHANGE = "exchange-service"
 GITHUB_PROVIDER = "github-provider"

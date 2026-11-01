@@ -1153,15 +1153,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_account_center.py",
-      "sha256": "f1b7aa92b17f6fc9a484c07fd4fe229fa167eabf25e871eeaf20c2b973b6c95c",
-      "size_bytes": 53244
+      "sha256": "820668582ac449faed89b4e72cdfa6bac2ab1ed14f9cc75fb4859e62c2fb6678",
+      "size_bytes": 53243
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_bilibili_direct_runtime.py",
-      "sha256": "ddab31391cbbd98c911c67bcdffe11f67f9951c4c62fd35a508b3f043cf813e3",
-      "size_bytes": 21452
+      "sha256": "cc7703e804cb24ff29ac9fb2ccc42b986a4067256366693b8f71dc2e2fbf10f9",
+      "size_bytes": 21451
     },
     {
       "kind": "file",
@@ -1195,8 +1195,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "9a65f8ca220891ecb1857ce1f8a440bd7644f96531b056ad07d090439af67664",
-      "size_bytes": 157130
+      "sha256": "a1b903d5f9969402ca0c4683d6c059c285f33282a23afcd16ee32b6dfade198d",
+      "size_bytes": 157129
     },
     {
       "kind": "file",
