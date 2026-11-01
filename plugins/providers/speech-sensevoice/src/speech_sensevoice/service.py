@@ -247,7 +247,11 @@ class SenseVoiceService:
 
         return {
             "text": " ".join(texts),
-            "detected_language": detected_languages[0] if detected_languages else None,
+            "detected_language": (
+                _normalize_detected_language(detected_languages[0])
+                if detected_languages
+                else None
+            ),
             "duration_ms": duration_ms,
             "segments": segments,
         }
@@ -427,6 +431,15 @@ def _normalize_language(language_hint: str | None) -> str:
     if language not in {"auto", "zh", "en", "ja", "ko", "yue"}:
         raise SpeechFailure("INVALID_INPUT")
     return language
+
+
+def _normalize_detected_language(value: str) -> str | None:
+    """Convert SenseVoice's tokenized language marker to a stable short code."""
+
+    normalized = value.strip().lower()
+    if normalized.startswith("<|") and normalized.endswith("|>"):
+        normalized = normalized[2:-2]
+    return normalized if normalized in {"zh", "en", "ja", "ko", "yue"} else None
 
 
 def _make_segments(

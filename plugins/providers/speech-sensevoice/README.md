@@ -36,6 +36,13 @@ The model files are never included in the package. When a model or dependency is
 unavailable, the plugin reports a typed failure instead of returning a mock
 transcript.
 
+The real WSL CPU smoke used the official sherpa-onnx Chinese sample. The model
+returned “开饭时间早上9点至下午5点。” for the sample whose reference text is
+“开放时间早上9点至下午5点。”; the provider preserves this genuine model output.
+SenseVoice emits language markers such as `<|zh|>`; recognized markers are
+normalized to short language codes (`zh`, `en`, `ja`, `ko`, `yue`), and unknown
+markers are omitted.
+
 ## Checks
 
     pytest -q
