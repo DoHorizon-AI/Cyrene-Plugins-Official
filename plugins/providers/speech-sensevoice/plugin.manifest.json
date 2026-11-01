@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.providers.speech-sensevoice",
+  "name": "SenseVoice Speech Provider",
+  "version": "0.1.0",
+  "licenseExpression": "Apache-2.0",
+  "description": "Local CPU speech.provider.v1 transcription through operator-provisioned SenseVoice and FFmpeg.",
+  "kind": "capability-plugin",
+  "capabilities": ["speech.provider.v1"],
+  "supportedServices": ["Cyrene-Exchange", "Cyrene-Navigator"],
+  "methods": [
+    {
+      "name": "transcribe",
+      "capability": "speech.provider.v1",
+      "interfaceVersion": "1",
+      "executionMode": "service"
+    }
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "speech_sensevoice.plugin:SenseVoiceSpeechProvider",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": [
+        "-B",
+        "src/cyrene_plugin_runtime/bootstrap.py",
+        "--entrypoint",
+        "speech_sensevoice.plugin:SenseVoiceSpeechProvider"
+      ]
+    }
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": ["linux", "windows", "darwin"],
+    "architectures": ["x86_64", "aarch64"]
+  },
+  "configuration": {"schemaRef": "configuration.schema.json"},
+  "secrets": {"requiredSecretRefs": [], "optionalSecretRefs": []},
+  "state": {
+    "isStateful": false,
+    "storageCategory": "stateless",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}
