@@ -390,7 +390,10 @@ impl CyreneMemoryService {
                     })
                     .collect();
                 ExportMemoryResponse {
-                    result: Some(export_memory_response::Result::Batch(ExportBatch { items })),
+                    result: Some(export_memory_response::Result::Batch(ExportBatch {
+                        items,
+                        next_page_token: String::new(),
+                    })),
                 }
             }
             Err(e) => ExportMemoryResponse {

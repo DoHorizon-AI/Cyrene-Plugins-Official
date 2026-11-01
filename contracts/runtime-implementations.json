@@ -3,11 +3,6 @@
   "description": "Runtime packages that serve capability contracts without publishing a Plugin manifest package. tools/ci/capability_catalog.py merges these records with plugins/**/plugin.manifest.json.",
   "declaredWithoutContract": [
     {
-      "id": "speech.provider.v1",
-      "declaredBy": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
-      "notes": "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."
-    },
-    {
       "id": "rerank.provider.v1",
       "declaredBy": "runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs",
       "notes": "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."

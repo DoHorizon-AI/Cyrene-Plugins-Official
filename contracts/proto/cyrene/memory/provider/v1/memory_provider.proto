@@ -137,10 +137,14 @@ message ExportMemoryRequest {
   string tenant_id = 1;
   optional string scope = 2;
   optional int32 limit = 3;
+  // Opaque cursor for bounded export. Omitted starts at the first page.
+  optional string page_token = 4;
 }
 
 message ExportBatch {
   repeated MemoryItem items = 1;
+  // Empty when the export is complete; otherwise pass to the next request.
+  string next_page_token = 2;
 }
 
 message ExportMemoryResponse {
