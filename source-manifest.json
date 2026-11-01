@@ -306,8 +306,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/json/integration-support/v1/schema.json",
-      "sha256": "d66aba940ed683d9d4c07f825b27adbedf4ef9fcec5d694e07734530a28026db",
-      "size_bytes": 20871
+      "sha256": "45e41d7b1bfa3f6e7444eee7ef87f86da1329179c07c3920de12b94e6f873189",
+      "size_bytes": 27050
     },
     {
       "kind": "file",
@@ -971,8 +971,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/tool-provider-v1/test_integration_support_contracts.py",
-      "sha256": "c83a95aa566c3c975140a49b321981a31d52c6f45406eea8b6afd7b002e57379",
-      "size_bytes": 18154
+      "sha256": "c26debf54dfacae780bc332a525f1055d3a33d8ff1ba357bcf081e31f6018b41",
+      "size_bytes": 18274
     },
     {
       "kind": "file",
@@ -6949,8 +6949,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_integration_contracts/src/cyrene_integration_contracts/contracts.py",
-      "sha256": "b75e8941285f3fe99af63c28277b4f2265b328a464977b7ed870ad3b402f2b5c",
-      "size_bytes": 41448
+      "sha256": "f73a10e0636538e38ddf3f9e8c2582e6a0ab79e8af089652101f2037950c46a9",
+      "size_bytes": 42702
     },
     {
       "kind": "file",
@@ -6963,8 +6963,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_integration_contracts/src/cyrene_integration_contracts/schema.json",
-      "sha256": "d66aba940ed683d9d4c07f825b27adbedf4ef9fcec5d694e07734530a28026db",
-      "size_bytes": 20871
+      "sha256": "45e41d7b1bfa3f6e7444eee7ef87f86da1329179c07c3920de12b94e6f873189",
+      "size_bytes": 27050
     },
     {
       "kind": "file",
@@ -6972,6 +6972,13 @@
       "path": "sdk/python/cyrene_integration_contracts/tests/test_cloud_management_operations.py",
       "sha256": "6c154e0d7b10b88d0634d7459ee92b7f73e4eaca2c71ab3ec54fa719fb5f8d63",
       "size_bytes": 6176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_integration_contracts/tests/test_conversation_operations.py",
+      "sha256": "aac399a164d332d509f1474fbd4ff9e6c43589b23807b4e2b227d91b7960a8a6",
+      "size_bytes": 3453
     },
     {
       "kind": "file",
