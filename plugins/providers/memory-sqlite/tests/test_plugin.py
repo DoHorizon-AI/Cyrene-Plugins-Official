@@ -51,17 +51,28 @@ from memory_sqlite_provider.settings import ProviderSettings
 class FakeEmbeddingClient:
     """Return a deterministic non-zero vector as if supplied by a real binding."""
 
+    def __init__(self) -> None:
+        self.inputs: list[str] = []
+
     def embed(
         self, inputs: Any, *, cancellation: Any | None = None
     ) -> tuple[tuple[float, ...], ...]:
         del cancellation
+        self.inputs.extend(inputs)
         return tuple((1.0, 0.0, 0.0) for _ in inputs)
 
     def close(self) -> None:
         return None
 
 
-def _provider(tmp_path: Path, *, embedding_client: Any | None = None) -> MemorySqliteProvider:
+def _provider(
+    tmp_path: Path,
+    *,
+    embedding_client: Any | None = None,
+    embedding_profile_id: str | None = None,
+    document_prefix: str = "",
+    query_prefix: str = "",
+) -> MemorySqliteProvider:
     settings = ProviderSettings(
         database_path=tmp_path / "memory.sqlite3",
         embedding_model_id="embed-v1",
@@ -70,6 +81,9 @@ def _provider(tmp_path: Path, *, embedding_client: Any | None = None) -> MemoryS
         embedding_timeout_seconds=5,
         recall_batch_size=16,
         max_top_k=20,
+        embedding_profile_id=embedding_profile_id,
+        embedding_document_prefix=document_prefix,
+        embedding_query_prefix=query_prefix,
     )
     return MemorySqliteProvider(settings=settings, embedding_client=embedding_client)
 
@@ -266,6 +280,51 @@ def test_text_store_uses_only_the_injected_embedding_provider(tmp_path: Path) ->
             encode_store_request(StoreMemoryRequest("tenant-a", item)),
         )
         assert decode_store_response(result.value).item_id == "real-vector"
+    finally:
+        provider.on_shutdown(1000)
+
+
+def test_query_and_document_prefixes_use_a_distinct_embedding_profile(
+    tmp_path: Path,
+) -> None:
+    embedding_client = FakeEmbeddingClient()
+    provider = _provider(
+        tmp_path,
+        embedding_client=embedding_client,
+        embedding_profile_id="embed-v1-query-passage-v1",
+        document_prefix="passage: ",
+        query_prefix="query: ",
+    )
+    item = MemoryItem(
+        item_id="prefixed-memory",
+        tenant_id="tenant-a",
+        content="The user prefers concise replies.",
+    )
+    try:
+        stored = decode_store_response(
+            _invoke(
+                provider,
+                "store",
+                encode_store_request(StoreMemoryRequest("tenant-a", item)),
+            ).value
+        )
+        assert stored.item_id == "prefixed-memory"
+        assert embedding_client.inputs == ["passage: The user prefers concise replies."]
+
+        recalled = decode_recall_response(
+            _invoke(
+                provider,
+                "recall",
+                encode_recall_request(
+                    RecallMemoryRequest(tenant_id="tenant-a", query_text="concise replies")
+                ),
+            ).value
+        )
+        assert recalled.matches is not None
+        assert embedding_client.inputs[-1] == "query: concise replies"
+        assert recalled.matches[0].item.metadata["cyrene.embedding.model_id"] == (
+            "embed-v1-query-passage-v1"
+        )
     finally:
         provider.on_shutdown(1000)
 

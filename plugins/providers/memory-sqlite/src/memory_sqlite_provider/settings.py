@@ -38,6 +38,15 @@ class ProviderSettings:
     embedding_timeout_seconds: float
     recall_batch_size: int
     max_top_k: int
+    embedding_profile_id: str | None = None
+    embedding_document_prefix: str = ""
+    embedding_query_prefix: str = ""
+
+    @property
+    def vector_profile_id(self) -> str:
+        """Return the stable identity of model plus input preprocessing."""
+
+        return self.embedding_profile_id or self.embedding_model_id
 
     @classmethod
     def from_environment(cls) -> ProviderSettings:
@@ -58,6 +67,9 @@ class ProviderSettings:
         allowed = {
             "database_path",
             "embedding_model_id",
+            "embedding_profile_id",
+            "embedding_document_prefix",
+            "embedding_query_prefix",
             "embedding_dimensions",
             "embedding_endpoint",
             "embedding_timeout_seconds",
@@ -69,6 +81,23 @@ class ProviderSettings:
         try:
             path = _database_path(values.get("database_path"))
             model_id = _required_text(values.get("embedding_model_id"), "embedding_model_id", 256)
+            profile_id = values.get("embedding_profile_id")
+            document_prefix = _optional_text(
+                values.get("embedding_document_prefix", ""),
+                "embedding_document_prefix",
+            )
+            query_prefix = _optional_text(
+                values.get("embedding_query_prefix", ""), "embedding_query_prefix"
+            )
+            if (document_prefix or query_prefix) and profile_id is None:
+                raise ValueError(
+                    "embedding_profile_id is required when an embedding prefix is configured"
+                )
+            vector_profile_id = (
+                model_id
+                if profile_id is None
+                else _required_text(profile_id, "embedding_profile_id", 256)
+            )
             dimensions = _bounded_integer(
                 values.get("embedding_dimensions"), "embedding_dimensions", 1, 4096
             )
@@ -90,6 +119,9 @@ class ProviderSettings:
             embedding_timeout_seconds=timeout,
             recall_batch_size=batch_size,
             max_top_k=max_top_k,
+            embedding_profile_id=vector_profile_id,
+            embedding_document_prefix=document_prefix,
+            embedding_query_prefix=query_prefix,
         )
 
 
@@ -119,6 +151,12 @@ def _required_text(value: Any, name: str, maximum_bytes: int) -> str:
     if len(value.encode("utf-8")) > maximum_bytes:
         raise ValueError(f"{name} exceeds its byte limit")
     return value.strip()
+
+
+def _optional_text(value: Any, name: str) -> str:
+    if not isinstance(value, str) or len(value.encode("utf-8")) > 512:
+        raise ValueError(f"{name} must be text within 512 bytes")
+    return value
 
 
 def _bounded_integer(value: Any, name: str, minimum: int, maximum: int) -> int:

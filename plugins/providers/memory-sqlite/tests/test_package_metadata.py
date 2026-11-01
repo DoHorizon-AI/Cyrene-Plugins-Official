@@ -58,3 +58,10 @@ def test_activation_schema_rejects_missing_profile_and_remote_endpoint() -> None
         "embedding_endpoint": "grpc://model-service:18720",
     }
     assert list(validator.iter_errors(invalid))
+    prefixed = {
+        **invalid,
+        "embedding_endpoint": "grpc://127.0.0.1:18720",
+        "embedding_document_prefix": "passage: ",
+    }
+    assert list(validator.iter_errors(prefixed))
+    jsonschema.validate({**prefixed, "embedding_profile_id": "embed-v1-passage-v1"}, schema)

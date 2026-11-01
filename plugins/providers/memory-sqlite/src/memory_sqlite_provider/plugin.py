@@ -150,7 +150,9 @@ class MemorySqliteProvider:
             if not query_embedding:
                 if not request.query_text or not request.query_text.strip():
                     raise ValueError("query_embedding or query_text is required")
-                query_embedding = self._embed((request.query_text,), cancellation=cancellation)[0]
+                query_embedding = self._embed(
+                    (request.query_text,), role="query", cancellation=cancellation
+                )[0]
             results = self._require_store().recall(
                 tenant_id=request.tenant_id,
                 query_embedding=query_embedding,
@@ -202,15 +204,12 @@ class MemorySqliteProvider:
         raise ValueError("unsupported memory method")
 
     def _item_with_embedding(self, item: MemoryItem, *, cancellation: Any | None) -> MemoryItem:
-        vector = self._embed((item.content,), cancellation=cancellation)[0]
+        vector = self._embed((item.content,), role="document", cancellation=cancellation)[0]
         metadata = dict(item.metadata)
-        metadata.setdefault(
-            "cyrene.embedding.model_id", self._require_settings().embedding_model_id
-        )
-        metadata.setdefault(
-            "cyrene.embedding.dimensions",
-            str(self._require_settings().embedding_dimensions),
-        )
+        settings = self._require_settings()
+        metadata.setdefault("cyrene.embedding.model_id", settings.vector_profile_id)
+        metadata.setdefault("cyrene.embedding.dimensions", str(settings.embedding_dimensions))
+        metadata.setdefault("cyrene.embedding.provider_model_id", settings.embedding_model_id)
         return MemoryItem(
             item_id=item.item_id,
             tenant_id=item.tenant_id,
@@ -225,7 +224,11 @@ class MemorySqliteProvider:
         )
 
     def _embed(
-        self, inputs: tuple[str, ...], *, cancellation: Any | None
+        self,
+        inputs: tuple[str, ...],
+        *,
+        role: str,
+        cancellation: Any | None,
     ) -> tuple[tuple[float, ...], ...]:
         with self._initialization_lock:
             settings = self._require_settings()
@@ -242,7 +245,12 @@ class MemorySqliteProvider:
                     timeout_seconds=settings.embedding_timeout_seconds,
                 )
             client = self._embedding_client
-        return client.embed(inputs, cancellation=cancellation)
+            prefix = (
+                settings.embedding_query_prefix
+                if role == "query"
+                else settings.embedding_document_prefix
+            )
+        return client.embed(tuple(prefix + value for value in inputs), cancellation=cancellation)
 
     def _require_store(self) -> SQLiteMemoryStore:
         with self._initialization_lock:
@@ -250,7 +258,7 @@ class MemorySqliteProvider:
                 settings = self._require_settings()
                 self._store = SQLiteMemoryStore(
                     settings.database_path,
-                    embedding_model_id=settings.embedding_model_id,
+                    embedding_model_id=settings.vector_profile_id,
                     embedding_dimensions=settings.embedding_dimensions,
                     recall_batch_size=settings.recall_batch_size,
                     max_top_k=settings.max_top_k,

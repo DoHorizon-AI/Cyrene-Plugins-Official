@@ -41,6 +41,13 @@ and the database file is restricted to owner read/write. The endpoint is limited
 to a local loopback gRPC address; endpoint and model selection are owned by the
 host binding.
 
+Models that require different document and query input forms can set
+`embedding_document_prefix` and `embedding_query_prefix`. When either prefix is
+non-empty, `embedding_profile_id` is required and must identify that transform
+as well as the model. The provider applies the document prefix when embedding
+stored text and the query prefix when embedding `query_text`; host-supplied
+vectors must already use the same profile.
+
 The plugin uses SQLite WAL mode, `synchronous=FULL`, an idempotent schema
 migration, a process lock for connection access, and a transaction for each
 import batch. Import is idempotent by `(tenant_id, item_id)` and never merges
