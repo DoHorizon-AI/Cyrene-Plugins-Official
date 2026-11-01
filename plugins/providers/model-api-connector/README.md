@@ -1,19 +1,22 @@
 # Official Model API Connector
 
-`model.provider.v1` implementation that adapts the typed Cyrene chat contract
-onto one operator-configured OpenAI-compatible endpoint.
+`model.provider.v1` implementation that adapts typed Cyrene chat and embedding
+contracts onto one operator-configured OpenAI-compatible endpoint.
 
 ## What it owns
 
-Only the typed transport. The connector decodes a `ChatCompletionRequest`,
-calls `POST <base_url>/v1/chat/completions`, and re-encodes the answer as the
-contract's chunks:
+Only the typed transport. The connector calls the operation-specific OpenAI
+endpoint and re-encodes provider facts through the canonical contract:
 
 - `chat_completion` (interface 1) — the text-compatible method. The v1 codec
   cannot carry a role, tool calls or a reported total, so those are never
   claimed on this version.
 - `chat_completion_v2` (interface 2) — adds the assistant role preamble,
   indexed streamed tool-call fragments and the provider-reported total.
+- `embeddings` (interface 1) — calls `POST <base_url>/v1/embeddings`, validates
+  bounded ordered inputs and the returned vector batch, and preserves the
+  provider-reported model and dimensions. Provider rows are placed by their
+  explicit `index`; malformed, incomplete or non-finite vectors fail closed.
 
 Routing, credentials, quota, retries and resource lifecycle stay with the
 Product that resolved the binding. | 路由、凭据、配额与生命周期不属于插件。
@@ -22,8 +25,8 @@ Product that resolved the binding. | 路由、凭据、配额与生命周期不�
 
 - No vendor compatibility layer, no AstrBot/legacy adapter tree, no local model
   loading.
-- No invented usage: token counts are only reported when the provider reports
-  them.
+- No invented facts: token counts and embedding model identity are only
+  reported when the provider reports them.
 - No silent renumbering: a streamed tool fragment without an index is an error,
   because the gateway could not merge it correctly.
 
@@ -40,7 +43,8 @@ stream reports no chunks and no usage.
 | `CYRENE_CHAT_BASE_URL` | Upstream base URL; may carry a path prefix. Required. |
 | `CYRENE_CHAT_API_KEY` | Bearer credential sent to the upstream, when set. |
 | `CYRENE_CHAT_TIMEOUT` | Per-request timeout in seconds (default 30). |
-| `CYRENE_EMBEDDINGS_SUPPORTED` | Reserved: embeddings are not implemented, so the method fails closed with `METHOD_NOT_SUPPORTED`. |
+| `CYRENE_EMBEDDINGS_SUPPORTED` | Must be `true` to enable the embeddings method; defaults to fail-closed. |
+| `CYRENE_EMBEDDINGS_MODEL` | Embedding-only default model used when the typed request omits `model`. It never falls back to a chat model. |
 
 ## Running it
 
@@ -73,13 +77,14 @@ acceptance lane lives in `Cyrene-Exchange/tests/test_platform_integration.py`.
 
 - chat_completion（interface 1）：兼容文本的方法。v1 codec 无法承载 role、tool call 或上报的总数，因此此版本不会声称提供这些信息。
 - chat_completion_v2（interface 2）：增加 assistant role 前导内容、带索引的流式 tool-call 片段，以及 provider 上报的总数。
+- embeddings（interface 1）：调用 `POST <base_url>/v1/embeddings`，校验有界输入和完整向量批次，并保留 provider 返回的 model 和维数。根据显式 `index` 恢复顺序；畸形、不完整或非有限向量会失败关闭。
 
 路由、凭据、配额、重试和资源生命周期仍由解析 binding 的 Product 负责。
 
 ## 明确不负责的事项
 
 - 不提供厂商兼容层，不包含 AstrBot/legacy adapter 树，也不加载本地模型。
-- 不编造 usage：只有 provider 上报 token count 时才会返回。
+- 不编造事实：只有 provider 上报 token count 和 embedding model identity 时才会返回。
 - 不会静默重新编号：缺少 index 的流式 tool fragment 会被视为错误，因为 gateway 无法正确合并。
 
 ## 取消
@@ -93,7 +98,8 @@ connector 拥有上游 socket。on_cancel 会关闭该 socket，因此停止等�
 | CYRENE_CHAT_BASE_URL | 上游 base URL，可包含路径前缀，必填。 |
 | CYRENE_CHAT_API_KEY | 设置后，会作为 Bearer credential 发送给上游。 |
 | CYRENE_CHAT_TIMEOUT | 单请求超时时间（秒），默认 30。 |
-| CYRENE_EMBEDDINGS_SUPPORTED | 预留配置：尚未实现 embeddings，因此对应 method 会以 METHOD_NOT_SUPPORTED 失败关闭。 |
+| CYRENE_EMBEDDINGS_SUPPORTED | 必须设为 `true` 才启用 embeddings；默认失败关闭。 |
+| CYRENE_EMBEDDINGS_MODEL | typed request 未携带 `model` 时使用的独立 embedding 默认模型，不回退到 chat 模型。 |
 
 ## 运行
 

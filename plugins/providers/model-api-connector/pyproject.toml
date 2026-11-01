@@ -4,9 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cyrene-model-api-connector"
-version = "0.1.0"
-description = "OpenAI-compatible model.provider.v1 connector for one configured upstream endpoint"
+version = "0.2.0"
+description = "OpenAI-compatible model.provider.v1 connector for chat and embeddings"
 requires-python = ">=3.11"
+license = "Apache-2.0"
 dependencies = [
   "cyrene-plugin-runtime>=0.2,<0.3",
   "cyrene-model-provider-contracts>=0.1,<0.2",

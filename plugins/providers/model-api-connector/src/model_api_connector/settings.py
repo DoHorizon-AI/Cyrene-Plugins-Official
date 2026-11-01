@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -12,15 +13,17 @@ BASE_URL_ENV = "CYRENE_CHAT_BASE_URL"
 API_KEY_ENV = "CYRENE_CHAT_API_KEY"
 TIMEOUT_ENV = "CYRENE_CHAT_TIMEOUT"
 EMBEDDINGS_ENV = "CYRENE_EMBEDDINGS_SUPPORTED"
+EMBEDDINGS_MODEL_ENV = "CYRENE_EMBEDDINGS_MODEL"
 
 CHAT_COMPLETIONS_PATH = "/v1/chat/completions"
+EMBEDDINGS_PATH = "/v1/embeddings"
 DEFAULT_TIMEOUT_SECONDS = 30.0
 
 
 class ConfigurationError(ValueError):
     """The binding is unusable; the Plugin must fail closed, not guess.
 
-        中文:此绑定不可用;Plugin 必须按失败即拒绝处理,不得猜测。"""
+    中文:此绑定不可用;Plugin 必须按失败即拒绝处理,不得猜测。"""
 
 
 def _positive_float(raw: str | None, *, field: str, default: float) -> float:
@@ -30,7 +33,7 @@ def _positive_float(raw: str | None, *, field: str, default: float) -> float:
         value = float(raw)
     except ValueError as error:
         raise ConfigurationError(f"{field} must be a number") from error
-    if value <= 0:
+    if not math.isfinite(value) or value <= 0:
         raise ConfigurationError(f"{field} must be positive")
     return value
 
@@ -45,32 +48,48 @@ def _boolean(raw: str | None, *, default: bool) -> bool:
 class ProviderSettings:
     """The upstream endpoint a single binding is allowed to reach.
 
-        中文:单个绑定获准访问的上游端点。"""
+    中文:单个绑定获准访问的上游端点。"""
 
     base_url: str
     api_key: str | None = None
     timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS
     embeddings_supported: bool = False
+    embeddings_model: str | None = None
 
     def __post_init__(self) -> None:
         if not self.base_url.startswith(("http://", "https://")):
             raise ConfigurationError("base_url must be an http(s) URL")
-        if self.timeout_seconds <= 0:
-            raise ConfigurationError("timeout_seconds must be positive")
+        if not math.isfinite(self.timeout_seconds) or self.timeout_seconds <= 0:
+            raise ConfigurationError("timeout_seconds must be a finite positive number")
+        if self.embeddings_model is not None and (
+            not isinstance(self.embeddings_model, str) or not self.embeddings_model.strip()
+        ):
+            raise ConfigurationError("embeddings_model must be non-empty text when provided")
+        if self.embeddings_model is not None and len(self.embeddings_model) > 256:
+            raise ConfigurationError("embeddings_model exceeds the maximum length")
 
     @property
     def chat_completions_url(self) -> str:
         """Full upstream URL; the binding may carry a path prefix.
 
-            中文:完整上游 URL;绑定可以包含路径前缀。"""
+        中文:完整上游 URL;绑定可以包含路径前缀。"""
 
         return self.base_url.rstrip("/") + CHAT_COMPLETIONS_PATH
+
+    @property
+    def embeddings_url(self) -> str:
+        """Return the embeddings operation endpoint for this binding.
+
+        中文:返回此 binding 的 embeddings 操作 endpoint。
+        """
+
+        return self.base_url.rstrip("/") + EMBEDDINGS_PATH
 
     @classmethod
     def from_environment(cls, environ: Mapping[str, str] | None = None) -> ProviderSettings:
         """Read the operator-provided activation environment.
 
-            中文:读取操作者提供的激活环境。"""
+        中文:读取操作者提供的激活环境。"""
 
         source = os.environ if environ is None else environ
         raw_base = (source.get(BASE_URL_ENV) or "").strip()
@@ -86,4 +105,5 @@ class ProviderSettings:
                 default=DEFAULT_TIMEOUT_SECONDS,
             ),
             embeddings_supported=_boolean(source.get(EMBEDDINGS_ENV), default=False),
+            embeddings_model=(source.get(EMBEDDINGS_MODEL_ENV) or "").strip() or None,
         )
