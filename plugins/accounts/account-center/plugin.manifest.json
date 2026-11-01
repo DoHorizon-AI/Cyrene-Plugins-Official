@@ -35,7 +35,9 @@
     {"name": "complete_microsoft_graph_scope_upgrade", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteMicrosoftGraphLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
     {"name": "update_microsoft_graph_v2_scope", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphV2ScopeUpdateRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphV2ScopeUpdateResponse"},
     {"name": "begin_azure_devops_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginAzureDevOpsLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/MicrosoftGraphOAuthSession"},
-    {"name": "complete_azure_devops_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteAzureDevOpsLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"}
+    {"name": "complete_azure_devops_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteAzureDevOpsLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"},
+    {"name": "begin_bilibili_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/BeginBilibiliLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/BilibiliLinkSession"},
+    {"name": "complete_bilibili_link", "interfaceVersion": "1", "executionMode": "service", "inputSchema": "contracts/v1/schema.json#/$defs/CompleteBilibiliLinkRequest", "outputSchema": "contracts/v1/schema.json#/$defs/LinkedProviderProfileResponse"}
   ],
   "runtime": {
     "language": "python",
@@ -57,6 +59,7 @@
       "account-center/caller-hmac-keys/microsoft-graph-callback",
       "account-center/caller-hmac-keys/microsoft-graph-provider",
       "account-center/caller-hmac-keys/azure-devops-provider",
+      "account-center/caller-hmac-keys/bilibili-provider",
       "github-app/client-secret",
       "github-app/private-key",
       "huggingface/fine-grained-token",

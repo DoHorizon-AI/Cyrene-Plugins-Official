@@ -1,0 +1,52 @@
+[build-system]
+requires = ["setuptools>=80"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-bilibili-connector"
+version = "0.1.0"
+description = "Account-scoped Bilibili tools with private credential handling and write receipts"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-account-center-contracts>=0.1,<0.2",
+  "cyrene-integration-contracts>=0.1,<0.2",
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "cyrene-tool-provider-contracts>=0.1,<0.2",
+  "httpx>=0.28,<0.29",
+  "Pillow>=10.4,<13",
+  "qrcode>=8.0,<9",
+  "jsonschema>=4.23,<5",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.connectors.bilibili" = [
+  "plugin.manifest.json",
+  "configuration.schema.json",
+]
+
+[tool.uv.sources]
+cyrene-account-center-contracts = { path = "../../../sdk/python/cyrene_account_center_contracts" }
+cyrene-integration-contracts = { path = "../../../sdk/python/cyrene_integration_contracts" }
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+cyrene-tool-provider-contracts = { path = "../../../sdk/python/cyrene_tool_provider_contracts" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

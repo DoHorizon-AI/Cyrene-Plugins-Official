@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "28c8af846dba0daf206ffd3eb6f03a46a9cf2dff121a2e2aaa2480e949a0e9a0",
-      "size_bytes": 44975
+      "sha256": "7317bec78f41bb7fa0d6c77af7441ad63116ccc9e9613565d5e39c61507d4ddf",
+      "size_bytes": 45168
     },
     {
       "kind": "file",
@@ -1041,29 +1041,29 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/README.md",
-      "sha256": "9e2dbf43b63d0bbe107dca226190318929269348844248b87bd4af118c484b50",
-      "size_bytes": 17736
+      "sha256": "a8266210ee36379468e9f7c54f26bcf74afe221357e770bfda8f820cafe8e43c",
+      "size_bytes": 19907
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/contracts/v1/schema.json",
-      "sha256": "81051e07ca446bc0fd7b761e8930f8c9fd7c9e3928f683752846dc5a3e212be2",
-      "size_bytes": 29955
+      "sha256": "36b7ae5ceeb346a4387be5bea6f99a52a617b3723c16fcbe035535b0d7eef9a1",
+      "size_bytes": 31898
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/plugin.manifest.json",
-      "sha256": "efc27606ba02d5706ca331eb1a6247bf01c17c95e8f04dedf6ee3c4312cf9db4",
-      "size_bytes": 8564
+      "sha256": "2c2787d2f3a9fddaed092b0243f3b72db92f6b4436c02a119b767a4878c5d5aa",
+      "size_bytes": 9111
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/pyproject.toml",
-      "sha256": "cbc9f0e1773852fe2846f2e734b088f60dc6140faae3ad78bc04f0a2ceb33cec",
-      "size_bytes": 923
+      "sha256": "93a3694529ba93d92ab52454a169e3ccc787493d74a3cbf111f81fbd44f1c5d9",
+      "size_bytes": 1053
     },
     {
       "kind": "file",
@@ -1132,8 +1132,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/plugin.py",
-      "sha256": "892538da74b55ce66cf018d590716d6ec9f65b37b20d591597a5ae132249ac33",
-      "size_bytes": 237741
+      "sha256": "e281481c072a714f6f605c35fca3b0c374618aef4e1c52337262529114e12a5f",
+      "size_bytes": 254035
     },
     {
       "kind": "file",
@@ -1146,15 +1146,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/store.py",
-      "sha256": "e973d08e650302d9bded30582e4058e526822128974faa4c606e03621fd9ed91",
-      "size_bytes": 132517
+      "sha256": "2dac09eeefee59754501ebb13b400da1abbe6a1d1c840d0df3ba94e9d05c2bfe",
+      "size_bytes": 149300
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_account_center.py",
-      "sha256": "0f645f4bce5e0f857363db29fc54e6eb934874a4e54463667e0803f5361aface",
-      "size_bytes": 53110
+      "sha256": "f1b7aa92b17f6fc9a484c07fd4fe229fa167eabf25e871eeaf20c2b973b6c95c",
+      "size_bytes": 53244
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/accounts/account-center/tests/test_bilibili_direct_runtime.py",
+      "sha256": "ddab31391cbbd98c911c67bcdffe11f67f9951c4c62fd35a508b3f043cf813e3",
+      "size_bytes": 21452
     },
     {
       "kind": "file",
@@ -1188,8 +1195,134 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "96f665da54d17b6e2ff9ed77990d1cf0ca1b50215534cefe7b0e78521f19a36e",
-      "size_bytes": 146301
+      "sha256": "9a65f8ca220891ecb1857ce1f8a440bd7644f96531b056ad07d090439af67664",
+      "size_bytes": 157130
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/README.md",
+      "sha256": "6b156d634a0ee233e985664547d197a112c6050e6fc540cab8021017f901fbb1",
+      "size_bytes": 2324
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/configuration.schema.json",
+      "sha256": "edcf0b16b4e2e8d4a14037c4758e7ad33addd4202c1746b1a96a4314057eeb40",
+      "size_bytes": 3181
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/plugin.manifest.json",
+      "sha256": "2d8687fe1e5e02e5aa0a9ec0c80678f8abe7790eeb3e4bf8b9a4ab6a2113f743",
+      "size_bytes": 1661
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/pyproject.toml",
+      "sha256": "0fd038ce25fce93c74b14cb03cb23acdcc5728029d48ccf307de37c0310d2da6",
+      "size_bytes": 1442
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/requirements.lock",
+      "sha256": "fca130caccafffb20e14f76e612ff95b5d40e8cf6b551ab47bfc373c30db5fcd",
+      "size_bytes": 480
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/__init__.py",
+      "sha256": "213e819db44197604e2898535ec72e2101d263212ab2fd51690bab91188e7ae3",
+      "size_bytes": 111
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/account_center.py",
+      "sha256": "3e522271db0145aea81f1d3114bf56dec53ec2a23d8b1d006eb1140ae07d0026",
+      "size_bytes": 15329
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/api.py",
+      "sha256": "db4edbecb1abee6ff6633bc2715426100055281fc6cab37fca1f5eb7fd4cf657",
+      "size_bytes": 39021
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/plugin.py",
+      "sha256": "d8a13561efd7629bc84cbcf7858171db47159dcdc9d928575bceab41261c251f",
+      "size_bytes": 28246
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/receipts.py",
+      "sha256": "aff79d55166fab10c4e75e78833ff8b7851a9eb1dc29d77602631619f92c469a",
+      "size_bytes": 15164
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/settings.py",
+      "sha256": "c2c7487b840b0e4a1b0c6377a79f06aa67bcd8dad9316eeb78c19598081a6671",
+      "size_bytes": 12788
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/tool_catalog.py",
+      "sha256": "977f94fa65f8ff159be4999489711af96788b10e80c3b3bcc67152edf5c57fb6",
+      "size_bytes": 6808
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/src/cyrene_bilibili/trust.py",
+      "sha256": "3ebc7d432cf9f13469e2f5b075422429ae048087fece079679e47a5577d24d83",
+      "size_bytes": 6299
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/tests/README.md",
+      "sha256": "4047550a5b67608ee466ed289756f201fdc684997d326db9a77f449f70a9f4f4",
+      "size_bytes": 408
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/tests/test_api.py",
+      "sha256": "56fa2c4b207d5a519827bbb5749147078239bfc6bc54e5f2490727812e82b973",
+      "size_bytes": 7364
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/tests/test_provider.py",
+      "sha256": "9a40b83c979679d7f091a7fa9f3e81c7f25988acc5afe85599902bb9626a5d66",
+      "size_bytes": 16142
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/tests/test_receipts.py",
+      "sha256": "e4a127d700fe79f95fcc3bd5b1493b4496c0339e8e767765cd7d3dea77a4852c",
+      "size_bytes": 5145
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/connectors/bilibili/tests/test_settings.py",
+      "sha256": "b24d4429be2e658d0acba30d314abddd5e4a2d73918d287f3b5e04f5865a7205",
+      "size_bytes": 3412
     },
     {
       "kind": "file",
@@ -2903,8 +3036,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/README.md",
-      "sha256": "c1054854b93b1f36e47370e156a57e85afb6f06607474907bf551e15bdf8b6db",
-      "size_bytes": 10257
+      "sha256": "71a43d63e59d53aec46f6bfaec0485fe9ba2e172a7d0a4ec9d9ba219978d3a1b",
+      "size_bytes": 14098
     },
     {
       "kind": "file",
@@ -2924,8 +3057,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/plugin.manifest.json",
-      "sha256": "cc865212b8d3bd72f4c50bcb94aa9cb514f71d9f92b46887dbacef7acb994432",
-      "size_bytes": 2026
+      "sha256": "a9268ec2738139314e6257db0cf9dd951a4f3a30215df4e38a5c03e1b0ce2d32",
+      "size_bytes": 2045
     },
     {
       "kind": "file",
@@ -2987,15 +3120,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/github_api.py",
-      "sha256": "75e2a705aebb49b39a1d3a8068a00c97f223caeecc89c2c4e3360d5b03d6bc3b",
-      "size_bytes": 79333
+      "sha256": "f477cbe0c3841174169c44158f1857fbabee1371aa6e6e1ce66da8f4017ee214",
+      "size_bytes": 91727
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/plugin.py",
-      "sha256": "1adc93be318efa51add6223a6f843104798f37dc10a562a0327e275679dfbca7",
-      "size_bytes": 60729
+      "sha256": "31a0b744c9265d1aef9e2795cb13292dcde7ee6a6b485fd96e58677c8a4a86b1",
+      "size_bytes": 63400
     },
     {
       "kind": "file",
@@ -3008,8 +3141,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/trust.py",
-      "sha256": "3b55aac1bf7fb18d6c351c82df961f6ea6b5b43ad411bba34466935401cddee8",
-      "size_bytes": 4477
+      "sha256": "67751bfdd12086d3cdb4b99978507c831d64bd478c101d3e9c859901711f093e",
+      "size_bytes": 4511
     },
     {
       "kind": "file",
@@ -3029,8 +3162,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/tests/test_provider.py",
-      "sha256": "fa3f8354c88bfe18a2f5c124f8d8bd3997dbdffdadf8640ee49e54d322bb3c69",
-      "size_bytes": 96528
+      "sha256": "07d444a996e0216e013956d3859edf50ddb0746283aa7c34ef7fd30b279b47b6",
+      "size_bytes": 121067
     },
     {
       "kind": "file",
@@ -4494,6 +4627,160 @@
       "path": "plugins/tools/media/tests/test_settings.py",
       "sha256": "8426bd92527976c60ce398c09f20028106cb022cada41fa6ab927a232e00585f",
       "size_bytes": 3518
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/README.md",
+      "sha256": "de3487f1ca7542ca65282bed23b00caff9079dc03a6a1b7d5cdcdb377d355e6c",
+      "size_bytes": 2007
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/configuration.schema.json",
+      "sha256": "d8ef020e2fd2c32ad6efa21abe9f51c7f40fc84cf8e9ccf47493069ea4fcd289",
+      "size_bytes": 2708
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/plugin.manifest.json",
+      "sha256": "334855eeec4b699fd0856c4f07285244da37ef83eafef88f70793ae881866dfb",
+      "size_bytes": 1580
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/pyproject.toml",
+      "sha256": "8ba5f7aabbd10b5811ead59574ec0e9dd253d29315323246d236a5c7bad24f50",
+      "size_bytes": 1347
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/requirements.lock",
+      "sha256": "c02785cd91e0841f0a9ac16219d0dea467932773dbc984bea1fd499dfca72650",
+      "size_bytes": 1260
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/__init__.py",
+      "sha256": "4689a3eb234aa7e153c44cfeaea7426496e5208ff1b42972c2a18dc214a5fec9",
+      "size_bytes": 113
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/artifact_resolver.py",
+      "sha256": "5494847f92a682cff057f5e3cc55af10b2f1b10ccdc5aedf6dd23e7ad51172dd",
+      "size_bytes": 7480
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/cursors.py",
+      "sha256": "9c73f4b1405c8fb42aed7d8189d765ba921dfca21baef211bed119f70861978b",
+      "size_bytes": 4374
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/document_parser_worker.py",
+      "sha256": "a780b60e1825987e5140f26a79013add5a56a960d86df2f12c6bc41af9ecda8a",
+      "size_bytes": 3298
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/html_text.py",
+      "sha256": "61f30b5527cfd095764a17d79722f44b22d498d3f93829bf9a495437a1646f14",
+      "size_bytes": 3673
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/plugin.py",
+      "sha256": "b3cfbc9edac2696aa38a4cdea09482aa6606904e5f03380196ff97dae43f8bc4",
+      "size_bytes": 44342
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/public_http.py",
+      "sha256": "632c1dd223bcbb8ab6a59cc7dc74b2df65f6bc168cbeef699d53073473679ea3",
+      "size_bytes": 13569
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/settings.py",
+      "sha256": "d2a21239cbae4d661df8d753e43a8763c805600722eae285d45720b8083a3529",
+      "size_bytes": 13117
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/src/cyrene_public_web/tool_catalog.py",
+      "sha256": "08c1ac6b7f03e973609d8d5d5277aefe65aacb4c10efeb06587394adb40b9841",
+      "size_bytes": 2537
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/README.md",
+      "sha256": "c8717bcb860df8a76c8673920ba1ff996c06d65bc74b9baf38c61f8267565131",
+      "size_bytes": 403
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/test_artifact_resolver.py",
+      "sha256": "b9c5cb963b66b68f6825f7b29b7a0debb8bba625d2536b9ee5f9d870ba56b3fa",
+      "size_bytes": 4200
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/test_cursors.py",
+      "sha256": "1e163e3c38b877902505961e5d2de0ca8a06fa614d7af35a29cf07427789f661",
+      "size_bytes": 1474
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/test_html_text.py",
+      "sha256": "2b9c5ad7a80d507b93b6cd75301b00bddd39ee256ed191a343834f690c6896fc",
+      "size_bytes": 861
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/test_parser_worker.py",
+      "sha256": "d8626770685febc0bfd4db643eaf5085d0d5a1dbf5f57737ccfdfa8101291ef5",
+      "size_bytes": 1571
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/test_provider.py",
+      "sha256": "bfb8d44bea25f238f85986ab2335660316c2d21550192a406b03dfc33b8385eb",
+      "size_bytes": 13858
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/test_public_http.py",
+      "sha256": "9dcb8a9286a13b1c49ab8c7241d17c3de00a0d2568e49775e6cd096354f30029",
+      "size_bytes": 5213
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/public-web/tests/test_settings.py",
+      "sha256": "b49be3e2c7636ef9c5f97abe0d35b9db126d772a19aa76726ee082bbe9573ec0",
+      "size_bytes": 3251
     },
     {
       "kind": "file",
@@ -7509,14 +7796,14 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/README.md",
-      "sha256": "e0d84576c04a3e32eb813fa3a1dd06abef2e592ca8dfc8672915f0ed18ee89dd",
-      "size_bytes": 4954
+      "sha256": "ec907915f165ee2983d297ea3fe31668f1c5dd3888f5e683c1b7fa8377baf7e8",
+      "size_bytes": 5892
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/pyproject.toml",
-      "sha256": "15253f1325725b3182d3b2543b3c427ac685da178e353696a059b49d6d12b5df",
+      "sha256": "448bc24b9de6a754778d6002a8c02eefc63aad6d0f8d617450c9376839dcaa0e",
       "size_bytes": 479
     },
     {
@@ -7530,15 +7817,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/__init__.py",
-      "sha256": "4e75fb071d3ec985fede6250c533ddff24e0fa9c684b326e7f809e6d94e0ef23",
-      "size_bytes": 3065
+      "sha256": "df668140da574c6e1ed618eb1cf34716b17213383ee7b59dab991b42b7ee698b",
+      "size_bytes": 3295
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/contracts.py",
-      "sha256": "6b171479cf5c223ef62cb9841f36c4e371be45912616f5c2e86db0b219031316",
-      "size_bytes": 21327
+      "sha256": "5905ef42e7d22b3325aaa83ab89be5412e45331ba5c8058826968737c5cb7213",
+      "size_bytes": 25826
     },
     {
       "kind": "file",
@@ -7546,6 +7833,13 @@
       "path": "sdk/python/cyrene_account_center_contracts/src/cyrene_account_center_contracts/py.typed",
       "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_account_center_contracts/tests/test_bilibili_contracts.py",
+      "sha256": "7796d2d23bb81a789cee3ce6985f6b1d07b167896c9cd7543e4b8c6ea4259708",
+      "size_bytes": 2886
     },
     {
       "kind": "file",
@@ -7749,6 +8043,118 @@
       "path": "sdk/python/cyrene_memory_provider_contracts/tests/test_memory_codec.py",
       "sha256": "2fa4f132f65b11138191608f6e235c9a8e595f913ee0888db47249e191400339",
       "size_bytes": 2496
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/README.md",
+      "sha256": "cab5cf58c6c5d393c0c7b3eab4e7087bcfbca0ddd9dbabbd12cbe4cf4410815c",
+      "size_bytes": 2355
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/generate_bindings.py",
+      "sha256": "07219c7b22b00cbef58a43791090bd33db1bb2a0eadc79b6aab7c78ec13822da",
+      "size_bytes": 2647
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/pyproject.toml",
+      "sha256": "22a8a769c7c26a8f5cc54d778b6578b628af65d1f2dd21feb967c6ac114acea1",
+      "size_bytes": 926
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/README.md",
+      "sha256": "858768112cd10cc565c42a5e3d20a447b568b35a5f5db6eb74181b128a00adfc",
+      "size_bytes": 316
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/README.md",
+      "sha256": "f16e60a276b8e441f3bff41ca0c2c9ce35e45b6aa64e1adde4932ffb6b9b6cd8",
+      "size_bytes": 468
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/__init__.py",
+      "sha256": "c8175a5e9de84ddb514093969acffc02763cc7f160b111b8e3dd9453dd5cd75e",
+      "size_bytes": 2509
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/_generated/README.md",
+      "sha256": "98d0a4d2d04767ee29c53ed2eae471402de656475f9a0a47441c721feeea251c",
+      "size_bytes": 386
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/_generated/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size_bytes": 0
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/_generated/message_connector_pb2.py",
+      "sha256": "2236b0ac3215bfaa1be71e0ffecaacd697264c01b8af981356640f9e62f4dd17",
+      "size_bytes": 6945
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/codec.py",
+      "sha256": "bf7716cfeb161611e95bde41ee3fdc3c4d3d2a941cb0e317badad14dfcc386d4",
+      "size_bytes": 5740
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/schemas/README.md",
+      "sha256": "66e78dad741e383380c0f0c1aba89b7ba68d208a68551ceea1690fa44bc866bf",
+      "size_bytes": 410
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/schemas/inbound_request.schema.json",
+      "sha256": "9393a0341bdbdb112a55f9bccd028848d5ee2a3a5fe1a641cc97b14f74c22a2e",
+      "size_bytes": 993
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/schemas/request_response.schema.json",
+      "sha256": "1ac2e62deb044d3f5184961688baabffdbed8181be5f1206a5560bb09c4bbe85",
+      "size_bytes": 1324
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/src/cyrene_message_connector_contracts/validation.py",
+      "sha256": "af2eb082a2a2def915323166772aac42578c3b98112a3c718bd3a3b9981caea1",
+      "size_bytes": 13847
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_message_connector_contracts/tests/test_codec.py",
+      "sha256": "f3ea80e05170df3cbca9baef42e97d642508d6a51a2c93898786288bb700af61",
+      "size_bytes": 8252
     },
     {
       "kind": "file",
@@ -7985,8 +8391,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_product_subscriptions.py",
-      "sha256": "1ce48de383a1ca2aacea71c09febba7a2437807a68902c64c6be7d2efedadd37",
-      "size_bytes": 3935
+      "sha256": "ee9a9c6a8e287d7d5417e461a2345b2a4f24456fc5e5c6e06bf2da719a459c22",
+      "size_bytes": 3933
     },
     {
       "kind": "file",

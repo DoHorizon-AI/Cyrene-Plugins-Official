@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/tool.provider.v1.public-web/configuration.schema.json",
+  "title": "Public web tool binding",
+  "type": "object",
+  "required": ["trusted_callers", "artifact_bridge_origin", "hostSecretRefs"],
+  "properties": {
+    "trusted_callers": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "type": "object",
+        "required": ["caller_workload", "audience", "organization_id", "workspace_id", "issuer", "verification_key_ref"],
+        "properties": {
+          "caller_workload": {"type": "string", "minLength": 1, "maxLength": 256},
+          "audience": {"type": "string", "minLength": 1, "maxLength": 256},
+          "organization_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "workspace_id": {"type": "string", "minLength": 1, "maxLength": 256},
+          "issuer": {"type": "string", "minLength": 1, "maxLength": 512},
+          "verification_key_ref": {"const": "public-web/caller-verification-key"}
+        },
+        "additionalProperties": false
+      }
+    },
+    "search_endpoint": {"type": "string", "format": "uri", "minLength": 8, "maxLength": 2048},
+    "search_bearer_token_ref": {"const": "public-web/search-bearer-token"},
+    "artifact_bridge_origin": {
+      "type": "string",
+      "format": "uri",
+      "pattern": "^http://(127\\.0\\.0\\.1|localhost|\\[::1\\]):[0-9]{1,5}$",
+      "maxLength": 2048
+    },
+    "loopback_test_origins": {
+      "type": "array",
+      "maxItems": 10,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^http://(127\\.0\\.0\\.1|localhost|\\[::1\\]):[0-9]{1,5}$",
+        "maxLength": 256
+      }
+    },
+    "timeout_seconds": {"type": "number", "minimum": 1, "maximum": 20, "default": 8},
+    "max_page_size": {"type": "integer", "minimum": 1, "maximum": 20, "default": 10},
+    "hostSecretRefs": {
+      "type": "object",
+      "required": [
+        "public-web/caller-verification-key",
+        "public-web/cursor-hmac-key",
+        "public-web/state-dir",
+        "public-web/artifact-bridge-token"
+      ],
+      "properties": {
+        "public-web/caller-verification-key": {"$ref": "#/$defs/envName"},
+        "public-web/cursor-hmac-key": {"$ref": "#/$defs/envName"},
+        "public-web/state-dir": {"$ref": "#/$defs/envName"},
+        "public-web/artifact-bridge-token": {"$ref": "#/$defs/envName"},
+        "public-web/search-bearer-token": {"$ref": "#/$defs/envName"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {"envName": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}}
+}

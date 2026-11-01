@@ -4,7 +4,7 @@
   "name": "GitHub Issues Provider",
   "version": "0.2.0",
   "licenseExpression": "Apache-2.0",
-  "description": "Fixed GitHub Cloud issue, repository, Actions, and bounded task-branch tools with actor-bound Account Center leases and signed webhook normalization.",
+  "description": "Fixed GitHub Cloud issue, repository, commit-comparison, Actions, and bounded task-branch tools with actor-bound Account Center leases and signed webhook normalization.",
   "kind": "capability-plugin",
   "capabilities": ["tool.provider.v1"],
   "supportedServices": ["Cyrene-Exchange"],
