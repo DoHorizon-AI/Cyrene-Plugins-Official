@@ -105,6 +105,7 @@ PROVIDER_OPERATIONS_BY_PROVIDER = {
         "github.branches.list",
         "github.pull_requests.list",
         "github.pull_request.get",
+        "github.commits.compare",
         "github.actions.runs.list",
         "github.ci.status",
         "github.issues.search",
@@ -4665,6 +4666,9 @@ def _safe_provider_target(provider: str, operation_id: str, value: Any) -> dict[
         elif operation_id == "github.pull_request.get":
             allowed.add("pull_number")
             required.add("pull_number")
+        elif operation_id == "github.commits.compare":
+            allowed.update({"base_sha", "head_sha"})
+            required.update({"base_sha", "head_sha"})
         elif operation_id == "github.actions.runs.list":
             allowed.update({"branch", "commit_sha"})
         elif operation_id == "github.ci.status":
@@ -4738,6 +4742,14 @@ def _safe_provider_target(provider: str, operation_id: str, value: Any) -> dict[
             ):
                 raise AccountCenterError("invalid_request")
             normalized["commit_sha"] = commit_sha
+        for field in ("base_sha", "head_sha"):
+            if field in target:
+                commit_sha = target[field]
+                if not isinstance(commit_sha, str) or not re.fullmatch(
+                    r"[0-9a-fA-F]{40}", commit_sha
+                ):
+                    raise AccountCenterError("invalid_request")
+                normalized[field] = commit_sha.lower()
         return normalized
     if provider == "huggingface":
         if operation_id == "huggingface.vendor.cli.execute":

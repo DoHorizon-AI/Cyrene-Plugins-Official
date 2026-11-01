@@ -56,6 +56,7 @@ def verify_exchange_context(
         "github.file.get",
         "github.pull_requests.list",
         "github.pull_request.get",
+        "github.commits.compare",
         "github.pull_request.draft.find",
         "github.actions.runs.list",
         "github.ci.status",
