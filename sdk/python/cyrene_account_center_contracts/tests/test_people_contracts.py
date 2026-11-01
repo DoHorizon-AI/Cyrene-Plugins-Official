@@ -12,6 +12,7 @@ from cyrene_account_center_contracts import (
     DeclareAccountHandleRequest,
     FindPeopleRequest,
     RetractAccountHandleRequest,
+    RevokePersonLinksRequest,
 )
 
 _SCHEMA = (
@@ -26,6 +27,7 @@ _SCHEMA = (
         (DeclareAccountHandleRequest, "DeclareAccountHandleRequest"),
         (RetractAccountHandleRequest, "RetractAccountHandleRequest"),
         (FindPeopleRequest, "FindPeopleRequest"),
+        (RevokePersonLinksRequest, "RevokePersonLinksRequest"),
     ],
 )
 def test_request_fields_match_the_account_center_schema(

@@ -766,19 +766,130 @@ def test_find_people_is_exchange_only_scoped_and_metadata_only(tmp_path: Path) -
     assert [a["source"] for a in remaining["user-43"]] == ["declared"]
 
 
-def test_schema_v10_database_gains_the_people_tables(tmp_path: Path) -> None:
+def test_schema_v10_database_gains_the_people_and_audit_tables(tmp_path: Path) -> None:
     db_path = tmp_path / "accounts.sqlite"
     Harness(db_path)
     with sqlite3.connect(db_path) as db:
+        db.execute("DROP TABLE account_admin_audit")
         db.execute("DROP TABLE account_handles")
         db.execute("DROP TABLE workspace_people")
         db.execute("PRAGMA user_version=10")
     store = AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
         tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        assert {"workspace_people", "account_handles"} <= tables
+        assert {"workspace_people", "account_handles", "account_admin_audit"} <= tables
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
+
+
+ADMIN = {**ACTOR, "subject": "admin-1"}
+
+
+def _revoke(
+    harness: Harness, key: str, *, subject: str, provider: str, actor: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    return harness.call(
+        "revoke_person_links",
+        {"subject": subject, "provider": provider, "idempotency_key": key},
+        actor=ADMIN if actor is None else actor,
+    )
+
+
+def test_revoke_person_links_dissolves_the_link_through_the_owner_path(tmp_path: Path) -> None:
+    db_path = tmp_path / "accounts.sqlite"
+    harness = Harness(db_path)
+    harness.link_github()
+
+    result = _revoke(harness, "rev-1", subject="user-42", provider="github")
+
+    assert result == {
+        "subject": "user-42",
+        "provider": "github",
+        "unlinked": 1,
+        "skipped_shared": 0,
+        "results": [{"kind": "account", "status": "unlinked"}],
+    }
+    # The provider was asked to revoke the token, exactly as for the owner's own unlink.
+    assert harness.github.revoked == [TOKEN]
+    assert harness.call("list_links", {})["links"][0]["status"] == "unlinked"
+    assert _find(harness)["people"] == []
+
+    # Replaying the same key returns the stored result and revokes nothing twice.
+    assert _revoke(harness, "rev-1", subject="user-42", provider="github") == result
+    assert harness.github.revoked == [TOKEN]
+    # With nothing left to dissolve a new key still succeeds.
+    again = _revoke(harness, "rev-2", subject="user-42", provider="github")
+    assert (again["unlinked"], again["results"]) == (0, [])
+
+    with sqlite3.connect(db_path) as db:
+        audit = db.execute(
+            "SELECT actor_subject,action,target_subject,provider,unlinked,skipped_shared "
+            "FROM account_admin_audit ORDER BY created_at,rowid"
+        ).fetchall()
+    assert audit == [
+        ("admin-1", "revoke_person_links", "user-42", "github", 1, 0),
+        ("admin-1", "revoke_person_links", "user-42", "github", 0, 0),
+    ]
+
+
+def test_revoke_person_links_reports_unknown_revocation_and_stays_in_scope(tmp_path: Path) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    harness.link_github()
+    other_workspace = {**ACTOR, "workspace_id": "workspace-b"}
+    _link_github_as(harness, other_workspace, "666666")
+    harness.github.revoke_error = AccountCenterError("provider_unavailable")
+
+    result = _revoke(harness, "rev-1", subject="user-42", provider="github")
+
+    # Local access is gone even though the provider outcome is not knowable.
+    assert result["unlinked"] == 1
+    assert result["results"] == [{"kind": "account", "status": "revocation_unknown"}]
+    # The same subject's link in another workspace is untouched.
+    people = harness.call("find_people", {}, actor={**ADMIN, "workspace_id": "workspace-b"})["people"]
+    assert [(p["subject"], [a["status"] for a in p["accounts"]]) for p in people] == [
+        ("user-42", ["active"])
+    ]
+
+
+def test_revoke_person_links_is_exchange_only_and_validates_input(tmp_path: Path) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    harness.link_github()
+    with pytest.raises(AccountCenterError, match="untrusted_caller"):
+        harness.call(
+            "revoke_person_links",
+            {"subject": "user-42", "provider": "github", "idempotency_key": "k"},
+            caller=PROVIDER,
+            actor=ADMIN,
+        )
+    invalid = [
+        {"provider": "github"},
+        {"subject": "user-42"},
+        {"subject": "user-42", "provider": "gitlab"},
+        {"subject": "user 42", "provider": "github"},
+        {"subject": "user-42", "provider": "github", "extra": 1},
+    ]
+    for index, fields in enumerate(invalid):
+        with pytest.raises(AccountCenterError, match="invalid_request"):
+            harness.call(
+                "revoke_person_links", {**fields, "idempotency_key": f"bad-{index}"}, actor=ADMIN
+            )
+
+    # An unknown person is not an error, and nothing was revoked along the way.
+    assert _revoke(harness, "unknown", subject="nobody", provider="github")["unlinked"] == 0
+    assert harness.github.revoked == []
+
+
+def test_schema_v11_database_gains_the_admin_audit_table(tmp_path: Path) -> None:
+    db_path = tmp_path / "accounts.sqlite"
+    Harness(db_path)
+    with sqlite3.connect(db_path) as db:
+        db.execute("DROP TABLE account_admin_audit")
+        db.execute("PRAGMA user_version=11")
+    store = AccountStore(db_path)
+    with store._connect() as db:
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
+        tables = {row[0] for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert "account_admin_audit" in tables
 
 
 def test_wecom_challenge_requires_trusted_source_and_primary_confirmation(
@@ -1434,7 +1545,7 @@ def test_schema_v1_migration_preserves_legacy_data_and_fails_closed_on_wecom_tup
     store = AccountStore(db_path)
 
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
     links = store.list_accounts(ACTOR_ANCHOR(), ACTOR["workspace_id"])
     assert links[0]["source_authority"] == "wecom:tenant:9/bot/main"
     assert links[0]["status"] == "reauthorization_required"
@@ -1482,7 +1593,7 @@ def test_fresh_schema_ddl_rolls_back_as_one_transaction(
 
     store = AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
 
 
 def test_direct_runtime_rejects_duplicate_json_keys_and_wrong_type_url(

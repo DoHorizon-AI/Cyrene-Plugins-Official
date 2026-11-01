@@ -38,6 +38,7 @@ capabilities:
       - register_host_identity_profile
       - resolve_linked_sender
       - retract_account_handle
+      - revoke_person_links
       - rotate_huggingface_profile
       - unlink
       - unlink_provider_profile
@@ -77,6 +78,7 @@ capabilities:
           - register_host_identity_profile
           - resolve_linked_sender
           - retract_account_handle
+          - revoke_person_links
           - rotate_huggingface_profile
           - unlink
           - unlink_provider_profile

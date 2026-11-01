@@ -395,6 +395,18 @@ class FindPeopleRequest:
     limit: int | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class RevokePersonLinksRequest:
+    """Dissolve one person's verified links to one provider, on their behalf.
+
+    Shared workspace-operator profiles are never touched by this request.
+    """
+
+    subject: str
+    provider: str
+    idempotency_key: str
+
+
 class MicrosoftGraphOperation(StrEnum):
     """Closed Microsoft Graph operation names accepted by Account Center."""
 

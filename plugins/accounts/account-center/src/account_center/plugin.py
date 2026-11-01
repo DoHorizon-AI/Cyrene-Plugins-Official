@@ -72,6 +72,7 @@ METHODS = (
     "declare_account_handle",
     "retract_account_handle",
     "find_people",
+    "revoke_person_links",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -205,6 +206,7 @@ EXCHANGE_ONLY_METHODS = {
     "declare_account_handle",
     "retract_account_handle",
     "find_people",
+    "revoke_person_links",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -251,6 +253,7 @@ MAX_WORKSPACE_LINKS = 5000
 IDEMPOTENT_METHODS = {
     "declare_account_handle",
     "retract_account_handle",
+    "revoke_person_links",
     "begin_link",
     "confirm_wecom_link",
     "unlink",
@@ -299,6 +302,7 @@ def _action_type_name(action: str, suffix: str) -> str:
         "declare_account_handle": "DeclareAccountHandle",
         "retract_account_handle": "RetractAccountHandle",
         "find_people": "FindPeople",
+        "revoke_person_links": "RevokePersonLinks",
         "get_authorization": "GetAuthorization",
         "unlink": "Unlink",
         "create_credential_lease": "CreateCredentialLease",
@@ -728,6 +732,8 @@ class AccountCenterPlugin:
             return self._retract_account_handle(request, anchor, idempotency_key_hash)
         if method == "find_people":
             return self._find_people(request, anchor)
+        if method == "revoke_person_links":
+            return self._revoke_person_links(request, anchor, idempotency_key_hash)
         if method == "get_authorization":
             return self._get_authorization(request, anchor)
         if method == "unlink":
@@ -1116,6 +1122,66 @@ class AccountCenterPlugin:
             now=int(self._now()),
             command=self._idempotency_command(idempotency_key_hash),
         )
+
+    def _revoke_person_links(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Dissolve one person's verified links to one provider on their behalf.
+
+        Each link goes through the same unlink path its owner would use, so
+        credentials are cleared, leases invalidated, and the provider is asked to
+        revoke the token. Shared workspace-operator profiles are never touched;
+        they are counted in ``skipped_shared`` for a deliberate follow-up. Links
+        already dissolved stay dissolved if a later one fails, so a retry with a
+        new key finishes the rest. The action is audited.
+        中文：以本人身份走既有解除路径；共享运维档案不动，只计数；全程审计。
+        """
+
+        _require_fields(request, {"subject", "provider"})
+        subject = people_directory.normalize_subject(request["subject"])
+        provider = people_directory.normalize_provider(
+            request["provider"], allowed=people_directory.FILTER_PROVIDERS
+        )
+        target = Anchor(
+            issuer=anchor.issuer,
+            subject=subject,
+            organization_id=anchor.organization_id,
+            workspace_id=anchor.workspace_id,
+        )
+        account_refs, profiles = self._store.list_active_links(target, provider)
+        results: list[dict[str, str]] = []
+        skipped_shared = 0
+        for account_ref in account_refs:
+            outcome = self._unlink({"account_ref": account_ref}, target)
+            results.append({"kind": "account", "status": outcome["status"]})
+        for profile_ref, access_mode in profiles:
+            if access_mode == "workspace_operator":
+                skipped_shared += 1
+                continue
+            self._store.unlink_provider_profile(profile_ref, target, now=int(self._now()))
+            results.append({"kind": "profile", "status": "unlinked"})
+        response: dict[str, Any] = {
+            "subject": subject,
+            "provider": provider,
+            "unlinked": len(results),
+            "skipped_shared": skipped_shared,
+            "results": results,
+        }
+        self._store.record_admin_action(
+            anchor=anchor,
+            action="revoke_person_links",
+            target_subject=subject,
+            provider=provider,
+            unlinked=len(results),
+            skipped_shared=skipped_shared,
+            now=int(self._now()),
+            result=response,
+            command=self._idempotency_command(idempotency_key_hash),
+        )
+        return response
 
     def _find_people(self, request: Mapping[str, Any], anchor: Anchor) -> dict[str, Any]:
         """Answer who owns an account and which accounts a person has.

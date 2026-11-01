@@ -17,7 +17,7 @@ from typing import Any
 
 from .models import AccountCenterError, Anchor
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 IDEMPOTENCY_RETENTION_SECONDS = 86_400
 
 
@@ -598,7 +598,22 @@ class AccountStore:
                     "CREATE INDEX IF NOT EXISTS account_handle_person "
                     "ON account_handles(person_ref,status)"
                 )
-            db.execute("PRAGMA user_version = 11")
+            if current < 12:
+                # Audit trail for administrator actions taken on another person's links.
+                db.execute(
+                    "CREATE TABLE IF NOT EXISTS account_admin_audit ("
+                    "action_ref TEXT PRIMARY KEY,organization_id TEXT NOT NULL,"
+                    "workspace_id TEXT,actor_issuer TEXT NOT NULL,actor_subject TEXT NOT NULL,"
+                    "action TEXT NOT NULL CHECK(action IN ('revoke_person_links')),"
+                    "target_subject TEXT NOT NULL,provider TEXT NOT NULL,"
+                    "unlinked INTEGER NOT NULL,skipped_shared INTEGER NOT NULL,"
+                    "created_at INTEGER NOT NULL)"
+                )
+                db.execute(
+                    "CREATE INDEX IF NOT EXISTS account_admin_audit_scope "
+                    "ON account_admin_audit(organization_id,ifnull(workspace_id,''),created_at)"
+                )
+            db.execute("PRAGMA user_version = 12")
             if 0 < current < SCHEMA_VERSION:
                 # FK checks are connection-local and were disabled only to allow
                 # the parent-table rebuild. Check all rows before commit so a
@@ -2067,6 +2082,76 @@ class AccountStore:
                 (organization_id, workspace_id, limit + 1),
             ).fetchall()
         return list(accounts), list(profiles)
+
+    def list_active_links(
+        self, anchor: Anchor, provider: str
+    ) -> tuple[list[str], list[tuple[str, str]]]:
+        """Return one owner's active link refs for one provider.
+
+        Accounts come back as refs; profiles as ``(ref, access_mode)`` so the
+        caller can leave shared workspace-operator profiles alone.
+        中文：返回某人在某平台的有效关联引用；共享运维档案附带访问模式。
+        """
+
+        owner = (anchor.issuer, anchor.subject, anchor.organization_id, anchor.workspace_id)
+        with self._connect() as db:
+            accounts = db.execute(
+                "SELECT account_ref FROM accounts WHERE anchor_issuer=? AND anchor_subject=? "
+                "AND organization_id=? AND workspace_id IS ? AND provider=? AND status='active' "
+                "ORDER BY linked_at,account_ref",
+                (*owner, provider),
+            ).fetchall()
+            profiles = db.execute(
+                "SELECT profile_ref,access_mode FROM provider_profiles WHERE anchor_issuer=? "
+                "AND anchor_subject=? AND organization_id=? AND workspace_id IS ? "
+                "AND provider=? AND status='active' ORDER BY created_at,profile_ref",
+                (*owner, provider),
+            ).fetchall()
+        return (
+            [row["account_ref"] for row in accounts],
+            [(row["profile_ref"], row["access_mode"]) for row in profiles],
+        )
+
+    def record_admin_action(
+        self,
+        *,
+        anchor: Anchor,
+        action: str,
+        target_subject: str,
+        provider: str,
+        unlinked: int,
+        skipped_shared: int,
+        now: int,
+        result: dict[str, Any],
+        command: tuple[str, Callable[[dict[str, Any]], bytes]] | None = None,
+    ) -> None:
+        """Audit one administrator action and finish its idempotent command atomically.
+
+        中文：记录管理员对他人关联的操作，并在同一事务里完成幂等记录。
+        """
+
+        with self.transaction() as db:
+            db.execute(
+                "INSERT INTO account_admin_audit(action_ref,organization_id,workspace_id,"
+                "actor_issuer,actor_subject,action,target_subject,provider,unlinked,"
+                "skipped_shared,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    str(uuid.uuid4()),
+                    anchor.organization_id,
+                    anchor.workspace_id,
+                    anchor.issuer,
+                    anchor.subject,
+                    action,
+                    target_subject,
+                    provider,
+                    unlinked,
+                    skipped_shared,
+                    now,
+                ),
+            )
+            if command is not None:
+                key_hash, encode = command
+                self._complete_command_in_transaction(db, key_hash, encode({"value": result}))
 
     def list_workspace_people(
         self, organization_id: str, workspace_id: str | None, *, limit: int

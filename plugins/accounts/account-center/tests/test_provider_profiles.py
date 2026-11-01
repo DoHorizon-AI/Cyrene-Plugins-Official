@@ -1065,6 +1065,51 @@ def test_find_people_merges_profile_links_with_declared_handles_without_secrets(
     assert [p["subject"] for p in harness.call("find_people", {})["people"]] == ["user-other"]
 
 
+def test_revoke_person_links_dissolves_owned_profiles_and_skips_shared_operator_profiles(
+    tmp_path: Path,
+) -> None:
+    shared_ref = "00000000-0000-4000-8000-000000000236"
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3", workspace_operator_profile_refs=[shared_ref]
+    )
+    _github_profile(harness)
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": shared_ref,
+            "credential_secret_ref": "huggingface/fine-grained-token",
+            "scopes": _huggingface_scope("derek/shared-model"),
+        },
+    )
+    admin = {**ACTOR, "subject": "admin-1"}
+
+    github = harness.call(
+        "revoke_person_links",
+        {"subject": "user-derek", "provider": "github", "idempotency_key": "rev-gh"},
+        actor=admin,
+    )
+    assert github == {
+        "subject": "user-derek",
+        "provider": "github",
+        "unlinked": 1,
+        "skipped_shared": 0,
+        "results": [{"kind": "profile", "status": "unlinked"}],
+    }
+
+    # A profile shared by the whole workspace is never dissolved on a person's behalf.
+    shared = harness.call(
+        "revoke_person_links",
+        {"subject": "user-derek", "provider": "huggingface", "idempotency_key": "rev-hf"},
+        actor=admin,
+    )
+    assert (shared["unlinked"], shared["skipped_shared"], shared["results"]) == (0, 1, [])
+
+    people = harness.call("find_people", {})["people"]
+    assert [(p["subject"], [a["provider"] for a in p["accounts"]]) for p in people] == [
+        ("user-derek", ["huggingface"])
+    ]
+
+
 def test_github_installation_cannot_be_claimed_by_a_second_owner(
     tmp_path: Path,
 ) -> None:
@@ -2136,7 +2181,7 @@ def test_schema_v8_migration_preserves_provider_rows_with_foreign_key_children(
 
     assert snapshot() == before
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
@@ -4369,7 +4414,7 @@ def test_schema_v9_migration_enables_bilibili_without_orphaning_leases(tmp_path:
         db.execute("PRAGMA user_version=9")
     store = account_center_plugin_module.AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 11
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
         sql = db.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_profiles'"
