@@ -13,6 +13,7 @@ from cyrene_integration_contracts import (
     serialize_tool_envelope,
     sign_context,
 )
+from cyrene_plugin_runtime import DirectPayload
 from cyrene_tool_provider_contracts import (
     CAPABILITY_ID,
     METHOD_CALL_TOOL,
@@ -25,6 +26,7 @@ from cyrene_tool_provider_contracts import (
     tool_provider_pb2 as wire,
 )
 
+from cyrene_bilibili.account_center import AccountCenterDirectClient
 from cyrene_bilibili.api import QrPoll, QrTicket
 from cyrene_bilibili.plugin import BilibiliProvider
 from cyrene_bilibili.settings import ProviderSettings, TrustedCaller
@@ -227,6 +229,56 @@ def _write_arguments(
         "payload": payload,
         "idempotency_key": idempotency_key,
     }
+
+
+def test_account_center_complete_always_sends_nullable_cookie_expiry(tmp_path: Path) -> None:
+    """Keep the completion wire closed when session cookies have no expiry."""
+
+    class _CapturingClient:
+        def __init__(self) -> None:
+            self.envelope: dict[str, Any] | None = None
+
+        def invoke(self, **kwargs: Any) -> DirectPayload:
+            request = kwargs["request"]
+            self.envelope = json.loads(request.value)
+            profile = {
+                "profile_ref": _PROFILE,
+                "provider": "bilibili",
+                "auth_status": "healthy",
+                "external_subject": "12345",
+                "auth_mode": "session_cookie",
+                "access_mode": "actor_owned",
+                "credential_revision": 1,
+            }
+            return DirectPayload(
+                type_url="type.googleapis.com/cyrene.account.center.v1.LinkedProviderProfileResponse",
+                value=json.dumps(profile, separators=(",", ":")).encode("utf-8"),
+            )
+
+    actor = {
+        "issuer": _ISSUER,
+        "subject": _SUBJECT,
+        "organization_id": _ORGANIZATION,
+        "workspace_id": _WORKSPACE,
+    }
+    client = _CapturingClient()
+    account_center = AccountCenterDirectClient(_settings(tmp_path), client=client)
+    result = account_center.complete_bilibili_link(
+        {
+            "profile_ref": _PROFILE,
+            "link_session_ref": _SESSION,
+            "external_subject": "12345",
+            "credential_json": _COOKIE_JAR,
+            "credential_expires_at": None,
+            "idempotency_key": "complete:nullable-expiry",
+        },
+        actor,
+    )
+
+    assert result["external_subject"] == "12345"
+    assert client.envelope is not None
+    assert client.envelope["payload"]["credential_expires_at"] is None
+    assert _COOKIE_JAR not in json.dumps(result)
 
 
 def test_real_shared_tool_envelope_and_idempotent_write_replay(tmp_path) -> None:

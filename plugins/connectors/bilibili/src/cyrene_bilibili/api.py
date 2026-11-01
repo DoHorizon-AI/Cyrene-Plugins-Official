@@ -582,7 +582,7 @@ class BilibiliApi:
         }
 
     def _read_subtitles(self, video_id: str, cid: int, cookies_json: str) -> list[dict[str, Any]]:
-        params = {"cid": cid}
+        params: dict[str, int | str] = {"cid": cid}
         if video_id.startswith("BV"):
             params["bvid"] = video_id
         else:
@@ -815,6 +815,8 @@ def _api_failure(value: Mapping[str, Any], *, mutation: bool = False) -> Bilibil
 
 def _cookies_from_response(headers: list[str], existing: str) -> str:
     values = _parse_cookie_jar(existing, allow_missing_auth=True)
+    for cookie in values.values():
+        cookie.setdefault("expires_at", None)
     for header in headers:
         parsed = SimpleCookie()
         try:
@@ -837,6 +839,7 @@ def _cookies_from_response(headers: list[str], existing: str) -> str:
                 "value": cookie.value,
                 "domain": ".bilibili.com",
                 "path": "/",
+                "expires_at": None,
             }
             expires = cookie["expires"]
             if expires:

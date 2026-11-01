@@ -116,16 +116,18 @@ class AccountCenterDirectClient:
             "link_session_ref",
             "external_subject",
             "credential_json",
+            "credential_expires_at",
             "idempotency_key",
         }
         if set(payload) != required:
             raise AccountCenterUnavailable("Account Center completion request is invalid")
-        request = {
+        request: dict[str, Any] = {
             "profile_ref": _uuid(payload["profile_ref"]),
             "link_session_ref": _uuid(payload["link_session_ref"]),
             "external_subject": _numeric_id(payload["external_subject"]),
             "credential_json": _bounded_text(payload["credential_json"], 16 * 1024),
             "idempotency_key": _bounded_text(payload["idempotency_key"], 128),
+            "credential_expires_at": None,
         }
         expires = payload.get("credential_expires_at")
         if expires is not None:

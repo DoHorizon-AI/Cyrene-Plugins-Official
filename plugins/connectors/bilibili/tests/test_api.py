@@ -85,7 +85,8 @@ def test_qr_begin_renders_real_png_and_keeps_only_allowlisted_cookies() -> None:
     png = ticket.qr_png
     assert png.startswith(b"\x89PNG\r\n\x1a\n")
     assert hashlib.sha256(ticket.qr_png).hexdigest() == ticket.qr_png_sha256
-    assert '"name":"buvid3"' in ticket.cookies_json
+    cookies = _parse_cookie_jar(ticket.cookies_json, allow_missing_auth=True)
+    assert cookies["buvid3"]["expires_at"] is None
 
 
 def test_qr_response_cannot_supply_arbitrary_browser_or_network_url() -> None:
