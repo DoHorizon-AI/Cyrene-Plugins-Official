@@ -56,6 +56,30 @@ TOOL_OPERATIONS: Mapping[str, str] = MappingProxyType(
         "hf_vendor_cli": "huggingface.vendor.cli.execute",
         "email_notification_send": "email.notification.send",
         "email_connection_health": "email.connection.health.read",
+        "media.asset.import": "media.asset.import",
+        "media.asset.search": "media.asset.search",
+        "media.asset.get": "media.asset.get",
+        "media.asset.delete": "media.asset.delete",
+        "media.asset.restore": "media.asset.restore",
+        "media.card.render": "media.card.render",
+        "knowledge.search": "knowledge.search",
+        "knowledge.read": "knowledge.read",
+        "web.search": "web.search",
+        "web.open": "web.open",
+        "document.read": "document.read",
+        "bilibili.auth.qr.begin": "bilibili.auth.qr.begin",
+        "bilibili.auth.qr.status": "bilibili.auth.qr.status",
+        "bilibili.search": "bilibili.search",
+        "bilibili.user.find": "bilibili.user.find",
+        "bilibili.video.read": "bilibili.video.read",
+        "bilibili.comments.list": "bilibili.comments.list",
+        "bilibili.dynamics.list": "bilibili.dynamics.list",
+        "bilibili.dynamic.read": "bilibili.dynamic.read",
+        "bilibili.dm.list": "bilibili.dm.list",
+        "bilibili.dm.read": "bilibili.dm.read",
+        "bilibili.comment.create": "bilibili.comment.create",
+        "bilibili.dynamic.publish": "bilibili.dynamic.publish",
+        "bilibili.dm.send": "bilibili.dm.send",
     }
 )
 
@@ -1175,13 +1199,13 @@ def verify_context(
         )
     ):
         return False
-    if isinstance(context, TrustedCallerContext):
-        values = serialize_trusted_caller_context(context)
-    elif isinstance(context, Mapping):
-        values = dict(context)
-    else:
-        return False
     try:
+        if isinstance(context, TrustedCallerContext):
+            values = serialize_trusted_caller_context(context)
+        elif isinstance(context, Mapping):
+            values = dict(context)
+        else:
+            return False
         parsed = parse_trusted_caller_context(values)
         current = datetime.now(UTC) if now is None else now
         if (
