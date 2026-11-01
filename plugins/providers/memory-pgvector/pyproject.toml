@@ -1,0 +1,48 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-memory-pgvector-provider"
+version = "0.1.0"
+description = "Persistent tenant-isolated PostgreSQL and pgvector implementation of memory.provider.v1"
+requires-python = ">=3.11"
+dependencies = [
+  "cyrene-memory-provider-contracts==0.1.0",
+  "cyrene-model-provider-contracts==0.1.0",
+  "cyrene-plugin-runtime==0.2.2",
+  "pgvector==0.5.1",
+  "psycopg[binary,pool]==3.3.6",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10", "ruff>=0.9,<1", "jsonschema>=4.23,<5"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.providers.memory-pgvector" = [
+  "plugin.manifest.json",
+  "configuration.schema.json",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.uv.sources]
+cyrene-memory-provider-contracts = { path = "../../../sdk/python/cyrene_memory_provider_contracts" }
+cyrene-model-provider-contracts = { path = "../../../sdk/python/cyrene_model_provider_contracts" }
+cyrene-plugin-runtime = { path = "../../../sdk/python/cyrene_plugin_runtime" }
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
