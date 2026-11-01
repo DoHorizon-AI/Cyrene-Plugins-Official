@@ -20,6 +20,7 @@ from speech_sensevoice.service import (
     SpeechSettings,
     _decode_audio,
     _make_segments,
+    _normalize_detected_language,
     _normalize_language,
 )
 
@@ -116,6 +117,12 @@ def test_language_hint_is_allowlisted() -> None:
     assert _normalize_language("zh") == "zh"
     with pytest.raises(SpeechFailure, match="INVALID_INPUT"):
         _normalize_language("https://attacker.invalid")
+
+
+def test_detected_language_normalizes_sensevoice_tags() -> None:
+    assert _normalize_detected_language("<|zh|>") == "zh"
+    assert _normalize_detected_language("en") == "en"
+    assert _normalize_detected_language("<|ar|>") is None
 
 
 def test_transcript_segments_are_bounded_and_ordered() -> None:
