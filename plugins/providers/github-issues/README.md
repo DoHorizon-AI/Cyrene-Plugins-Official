@@ -36,6 +36,28 @@ valid next link is treated as ambiguous and gets a conservative next cursor
 rather than being called complete. An oversized or malformed upstream page
 remains an explicit provider error; it is never converted to an empty list. The
 former 100-record request exceeded the limit for this repository (about 1.85 MB).
+
+### Frozen catalog compatibility for runtime images
+
+A runtime image may serve a host whose Navigator catalog is pinned to the older
+state-only GitHub contract. In that compatibility path, keep the
+`CANONICAL_TOOLS` input properties and descriptions in `plugin.py` exactly
+aligned with the frozen catalog: the PR-list arguments stay `repository_id`,
+`repository`, and `state`, with no advertised `page_cursor`. Keep small-page
+retrieval internal to `GitHubApi.list_pull_requests` (20 items per page, at
+most five pages), and report when the 100-item bound truncates results. This
+includes the descriptions for `github.pull_requests.list` and
+`github.ci.status`; changing a parameter or description in `plugin.py` changes
+the live catalog even if its 22 operation IDs remain the same.
+
+The canonical catalog can continue to advertise explicit `page_cursor` and
+`github.commits.compare`; compatibility work for the older runtime image must
+not remove them from canonical source. During a legacy-plugin merge, compare
+the complete catalog rows against the frozen Navigator configuration, including
+operation IDs, descriptions, and input schemas. Matching only the operation
+count is not proof of compatibility; resolve these rows deliberately instead
+of replacing the frozen schema or descriptions wholesale.
+
 CI status returns the raw combined commit-status state and separate status
 context/check-run counts. `required_contexts_verified` is always false because
 this operation does not read branch protection. A raw `PENDING` value with no
@@ -138,6 +160,21 @@ PR 列表每页最多请求 20 条，避免超过固定的 1 MB 上游响应上�
 因为它不包含前面页的数据。若满页响应没有可验证的 next link，会保守提供下一页 cursor，避免误报列表完整。
 上游单页超限或格式异常仍返回明确错误，绝不伪装成空列表。该仓库原先每次请求 100 条时响应约
 1.85 MB，会超过限制。
+
+### 运行镜像的冻结目录兼容
+
+运行镜像可能服务于一个 Navigator catalog 固定为旧版 state-only GitHub contract 的 host。
+兼容该镜像时，`plugin.py` 中 `CANONICAL_TOOLS` 的输入字段和描述必须与 frozen catalog 完全一致：
+PR list 仍只接受 `repository_id`、`repository` 和 `state`，不要公布 `page_cursor`。20 条一页、
+最多 5 页的读取应留在 `GitHubApi.list_pull_requests` 内部，并如实报告 100 条上限是否造成截断。
+这也包括 `github.pull_requests.list` 和 `github.ci.status` 的描述；即使 operation IDs 仍是 22 个，
+只要修改 `plugin.py` 参数或描述，live catalog 就会变化。
+
+canonical catalog 可以继续公开显式 `page_cursor` 和 `github.commits.compare`；旧运行镜像的兼容回移
+不能从 canonical source 删除这些能力。合并 legacy plugin 时，应与 frozen Navigator 配置逐项比较完整
+catalog row，包括 operation ID、描述和输入 schema。operation 数量相同不能证明兼容；应逐项解决冲突，
+不要整份替换 frozen schema 或描述。
+
 CI 状态返回 GitHub combined commit-status 原始状态及 status context/check-run 独立计数。
 由于此操作不会读取分支保护规则，`required_contexts_verified` 始终为 false。当原始状态为
 `PENDING`、没有 status context 且所有 check run 均已终态时，`state_note` 会明确解释这些事实；

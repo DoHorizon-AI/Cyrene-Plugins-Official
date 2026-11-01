@@ -2903,8 +2903,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/README.md",
-      "sha256": "71a43d63e59d53aec46f6bfaec0485fe9ba2e172a7d0a4ec9d9ba219978d3a1b",
-      "size_bytes": 14098
+      "sha256": "cdd12faaafab5a6584720f333a8f1509e12d84ea23f04951c168b821dca01e35",
+      "size_bytes": 16512
     },
     {
       "kind": "file",
