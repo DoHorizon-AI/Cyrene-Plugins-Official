@@ -5,6 +5,7 @@ from cyrene_model_provider_contracts import (
     EmbeddingBatch,
     EmbeddingError,
     EmbeddingErrorCode,
+    EmbeddingsCodecError,
     EmbeddingsRequest,
     EmbeddingsResponse,
     EmbeddingVector,
@@ -47,3 +48,10 @@ def test_embeddings_error_round_trips_code_and_retry_delay() -> None:
         )
     )
     assert decode_embeddings_response(encode_embeddings_response(response)) == response
+
+
+def test_embeddings_response_rejects_missing_oneof_result() -> None:
+    with pytest.raises(EmbeddingsCodecError, match="select a result"):
+        encode_embeddings_response(EmbeddingsResponse())
+    with pytest.raises(EmbeddingsCodecError, match="select a result"):
+        decode_embeddings_response(b"")

@@ -19,12 +19,20 @@ sys.path.insert(
 
 from cyrene.model.provider.v1 import model_provider_pb2
 from cyrene_model_provider_contracts import (
+    AudioContentPart,
+    ChatCompletionRequestV3,
+    ChatMessageV3,
+    ChatRole,
     EmbeddingBatch,
     EmbeddingsRequest,
     EmbeddingsResponse,
     EmbeddingVector,
+    ImageContentPart,
+    TextContentPart,
+    decode_chat_completion_request_v3,
     decode_embeddings_request,
     decode_embeddings_response,
+    encode_chat_completion_request_v3,
     encode_embeddings_request,
     encode_embeddings_response,
 )
@@ -81,6 +89,54 @@ assert decoded_embedding_response.embeddings is not None
 assert decoded_embedding_response.embeddings.model == "deterministic-model"
 assert decoded_embedding_response.embeddings.dimensions == 2
 assert tuple(decoded_embedding_response.embeddings.vectors[0].values) == (1.0, 2.0)
+
+# v3 media content stays typed and interoperates with an independent generated
+# binding. The schema does not expose a URL or host-path input.
+sdk_multimodal_request = ChatCompletionRequestV3(
+    messages=(
+        ChatMessageV3(
+            role=ChatRole.USER,
+            content=(
+                TextContentPart("summarize"),
+                ImageContentPart("image/png", artifact_id="asset-7"),
+                AudioContentPart("audio/wav", data=b"wave-bytes"),
+            ),
+        ),
+    ),
+    model="vision-model",
+    include_usage=True,
+)
+generated_multimodal_request = model_provider_pb2.ChatCompletionRequestV3(
+    messages=[
+        model_provider_pb2.ChatMessageV3(
+            role=model_provider_pb2.ChatMessage.ROLE_USER,
+            content=[
+                model_provider_pb2.ChatContentPartV3(text="summarize"),
+                model_provider_pb2.ChatContentPartV3(
+                    image=model_provider_pb2.ChatImageContentV3(
+                        mime_type="image/png",
+                        artifact_id="asset-7",
+                    )
+                ),
+                model_provider_pb2.ChatContentPartV3(
+                    audio=model_provider_pb2.ChatAudioContentV3(
+                        mime_type="audio/wav",
+                        data=b"wave-bytes",
+                    )
+                ),
+            ],
+        )
+    ],
+    model="vision-model",
+    include_usage=True,
+)
+assert encode_chat_completion_request_v3(sdk_multimodal_request) == (
+    generated_multimodal_request.SerializeToString(deterministic=True)
+)
+assert (
+    decode_chat_completion_request_v3(generated_multimodal_request.SerializeToString())
+    == sdk_multimodal_request
+)
 
 chat = model_provider_pb2.ChatCompletionRequest(
     messages=[

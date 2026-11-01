@@ -251,7 +251,7 @@ def encode_embeddings_response(response: EmbeddingsResponse) -> bytes:
         return _wire.encode_len_delimited(1, _encode_batch(response.embeddings))
     if response.error is not None:
         return _wire.encode_len_delimited(2, _encode_error(response.error))
-    return b""
+    raise EmbeddingsCodecError("EmbeddingsResponse must select a result")
 
 
 def decode_embeddings_response(payload: bytes) -> EmbeddingsResponse:
@@ -264,6 +264,8 @@ def decode_embeddings_response(payload: bytes) -> EmbeddingsResponse:
             embeddings, error = _decode_batch(value), None
         elif number == 2 and wire_type == _wire.WIRE_LEN and isinstance(value, bytes):
             error, embeddings = _decode_error(value), None
+    if embeddings is None and error is None:
+        raise EmbeddingsCodecError("EmbeddingsResponse must select a result")
     return EmbeddingsResponse(embeddings=embeddings, error=error)
 
 

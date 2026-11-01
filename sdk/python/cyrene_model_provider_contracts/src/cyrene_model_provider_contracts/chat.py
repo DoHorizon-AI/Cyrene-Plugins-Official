@@ -36,6 +36,8 @@ INTERFACE_VERSION = "1"
 CHAT_COMPLETION_METHOD = "chat_completion"
 CHAT_COMPLETION_V2_METHOD = "chat_completion_v2"
 CHAT_COMPLETION_V2_INTERFACE_VERSION = "2"
+CHAT_COMPLETION_V3_METHOD = "chat_completion_v3"
+CHAT_COMPLETION_V3_INTERFACE_VERSION = "3"
 CHAT_COMPLETION_REQUEST_TYPE_URL = (
     "type.cyrene.io/cyrene.model.provider.v1.ChatCompletionRequest"
 )
@@ -45,6 +47,10 @@ CHAT_COMPLETION_RESPONSE_TYPE_URL = (
 CHAT_COMPLETION_CHUNK_TYPE_URL = (
     "type.cyrene.io/cyrene.model.provider.v1.ChatCompletionChunk"
 )
+CHAT_COMPLETION_V3_REQUEST_TYPE_URL = (
+    "type.cyrene.io/cyrene.model.provider.v1.ChatCompletionRequestV3"
+)
+CHAT_COMPLETION_V3_RESPONSE_TYPE_URL = CHAT_COMPLETION_RESPONSE_TYPE_URL
 
 _MESSAGE_ROLE = 1
 _MESSAGE_CONTENT = 2
@@ -92,14 +98,14 @@ _UINT32_MAX = (1 << 32) - 1
 class ChatCodecError(ValueError):
     """A typed chat payload is malformed or violates its wire contract.
 
-        中文:类型化 chat 负载格式错误,或违反其 wire contract。
+    中文:类型化 chat 负载格式错误,或违反其 wire contract。
     """
 
 
 class ChatRole(IntEnum):
     """Stable values from ``ChatMessage.Role`` in the canonical proto.
 
-        中文:规范 proto 中 ``ChatMessage.Role`` 的稳定取值。
+    中文:规范 proto 中 ``ChatMessage.Role`` 的稳定取值。
     """
 
     ROLE_UNSPECIFIED = 0
@@ -125,7 +131,7 @@ ChatMessageRole = ChatRole
 class ChatMessage:
     """One canonical chat message in request order.
 
-        中文:请求顺序中的一条规范 chat 消息。
+    中文:请求顺序中的一条规范 chat 消息。
     """
 
     role: ChatRole | int = ChatRole.ROLE_UNSPECIFIED
@@ -139,7 +145,7 @@ class ChatMessage:
 class ChatFunction:
     """One provider function definition carried by structured chat v2.
 
-        中文:structured chat v2 携带的一份 Provider 函数定义。
+    中文:structured chat v2 携带的一份 Provider 函数定义。
     """
 
     name: str
@@ -152,7 +158,7 @@ class ChatFunction:
 class ChatTool:
     """One function tool offered to the provider.
 
-        中文:提供给 Provider 的一个 function tool。
+    中文:提供给 Provider 的一个 function tool。
     """
 
     type: str
@@ -163,7 +169,7 @@ class ChatTool:
 class ChatToolChoice:
     """Normalized tool-choice mode, optionally naming one function.
 
-        中文:经过规范化的 tool-choice 模式,也可指定一个函数名称。
+    中文:经过规范化的 tool-choice 模式,也可指定一个函数名称。
     """
 
     mode: str
@@ -174,7 +180,7 @@ class ChatToolChoice:
 class ChatToolCallFunction:
     """Completed function identity and JSON argument text.
 
-        中文:已完成函数的标识和 JSON 参数文本。
+    中文:已完成函数的标识和 JSON 参数文本。
     """
 
     name: str
@@ -185,7 +191,7 @@ class ChatToolCallFunction:
 class ChatToolCall:
     """A completed assistant tool call in request history.
 
-        中文:请求历史中的一条已完成 assistant tool call。
+    中文:请求历史中的一条已完成 assistant tool call。
     """
 
     id: str
@@ -197,7 +203,7 @@ class ChatToolCall:
 class ChatToolCallDelta:
     """One indexed, possibly partial streamed tool-call fragment.
 
-        中文:一个带索引、可能尚未完整的流式 tool-call 片段。
+    中文:一个带索引、可能尚未完整的流式 tool-call 片段。
     """
 
     index: int
@@ -211,7 +217,7 @@ class ChatToolCallDelta:
 class ChatCompletionRequest:
     """Decoded or encodable ``ChatCompletionRequest``.
 
-        中文:已解码或可编码的 ``ChatCompletionRequest``。
+    中文:已解码或可编码的 ``ChatCompletionRequest``。
     """
 
     messages: tuple[ChatMessage, ...] = ()
@@ -229,7 +235,7 @@ class ChatCompletionRequest:
 class ChatCompletionChunk:
     """One ordered provider response chunk.
 
-        中文:一段有序的 Provider 响应 chunk。
+    中文:一段有序的 Provider 响应 chunk。
     """
 
     delta: str = ""
@@ -245,7 +251,7 @@ class ChatCompletionChunk:
 class ChatCompletionResponse:
     """Ordered chunks shared by unary and streamed provider responses.
 
-        中文:供 unary 和流式 Provider 响应共用的有序 chunk 列表。
+    中文:供 unary 和流式 Provider 响应共用的有序 chunk 列表。
     """
 
     chunks: tuple[ChatCompletionChunk, ...] = ()
@@ -254,7 +260,7 @@ class ChatCompletionResponse:
 def encode_chat_message(message: ChatMessage) -> bytes:
     """Encode one canonical ``ChatMessage`` body.
 
-        中文:编码一条规范 ``ChatMessage`` 正文。
+    中文:编码一条规范 ``ChatMessage`` 正文。
     """
 
     return _encode_chat_message(message, structured=False)
@@ -263,7 +269,7 @@ def encode_chat_message(message: ChatMessage) -> bytes:
 def encode_chat_message_v2(message: ChatMessage) -> bytes:
     """Encode a ``ChatMessage`` including structured tool-call history.
 
-        中文:编码一条包含结构化 tool-call 历史的 ``ChatMessage``。
+    中文:编码一条包含结构化 tool-call 历史的 ``ChatMessage``。
     """
 
     return _encode_chat_message(message, structured=True)
@@ -272,7 +278,7 @@ def encode_chat_message_v2(message: ChatMessage) -> bytes:
 def _encode_chat_message(message: ChatMessage, *, structured: bool) -> bytes:
     """Encode one message for the selected chat contract version.
 
-        中文:根据所选 chat contract 版本编码一条消息。
+    中文:根据所选 chat contract 版本编码一条消息。
     """
 
     if not isinstance(message, ChatMessage):
@@ -304,7 +310,7 @@ def _encode_chat_message(message: ChatMessage, *, structured: bool) -> bytes:
 def decode_chat_message(payload: bytes) -> ChatMessage:
     """Decode one canonical ``ChatMessage`` body.
 
-        中文:解码一条规范 ``ChatMessage`` 正文。
+    中文:解码一条规范 ``ChatMessage`` 正文。
     """
 
     payload = _payload_bytes(payload, "ChatMessage")
@@ -348,7 +354,7 @@ def decode_chat_message(payload: bytes) -> ChatMessage:
 def encode_chat_completion_request(request: ChatCompletionRequest) -> bytes:
     """Encode the v1 text-only ``ChatCompletionRequest`` message.
 
-        中文:编码 v1 仅含文本的 ``ChatCompletionRequest`` 消息。
+    中文:编码 v1 仅含文本的 ``ChatCompletionRequest`` 消息。
     """
 
     return _encode_chat_completion_request(request, structured=False)
@@ -357,7 +363,7 @@ def encode_chat_completion_request(request: ChatCompletionRequest) -> bytes:
 def encode_chat_completion_request_v2(request: ChatCompletionRequest) -> bytes:
     """Encode a structured ``ChatCompletionRequest`` for chat v2.
 
-        中文:为 chat v2 编码结构化 ``ChatCompletionRequest``。
+    中文:为 chat v2 编码结构化 ``ChatCompletionRequest``。
     """
 
     return _encode_chat_completion_request(request, structured=True)
@@ -368,7 +374,7 @@ def _encode_chat_completion_request(
 ) -> bytes:
     """Encode a request for the selected chat contract version.
 
-        中文:根据所选 chat contract 版本编码请求。
+    中文:根据所选 chat contract 版本编码请求。
     """
 
     if not isinstance(request, ChatCompletionRequest):
@@ -441,7 +447,7 @@ def _encode_chat_completion_request(
 def decode_chat_completion_request(payload: bytes) -> ChatCompletionRequest:
     """Decode the canonical ``ChatCompletionRequest`` message.
 
-        中文:解码规范的 ``ChatCompletionRequest`` 消息。
+    中文:解码规范的 ``ChatCompletionRequest`` 消息。
     """
 
     payload = _payload_bytes(payload, "ChatCompletionRequest")
@@ -536,7 +542,7 @@ def decode_chat_completion_request(payload: bytes) -> ChatCompletionRequest:
 def decode_chat_completion_request_v2(payload: bytes) -> ChatCompletionRequest:
     """Decode a structured chat request using the additive protobuf fields.
 
-        中文:使用新增的 protobuf 字段解码结构化 chat 请求。
+    中文:使用新增的 protobuf 字段解码结构化 chat 请求。
     """
 
     return decode_chat_completion_request(payload)
@@ -545,7 +551,7 @@ def decode_chat_completion_request_v2(payload: bytes) -> ChatCompletionRequest:
 def encode_chat_completion_chunk(chunk: ChatCompletionChunk) -> bytes:
     """Encode one v1 text-only ``ChatCompletionChunk`` body.
 
-        中文:编码一个 v1 仅含文本的 ``ChatCompletionChunk`` 正文。
+    中文:编码一个 v1 仅含文本的 ``ChatCompletionChunk`` 正文。
     """
 
     return _encode_chat_completion_chunk(chunk, structured=False)
@@ -554,7 +560,7 @@ def encode_chat_completion_chunk(chunk: ChatCompletionChunk) -> bytes:
 def encode_chat_completion_chunk_v2(chunk: ChatCompletionChunk) -> bytes:
     """Encode one structured ``ChatCompletionChunk`` body for chat v2.
 
-        中文:为 chat v2 编码一个结构化 ``ChatCompletionChunk`` 正文。
+    中文:为 chat v2 编码一个结构化 ``ChatCompletionChunk`` 正文。
     """
 
     return _encode_chat_completion_chunk(chunk, structured=True)
@@ -565,7 +571,7 @@ def _encode_chat_completion_chunk(
 ) -> bytes:
     """Encode one response chunk for the selected chat contract version.
 
-        中文:根据所选 chat contract 版本编码一个响应 chunk。
+    中文:根据所选 chat contract 版本编码一个响应 chunk。
     """
 
     if not isinstance(chunk, ChatCompletionChunk):
@@ -613,7 +619,7 @@ def _encode_chat_completion_chunk(
 def decode_chat_completion_chunk(payload: bytes) -> ChatCompletionChunk:
     """Decode one canonical ``ChatCompletionChunk`` body.
 
-        中文:解码一条规范 ``ChatCompletionChunk`` 正文。
+    中文:解码一条规范 ``ChatCompletionChunk`` 正文。
     """
 
     payload = _payload_bytes(payload, "ChatCompletionChunk")
@@ -690,7 +696,7 @@ def decode_chat_completion_chunk(payload: bytes) -> ChatCompletionChunk:
 def decode_chat_completion_chunk_v2(payload: bytes) -> ChatCompletionChunk:
     """Decode one structured response chunk using additive fields.
 
-        中文:使用新增字段解码一个结构化响应 chunk。
+    中文:使用新增字段解码一个结构化响应 chunk。
     """
 
     return decode_chat_completion_chunk(payload)
@@ -699,7 +705,7 @@ def decode_chat_completion_chunk_v2(payload: bytes) -> ChatCompletionChunk:
 def encode_chat_completion_response(response: ChatCompletionResponse) -> bytes:
     """Encode one v1 text-only ``ChatCompletionResponse`` message.
 
-        中文:编码一条 v1 仅含文本的 ``ChatCompletionResponse`` 消息。
+    中文:编码一条 v1 仅含文本的 ``ChatCompletionResponse`` 消息。
     """
 
     return _encode_chat_completion_response(response, structured=False)
@@ -708,7 +714,7 @@ def encode_chat_completion_response(response: ChatCompletionResponse) -> bytes:
 def encode_chat_completion_response_v2(response: ChatCompletionResponse) -> bytes:
     """Encode one structured ``ChatCompletionResponse`` for chat v2.
 
-        中文:为 chat v2 编码一个结构化 ``ChatCompletionResponse``。
+    中文:为 chat v2 编码一个结构化 ``ChatCompletionResponse``。
     """
 
     return _encode_chat_completion_response(response, structured=True)
@@ -719,7 +725,7 @@ def _encode_chat_completion_response(
 ) -> bytes:
     """Encode one response for the selected chat contract version.
 
-        中文:根据所选 chat contract 版本编码一个响应。
+    中文:根据所选 chat contract 版本编码一个响应。
     """
 
     if not isinstance(response, ChatCompletionResponse):
@@ -740,7 +746,7 @@ def _encode_chat_completion_response(
 def decode_chat_completion_response(payload: bytes) -> ChatCompletionResponse:
     """Decode the canonical ``ChatCompletionResponse`` message.
 
-        中文:解码规范的 ``ChatCompletionResponse`` 消息。
+    中文:解码规范的 ``ChatCompletionResponse`` 消息。
     """
 
     payload = _payload_bytes(payload, "ChatCompletionResponse")
@@ -762,10 +768,447 @@ def decode_chat_completion_response(payload: bytes) -> ChatCompletionResponse:
 def decode_chat_completion_response_v2(payload: bytes) -> ChatCompletionResponse:
     """Decode one structured response using additive protobuf fields.
 
-        中文:使用新增的 protobuf 字段解码一个结构化响应。
+    中文:使用新增的 protobuf 字段解码一个结构化响应。
     """
 
     return decode_chat_completion_response(payload)
+
+
+@dataclass(frozen=True)
+class TextContentPart:
+    """One text part in a typed multimodal chat message."""
+
+    text: str
+
+
+@dataclass(frozen=True)
+class ImageContentPart:
+    """Image bytes or a caller-authorized opaque artifact identifier."""
+
+    mime_type: str
+    data: bytes | None = None
+    artifact_id: str | None = None
+
+    def __post_init__(self) -> None:
+        _validate_media_source(self.mime_type, self.data, self.artifact_id, "image")
+        if not self.mime_type.startswith("image/"):
+            raise ChatCodecError("image content requires an image/* MIME type")
+
+
+@dataclass(frozen=True)
+class AudioContentPart:
+    """Audio bytes or a caller-authorized opaque artifact identifier."""
+
+    mime_type: str
+    data: bytes | None = None
+    artifact_id: str | None = None
+
+    def __post_init__(self) -> None:
+        _validate_media_source(self.mime_type, self.data, self.artifact_id, "audio")
+        if not self.mime_type.startswith("audio/"):
+            raise ChatCodecError("audio content requires an audio/* MIME type")
+
+
+@dataclass(frozen=True)
+class FileContentPart:
+    """A file attachment represented by bytes or an opaque artifact ID."""
+
+    mime_type: str
+    data: bytes | None = None
+    artifact_id: str | None = None
+    filename: str | None = None
+
+    def __post_init__(self) -> None:
+        _validate_media_source(self.mime_type, self.data, self.artifact_id, "file")
+        _require_optional_string(self.filename, "FileContentPart.filename")
+
+
+ChatContentPart = (
+    TextContentPart | ImageContentPart | AudioContentPart | FileContentPart
+)
+
+
+@dataclass(frozen=True)
+class ChatMessageV3:
+    """One ordered message with typed text and media content parts."""
+
+    role: ChatRole | int = ChatRole.ROLE_UNSPECIFIED
+    content: tuple[ChatContentPart, ...] = ()
+    name: str | None = None
+    tool_call_id: str | None = None
+    tool_calls: tuple[ChatToolCall, ...] = ()
+
+
+@dataclass(frozen=True)
+class ChatCompletionRequestV3:
+    """Typed multimodal request for ``chat_completion_v3``."""
+
+    messages: tuple[ChatMessageV3, ...] = ()
+    model: str | None = None
+    stream: bool = False
+    temperature: float | None = None
+    max_tokens: int | None = None
+    tools: tuple[ChatTool, ...] = ()
+    tool_choice: ChatToolChoice | None = None
+    parallel_tool_calls: bool | None = None
+    include_usage: bool | None = None
+
+
+def _validate_media_source(
+    mime_type: str,
+    data: bytes | None,
+    artifact_id: str | None,
+    label: str,
+) -> None:
+    _require_string(mime_type, f"{label}.mime_type")
+    if not mime_type or (data is None) == (artifact_id is None):
+        raise ChatCodecError(f"{label} requires a MIME type and exactly one source")
+    if data is not None and (not isinstance(data, bytes) or not data):
+        raise ChatCodecError(f"{label}.data must contain non-empty bytes")
+    if artifact_id is not None:
+        _require_string(artifact_id, f"{label}.artifact_id")
+        if (
+            not artifact_id
+            or "://" in artifact_id
+            or "/" in artifact_id
+            or "\\" in artifact_id
+            or artifact_id.startswith("~")
+        ):
+            raise ChatCodecError("artifact_id must be an opaque artifact reference")
+
+
+def _encode_media_source(
+    mime_type: str,
+    data: bytes | None,
+    artifact_id: str | None,
+) -> bytes:
+    body = _wire.encode_string_field(1, mime_type)
+    if data is not None:
+        body += _wire.encode_len_delimited(2, data)
+    elif artifact_id is not None:
+        body += _wire.encode_len_delimited(3, artifact_id.encode("utf-8"))
+    else:
+        raise ChatCodecError("media content is missing a source")
+    return body
+
+
+def _encode_content_part(part: ChatContentPart) -> bytes:
+    if isinstance(part, TextContentPart):
+        _require_string(part.text, "TextContentPart.text")
+        return _wire.encode_len_delimited(1, part.text.encode("utf-8"))
+    if isinstance(part, ImageContentPart):
+        payload = _encode_media_source(part.mime_type, part.data, part.artifact_id)
+        return _wire.encode_len_delimited(2, payload)
+    if isinstance(part, AudioContentPart):
+        payload = _encode_media_source(part.mime_type, part.data, part.artifact_id)
+        return _wire.encode_len_delimited(3, payload)
+    if isinstance(part, FileContentPart):
+        payload = _wire.encode_string_field(1, part.mime_type)
+        payload += _optional_string_field(2, part.filename, "FileContentPart.filename")
+        if part.data is not None:
+            payload += _wire.encode_len_delimited(3, part.data)
+        elif part.artifact_id is not None:
+            payload += _wire.encode_len_delimited(4, part.artifact_id.encode("utf-8"))
+        else:
+            raise ChatCodecError("file content is missing a source")
+        return _wire.encode_len_delimited(4, payload)
+    raise ChatCodecError("content part has an unsupported type")
+
+
+def _encode_chat_message_v3(message: ChatMessageV3) -> bytes:
+    if not isinstance(message, ChatMessageV3):
+        raise ChatCodecError("message must be a ChatMessageV3")
+    _require_sequence(message.content, "ChatMessageV3.content")
+    _require_sequence(message.tool_calls, "ChatMessageV3.tool_calls")
+    body = _wire.encode_enum_field(_MESSAGE_ROLE, _role_value(message.role))
+    body += b"".join(
+        _wire.encode_len_delimited(2, _encode_content_part(part))
+        for part in message.content
+    )
+    body += _optional_string_field(3, message.name, "ChatMessageV3.name")
+    body += _optional_string_field(
+        4, message.tool_call_id, "ChatMessageV3.tool_call_id"
+    )
+    body += b"".join(
+        _wire.encode_len_delimited(5, _encode_chat_tool_call(call))
+        for call in message.tool_calls
+    )
+    return body
+
+
+def _decode_media_source(
+    payload: bytes,
+    *,
+    label: str,
+    data_field: int,
+    artifact_field: int,
+) -> tuple[str, bytes | None, str | None]:
+    mime_type = ""
+    data: bytes | None = None
+    artifact_id: str | None = None
+    for field, wire_type, value in _wire.iter_fields(payload):
+        if field == 1:
+            _require_wire_type(label, "mime_type", wire_type, _wire.WIRE_LEN)
+            mime_type = _wire.decode_utf8(value)  # type: ignore[arg-type]
+        elif field == data_field:
+            _require_wire_type(label, "data", wire_type, _wire.WIRE_LEN)
+            data, artifact_id = value, None  # type: ignore[assignment]
+        elif field == artifact_field:
+            _require_wire_type(label, "artifact_id", wire_type, _wire.WIRE_LEN)
+            artifact_id = _wire.decode_utf8(value)  # type: ignore[arg-type]
+            data = None
+    _validate_media_source(mime_type, data, artifact_id, label)
+    return mime_type, data, artifact_id
+
+
+def _decode_content_part(payload: bytes) -> ChatContentPart:
+    selection: tuple[int, bytes | str] | None = None
+    for field, wire_type, value in _wire.iter_fields(payload):
+        if field in (1, 2, 3, 4):
+            _require_wire_type("ChatContentPartV3", "part", wire_type, _wire.WIRE_LEN)
+            selection = (field, value)  # type: ignore[arg-type]
+    if selection is None:
+        raise ChatCodecError("ChatContentPartV3 must select one content part")
+    field, content = selection
+    if field == 1:
+        return TextContentPart(_wire.decode_utf8(content))  # type: ignore[arg-type]
+    if field == 2:
+        mime_type, data, artifact_id = _decode_media_source(
+            content,
+            label="image",
+            data_field=2,
+            artifact_field=3,  # type: ignore[arg-type]
+        )
+        return ImageContentPart(mime_type, data=data, artifact_id=artifact_id)
+    if field == 3:
+        mime_type, data, artifact_id = _decode_media_source(
+            content,
+            label="audio",
+            data_field=2,
+            artifact_field=3,  # type: ignore[arg-type]
+        )
+        return AudioContentPart(mime_type, data=data, artifact_id=artifact_id)
+    mime_type = ""
+    filename: str | None = None
+    data: bytes | None = None
+    artifact_id: str | None = None
+    for media_field, wire_type, value in _wire.iter_fields(content):  # type: ignore[arg-type]
+        if media_field == 1:
+            _require_wire_type(
+                "ChatFileContentV3", "mime_type", wire_type, _wire.WIRE_LEN
+            )
+            mime_type = _wire.decode_utf8(value)  # type: ignore[arg-type]
+        elif media_field == 2:
+            _require_wire_type(
+                "ChatFileContentV3", "filename", wire_type, _wire.WIRE_LEN
+            )
+            filename = _wire.decode_utf8(value)  # type: ignore[arg-type]
+        elif media_field == 3:
+            _require_wire_type("ChatFileContentV3", "data", wire_type, _wire.WIRE_LEN)
+            data, artifact_id = value, None  # type: ignore[assignment]
+        elif media_field == 4:
+            _require_wire_type(
+                "ChatFileContentV3", "artifact_id", wire_type, _wire.WIRE_LEN
+            )
+            artifact_id = _wire.decode_utf8(value)  # type: ignore[arg-type]
+            data = None
+    _validate_media_source(mime_type, data, artifact_id, "file")
+    return FileContentPart(
+        mime_type, data=data, artifact_id=artifact_id, filename=filename
+    )
+
+
+def _decode_chat_message_v3(payload: bytes) -> ChatMessageV3:
+    role: ChatRole | int = ChatRole.ROLE_UNSPECIFIED
+    content: list[ChatContentPart] = []
+    name: str | None = None
+    tool_call_id: str | None = None
+    tool_calls: list[ChatToolCall] = []
+    try:
+        for field, wire_type, value in _wire.iter_fields(payload):
+            if field == 1:
+                _require_wire_type(
+                    "ChatMessageV3", "role", wire_type, _wire.WIRE_VARINT
+                )
+                role = _role_value(value)
+            elif field == 2:
+                _require_wire_type(
+                    "ChatMessageV3", "content", wire_type, _wire.WIRE_LEN
+                )
+                content.append(_decode_content_part(value))  # type: ignore[arg-type]
+            elif field == 3:
+                _require_wire_type("ChatMessageV3", "name", wire_type, _wire.WIRE_LEN)
+                name = _wire.decode_utf8(value)  # type: ignore[arg-type]
+            elif field == 4:
+                _require_wire_type(
+                    "ChatMessageV3", "tool_call_id", wire_type, _wire.WIRE_LEN
+                )
+                tool_call_id = _wire.decode_utf8(value)  # type: ignore[arg-type]
+            elif field == 5:
+                _require_wire_type(
+                    "ChatMessageV3", "tool_calls", wire_type, _wire.WIRE_LEN
+                )
+                tool_calls.append(_decode_chat_tool_call(value))  # type: ignore[arg-type]
+    except _wire.WireFormatError as error:
+        raise ChatCodecError(f"undecodable ChatMessageV3: {error}") from error
+    return ChatMessageV3(
+        role=role,
+        content=tuple(content),
+        name=name,
+        tool_call_id=tool_call_id,
+        tool_calls=tuple(tool_calls),
+    )
+
+
+def encode_chat_completion_request_v3(request: ChatCompletionRequestV3) -> bytes:
+    """Encode typed text/media content for the additive v3 chat method."""
+
+    if not isinstance(request, ChatCompletionRequestV3):
+        raise ChatCodecError("request must be a ChatCompletionRequestV3")
+    _require_sequence(request.messages, "ChatCompletionRequestV3.messages")
+    _require_sequence(request.tools, "ChatCompletionRequestV3.tools")
+    if not isinstance(request.stream, bool):
+        raise ChatCodecError("ChatCompletionRequestV3.stream must be a boolean")
+    _require_optional_string(request.model, "ChatCompletionRequestV3.model")
+    _require_temperature(request.temperature)
+    _require_optional_uint32(request.max_tokens, "ChatCompletionRequestV3.max_tokens")
+    _require_optional_bool(
+        request.parallel_tool_calls, "ChatCompletionRequestV3.parallel_tool_calls"
+    )
+    _require_optional_bool(
+        request.include_usage, "ChatCompletionRequestV3.include_usage"
+    )
+    if request.tool_choice is not None:
+        _validate_tool_choice(request.tool_choice)
+    body = b"".join(
+        _wire.encode_len_delimited(1, _encode_chat_message_v3(message))
+        for message in request.messages
+    )
+    body += _optional_string_field(2, request.model, "ChatCompletionRequestV3.model")
+    if request.stream:
+        body += _wire.encode_tag(3, _wire.WIRE_VARINT) + _wire.encode_varint(1)
+    if request.temperature is not None:
+        body += _wire.encode_tag(4, _wire.WIRE_FIXED64) + struct.pack(
+            "<d", request.temperature
+        )
+    if request.max_tokens is not None:
+        body += _optional_uint32_field(5, request.max_tokens)
+    body += b"".join(
+        _wire.encode_len_delimited(6, _encode_chat_tool(tool)) for tool in request.tools
+    )
+    if request.tool_choice is not None:
+        body += _wire.encode_len_delimited(
+            7, _encode_chat_tool_choice(request.tool_choice)
+        )
+    if request.parallel_tool_calls is not None:
+        body += _optional_bool_field(8, request.parallel_tool_calls)
+    if request.include_usage is not None:
+        body += _optional_bool_field(9, request.include_usage)
+    return body
+
+
+def decode_chat_completion_request_v3(payload: bytes) -> ChatCompletionRequestV3:
+    """Decode the typed multimodal v3 chat request."""
+
+    payload = _payload_bytes(payload, "ChatCompletionRequestV3")
+    messages: list[ChatMessageV3] = []
+    model: str | None = None
+    stream = False
+    temperature: float | None = None
+    max_tokens: int | None = None
+    tools: list[ChatTool] = []
+    tool_choice: ChatToolChoice | None = None
+    parallel_tool_calls: bool | None = None
+    include_usage: bool | None = None
+    try:
+        for field, wire_type, value in _wire.iter_fields(payload):
+            if field == 1:
+                _require_wire_type(
+                    "ChatCompletionRequestV3", "messages", wire_type, _wire.WIRE_LEN
+                )
+                messages.append(_decode_chat_message_v3(value))  # type: ignore[arg-type]
+            elif field == 2:
+                _require_wire_type(
+                    "ChatCompletionRequestV3", "model", wire_type, _wire.WIRE_LEN
+                )
+                model = _wire.decode_utf8(value)  # type: ignore[arg-type]
+            elif field == 3:
+                _require_wire_type(
+                    "ChatCompletionRequestV3", "stream", wire_type, _wire.WIRE_VARINT
+                )
+                stream = bool(value)
+            elif field == 4:
+                _require_wire_type(
+                    "ChatCompletionRequestV3",
+                    "temperature",
+                    wire_type,
+                    _wire.WIRE_FIXED64,
+                )
+                temperature = struct.unpack("<d", value)[0]  # type: ignore[arg-type]
+            elif field == 5:
+                _require_wire_type(
+                    "ChatCompletionRequestV3",
+                    "max_tokens",
+                    wire_type,
+                    _wire.WIRE_VARINT,
+                )
+                max_tokens = _uint32_value(value, "ChatCompletionRequestV3.max_tokens")
+            elif field == 6:
+                _require_wire_type(
+                    "ChatCompletionRequestV3", "tools", wire_type, _wire.WIRE_LEN
+                )
+                tools.append(_decode_chat_tool(value))  # type: ignore[arg-type]
+            elif field == 7:
+                _require_wire_type(
+                    "ChatCompletionRequestV3", "tool_choice", wire_type, _wire.WIRE_LEN
+                )
+                tool_choice = _decode_chat_tool_choice(value)  # type: ignore[arg-type]
+            elif field == 8:
+                _require_wire_type(
+                    "ChatCompletionRequestV3",
+                    "parallel_tool_calls",
+                    wire_type,
+                    _wire.WIRE_VARINT,
+                )
+                parallel_tool_calls = bool(value)
+            elif field == 9:
+                _require_wire_type(
+                    "ChatCompletionRequestV3",
+                    "include_usage",
+                    wire_type,
+                    _wire.WIRE_VARINT,
+                )
+                include_usage = bool(value)
+    except _wire.WireFormatError as error:
+        raise ChatCodecError(f"undecodable ChatCompletionRequestV3: {error}") from error
+    except struct.error as error:
+        raise ChatCodecError(
+            f"invalid ChatCompletionRequestV3 temperature: {error}"
+        ) from error
+    _require_temperature(temperature)
+    return ChatCompletionRequestV3(
+        messages=tuple(messages),
+        model=model,
+        stream=stream,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        tools=tuple(tools),
+        tool_choice=tool_choice,
+        parallel_tool_calls=parallel_tool_calls,
+        include_usage=include_usage,
+    )
+
+
+def encode_chat_completion_response_v3(response: ChatCompletionResponse) -> bytes:
+    """Encode the shared structured response payload used by v3."""
+
+    return encode_chat_completion_response_v2(response)
+
+
+def decode_chat_completion_response_v3(payload: bytes) -> ChatCompletionResponse:
+    """Decode the shared structured response payload used by v3."""
+
+    return decode_chat_completion_response_v2(payload)
 
 
 def _encode_chat_function(function: ChatFunction) -> bytes:
@@ -1042,7 +1485,7 @@ def _require_wire_type(
 ) -> None:
     """Reject a known field encoded with a different protobuf wire type.
 
-        中文:拒绝使用错误 protobuf wire type 编码的已知字段。
+    中文:拒绝使用错误 protobuf wire type 编码的已知字段。
     """
 
     if actual != expected:

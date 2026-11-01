@@ -19,8 +19,7 @@ pub const RECALL_REQUEST_TYPE_URL: &str =
     "type.cyrene.io/cyrene.memory.provider.v1.RecallMemoryRequest";
 pub const RECALL_RESPONSE_TYPE_URL: &str =
     "type.cyrene.io/cyrene.memory.provider.v1.RecallMemoryResponse";
-pub const GET_REQUEST_TYPE_URL: &str =
-    "type.cyrene.io/cyrene.memory.provider.v1.GetMemoryRequest";
+pub const GET_REQUEST_TYPE_URL: &str = "type.cyrene.io/cyrene.memory.provider.v1.GetMemoryRequest";
 pub const GET_RESPONSE_TYPE_URL: &str =
     "type.cyrene.io/cyrene.memory.provider.v1.GetMemoryResponse";
 pub const DELETE_REQUEST_TYPE_URL: &str =

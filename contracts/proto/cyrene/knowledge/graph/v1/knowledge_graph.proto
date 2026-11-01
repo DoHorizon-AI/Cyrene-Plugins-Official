@@ -1,0 +1,247 @@
+// SPDX-License-Identifier: Apache-2.0
+// ┌────────────────────────────────────────────────────────────────────────┐
+// │ 📄 knowledge_graph.proto                                               │
+// │ Package: cyrene.knowledge.graph.v1                                     │
+// │ Role: Tenant-scoped graph storage and traversal payload contract.     │
+// │                                                                        │
+// │ 协议职责：定义租户隔离的图数据存储、检索、展开与批量迁移负载。          │
+// │ · 不包含画像、Dream、业务授权推断或产品工作流。                         │
+// └────────────────────────────────────────────────────────────────────────┘
+syntax = "proto3";
+
+package cyrene.knowledge.graph.v1;
+
+option csharp_namespace = "Cyrene.Knowledge.Graph.V1";
+option java_multiple_files = true;
+option java_outer_classname = "KnowledgeGraphProto";
+option java_package = "io.cyrene.proto.knowledge.graph.v1";
+
+// Direct plugin invocation identifiers:
+//   capability ID: knowledge.graph.v1
+//   interface version: 1
+//   methods: upsert_nodes, get_node, search_nodes, delete_node, upsert_edges,
+//            get_edge, search_edges, delete_edge, expand, import_batch,
+//            export_batch
+
+enum KnowledgeGraphErrorCode {
+  KNOWLEDGE_GRAPH_ERROR_CODE_UNSPECIFIED = 0;
+  KNOWLEDGE_GRAPH_ERROR_CODE_NOT_FOUND = 1;
+  KNOWLEDGE_GRAPH_ERROR_CODE_TENANT_MISMATCH = 2;
+  KNOWLEDGE_GRAPH_ERROR_CODE_INVALID_INPUT = 3;
+  KNOWLEDGE_GRAPH_ERROR_CODE_QUOTA_EXCEEDED = 4;
+  KNOWLEDGE_GRAPH_ERROR_CODE_STORAGE_FAILED = 5;
+}
+
+message GraphNode {
+  string node_id = 1;
+  string tenant_id = 2;
+  string namespace = 3;
+  string kind = 4;
+  string label = 5;
+  optional string description = 6;
+  map<string, string> metadata = 7;
+  repeated string source_refs = 8;
+  int64 created_at_ms = 9;
+  int64 updated_at_ms = 10;
+}
+
+message GraphEdge {
+  string edge_id = 1;
+  string tenant_id = 2;
+  string namespace = 3;
+  string source_node_id = 4;
+  string target_node_id = 5;
+  string relation = 6;
+  map<string, string> metadata = 7;
+  repeated string source_refs = 8;
+  int64 created_at_ms = 9;
+  int64 updated_at_ms = 10;
+}
+
+message KnowledgeGraphError {
+  KnowledgeGraphErrorCode code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
+
+message UpsertNodesRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  repeated GraphNode nodes = 3;
+}
+
+message UpsertNodesResponse {
+  oneof result {
+    int32 upserted_count = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message GetNodeRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  string node_id = 3;
+}
+
+message GetNodeResponse {
+  oneof result {
+    GraphNode node = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message SearchNodesRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  optional string query = 3;
+  optional string kind = 4;
+  map<string, string> metadata_filters = 5;
+  optional int32 page_size = 6;
+  optional string page_token = 7;
+}
+
+message SearchNodesBatch {
+  repeated GraphNode nodes = 1;
+  string next_page_token = 2;
+}
+
+message SearchNodesResponse {
+  oneof result {
+    SearchNodesBatch batch = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message DeleteNodeRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  string node_id = 3;
+}
+
+message DeleteNodeResponse {
+  oneof result {
+    bool deleted = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message UpsertEdgesRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  repeated GraphEdge edges = 3;
+}
+
+message UpsertEdgesResponse {
+  oneof result {
+    int32 upserted_count = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message GetEdgeRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  string edge_id = 3;
+}
+
+message GetEdgeResponse {
+  oneof result {
+    GraphEdge edge = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message SearchEdgesRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  optional string node_id = 3;
+  optional string relation = 4;
+  optional int32 page_size = 5;
+  optional string page_token = 6;
+}
+
+message SearchEdgesBatch {
+  repeated GraphEdge edges = 1;
+  string next_page_token = 2;
+}
+
+message SearchEdgesResponse {
+  oneof result {
+    SearchEdgesBatch batch = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message DeleteEdgeRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  string edge_id = 3;
+}
+
+message DeleteEdgeResponse {
+  oneof result {
+    bool deleted = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message ExpandGraphRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  repeated string seed_node_ids = 3;
+  repeated string relation_filters = 4;
+  optional int32 max_depth = 5;
+  optional int32 node_limit = 6;
+}
+
+message ExpandGraphBatch {
+  repeated GraphNode nodes = 1;
+  repeated GraphEdge edges = 2;
+}
+
+message ExpandGraphResponse {
+  oneof result {
+    ExpandGraphBatch batch = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message ImportGraphRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  repeated GraphNode nodes = 3;
+  repeated GraphEdge edges = 4;
+  bool overwrite = 5;
+}
+
+message ImportGraphResponse {
+  oneof result {
+    ImportGraphResult imported = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
+
+message ImportGraphResult {
+  int32 node_count = 1;
+  int32 edge_count = 2;
+}
+
+message ExportGraphRequest {
+  string tenant_id = 1;
+  string namespace = 2;
+  optional int32 page_size = 3;
+  optional string page_token = 4;
+}
+
+message ExportGraphBatch {
+  repeated GraphNode nodes = 1;
+  repeated GraphEdge edges = 2;
+  string next_page_token = 3;
+}
+
+message ExportGraphResponse {
+  oneof result {
+    ExportGraphBatch batch = 1;
+    KnowledgeGraphError error = 2;
+  }
+}
