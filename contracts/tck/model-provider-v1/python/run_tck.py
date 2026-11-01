@@ -8,14 +8,27 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-
 if len(sys.argv) != 2:
     raise SystemExit("usage: run_tck.py <generated-python-root>")
 sys.path.insert(0, str(Path(sys.argv[1]).resolve()))
+repository_root = Path(__file__).resolve().parents[4]
+sys.path.insert(
+    0,
+    str(repository_root / "sdk/python/cyrene_model_provider_contracts/src"),
+)
 
-from google.protobuf.any_pb2 import Any  # noqa: E402
-from cyrene.model.provider.v1 import model_provider_pb2  # noqa: E402
-
+from cyrene.model.provider.v1 import model_provider_pb2
+from cyrene_model_provider_contracts import (
+    EmbeddingBatch,
+    EmbeddingsRequest,
+    EmbeddingsResponse,
+    EmbeddingVector,
+    decode_embeddings_request,
+    decode_embeddings_response,
+    encode_embeddings_request,
+    encode_embeddings_response,
+)
+from google.protobuf.any_pb2 import Any
 
 embedding_request = model_provider_pb2.EmbeddingsRequest(
     inputs=["alpha", "beta"], model="deterministic-model"
@@ -41,6 +54,33 @@ packed_response.Pack(response)
 unpacked_response = model_provider_pb2.EmbeddingsResponse()
 assert packed_response.Unpack(unpacked_response)
 assert len(unpacked_response.embeddings.vectors) == len(embedding_request.inputs)
+
+# The shared Python codec must encode the same protobuf bytes as protoc output.
+sdk_embedding_request = EmbeddingsRequest(
+    inputs=("alpha", "beta"), model="deterministic-model"
+)
+assert encode_embeddings_request(
+    sdk_embedding_request
+) == embedding_request.SerializeToString(deterministic=True)
+assert (
+    decode_embeddings_request(embedding_request.SerializeToString())
+    == sdk_embedding_request
+)
+sdk_embedding_response = EmbeddingsResponse(
+    embeddings=EmbeddingBatch(
+        vectors=(EmbeddingVector((1.0, 2.0)), EmbeddingVector((3.0, 4.0))),
+        dimensions=2,
+        model="deterministic-model",
+    )
+)
+assert encode_embeddings_response(sdk_embedding_response) == response.SerializeToString(
+    deterministic=True
+)
+decoded_embedding_response = decode_embeddings_response(response.SerializeToString())
+assert decoded_embedding_response.embeddings is not None
+assert decoded_embedding_response.embeddings.model == "deterministic-model"
+assert decoded_embedding_response.embeddings.dimensions == 2
+assert tuple(decoded_embedding_response.embeddings.vectors[0].values) == (1.0, 2.0)
 
 chat = model_provider_pb2.ChatCompletionRequest(
     messages=[
