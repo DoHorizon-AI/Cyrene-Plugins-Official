@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+import hashlib
 import heapq
 import json
 import math
@@ -35,7 +36,8 @@ DEFAULT_BATCH_SIZE = 256
 MAX_TOP_K = 1_000
 MODEL_ID_KEY = "cyrene.embedding.model_id"
 DIMENSIONS_KEY = "cyrene.embedding.dimensions"
-SCHEMA_VERSION = 1
+PROVIDER_MODEL_ID_KEY = "cyrene.embedding.provider_model_id"
+SCHEMA_VERSION = 2
 _FETCH_SIZE = 256
 
 
@@ -88,11 +90,26 @@ class SQLiteMemoryStore:
         embedding_dimensions: int,
         recall_batch_size: int = DEFAULT_BATCH_SIZE,
         max_top_k: int = 100,
+        provider_model_id: str | None = None,
+        document_prefix: str = "",
+        query_prefix: str = "",
     ) -> None:
         self.database_path = _absolute_database_path(database_path)
         self.embedding_model_id = _required_text(embedding_model_id, "embedding_model_id", 256)
+        self.provider_model_id = _required_text(
+            provider_model_id or embedding_model_id, "provider_model_id", 256
+        )
         self.embedding_dimensions = _bounded_integer(
             embedding_dimensions, "embedding_dimensions", 1, 4096
+        )
+        self.document_prefix = _bounded_optional_text(document_prefix, "document_prefix", 512)
+        self.query_prefix = _bounded_optional_text(query_prefix, "query_prefix", 512)
+        self.profile_fingerprint = _profile_fingerprint(
+            self.embedding_model_id,
+            self.provider_model_id,
+            self.embedding_dimensions,
+            self.document_prefix,
+            self.query_prefix,
         )
         self.recall_batch_size = _bounded_integer(recall_batch_size, "recall_batch_size", 16, 4096)
         self.max_top_k = _bounded_integer(max_top_k, "max_top_k", 1, MAX_TOP_K)
@@ -129,6 +146,7 @@ class SQLiteMemoryStore:
             expected_tenant=tenant,
             expected_model_id=self.embedding_model_id,
             expected_dimensions=self.embedding_dimensions,
+            expected_provider_model_id=self.provider_model_id,
         )
         embedding = _pack_vector(record.embedding, self.embedding_dimensions)
         metadata = _encode_metadata(record.metadata)
@@ -355,13 +373,36 @@ class SQLiteMemoryStore:
             raise MemoryStoreError(4, f"import batch exceeds {MAX_BATCH_ITEMS} items")
         normalized: list[StoredMemory] = []
         for item in items:
+            if not {MODEL_ID_KEY, DIMENSIONS_KEY, PROVIDER_MODEL_ID_KEY}.issubset(item.metadata):
+                raise MemoryStoreError(
+                    3,
+                    "import vectors must declare their model profile, provider model, "
+                    "and dimensions",
+                )
             model_id, dimensions = _profile_from_metadata(
                 item.metadata, default_model_id=self.embedding_model_id
             )
             if dimensions is None:
-                dimensions = len(item.embedding)
-            profiled = _with_profile_metadata(item, model_id, dimensions)
-            normalized.append(_normalize_item(profiled, expected_tenant=tenant))
+                dimensions = self.embedding_dimensions
+            provider_model_id = item.metadata.get(PROVIDER_MODEL_ID_KEY, self.provider_model_id)
+            if (
+                model_id != self.embedding_model_id
+                or dimensions != self.embedding_dimensions
+                or provider_model_id != self.provider_model_id
+            ):
+                raise MemoryStoreError(
+                    3,
+                    "import vectors must be re-embedded for the active database profile",
+                )
+            normalized.append(
+                _normalize_item(
+                    _with_profile_metadata(item, model_id, dimensions, provider_model_id),
+                    expected_tenant=tenant,
+                    expected_model_id=self.embedding_model_id,
+                    expected_dimensions=self.embedding_dimensions,
+                    expected_provider_model_id=self.provider_model_id,
+                )
+            )
         identities = [item.item_id for item in normalized]
         if len(identities) != len(set(identities)):
             raise ValueError("import batch contains duplicate item_id values")
@@ -438,8 +479,6 @@ class SQLiteMemoryStore:
                 version = int(connection.execute("PRAGMA user_version").fetchone()[0])
                 if version > SCHEMA_VERSION:
                     raise ValueError("memory database schema is newer than this provider")
-                if version == SCHEMA_VERSION:
-                    return
                 connection.execute("BEGIN IMMEDIATE")
                 statements = (
                     """
@@ -470,6 +509,72 @@ class SQLiteMemoryStore:
                 )
                 for statement in statements:
                     connection.execute(statement)
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS memory_active_profile (
+                        singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+                        fingerprint TEXT NOT NULL
+                    )
+                    """
+                )
+                profile = connection.execute(
+                    "SELECT fingerprint FROM memory_active_profile WHERE singleton = 1"
+                ).fetchone()
+                if profile is None:
+                    existing_profiles = connection.execute(
+                        "SELECT DISTINCT embedding_model_id, embedding_dimensions "
+                        "FROM memory_records"
+                    ).fetchall()
+                    if existing_profiles and (
+                        self.document_prefix
+                        or self.query_prefix
+                        or self.embedding_model_id != self.provider_model_id
+                    ):
+                        raise ValueError(
+                            "existing memories have no complete profile fingerprint; "
+                            "use a fresh database"
+                        )
+                    if any(
+                        str(row["embedding_model_id"]) != self.embedding_model_id
+                        or int(row["embedding_dimensions"]) != self.embedding_dimensions
+                        for row in existing_profiles
+                    ):
+                        raise ValueError(
+                            "existing memories use another vector profile; use a fresh database"
+                        )
+                    if existing_profiles:
+                        metadata_cursor = connection.execute(
+                            "SELECT metadata_json FROM memory_records"
+                        )
+                        while True:
+                            rows = metadata_cursor.fetchmany(self.recall_batch_size)
+                            if not rows:
+                                break
+                            for row in rows:
+                                metadata = _decode_metadata(row["metadata_json"])
+                                stored_provider = metadata.get(PROVIDER_MODEL_ID_KEY)
+                                if stored_provider and stored_provider != self.provider_model_id:
+                                    raise ValueError(
+                                        "existing memories use another provider model; "
+                                        "use a fresh database"
+                                    )
+                    connection.execute(
+                        "INSERT INTO memory_active_profile(singleton, fingerprint) VALUES (1, ?)",
+                        (self.profile_fingerprint,),
+                    )
+                elif str(profile["fingerprint"]) != self.profile_fingerprint:
+                    count = int(
+                        connection.execute("SELECT count(*) FROM memory_records").fetchone()[0]
+                    )
+                    if count:
+                        raise ValueError(
+                            "database vector profile changed; create and verify a fresh "
+                            "database before switching"
+                        )
+                    connection.execute(
+                        "UPDATE memory_active_profile SET fingerprint = ? WHERE singleton = 1",
+                        (self.profile_fingerprint,),
+                    )
                 connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
                 connection.execute("COMMIT")
             except (sqlite3.Error, ValueError) as error:
@@ -489,6 +594,7 @@ class SQLiteMemoryStore:
         )
         stored_metadata.setdefault(MODEL_ID_KEY, str(row["embedding_model_id"]))
         stored_metadata.setdefault(DIMENSIONS_KEY, str(dimensions))
+        stored_metadata.setdefault(PROVIDER_MODEL_ID_KEY, self.provider_model_id)
         return StoredMemory(
             item_id=str(row["item_id"]),
             tenant_id=str(row["tenant_id"]),
@@ -509,6 +615,7 @@ def _normalize_item(
     expected_tenant: str,
     expected_model_id: str | None = None,
     expected_dimensions: int | None = None,
+    expected_provider_model_id: str | None = None,
 ) -> StoredMemory:
     tenant = _required_tenant(item.tenant_id)
     expected_tenant = _required_tenant(expected_tenant)
@@ -519,6 +626,11 @@ def _normalize_item(
     if not item.content or len(item.content.encode("utf-8")) > MAX_CONTENT_BYTES:
         raise ValueError("content must be non-empty and within the 1 MiB limit")
     metadata = _validated_metadata(item.metadata)
+    if not {MODEL_ID_KEY, DIMENSIONS_KEY, PROVIDER_MODEL_ID_KEY}.issubset(metadata):
+        raise MemoryStoreError(
+            3,
+            "vector metadata must declare its model profile, provider model, and dimensions",
+        )
     model_id, profile_dimensions = _profile_from_metadata(
         metadata, default_model_id=expected_model_id
     )
@@ -528,9 +640,15 @@ def _normalize_item(
         raise MemoryStoreError(3, "embedding model does not match the configured profile")
     if expected_dimensions is not None and profile_dimensions != expected_dimensions:
         raise MemoryStoreError(3, "embedding dimension does not match the configured profile")
+    provider_model_id = metadata.get(PROVIDER_MODEL_ID_KEY, expected_provider_model_id)
+    if provider_model_id is None:
+        provider_model_id = model_id
+    provider_model_id = _required_text(provider_model_id, "provider_model_id", 256)
+    if expected_provider_model_id is not None and provider_model_id != expected_provider_model_id:
+        raise MemoryStoreError(3, "embedding provider model does not match the configured profile")
     if profile_dimensions != len(item.embedding):
         raise MemoryStoreError(3, "embedding vector and profile dimensions do not match")
-    metadata = _with_profile_metadata(metadata, model_id, profile_dimensions)
+    metadata = _with_profile_metadata(metadata, model_id, profile_dimensions, provider_model_id)
     if item.ttl_seconds is not None and item.ttl_seconds < 0:
         raise ValueError("ttl_seconds must be nonnegative")
     if item.expires_at_ms is not None and item.expires_at_ms < 0:
@@ -631,11 +749,17 @@ def _profile_from_metadata(
 
 
 def _with_profile_metadata(
-    item: StoredMemory | Mapping[str, str], model_id: str, dimensions: int
+    item: StoredMemory | Mapping[str, str],
+    model_id: str,
+    dimensions: int,
+    provider_model_id: str | None = None,
 ) -> Any:
     metadata = dict(item.metadata if isinstance(item, StoredMemory) else item)
     metadata[MODEL_ID_KEY] = model_id
     metadata[DIMENSIONS_KEY] = str(dimensions)
+    metadata[PROVIDER_MODEL_ID_KEY] = provider_model_id or metadata.get(
+        PROVIDER_MODEL_ID_KEY, model_id
+    )
     return (
         metadata
         if not isinstance(item, StoredMemory)
@@ -680,6 +804,28 @@ def _effective_expiry(
         return expires_at_ms
     ttl_expiry = created_at_ms + ttl_seconds * 1000
     return ttl_expiry if expires_at_ms is None else min(expires_at_ms, ttl_expiry)
+
+
+def _profile_fingerprint(
+    profile_id: str,
+    provider_model_id: str,
+    dimensions: int,
+    document_prefix: str,
+    query_prefix: str,
+) -> str:
+    payload = json.dumps(
+        {
+            "document_prefix": document_prefix,
+            "dimensions": dimensions,
+            "profile_id": profile_id,
+            "provider_model_id": provider_model_id,
+            "query_prefix": query_prefix,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def _absolute_database_path(value: str | Path) -> Path:

@@ -117,6 +117,8 @@ class MemorySqliteProvider:
             ValueError,
             TypeError,
         ) as error:
+            if _cancelled(cancellation):
+                return False, "CANCELLED: operation cancelled"
             return self._error_result(action, error)
 
     def on_shutdown(self, timeout_ms: int) -> None:
@@ -262,6 +264,9 @@ class MemorySqliteProvider:
                     embedding_dimensions=settings.embedding_dimensions,
                     recall_batch_size=settings.recall_batch_size,
                     max_top_k=settings.max_top_k,
+                    provider_model_id=settings.embedding_model_id,
+                    document_prefix=settings.embedding_document_prefix,
+                    query_prefix=settings.embedding_query_prefix,
                 )
             return self._store
 

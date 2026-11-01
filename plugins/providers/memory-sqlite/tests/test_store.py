@@ -18,13 +18,23 @@ import pytest
 from memory_sqlite_provider.store import MemoryStoreError, SQLiteMemoryStore, StoredMemory
 
 
-def _store(path: Path, *, model: str = "embed-v1") -> SQLiteMemoryStore:
+def _store(
+    path: Path,
+    *,
+    model: str = "embed-v1",
+    provider_model: str | None = None,
+    document_prefix: str = "",
+    query_prefix: str = "",
+) -> SQLiteMemoryStore:
     return SQLiteMemoryStore(
         path,
         embedding_model_id=model,
         embedding_dimensions=3,
         recall_batch_size=16,
         max_top_k=20,
+        provider_model_id=provider_model,
+        document_prefix=document_prefix,
+        query_prefix=query_prefix,
     )
 
 
@@ -39,6 +49,12 @@ def _item(
     created: int = 1_800_000_000_000,
     expires: int | None = None,
 ) -> StoredMemory:
+    item_metadata = {
+        "cyrene.embedding.model_id": "embed-v1",
+        "cyrene.embedding.dimensions": str(len(embedding)),
+        "cyrene.embedding.provider_model_id": "embed-v1",
+    }
+    item_metadata.update(metadata or {})
     return StoredMemory(
         item_id=item_id,
         tenant_id=tenant,
@@ -46,7 +62,7 @@ def _item(
         subject=subject,
         content=f"same body for {item_id}",
         embedding=embedding,
-        metadata={} if metadata is None else metadata,
+        metadata=item_metadata,
         created_at_ms=created,
         expires_at_ms=expires,
         ttl_seconds=None,
@@ -84,7 +100,7 @@ def test_recall_filters_tenant_scope_subject_metadata_and_expiry_before_scoring(
         store.close()
 
 
-def test_recall_keeps_bounded_top_k_and_excludes_old_model_profiles(tmp_path: Path) -> None:
+def test_recall_keeps_bounded_top_k_and_rejects_foreign_profile_imports(tmp_path: Path) -> None:
     path = tmp_path / "memory.sqlite3"
     store = _store(path)
     try:
@@ -96,9 +112,11 @@ def test_recall_keeps_bounded_top_k_and_excludes_old_model_profiles(tmp_path: Pa
             metadata={
                 "cyrene.embedding.model_id": "embed-old",
                 "cyrene.embedding.dimensions": "3",
+                "cyrene.embedding.provider_model_id": "embed-old",
             },
         )
-        assert store.import_batch("tenant-a", [imported], overwrite=False) == 1
+        with pytest.raises(MemoryStoreError, match="re-embedded"):
+            store.import_batch("tenant-a", [imported], overwrite=False)
         matches = store.recall(
             tenant_id="tenant-a",
             query_embedding=(1.0, 0.0, 0.0),
@@ -141,6 +159,46 @@ def test_restart_preserves_records_and_model_profile_identity(tmp_path: Path) ->
         )
     finally:
         reopened.close()
+
+
+def test_populated_database_rejects_model_or_preprocessing_profile_drift(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "profile.sqlite3"
+    active = _store(
+        path,
+        model="e5-query-passage-v1",
+        provider_model="intfloat/e5-small-v2",
+        document_prefix="passage: ",
+        query_prefix="query: ",
+    )
+    active.store(
+        "tenant-a",
+        _item(
+            "fact",
+            metadata={
+                "cyrene.embedding.model_id": "e5-query-passage-v1",
+                "cyrene.embedding.dimensions": "3",
+                "cyrene.embedding.provider_model_id": "intfloat/e5-small-v2",
+            },
+        ),
+    )
+    active.close()
+
+    with pytest.raises(ValueError, match="vector profile changed"):
+        _store(
+            path,
+            model="e5-query-passage-v1",
+            provider_model="intfloat/e5-small-v2",
+            document_prefix="passage: ",
+            query_prefix="search: ",
+        )
+    with pytest.raises(ValueError, match="vector profile changed"):
+        _store(
+            path,
+            model="another-profile",
+            provider_model="another-model",
+        )
 
 
 def test_zero_vectors_and_wrong_embedding_profiles_fail_closed(tmp_path: Path) -> None:
@@ -192,6 +250,10 @@ def test_import_is_atomic_idempotent_and_preserves_same_text_as_distinct_items(
         first = replace(_item("source-one"), content="same source text")
         second = replace(_item("source-two"), content="same source text")
         invalid = _item("invalid", embedding=(0.0, 0.0, 0.0))
+        with pytest.raises(MemoryStoreError, match="must declare"):
+            store.import_batch(
+                "tenant-a", [replace(first, metadata={})], overwrite=False
+            )
         with pytest.raises(ValueError, match="zero vectors"):
             store.import_batch("tenant-a", [first, invalid], overwrite=False)
         assert store.get("tenant-a", "source-one") is None

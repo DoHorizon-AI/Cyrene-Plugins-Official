@@ -111,7 +111,12 @@ def test_typed_store_get_recall_delete_prune_and_import_methods(tmp_path: Path) 
             subject="user-1",
             content="The user prefers concise replies.",
             embedding=(1.0, 0.0, 0.0),
-            metadata={"origin": "message-9"},
+            metadata={
+                "origin": "message-9",
+                "cyrene.embedding.model_id": "embed-v1",
+                "cyrene.embedding.dimensions": "3",
+                "cyrene.embedding.provider_model_id": "embed-v1",
+            },
             created_at_ms=1_800_000_000_000,
         )
         stored = decode_store_response(
@@ -184,6 +189,11 @@ def test_typed_store_get_recall_delete_prune_and_import_methods(tmp_path: Path) 
             subject="user-1",
             content="A second source record with the same vector.",
             embedding=(1.0, 0.0, 0.0),
+            metadata={
+                "cyrene.embedding.model_id": "embed-v1",
+                "cyrene.embedding.dimensions": "3",
+                "cyrene.embedding.provider_model_id": "embed-v1",
+            },
             created_at_ms=1_800_000_000_001,
         )
         imported_second = decode_import_batch_response(
@@ -284,6 +294,28 @@ def test_text_store_uses_only_the_injected_embedding_provider(tmp_path: Path) ->
         provider.on_shutdown(1000)
 
 
+def test_host_supplied_vector_requires_an_explicit_profile(tmp_path: Path) -> None:
+    provider = _provider(tmp_path)
+    item = MemoryItem(
+        item_id="unprofiled-vector",
+        tenant_id="tenant-a",
+        content="A vector without provenance must not be accepted.",
+        embedding=(1.0, 0.0, 0.0),
+    )
+    try:
+        result = decode_store_response(
+            _invoke(
+                provider,
+                "store",
+                encode_store_request(StoreMemoryRequest("tenant-a", item)),
+            ).value
+        )
+        assert result.error is not None
+        assert "must declare its model profile" in result.error.message
+    finally:
+        provider.on_shutdown(1000)
+
+
 def test_query_and_document_prefixes_use_a_distinct_embedding_profile(
     tmp_path: Path,
 ) -> None:
@@ -363,6 +395,11 @@ def test_provider_serves_typed_calls_over_direct_plugin_runtime(tmp_path: Path) 
         tenant_id="tenant-a",
         content="This call crosses the local DirectPluginRuntime boundary.",
         embedding=(1.0, 0.0, 0.0),
+        metadata={
+            "cyrene.embedding.model_id": "embed-v1",
+            "cyrene.embedding.dimensions": "3",
+            "cyrene.embedding.provider_model_id": "embed-v1",
+        },
     )
     try:
         result = client.invoke(
