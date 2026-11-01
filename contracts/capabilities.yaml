@@ -343,6 +343,29 @@ capabilities:
         verified_at: 2026-09-20
     tck:
       - contracts/tck/execution-engine-v1
+  - id: knowledge.graph.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/knowledge/graph/v1/knowledge_graph.proto
+    contract_methods:
+      - delete_edge
+      - delete_node
+      - expand
+      - export_batch
+      - get_edge
+      - get_node
+      - import_batch
+      - search_edges
+      - search_nodes
+      - upsert_edges
+      - upsert_nodes
+    implementations: []
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/knowledge_graph_contract_tck.rs
+      - contracts/tck/knowledge-graph-v1
   - id: memory.provider.v1
     interface_versions:
       - "1"
@@ -374,6 +397,7 @@ capabilities:
         verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/memory_provider_contract_tck.rs
+      - contracts/tck/memory-provider-v1
   - id: message.connector.v1
     interface_versions:
       - "1"
@@ -483,6 +507,7 @@ capabilities:
     contract_methods:
       - chat_completion
       - chat_completion_v2
+      - chat_completion_v3
       - embeddings
     implementations:
       - ref: cyrene.providers.model-api-connector
@@ -533,6 +558,7 @@ capabilities:
         verified_at: 2026-09-13
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/model_provider_chat_contract_tck.rs
+      - contracts/rust/cyrene-plugin-contracts/tests/model_provider_chat_v3_contract_tck.rs
       - contracts/rust/cyrene-plugin-contracts/tests/model_provider_embedding_contract_tck.rs
       - contracts/tck/model-provider-v1
   - id: qq.client.v1
@@ -714,6 +740,19 @@ capabilities:
         execution_mode: SIMULATED
         verified_at: 2026-09-19
     tck: []
+  - id: speech.provider.v1
+    interface_versions:
+      - "1"
+    contract:
+      kind: proto
+      paths:
+        - contracts/proto/cyrene/speech/provider/v1/speech_provider.proto
+    contract_methods:
+      - transcribe
+    implementations: []
+    tck:
+      - contracts/rust/cyrene-plugin-contracts/tests/speech_provider_contract_tck.rs
+      - contracts/tck/speech-provider-v1
   - id: tool.dataset.validator.v1
     interface_versions:
       - "1"
@@ -911,8 +950,5 @@ capabilities:
       - contracts/tck/training-llama-factory-v1
 declared_without_contract:
   - id: rerank.provider.v1
-    declared_by: runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs
-    notes: "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."
-  - id: speech.provider.v1
     declared_by: runtime/dotnet-native-aot/Cyrene.Plugin.Core/PluginCore.cs
     notes: "Declared in the C# plugin core capability list; no shared contract and no owner-scoped schema exists."

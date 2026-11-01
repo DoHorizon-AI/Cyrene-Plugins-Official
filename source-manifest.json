@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "f5a531d3f4ed9320dcc672c484f9eb1aad1c30fd981ccb505e1aa9b3e7ba16f7",
-      "size_bytes": 42761
+      "sha256": "3888e5ca7778e4b983c834b6c3fc392fa45cf8017cbb142e00e051f44bc414b9",
+      "size_bytes": 44027
     },
     {
       "kind": "file",
@@ -201,8 +201,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "40a9f3f9a9e068ee12c0969dc3d6399251751d362b1735b4b5f78e10c952de5d",
-      "size_bytes": 28058
+      "sha256": "b847fccff92ca6858e9952aa4b5ac44bd6a1bf56b32fbbece846f77eca2b34da",
+      "size_bytes": 28960
     },
     {
       "kind": "file",
@@ -389,9 +389,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/proto/cyrene/knowledge/graph/v1/knowledge_graph.proto",
+      "sha256": "dd534fc03246bc762fccf90ae88d9af91b90b8c626b123c55527ebd55c538e63",
+      "size_bytes": 5987
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/proto/cyrene/memory/provider/v1/memory_provider.proto",
-      "sha256": "b278039f1bcaf012f72c17353ff5a1d315209d67f3c890b74a7b5d21442b66d0",
-      "size_bytes": 4245
+      "sha256": "f8c41f62537b0f28238266b6a5e2a8a298eba06b50707fff9c40b655800c95be",
+      "size_bytes": 4458
     },
     {
       "kind": "file",
@@ -404,8 +411,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/proto/cyrene/model/provider/v1/model_provider.proto",
-      "sha256": "7d4919ccdc6f2a6e4a01cfe71713471b0e201737640e9782875fe5649d471580",
-      "size_bytes": 6669
+      "sha256": "737fff36505a376161ad4dceddddeb484f82b50a821b2f08d9da914e6d377e65",
+      "size_bytes": 8281
     },
     {
       "kind": "file",
@@ -420,6 +427,13 @@
       "path": "contracts/proto/cyrene/semantic/v1/identity.proto",
       "sha256": "f96c7ac15fecf400ffcae8cddebc77ed6293f363ae9cc0520cd76328eb0ab814",
       "size_bytes": 1000
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/proto/cyrene/speech/provider/v1/speech_provider.proto",
+      "sha256": "0a9d5c166812c1e24bc2cd19bb60648de25fe68e59d208513336c76a9c23bf25",
+      "size_bytes": 2621
     },
     {
       "kind": "file",
@@ -502,8 +516,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/runtime-implementations.json",
-      "sha256": "09e09a39b9d177185e8f2fc9eeb6d9273f55fcb2ca6ddc886706d78fa0c9b9e2",
-      "size_bytes": 4530
+      "sha256": "1517140a1a205e226337ebbf7c0852ca283a45ce5c6533c5cd539e22bfe2d553",
+      "size_bytes": 4282
     },
     {
       "kind": "file",
@@ -523,8 +537,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/build.rs",
-      "sha256": "35bf7accc2e229ffbcf1376c92ba2fddc8b6313b94f78b0b351dcc5988e73b14",
-      "size_bytes": 4399
+      "sha256": "e3ae1ebcb53eed124a1e31d2b3f95bdfcc36ddd3d98f9443578ba612988869ec",
+      "size_bytes": 4793
     },
     {
       "kind": "file",
@@ -550,16 +564,23 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/knowledge_graph.rs",
+      "sha256": "aaa6e88652130a8ad99b38575262148f0ed177c4335fa32b4df38d38b231b7e8",
+      "size_bytes": 3232
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/src/lib.rs",
-      "sha256": "1a846a7298511cd9a11cc316acccd2cf294aaeba2fa02db0b1db2995b914d656",
-      "size_bytes": 5625
+      "sha256": "5588d365edd6247a50b5fb07175e11059b29a07d5ab2f32769c8e0d5aa699ed0",
+      "size_bytes": 6137
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/src/memory_provider.rs",
-      "sha256": "9577ef6edf363b6d2a1e75941db6270155e1f1086f6368961d83366a3c657654",
-      "size_bytes": 918
+      "sha256": "7b661094a7d596e67a8e405c50336cafae4c3bb3cbf7dd3dce7c2434946b040f",
+      "size_bytes": 2032
     },
     {
       "kind": "file",
@@ -572,8 +593,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/src/model_provider.rs",
-      "sha256": "26874a98255962c30e2fbc0956cdcae2968f9f51c60417936c80634a6cdbad71",
-      "size_bytes": 1637
+      "sha256": "eb13024c17a8ac731bbbcc7fe83d1c72320eff53a0eddb06fe58b00ccff79818",
+      "size_bytes": 2125
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/src/speech_provider.rs",
+      "sha256": "77e2dd94c02e2c034cb62526951a93a0fb42eb5b5cac0c9b23e10571fcc080f7",
+      "size_bytes": 444
     },
     {
       "kind": "file",
@@ -606,9 +634,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/knowledge_graph_contract_tck.rs",
+      "sha256": "5cc4ceab3192c6c707b20619caf7d34913f39ec1e7d0b98c7d198c0a7dcc0f9c",
+      "size_bytes": 3530
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/memory_provider_contract_tck.rs",
-      "sha256": "11d6974c1a33f7a6bd295b16b0508b840eccb97a3d54be7da2998f2c8e5d42c4",
-      "size_bytes": 5630
+      "sha256": "66ecb7985f894ae557ce6cc89e45fd8ab273d0243f29eebc380c323099945ebf",
+      "size_bytes": 6504
     },
     {
       "kind": "file",
@@ -627,9 +662,23 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/model_provider_chat_v3_contract_tck.rs",
+      "sha256": "612d907cdb3d5f52edbfe07c04f6f96d0f5e0535f24cb8e2778f1f97a7f998a9",
+      "size_bytes": 3082
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "contracts/rust/cyrene-plugin-contracts/tests/model_provider_embedding_contract_tck.rs",
       "sha256": "b15f71a1c03e459fc4e7d1868b4c38ba9bd870ff6da77f2c02397f12e924df8f",
       "size_bytes": 7753
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/rust/cyrene-plugin-contracts/tests/speech_provider_contract_tck.rs",
+      "sha256": "55f0fb7e5ac653a73bc29a59cb16d37687f0c3520d645d40e0e9c284a491f654",
+      "size_bytes": 3349
     },
     {
       "kind": "file",
@@ -679,6 +728,48 @@
       "path": "contracts/tck/execution-engine-v1/test_execution_engine_tck.py",
       "sha256": "29acdf7aa2f1ff1f033f9999d8b7ca9817b460588ad9a48def5a3f54ca6650ff",
       "size_bytes": 7327
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/knowledge-graph-v1/README.md",
+      "sha256": "e5f112ce40bee3baefea5429e631f2564956f21058493cc08c12e4e0aa5b49bd",
+      "size_bytes": 636
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/knowledge-graph-v1/python/generate_bindings.py",
+      "sha256": "4aad099f565909a03da77b1f4031cf2cb2f5b61257c5e32947273c60ab32e75e",
+      "size_bytes": 1674
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/knowledge-graph-v1/python/run_tck.py",
+      "sha256": "432259d769a0dcb4a6e72e3c3a3a13d465869e6664e113c0f89d25b2a8120793",
+      "size_bytes": 1313
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/memory-provider-v1/README.md",
+      "sha256": "a38ecbec4608ec4046cd505c6c8aa243b707e6be71113dbaa816690038fd878b",
+      "size_bytes": 803
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/memory-provider-v1/python/generate_bindings.py",
+      "sha256": "b91313c6e333e5df435ddf17fc383e1e41f2de2e42b3499b3aebb305cde7b90f",
+      "size_bytes": 2002
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/memory-provider-v1/python/run_tck.py",
+      "sha256": "e2c2fbec2562e44352f3a091752180c769a05c0b863daea2e6f880ae66ca25eb",
+      "size_bytes": 8647
     },
     {
       "kind": "file",
@@ -824,8 +915,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/model-provider-v1/python/run_tck.py",
-      "sha256": "cb1717feab600ab75ec16c54b8c3ce0453c64735c7a6360fd387f1e1ca6c03ac",
-      "size_bytes": 4928
+      "sha256": "e2be39f8f8abadfb8fbf93cf98dd911a05dc843ca95abfb94c96fe4942af1932",
+      "size_bytes": 8333
     },
     {
       "kind": "file",
@@ -840,6 +931,27 @@
       "path": "contracts/tck/model-provider-v1/run-jvm-tck.sh",
       "sha256": "c7eb3a539e90897b97153e5f05a2ff1c3d71b2a08160bcf9133244d95bca4c4e",
       "size_bytes": 900
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/speech-provider-v1/README.md",
+      "sha256": "40674eb985ba6711a0a4d6ea6ff03bf93eadacacfa1f82b1ad5d49f01e5df08a",
+      "size_bytes": 636
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/speech-provider-v1/python/generate_bindings.py",
+      "sha256": "8240f62ddafdf972ecd0944f7de57f638c86558f0a4a8636107adab1417f2095",
+      "size_bytes": 1675
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/tck/speech-provider-v1/python/run_tck.py",
+      "sha256": "4f3b7429caf5649dc8efaef6f7725137816dea3b335c8da6613980689e25c43a",
+      "size_bytes": 1248
     },
     {
       "kind": "file",
@@ -4709,8 +4821,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/Cargo.lock",
-      "sha256": "5be1f82bd877fe180bf02df0e68567026d4080ac7198667c1aec31016798d277",
-      "size_bytes": 22153
+      "sha256": "91d6a2151ef95c3936309110a29894c0121a67e9620cce60319b8e2d84166f8f",
+      "size_bytes": 26501
     },
     {
       "kind": "file",
@@ -4765,15 +4877,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/src/service.rs",
-      "sha256": "2c639d09edc5e93d2c40630d99fb429f2ebf0716034a08dc6d1f3bfd2f164750",
-      "size_bytes": 19449
+      "sha256": "62510ba69d4b66d6f79329fefb796e07c770f99e773cc9cdd713d4e912001b84",
+      "size_bytes": 19550
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "runtime/rust/cyrene-memory-runtime/tests/memory_runtime_tests.rs",
-      "sha256": "961b8b86aa2b7a3c3517a67db94d62a28643c0a6b1c5fd8fee3654febc78376d",
-      "size_bytes": 23021
+      "sha256": "7bbcf436a476e5d7e149c572ba016862db2029e612fdc369df34a28eb07f5544",
+      "size_bytes": 23051
     },
     {
       "kind": "file",
@@ -6864,6 +6976,132 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/README.md",
+      "sha256": "e701e4620bdd2c3a7e40c358c4b1b9fe0f8cab3d9176566f14b75b031d151d06",
+      "size_bytes": 575
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/pyproject.toml",
+      "sha256": "4bd0f2d254ff9fa87429d97f213329b2fab1557cc6cd2001a87fffe861f32d3a",
+      "size_bytes": 474
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts/README.md",
+      "sha256": "e2b30946c04fc760dfb9c5fd16fc90794d0846d35bb18eb6229fa743ab50a037",
+      "size_bytes": 681
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts/__init__.py",
+      "sha256": "8781df3b3bff63a13c6440c6d08fb35dc4f9d037c496c2c5a26c9835eb660daa",
+      "size_bytes": 636
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts/_generated/README.md",
+      "sha256": "5b3a453aa305bc0599e51976b131e22ee828972dad80d24414820c72c8a62a4c",
+      "size_bytes": 286
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts/_generated/__init__.py",
+      "sha256": "4bfe0ca6df975c4606fdf97f994d7b98fb30b3c7fd0a4bf411931b30f10ac6ea",
+      "size_bytes": 137
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts/_generated/knowledge_graph_pb2.py",
+      "sha256": "5680d4f6b4221d9a70b7ad60014db0852209fa79746b038d9d81e7b36afd900c",
+      "size_bytes": 13684
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts/codec.py",
+      "sha256": "9b3b8366d2f9cf3844b3d1ccabe5e51581941b00af43549e83ad23b2e945d51d",
+      "size_bytes": 5099
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_knowledge_graph_contracts/tests/test_graph_codec.py",
+      "sha256": "298a4a52c82e7237b5974bbb4515d3c798761bcde2b9eb21a56728228736add4",
+      "size_bytes": 2576
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/README.md",
+      "sha256": "6828860254b4a124dff6f88dac964ceb61df746e7149715987a2c429504fd266",
+      "size_bytes": 509
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/pyproject.toml",
+      "sha256": "054d4653d6c87eb86064e4ea7c395d1a4ea6577afe21f99ce23df4d2a6fed8c0",
+      "size_bytes": 437
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/src/cyrene_memory_provider_contracts/README.md",
+      "sha256": "f7356d4d918ee8a32ac3e3a7a01c49ad4bf13431030d994c8f30c5ecde42dfd1",
+      "size_bytes": 730
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/src/cyrene_memory_provider_contracts/__init__.py",
+      "sha256": "d66afc2e892a58b26b31b151537b6c2db4d092bf9c3268efe803319f04aed4b7",
+      "size_bytes": 140
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/src/cyrene_memory_provider_contracts/_wire.py",
+      "sha256": "7600978383bd124713ddd39b8ca46597853b8b1324a8c17aba026c9c5caf74fe",
+      "size_bytes": 3214
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/src/cyrene_memory_provider_contracts/memory.py",
+      "sha256": "15e0deb582e98f458910173b9fe0bf8940ae7c9ea7e8e28fd655ed08ae5b5cac",
+      "size_bytes": 30216
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/src/cyrene_memory_provider_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_memory_provider_contracts/tests/test_memory_codec.py",
+      "sha256": "2fa4f132f65b11138191608f6e235c9a8e595f913ee0888db47249e191400339",
+      "size_bytes": 2496
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/README.md",
       "sha256": "e2f6f83c415bb740d8dbcd585d6c75016ad6ba99954a4269227ea511d64a9bac",
       "size_bytes": 1193
@@ -6878,9 +7116,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/README.md",
+      "sha256": "b6571b88f22fadc839237a96afdfa5439edc31239780506b52cf5dbe7b53eea4",
+      "size_bytes": 721
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/__init__.py",
-      "sha256": "f32d893b5d5a18e042dd0249acbfc7bd2277ef8e97e42b7270943765e460b0c8",
-      "size_bytes": 2284
+      "sha256": "73eedd75324450c6db9fa409b9ab3cbc7f1f232e9905a7c0eb5f4b70efdeaf46",
+      "size_bytes": 4011
     },
     {
       "kind": "file",
@@ -6893,8 +7138,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/chat.py",
-      "sha256": "5673fd871ecab87291a9b22da982b938c8d4d33ed01447b43e6a9893ab3d208c",
-      "size_bytes": 44837
+      "sha256": "3cd51ee3503d2e239d3e0c8ae696b2f94808681d15bdb74be29f292e39bbffcb",
+      "size_bytes": 62228
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/embeddings.py",
+      "sha256": "284fcf85115cd085ffeab52f1e7281d4ed8bed948879e46256d343afde6954bb",
+      "size_bytes": 10278
     },
     {
       "kind": "file",
@@ -6902,6 +7154,20 @@
       "path": "sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts/py.typed",
       "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
       "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/tests/test_chat_v3_codec.py",
+      "sha256": "318bedc250c96f5245eed3cb29eb4cdce40c21e2ef73435659735195611718cc",
+      "size_bytes": 1933
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_model_provider_contracts/tests/test_embeddings_codec.py",
+      "sha256": "f71f1f3e81998153f5a73126928be956af12c2aea18dbb8fa00eeb7f9c022388",
+      "size_bytes": 2100
     },
     {
       "kind": "file",
@@ -7070,6 +7336,167 @@
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_vendor_cli.py",
       "sha256": "a92305b272fa8357308a9c2ea862144bc1c02bd2e43182b761ebdfcbda8a5b78",
       "size_bytes": 4378
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/README.md",
+      "sha256": "18921186347d4ec84b0ed46948767bd4485f6322f8bfe440bacde14f33483cf7",
+      "size_bytes": 613
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/pyproject.toml",
+      "sha256": "a1c9550eba2c5b552fac3f980f61b85b2fda36951c94b961593066626553a07a",
+      "size_bytes": 474
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts/README.md",
+      "sha256": "8f0578c4dad43bdcc7d1d76afe6134f7e681e5cce286e19c7e956503dc72d395",
+      "size_bytes": 661
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts/__init__.py",
+      "sha256": "c0f52306f63f52fd9e42edc0d350ec8e8299b95d7fd4a3d5b424fb3576d902db",
+      "size_bytes": 668
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts/_generated/README.md",
+      "sha256": "95a6f13669de60e4efe50e457e26216f15ad223eaa680e7f5a26ad1a83ae3229",
+      "size_bytes": 288
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts/_generated/__init__.py",
+      "sha256": "d67b8fe949a720c6af410292d9a6b58df92a650f113df5f3bfcd8b4ebefc617a",
+      "size_bytes": 138
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts/_generated/speech_provider_pb2.py",
+      "sha256": "a50bce2a45a91d48bd8d6d4c039e9982fc4db69f804c3e161b16c041436bdef1",
+      "size_bytes": 4200
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts/codec.py",
+      "sha256": "c01fa928e0ac3e36dea1a1a0ec0c22b44ca0f64f56bdf1e6b619f3bf2a6c2cf5",
+      "size_bytes": 4951
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_speech_provider_contracts/tests/test_speech_codec.py",
+      "sha256": "ab0587f2085eb90867e3c5ad54aae93ced84543638626cf3a83531f7fe4e55b1",
+      "size_bytes": 3485
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/README.md",
+      "sha256": "de22916f62fa9b9c866f90a92adaf1d116fcced58b35fedc8b9cfba624cb3258",
+      "size_bytes": 508
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/generate_bindings.py",
+      "sha256": "03b6c5e365c65fa685b29acf06c13f627fc8afb84dca402efe3391cc9366a802",
+      "size_bytes": 1938
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/pyproject.toml",
+      "sha256": "c904a51d2a996a0e46eee24705df6eab049ef9ba1654b95c6c8fd5eaa7bb2e8a",
+      "size_bytes": 472
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/README.md",
+      "sha256": "e844381d27bba53deeeff77c5a138f423a74cb83971a122eb959a8072e7a83e4",
+      "size_bytes": 870
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/__init__.py",
+      "sha256": "bb107ea066cbadce104e48725db1c398474eb389a858fa2670370d1ebcc7fff0",
+      "size_bytes": 1058
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/_generated/README.md",
+      "sha256": "a3cdb96b62887c298a844905bdb999661804517f7bf01df4f05a1c91a09e4675",
+      "size_bytes": 379
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/_generated/__init__.py",
+      "sha256": "6917cd297dde76c51e6be30426882a4f6f73b48978055313dc9ca3ca913fb255",
+      "size_bytes": 140
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/_generated/tool_provider_pb2.py",
+      "sha256": "b3013443e2a8a1b9de2be9772e4b04e8d328246756240ca5dd7186a8c542efa8",
+      "size_bytes": 4836
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/contracts.py",
+      "sha256": "a5e7cdad2f818756bdfc9fca5b7fc82755da7e00ef71491ddd303107ab6f6e56",
+      "size_bytes": 1984
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/payload.py",
+      "sha256": "51645809a32c1cecb956077dc890fb7a2e9bae14ddc41ac19781f13277e01ff9",
+      "size_bytes": 4789
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts/py.typed",
+      "sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "size_bytes": 1
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/tests/test_binding_coexistence.py",
+      "sha256": "943da6f4b1d2e122d93de90062336e7a449ceb3565d11269e1eb7ec7c24e72c3",
+      "size_bytes": 2148
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_tool_provider_contracts/tests/test_contracts.py",
+      "sha256": "8a492d180f81aa7114fbc133afc0c86eb83aa2ed76a00d1a7a14c0b0f2ba173d",
+      "size_bytes": 1358
     },
     {
       "kind": "file",
@@ -7413,6 +7840,13 @@
       "path": "tools/ci/exercise_onebot_native_transports.py",
       "sha256": "48cdf594a2a5ba30f3c848ed9a4f026bd346fa4916580a7ca9a937ceed90bde8",
       "size_bytes": 23993
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tools/ci/generate_python_contract_bindings.py",
+      "sha256": "9451a043ba8ab827810aab14a095f4a7db109b9f7bab384cf2e6dcbb88d9f4c7",
+      "size_bytes": 1966
     },
     {
       "kind": "file",

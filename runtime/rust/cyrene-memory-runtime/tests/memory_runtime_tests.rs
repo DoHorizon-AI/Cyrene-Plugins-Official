@@ -601,6 +601,7 @@ async fn test_t72_adversarial_tenancy_dimension_expiry_rollback() {
             tenant_id: "tenant_A".into(),
             scope: Some("export_scope".into()),
             limit: Some(1),
+            page_token: None,
         })
         .await;
     match export_resp.result.unwrap() {
