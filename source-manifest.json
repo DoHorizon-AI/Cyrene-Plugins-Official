@@ -3505,8 +3505,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/knowledge-retrieval/tests/test_plugin.py",
-      "sha256": "0263492de9439d667a99847ee949f287207d319a024d4d8e5cc229b75bde7278",
-      "size_bytes": 11964
+      "sha256": "515df3cdfd4527fcd0395469d8bb13f9dc245d533741db4fd865491c765a21ed",
+      "size_bytes": 12047
     },
     {
       "kind": "file",

@@ -32,12 +32,16 @@ from cyrene_tool_provider_contracts import (
     encode_request,
     tool_provider_pb2,
 )
-from test_bundle import _build_bundle, _records
 
 from knowledge_retrieval_provider import KnowledgeRetrievalProvider, RetrievalSettings
 from knowledge_retrieval_provider.bundle import verify_bundle
 from knowledge_retrieval_provider.plugin import TOOL_ID
 from knowledge_retrieval_provider.settings import CONTEXT_KEY_REF
+
+try:
+    from .test_bundle import _build_bundle, _records
+except ImportError:
+    from test_bundle import _build_bundle, _records
 
 _KEY = b"\x37" * 32
 _CALLER = {
