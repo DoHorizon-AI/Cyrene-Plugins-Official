@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.providers.memory-sqlite",
+  "name": "SQLite Memory Provider",
+  "version": "0.1.0",
+  "licenseExpression": "Apache-2.0",
+  "description": "Persistent, tenant-isolated SQLite storage and bounded vector recall for memory.provider.v1.",
+  "kind": "capability-plugin",
+  "capabilities": ["memory.provider.v1"],
+  "supportedServices": ["Cyrene-Navigator"],
+  "methods": [
+    {"capability": "memory.provider.v1", "name": "store", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "memory.provider.v1", "name": "get", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "memory.provider.v1", "name": "recall", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "memory.provider.v1", "name": "delete", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "memory.provider.v1", "name": "prune", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "memory.provider.v1", "name": "export_batch", "interfaceVersion": "1", "executionMode": "service"},
+    {"capability": "memory.provider.v1", "name": "import_batch", "interfaceVersion": "1", "executionMode": "service"}
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "memory_sqlite_provider.plugin:MemorySqliteProvider",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {
+      "executable": "prepared-runtime",
+      "args": ["-B", "src/cyrene_plugin_runtime/bootstrap.py", "--entrypoint", "memory_sqlite_provider.plugin:MemorySqliteProvider"]
+    }
+  },
+  "compatibility": {"platformVersion": ">=0.1.0", "requiresPython": ">=3.11"},
+  "configuration": {"schemaRef": "configuration.schema.json"},
+  "secrets": {"requiredSecretRefs": []},
+  "state": {
+    "isStateful": true,
+    "storageCategory": "relational",
+    "storageDescription": "Private SQLite database with tenant-scoped records, model-profile-bound embeddings, migrations, atomic imports, and retained data on uninstall.",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

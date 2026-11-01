@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/memory.provider.v1.memory-pgvector/configuration.schema.json",
+  "title": "PostgreSQL pgvector memory provider activation configuration",
+  "type": "object",
+  "required": ["database_dsn_ref", "embedding_model_id", "embedding_dimensions", "hostSecretRefs"],
+  "properties": {
+    "database_dsn_ref": {"const": "memory-pgvector/database-dsn"},
+    "embedding_model_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "embedding_profile_id": {"type": "string", "minLength": 1, "maxLength": 256},
+    "embedding_document_prefix": {"type": "string", "maxLength": 512, "default": ""},
+    "embedding_query_prefix": {"type": "string", "maxLength": 512, "default": ""},
+    "embedding_dimensions": {"type": "integer", "minimum": 1, "maximum": 4096},
+    "embedding_endpoint": {"type": "string", "pattern": "^grpc://(?:127\\.0\\.0\\.1|localhost|\\[::1\\]):(?:[1-9][0-9]{0,3}|[1-5][0-9]{4}|6[0-4][0-9]{3}|65[0-4][0-9]{2}|655[0-2][0-9]|6553[0-5])$"},
+    "embedding_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 120, "default": 30},
+    "pool_min_size": {"type": "integer", "minimum": 1, "maximum": 8, "default": 1},
+    "pool_max_size": {"type": "integer", "minimum": 1, "maximum": 32, "default": 8},
+    "connection_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 120, "default": 10},
+    "statement_timeout_seconds": {"type": "number", "exclusiveMinimum": 0, "maximum": 600, "default": 30},
+    "recall_batch_size": {"type": "integer", "minimum": 16, "maximum": 4096, "default": 256},
+    "max_top_k": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 100},
+    "hostSecretRefs": {
+      "type": "object",
+      "required": ["memory-pgvector/database-dsn"],
+      "properties": {
+        "memory-pgvector/database-dsn": {"type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$"}
+      },
+      "additionalProperties": false
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "anyOf": [
+          {"properties": {"embedding_document_prefix": {"minLength": 1}}, "required": ["embedding_document_prefix"]},
+          {"properties": {"embedding_query_prefix": {"minLength": 1}}, "required": ["embedding_query_prefix"]}
+        ]
+      },
+      "then": {"required": ["embedding_profile_id"]}
+    }
+  ],
+  "additionalProperties": false
+}

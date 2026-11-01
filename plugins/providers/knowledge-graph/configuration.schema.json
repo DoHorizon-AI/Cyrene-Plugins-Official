@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/knowledge.graph.v1.sqlite/configuration.schema.json",
+  "title": "SQLite knowledge graph provider activation configuration",
+  "type": "object",
+  "required": ["database_path"],
+  "properties": {
+    "database_path": {"type": "string", "pattern": "^/[^\\u0000]{1,1023}$"},
+    "max_nodes_per_namespace": {"type": "integer", "minimum": 1, "maximum": 10000000, "default": 1000000},
+    "max_edges_per_namespace": {"type": "integer", "minimum": 1, "maximum": 50000000, "default": 5000000},
+    "max_batch_items": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 1000},
+    "max_page_size": {"type": "integer", "minimum": 1, "maximum": 1000, "default": 200},
+    "max_expand_depth": {"type": "integer", "minimum": 1, "maximum": 8, "default": 4},
+    "max_expand_nodes": {"type": "integer", "minimum": 1, "maximum": 500, "default": 200},
+    "max_expand_edges": {"type": "integer", "minimum": 1, "maximum": 10000, "default": 1000},
+    "max_expand_response_bytes": {"type": "integer", "minimum": 256, "maximum": 16777216, "default": 1048576}
+  },
+  "additionalProperties": false
+}
