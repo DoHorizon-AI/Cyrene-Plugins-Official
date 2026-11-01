@@ -18,7 +18,7 @@ import sys
 import threading
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -26,6 +26,7 @@ from urllib.parse import urlsplit
 
 from cyrene_plugin_runtime.configuration import read_environment_settings
 
+from . import people as people_directory
 from .github import (
     GitHubCredentialPersistenceError,
     GitHubCredentialPolicyError,
@@ -68,6 +69,10 @@ METHODS = (
     "observe_wecom_challenge",
     "confirm_wecom_link",
     "list_links",
+    "declare_account_handle",
+    "retract_account_handle",
+    "find_people",
+    "revoke_person_links",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -198,6 +203,10 @@ EXCHANGE_ONLY_METHODS = {
     "begin_link",
     "confirm_wecom_link",
     "list_links",
+    "declare_account_handle",
+    "retract_account_handle",
+    "find_people",
+    "revoke_person_links",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -240,7 +249,11 @@ MAX_REQUEST_BYTES = 64 * 1024
 MAX_IDEMPOTENCY_RESPONSE_BYTES = 64 * 1024
 SESSION_TTL_SECONDS = 600
 LEASE_TTL_SECONDS = 45
+MAX_WORKSPACE_LINKS = 5000
 IDEMPOTENT_METHODS = {
+    "declare_account_handle",
+    "retract_account_handle",
+    "revoke_person_links",
     "begin_link",
     "confirm_wecom_link",
     "unlink",
@@ -286,6 +299,10 @@ def _action_type_name(action: str, suffix: str) -> str:
         "observe_wecom_challenge": "ObserveWeComChallenge",
         "confirm_wecom_link": "ConfirmWeComLink",
         "list_links": "ListLinks",
+        "declare_account_handle": "DeclareAccountHandle",
+        "retract_account_handle": "RetractAccountHandle",
+        "find_people": "FindPeople",
+        "revoke_person_links": "RevokePersonLinks",
         "get_authorization": "GetAuthorization",
         "unlink": "Unlink",
         "create_credential_lease": "CreateCredentialLease",
@@ -709,6 +726,14 @@ class AccountCenterPlugin:
             return self._confirm_wecom_link(request, anchor, idempotency_key_hash)
         if method == "list_links":
             return self._list_links(request, anchor)
+        if method == "declare_account_handle":
+            return self._declare_account_handle(request, anchor, idempotency_key_hash)
+        if method == "retract_account_handle":
+            return self._retract_account_handle(request, anchor, idempotency_key_hash)
+        if method == "find_people":
+            return self._find_people(request, anchor)
+        if method == "revoke_person_links":
+            return self._revoke_person_links(request, anchor, idempotency_key_hash)
         if method == "get_authorization":
             return self._get_authorization(request, anchor)
         if method == "unlink":
@@ -1024,6 +1049,207 @@ class AccountCenterPlugin:
             command_result=command_result,
         )
         return response
+
+    def _idempotency_command(
+        self, key_hash: str | None
+    ) -> tuple[str, Callable[[dict[str, Any]], bytes]] | None:
+        """Bind a replay encoder so the store can finish the command atomically."""
+
+        if key_hash is None:
+            return None
+        return key_hash, lambda value: self._encode_idempotency_response(key_hash, value)
+
+    def _declare_account_handle(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Record one address an operator declares for a person; no credentials.
+
+        The person is found by identity subject or mail and created when new. A
+        handle can belong to one person per workspace.
+        中文：记录管理员为某人声明的账号地址，不涉及任何凭据；同一账号只属一人。
+        """
+
+        _require_fields(
+            request, {"provider", "handle"}, {"subject", "mail", "display_name"}
+        )
+        provider = people_directory.normalize_provider(request["provider"])
+        handle, key = people_directory.normalize_handle(provider, request["handle"])
+        subject = (
+            people_directory.normalize_subject(request["subject"])
+            if "subject" in request
+            else None
+        )
+        mail = (
+            people_directory.normalize_mail(request["mail"]) if "mail" in request else None
+        )
+        display_name = (
+            people_directory.normalize_display_name(request["display_name"])
+            if "display_name" in request
+            else None
+        )
+        if subject is None and mail is None:
+            raise AccountCenterError("invalid_request")
+        return self._store.declare_account_handle(
+            anchor=anchor,
+            subject=subject,
+            mail=mail,
+            display_name=display_name,
+            provider=provider,
+            handle=handle,
+            key=key,
+            now=int(self._now()),
+            command=self._idempotency_command(idempotency_key_hash),
+        )
+
+    def _retract_account_handle(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Retire one declared handle so it can be declared again later."""
+
+        _require_fields(request, {"provider", "handle"})
+        provider = people_directory.normalize_provider(request["provider"])
+        _, key = people_directory.normalize_handle(provider, request["handle"])
+        return self._store.retract_account_handle(
+            anchor=anchor,
+            provider=provider,
+            key=key,
+            now=int(self._now()),
+            command=self._idempotency_command(idempotency_key_hash),
+        )
+
+    def _revoke_person_links(
+        self,
+        request: Mapping[str, Any],
+        anchor: Anchor,
+        idempotency_key_hash: str | None = None,
+    ) -> dict[str, Any]:
+        """Dissolve one person's verified links to one provider on their behalf.
+
+        Each link goes through the same unlink path its owner would use, so
+        credentials are cleared, leases invalidated, and the provider is asked to
+        revoke the token. Shared workspace-operator profiles are never touched;
+        they are counted in ``skipped_shared`` for a deliberate follow-up. Links
+        already dissolved stay dissolved if a later one fails, so a retry with a
+        new key finishes the rest. The action is audited.
+        中文：以本人身份走既有解除路径；共享运维档案不动，只计数；全程审计。
+        """
+
+        _require_fields(request, {"subject", "provider"})
+        subject = people_directory.normalize_subject(request["subject"])
+        provider = people_directory.normalize_provider(
+            request["provider"], allowed=people_directory.FILTER_PROVIDERS
+        )
+        target = Anchor(
+            issuer=anchor.issuer,
+            subject=subject,
+            organization_id=anchor.organization_id,
+            workspace_id=anchor.workspace_id,
+        )
+        account_refs, profiles = self._store.list_active_links(target, provider)
+        results: list[dict[str, str]] = []
+        skipped_shared = 0
+        for account_ref in account_refs:
+            outcome = self._unlink({"account_ref": account_ref}, target)
+            results.append({"kind": "account", "status": outcome["status"]})
+        for profile_ref, access_mode in profiles:
+            if access_mode == "workspace_operator":
+                skipped_shared += 1
+                continue
+            self._store.unlink_provider_profile(profile_ref, target, now=int(self._now()))
+            results.append({"kind": "profile", "status": "unlinked"})
+        response: dict[str, Any] = {
+            "subject": subject,
+            "provider": provider,
+            "unlinked": len(results),
+            "skipped_shared": skipped_shared,
+            "results": results,
+        }
+        self._store.record_admin_action(
+            anchor=anchor,
+            action="revoke_person_links",
+            target_subject=subject,
+            provider=provider,
+            unlinked=len(results),
+            skipped_shared=skipped_shared,
+            now=int(self._now()),
+            result=response,
+            command=self._idempotency_command(idempotency_key_hash),
+        )
+        return response
+
+    def _find_people(self, request: Mapping[str, Any], anchor: Anchor) -> dict[str, Any]:
+        """Answer who owns an account and which accounts a person has.
+
+        Declared handles and the owners' verified links are merged per person.
+        Every filter is optional and the filters are ANDed. The response carries
+        metadata only: no reference that could be replayed and no credentials.
+        中文：按账号找人或按人找账号；只返回元数据，不含可重放的引用或凭据。
+        """
+
+        _require_fields(
+            request,
+            set(),
+            {"workspace_id", "subject", "mail", "provider", "handle", "name", "limit"},
+        )
+        workspace_id = request.get("workspace_id", anchor.workspace_id)
+        if workspace_id != anchor.workspace_id:
+            raise AccountCenterError("scope_mismatch")
+        subject = (
+            people_directory.normalize_subject(request["subject"])
+            if "subject" in request
+            else None
+        )
+        mail = (
+            people_directory.normalize_mail(request["mail"]) if "mail" in request else None
+        )
+        provider = (
+            people_directory.normalize_provider(
+                request["provider"], allowed=people_directory.FILTER_PROVIDERS
+            )
+            if "provider" in request
+            else None
+        )
+        handle = None
+        if "handle" in request:
+            if provider not in people_directory.HANDLE_PROVIDERS:
+                raise AccountCenterError("invalid_request")
+            handle, _ = people_directory.normalize_handle(provider, request["handle"])
+        name = None
+        if "name" in request:
+            name = people_directory.normalize_display_name(request["name"])
+            if len(name) < 2:
+                raise AccountCenterError("invalid_request")
+        limit = (
+            people_directory.normalize_limit(request["limit"])
+            if "limit" in request
+            else people_directory.DEFAULT_PEOPLE_LIMIT
+        )
+        accounts, profiles = self._store.list_workspace_links(
+            anchor.organization_id, workspace_id, limit=MAX_WORKSPACE_LINKS
+        )
+        declared, handles = self._store.list_workspace_people(
+            anchor.organization_id, workspace_id, limit=MAX_WORKSPACE_LINKS
+        )
+        if (
+            len(accounts) + len(profiles) + len(declared) + len(handles)
+            > MAX_WORKSPACE_LINKS
+        ):
+            raise AccountCenterError("result_too_large")
+        matched = people_directory.filter_people(
+            people_directory.assemble_people(declared, handles, accounts, profiles),
+            subject=subject,
+            mail=mail,
+            provider=provider,
+            handle=handle,
+            name=name,
+        )
+        return {"people": matched[:limit], "truncated": len(matched) > limit}
 
     def _list_links(self, request: Mapping[str, Any], anchor: Anchor) -> dict[str, Any]:
         _require_fields(request, set(), {"workspace_id"})

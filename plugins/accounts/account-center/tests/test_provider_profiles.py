@@ -992,6 +992,124 @@ def test_github_vendor_cli_lease_uses_profile_scope_and_empty_target(
         )
 
 
+def test_find_people_merges_profile_links_with_declared_handles_without_secrets(
+    tmp_path: Path,
+) -> None:
+    harness = ProfileHarness(tmp_path / "accounts.sqlite3")
+    _github_profile(harness)
+    other_actor = {**ACTOR, "subject": "user-other"}
+    elsewhere = {**ACTOR, "subject": "user-elsewhere", "workspace_id": "workspace-b"}
+    harness.github_app.verify_installation = lambda installation_id: {  # type: ignore[method-assign]
+        "account_id": "89",
+        "login": "globex",
+    }
+    for index, actor in enumerate((other_actor, elsewhere), start=1):
+        harness.call(
+            "link_github_app_installation",
+            {
+                "profile_ref": f"00000000-0000-4000-8000-00000000020{index}",
+                "installation_id": f"900{index + 1}",
+                "repositories": GITHUB_REPOSITORIES,
+            },
+            actor=actor,
+        )
+        harness.github_app.verify_installation = lambda installation_id, n=index: {  # type: ignore[method-assign]
+            "account_id": str(90 + n),
+            "login": f"globex-{n}",
+        }
+    declared = harness.call(
+        "declare_account_handle",
+        {
+            "provider": "huggingface",
+            "handle": "other-hf",
+            "subject": "user-other",
+            "display_name": "Other Owner",
+            "idempotency_key": "declare-other",
+        },
+    )
+
+    listed = harness.call("find_people", {})
+
+    # People sort by display name, then mail, then subject: "Other Owner" < "user-derek".
+    assert [person["subject"] for person in listed["people"]] == ["user-other", "user-derek"]
+    people = {person["subject"]: person for person in listed["people"]}
+    assert people["user-derek"]["person_ref"] is None
+    assert people["user-derek"]["accounts"] == [
+        {
+            "source": "verified",
+            "kind": "profile",
+            "provider": "github",
+            "handle": None,
+            "external_subject": "acme",
+            "status": "healthy",
+            "updated_at": 10_000,
+        }
+    ]
+    assert people["user-other"]["person_ref"] == declared["person_ref"]
+    assert [
+        (a["source"], a["kind"], a["provider"], a["handle"], a["external_subject"])
+        for a in people["user-other"]["accounts"]
+    ] == [
+        ("declared", "handle", "huggingface", "other-hf", None),
+        ("verified", "profile", "github", None, "globex"),
+    ]
+    rendered = json.dumps(listed)
+    for forbidden in ("profile_ref", "installation", "token", "target_scope", "credential"):
+        assert forbidden not in rendered
+    with pytest.raises(AccountCenterError, match="untrusted_caller"):
+        harness.call("find_people", {}, caller=GITHUB_PROVIDER)
+    harness.call(
+        "unlink_provider_profile",
+        {"profile_ref": "00000000-0000-4000-8000-000000000101"},
+    )
+    assert [p["subject"] for p in harness.call("find_people", {})["people"]] == ["user-other"]
+
+
+def test_revoke_person_links_dissolves_owned_profiles_and_skips_shared_operator_profiles(
+    tmp_path: Path,
+) -> None:
+    shared_ref = "00000000-0000-4000-8000-000000000236"
+    harness = ProfileHarness(
+        tmp_path / "accounts.sqlite3", workspace_operator_profile_refs=[shared_ref]
+    )
+    _github_profile(harness)
+    harness.call(
+        "link_huggingface_profile",
+        {
+            "profile_ref": shared_ref,
+            "credential_secret_ref": "huggingface/fine-grained-token",
+            "scopes": _huggingface_scope("derek/shared-model"),
+        },
+    )
+    admin = {**ACTOR, "subject": "admin-1"}
+
+    github = harness.call(
+        "revoke_person_links",
+        {"subject": "user-derek", "provider": "github", "idempotency_key": "rev-gh"},
+        actor=admin,
+    )
+    assert github == {
+        "subject": "user-derek",
+        "provider": "github",
+        "unlinked": 1,
+        "skipped_shared": 0,
+        "results": [{"kind": "profile", "status": "unlinked"}],
+    }
+
+    # A profile shared by the whole workspace is never dissolved on a person's behalf.
+    shared = harness.call(
+        "revoke_person_links",
+        {"subject": "user-derek", "provider": "huggingface", "idempotency_key": "rev-hf"},
+        actor=admin,
+    )
+    assert (shared["unlinked"], shared["skipped_shared"], shared["results"]) == (0, 1, [])
+
+    people = harness.call("find_people", {})["people"]
+    assert [(p["subject"], [a["provider"] for a in p["accounts"]]) for p in people] == [
+        ("user-derek", ["huggingface"])
+    ]
+
+
 def test_github_installation_cannot_be_claimed_by_a_second_owner(
     tmp_path: Path,
 ) -> None:
@@ -2063,7 +2181,7 @@ def test_schema_v8_migration_preserves_provider_rows_with_foreign_key_children(
 
     assert snapshot() == before
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
 
 
@@ -4296,7 +4414,7 @@ def test_schema_v9_migration_enables_bilibili_without_orphaning_leases(tmp_path:
         db.execute("PRAGMA user_version=9")
     store = account_center_plugin_module.AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 12
         assert db.execute("PRAGMA foreign_key_check").fetchall() == []
         sql = db.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='provider_profiles'"

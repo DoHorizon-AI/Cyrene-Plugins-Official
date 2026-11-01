@@ -353,6 +353,60 @@ class UnlinkProviderProfileRequest:
     idempotency_key: str
 
 
+@dataclass(frozen=True, slots=True)
+class DeclareAccountHandleRequest:
+    """Declare one platform account for a person; a handle never carries credentials.
+
+    The person is named by identity ``subject``, ``mail``, or both. Absent
+    optional fields must be omitted from the wire payload, not sent as null.
+    """
+
+    provider: str
+    handle: str
+    idempotency_key: str
+    subject: str | None = None
+    mail: str | None = None
+    display_name: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RetractAccountHandleRequest:
+    """Retire one declared platform account so it can be declared again later."""
+
+    provider: str
+    handle: str
+    idempotency_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class FindPeopleRequest:
+    """Find people by account, identity, or name; every filter is optional.
+
+    ``workspace_id`` may be null for an organization-level workspace; the other
+    optional fields must be omitted from the wire payload when absent.
+    """
+
+    workspace_id: str | None = None
+    subject: str | None = None
+    mail: str | None = None
+    provider: str | None = None
+    handle: str | None = None
+    name: str | None = None
+    limit: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class RevokePersonLinksRequest:
+    """Dissolve one person's verified links to one provider, on their behalf.
+
+    Shared workspace-operator profiles are never touched by this request.
+    """
+
+    subject: str
+    provider: str
+    idempotency_key: str
+
+
 class MicrosoftGraphOperation(StrEnum):
     """Closed Microsoft Graph operation names accepted by Account Center."""
 
