@@ -290,20 +290,20 @@ class OfficialPluginPackageTests(unittest.TestCase):
                 }
                 self.assertEqual(names, external)
                 self.assertIn("cyrene-plugin-runtime==0.2.2", requirements)
-                self.assertIn("cyrene-account-center-contracts==0.1.4", requirements)
+                self.assertIn("cyrene-account-center-contracts==0.1.5", requirements)
                 release._verify_lock_inputs(spec, source_files)
 
     def test_account_center_sdk_source_pins_match_every_registered_package(
         self,
     ) -> None:
-        """Keep every account-contract source comment aligned to SDK 0.1.4."""
+        """Keep every account-contract source comment aligned to SDK 0.1.5."""
 
         sdk_project = tomllib.loads(
             (self.repository / release.ACCOUNT_CENTER_SDK.project_path).read_text(
                 encoding="utf-8"
             )
         )
-        self.assertEqual(sdk_project["project"]["version"], "0.1.4")
+        self.assertEqual(sdk_project["project"]["version"], "0.1.5")
         bound_packages = [
             spec
             for spec in release.PACKAGE_SPECS.values()
@@ -324,7 +324,7 @@ class OfficialPluginPackageTests(unittest.TestCase):
             with self.subTest(package=spec.package_id):
                 source_files, _ = release._source_files(self.repository, spec)
                 requirements = source_files[spec.requirements_input].decode("utf-8")
-                self.assertIn("cyrene-account-center-contracts==0.1.4", requirements)
+                self.assertIn("cyrene-account-center-contracts==0.1.5", requirements)
                 self.assertNotIn("cyrene-account-center-contracts==0.1.3", requirements)
                 release._verify_lock_inputs(spec, source_files)
 
