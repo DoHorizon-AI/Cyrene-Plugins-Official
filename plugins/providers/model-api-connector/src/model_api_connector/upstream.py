@@ -24,37 +24,45 @@ from .settings import ProviderSettings
 SSE_DATA_PREFIX = "data:"
 SSE_DONE = "[DONE]"
 MAX_ERROR_BODY_CHARS = 400
+MAX_EMBEDDING_RESPONSE_BYTES = 64 * 1024 * 1024
 
 
 class _StreamEnd:
     """Sentinel pushed by the reader thread when the upstream stream finishes.
 
-        中文:reader 线程在上游流结束时推送的 sentinel。
+    中文:reader 线程在上游流结束时推送的 sentinel。
     """
 
 
 class UpstreamFailure(RuntimeError):
     """The upstream endpoint failed or answered outside the contract.
 
-        中文:上游 Endpoint 失败,或响应内容违反 contract。
+    中文:上游 Endpoint 失败,或响应内容违反 contract。
     """
 
-    def __init__(self, detail: str, *, status: int | None = None) -> None:
+    def __init__(
+        self,
+        detail: str,
+        *,
+        status: int | None = None,
+        retry_after_seconds: float | None = None,
+    ) -> None:
         super().__init__(detail)
         self.status = status
+        self.retry_after_seconds = retry_after_seconds
 
 
 class ProviderCancelled(RuntimeError):
     """The invocation was cancelled while the upstream request was in flight.
 
-        中文:上游请求仍在执行时,调用被取消。
+    中文:上游请求仍在执行时,调用被取消。
     """
 
 
 class UpstreamCall:
     """A handle another thread can use to abort one in-flight request.
 
-        中文:供另一个线程中止某个进行中请求的句柄。
+    中文:供另一个线程中止某个进行中请求的句柄。
     """
 
     def __init__(self) -> None:
@@ -102,7 +110,7 @@ class UpstreamCall:
     def close(self) -> None:
         """Abort the request; safe to call from a cancellation thread.
 
-            中文:中止请求;可从取消处理线程安全调用。
+        中文:中止请求;可从取消处理线程安全调用。
         """
 
         self._closed.set()
@@ -145,7 +153,7 @@ class UpstreamCall:
 class OpenAICompatibleUpstream:
     """POST one chat-completions body and hand back JSON or an SSE event stream.
 
-        中文:POST 一份 chat-completions 请求正文,并返回 JSON 或 SSE 事件流。
+    中文:POST 一份 chat-completions 请求正文,并返回 JSON 或 SSE 事件流。
     """
 
     def __init__(self, settings: ProviderSettings) -> None:
@@ -154,10 +162,15 @@ class OpenAICompatibleUpstream:
     def complete(self, body: Mapping[str, Any], call: UpstreamCall) -> dict[str, Any]:
         """Send a non-streamed request and return the decoded JSON body.
 
-            中文:发送非流式请求,并返回解码后的 JSON 正文。
+        中文:发送非流式请求,并返回解码后的 JSON 正文。
         """
 
-        connection, response = self._send(body, call)
+        connection, response = self._send(
+            body,
+            call,
+            self._settings.chat_completions_url,
+            api_key=self._settings.api_key,
+        )
         try:
             call.raise_if_closed()
             raw = response.read()
@@ -168,6 +181,35 @@ class OpenAICompatibleUpstream:
             raise UpstreamFailure(f"upstream read failed: {error}") from error
         finally:
             connection.close()
+            call.close()
+        return _decode_json(raw)
+
+    def complete_embeddings(self, body: Mapping[str, Any], call: UpstreamCall) -> dict[str, Any]:
+        """Send one unary embeddings request to the operation-specific endpoint.
+
+        中文:将一次 unary embeddings 请求发送到独立的操作 endpoint。
+        """
+
+        connection, response = self._send(
+            body,
+            call,
+            self._settings.embeddings_url,
+            api_key=self._settings.embeddings_api_key,
+            timeout_seconds=self._settings.embeddings_timeout_seconds,
+        )
+        try:
+            call.raise_if_closed()
+            raw = response.read(MAX_EMBEDDING_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_EMBEDDING_RESPONSE_BYTES:
+                raise UpstreamFailure("upstream embedding response exceeds the maximum size")
+            call.raise_if_closed()
+        except (OSError, ValueError) as error:
+            if call.closed:
+                raise ProviderCancelled("upstream request was cancelled") from error
+            raise UpstreamFailure(f"upstream read failed: {error}") from error
+        finally:
+            connection.close()
+            call.close()
         return _decode_json(raw)
 
     def events(
@@ -220,15 +262,18 @@ class OpenAICompatibleUpstream:
             call.close()
             worker.join(timeout=1.0)
 
-    def _read_events(
-        self, body: Mapping[str, Any], call: UpstreamCall
-    ) -> Iterator[dict[str, Any]]:
+    def _read_events(self, body: Mapping[str, Any], call: UpstreamCall) -> Iterator[dict[str, Any]]:
         """Read the upstream SSE stream on the reader thread.
 
-            中文:在 reader 线程上读取上游 SSE 流。
+        中文:在 reader 线程上读取上游 SSE 流。
         """
 
-        connection, response = self._send(body, call)
+        connection, response = self._send(
+            body,
+            call,
+            self._settings.chat_completions_url,
+            api_key=self._settings.api_key,
+        )
         try:
             while True:
                 call.raise_if_closed()
@@ -250,11 +295,17 @@ class OpenAICompatibleUpstream:
             connection.close()
 
     def _send(
-        self, body: Mapping[str, Any], call: UpstreamCall
+        self,
+        body: Mapping[str, Any],
+        call: UpstreamCall,
+        endpoint_url: str,
+        *,
+        api_key: str | None,
+        timeout_seconds: float | None = None,
     ) -> tuple[http.client.HTTPConnection, http.client.HTTPResponse]:
         call.raise_if_closed()
         encoded = json.dumps(body, ensure_ascii=False).encode("utf-8")
-        parsed = urlsplit(self._settings.chat_completions_url)
+        parsed = urlsplit(endpoint_url)
         host = parsed.hostname or ""
         if not host:
             raise UpstreamFailure("base_url has no host")
@@ -265,15 +316,19 @@ class OpenAICompatibleUpstream:
         factory = (
             http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
         )
-        connection = factory(host, port, timeout=self._settings.timeout_seconds)
+        connection = factory(
+            host,
+            port,
+            timeout=timeout_seconds or self._settings.timeout_seconds,
+        )
         call.attach(connection)
         headers = {
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if body.get("stream") else "application/json",
             "User-Agent": "cyrene-model-api-connector",
         }
-        if self._settings.api_key:
-            headers["Authorization"] = "Bearer " + self._settings.api_key
+        if api_key:
+            headers["Authorization"] = "Bearer " + api_key
         try:
             connection.request("POST", target, body=encoded, headers=headers)
             # The socket must be captured before the response is read: a peer
@@ -290,18 +345,38 @@ class OpenAICompatibleUpstream:
         call.attach_response(response)
         if response.status >= 400:
             detail = response.read(4096).decode("utf-8", errors="replace")
+            retry_after = _retry_after_seconds(response.getheader("Retry-After"))
             connection.close()
+            call.close()
             raise UpstreamFailure(
                 f"upstream returned HTTP {response.status}: {detail[:MAX_ERROR_BODY_CHARS]}",
                 status=response.status,
+                retry_after_seconds=retry_after,
             )
         return connection, response
+
+
+def _retry_after_seconds(value: str | None) -> float | None:
+    """Return a bounded numeric Retry-After value when the peer supplies one.
+
+    中文:仅在对端提供数值型 Retry-After 时返回有界秒数。
+    """
+
+    if value is None:
+        return None
+    try:
+        seconds = float(value)
+    except ValueError:
+        return None
+    if not 0 <= seconds <= 86_400:
+        return None
+    return seconds
 
 
 def parse_sse_line(line: str) -> dict[str, Any] | str | None:
     """Decode one SSE line into an event, the done marker, or nothing.
 
-        中文:将一行 SSE 解码为事件、结束标记或空结果。
+    中文:将一行 SSE 解码为事件、结束标记或空结果。
     """
 
     stripped = line.strip()

@@ -16,18 +16,41 @@ from cyrene_model_provider_contracts import (
     CHAT_COMPLETION_REQUEST_TYPE_URL,
     CHAT_COMPLETION_RESPONSE_TYPE_URL,
     CHAT_COMPLETION_V2_METHOD,
+    CHAT_COMPLETION_V3_METHOD,
+    CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+    EMBEDDINGS_METHOD,
+    EMBEDDINGS_REQUEST_TYPE_URL,
+    EMBEDDINGS_RESPONSE_TYPE_URL,
     ChatCodecError,
     ChatCompletionRequest,
     ChatCompletionResponse,
+    EmbeddingsCodecError,
+    EmbeddingsResponse,
     decode_chat_completion_request,
     decode_chat_completion_request_v2,
+    decode_chat_completion_request_v3,
+    decode_embeddings_request,
     encode_chat_completion_chunk,
     encode_chat_completion_chunk_v2,
     encode_chat_completion_response,
     encode_chat_completion_response_v2,
+    encode_chat_completion_response_v3,
+    encode_embeddings_response,
 )
 
-from .mapping import ProviderMappingError, chunk_from_event, response_chunks, to_upstream_body
+from .embeddings import (
+    embedding_batch_from_response,
+    embedding_error_from_upstream,
+    to_upstream_embeddings_body,
+    validate_embeddings_request,
+)
+from .mapping import (
+    ProviderMappingError,
+    chunk_from_event,
+    response_chunks,
+    to_upstream_body,
+    to_upstream_body_v3,
+)
 from .settings import ConfigurationError, ProviderSettings
 from .upstream import (
     OpenAICompatibleUpstream,
@@ -37,9 +60,7 @@ from .upstream import (
 )
 
 PLUGIN_ID = "cyrene.providers.model-api-connector"
-PLUGIN_VERSION = "0.1.0"
-EMBEDDINGS_METHOD = "embeddings"
-UNSUPPORTED_METHODS = ("embeddings", "chat_completion_v3")
+PLUGIN_VERSION = "0.3.0"
 
 _CANCELLED_CODE = "CANCELLED"
 _INVALID_REQUEST = "INVALID_REQUEST"
@@ -51,7 +72,7 @@ _METHOD_NOT_FOUND = "METHOD_NOT_FOUND"
 class TypedPayload:
     """One typed contract payload returned to the runtime.
 
-        中文:返回给运行时的一个有类型契约载荷。"""
+    中文:返回给运行时的一个有类型契约载荷。"""
 
     value: bytes
     type_url: str
@@ -75,7 +96,7 @@ class ChunkStream:
 class ModelApiConnector:
     """Adapt the typed chat contract onto one configured upstream endpoint.
 
-        中文:将有类型的聊天契约适配到一个已配置的上游端点。"""
+    中文:将有类型的聊天契约适配到一个已配置的上游端点。"""
 
     capabilities = (CAPABILITY_ID,)
     plugin_id = PLUGIN_ID
@@ -108,32 +129,55 @@ class ModelApiConnector:
     ) -> tuple[bool, Any]:
         """Dispatch one direct invocation without leaking vendor detail.
 
-            中文:分发一次直接调用,不泄露厂商细节。"""
+        中文:分发一次直接调用,不泄露厂商细节。"""
 
         try:
             if capability != CAPABILITY_ID:
                 return False, f"{_INVALID_REQUEST}: unsupported capability {capability!r}"
             if action == EMBEDDINGS_METHOD:
-                return (
-                    False,
-                    f"{_METHOD_NOT_SUPPORTED}: this connector implements chat completions only",
+                if request_type_url not in (None, EMBEDDINGS_REQUEST_TYPE_URL):
+                    return (
+                        False,
+                        f"{_INVALID_REQUEST}: request_type_url must be "
+                        f"{EMBEDDINGS_REQUEST_TYPE_URL}",
+                    )
+                if stream_results:
+                    return (
+                        False,
+                        f"{_METHOD_NOT_SUPPORTED}: embeddings does not support streaming results",
+                    )
+                return self._invoke_embeddings(
+                    payload, request_id=request_id, cancellation=cancellation
                 )
-            if action not in (CHAT_COMPLETION_METHOD, CHAT_COMPLETION_V2_METHOD):
+            if action not in (
+                CHAT_COMPLETION_METHOD,
+                CHAT_COMPLETION_V2_METHOD,
+                CHAT_COMPLETION_V3_METHOD,
+            ):
                 return (
                     False,
                     f"{_METHOD_NOT_FOUND}: unsupported method {action!r} for {CAPABILITY_ID}",
                 )
-            if request_type_url not in (None, CHAT_COMPLETION_REQUEST_TYPE_URL):
+            expected_request_type = (
+                CHAT_COMPLETION_V3_REQUEST_TYPE_URL
+                if action == CHAT_COMPLETION_V3_METHOD
+                else CHAT_COMPLETION_REQUEST_TYPE_URL
+            )
+            if request_type_url not in (None, expected_request_type):
                 return (
                     False,
-                    f"{_INVALID_REQUEST}: request_type_url must be"
-                    f" {CHAT_COMPLETION_REQUEST_TYPE_URL}",
+                    f"{_INVALID_REQUEST}: request_type_url must be {expected_request_type}",
                 )
-            structured = action == CHAT_COMPLETION_V2_METHOD
-            request = self._decode(payload, structured=structured)
+            structured = action != CHAT_COMPLETION_METHOD
+            multimodal = action == CHAT_COMPLETION_V3_METHOD
+            request = (
+                decode_chat_completion_request_v3(payload)
+                if multimodal
+                else self._decode(payload, structured=structured)
+            )
             settings = self._require_settings()
             upstream = self._upstream or OpenAICompatibleUpstream(settings)
-            body = to_upstream_body(request)
+            body = to_upstream_body_v3(request) if multimodal else to_upstream_body(request)
             call = self._register(request_id)
             if stream_results:
                 return True, ChunkStream(
@@ -150,7 +194,9 @@ class ModelApiConnector:
             self._forget(request_id)
             encoder = (
                 encode_chat_completion_response_v2
-                if structured
+                if structured and not multimodal
+                else encode_chat_completion_response_v3
+                if multimodal
                 else encode_chat_completion_response
             )
             return True, TypedPayload(
@@ -168,10 +214,69 @@ class ModelApiConnector:
         except ChatCodecError as error:
             return False, f"{_INVALID_REQUEST}: payload is not a chat-completion request ({error})"
 
+    def _invoke_embeddings(
+        self,
+        payload: bytes,
+        *,
+        request_id: str | None,
+        cancellation: Any | None,
+    ) -> tuple[bool, Any]:
+        """Invoke one non-streaming embedding operation on the bound provider.
+
+        中文:在当前绑定的提供方上执行一次非流式 embedding 操作。
+        """
+
+        try:
+            request = decode_embeddings_request(payload)
+            try:
+                validate_embeddings_request(request)
+            except ProviderMappingError as error:
+                return False, f"{_INVALID_REQUEST}: {error}"
+            settings = self._require_settings()
+            if not settings.embeddings_supported:
+                return False, f"{_METHOD_NOT_SUPPORTED}: embeddings are disabled for this binding"
+            if cancellation is not None and cancellation.is_cancelled():
+                raise ProviderCancelled("upstream request was cancelled")
+            model = request.model or settings.embeddings_model
+            if model is None:
+                raise ConfigurationError(
+                    "CYRENE_EMBEDDINGS_MODEL is required when request.model is omitted"
+                )
+            upstream = self._upstream or OpenAICompatibleUpstream(settings)
+            body = to_upstream_embeddings_body(request, model=model)
+            call = self._register(request_id)
+            try:
+                try:
+                    answer = upstream.complete_embeddings(body, call)
+                except UpstreamFailure as error:
+                    if error.status is not None:
+                        response = EmbeddingsResponse(error=embedding_error_from_upstream(error))
+                        return True, TypedPayload(
+                            encode_embeddings_response(response), EMBEDDINGS_RESPONSE_TYPE_URL
+                        )
+                    raise
+                batch = embedding_batch_from_response(answer, expected_count=len(request.inputs))
+                response = EmbeddingsResponse(embeddings=batch)
+                return True, TypedPayload(
+                    encode_embeddings_response(response), EMBEDDINGS_RESPONSE_TYPE_URL
+                )
+            finally:
+                self._forget(request_id)
+        except ProviderCancelled:
+            self._forget(request_id)
+            return False, f"{_CANCELLED_CODE}: upstream request was cancelled"
+        except ConfigurationError as error:
+            return False, f"INVALID_CONFIGURATION: {error}"
+        except EmbeddingsCodecError as error:
+            return False, f"{_INVALID_REQUEST}: payload is not an embeddings request ({error})"
+        except (UpstreamFailure, ProviderMappingError) as error:
+            self._forget(request_id)
+            return False, f"EXECUTION_FAILED: {error}"
+
     def on_cancel(self, request_id: str, reason: str) -> None:
         """Abort the upstream request the runtime is no longer waiting for.
 
-            中文:中止运行时已不再等待的上游请求。"""
+        中文:中止运行时已不再等待的上游请求。"""
 
         with self._lock:
             call = self._calls.get(request_id)
@@ -216,7 +321,7 @@ class ModelApiConnector:
     ) -> Iterator[TypedPayload]:
         """Yield one contract chunk per upstream event, without materialising.
 
-            中文:每收到一个上游事件就产出一个契约数据块,不先将其全部载入内存。"""
+        中文:每收到一个上游事件就产出一个契约数据块,不先将其全部载入内存。"""
         encoder = encode_chat_completion_chunk_v2 if structured else encode_chat_completion_chunk
         try:
             for event in upstream.events(body, call, cancellation=cancellation):
