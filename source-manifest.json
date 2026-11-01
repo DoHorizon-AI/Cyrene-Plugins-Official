@@ -8615,8 +8615,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "2961b204a26e7fad1c6bfd8c54b1f5438f0e7c2aab38513963f6b8f1bc77ed57",
-      "size_bytes": 111273
+      "sha256": "e85416cad3f5628cb0e1ae1679ab701284550c46f5bc022f296520a837f08079",
+      "size_bytes": 116477
     },
     {
       "kind": "file",
@@ -8691,9 +8691,16 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tooling/release/licenses/rfc8785/LICENSE",
+      "sha256": "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+      "size_bytes": 10174
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tooling/release/official_plugin_package.py",
-      "sha256": "60c557fbf161b413982f4d3f55b6425e9dfaa3ceead6c2848fcd9eba511654d2",
-      "size_bytes": 124185
+      "sha256": "6f971df6eec77a50bc20c2492164cd0de30aae52099c802c1d36c5bcfad2d1a2",
+      "size_bytes": 130267
     },
     {
       "kind": "file",

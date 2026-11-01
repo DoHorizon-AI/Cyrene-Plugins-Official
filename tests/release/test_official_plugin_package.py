@@ -1386,6 +1386,112 @@ class OfficialPluginPackageTests(unittest.TestCase):
                             for name in pdfium_license_files
                         )
                     )
+                package_lock = (
+                    self.repository / spec.source_dir / "requirements.lock"
+                ).read_bytes()
+                if any(
+                    line.strip() == "rfc8785==0.1.4"
+                    for line in package_lock.decode("utf-8").splitlines()
+                ):
+                    sbom = json.loads(outputs["sbom"].read_text(encoding="utf-8"))
+                    components = {item["name"]: item for item in sbom["components"]}
+                    component = components["rfc8785"]
+                    properties = {
+                        item["name"]: item["value"]
+                        for item in component["properties"]
+                    }
+                    self.assertEqual(
+                        properties["cyrene:license:metadata"],
+                        "wheel metadata does not declare a license",
+                    )
+                    self.assertEqual(
+                        json.loads(properties["cyrene:license:files"]), []
+                    )
+                    self.assertEqual(
+                        component["licenses"][0]["expression"], "Apache-2.0"
+                    )
+                    self.assertEqual(
+                        properties["cyrene:license:evidence:origin"],
+                        "verified source distribution; not wheel metadata",
+                    )
+                    self.assertEqual(
+                        properties["cyrene:license:evidence:attribution"],
+                        "Trail of Bits <opensource@trailofbits.com>",
+                    )
+                    self.assertEqual(
+                        properties[
+                            "cyrene:license:evidence:source-archive-sha256"
+                        ],
+                        "e545841329fe0eee4f6a3b44e7034343100c12b4ec566dc06ca9735681deb4da",
+                    )
+                    self.assertEqual(
+                        properties[
+                            "cyrene:license:evidence:source-archive-url"
+                        ],
+                        "https://files.pythonhosted.org/packages/source/r/rfc8785/rfc8785-0.1.4.tar.gz",
+                    )
+                    self.assertEqual(
+                        properties[
+                            "cyrene:license:evidence:source-license-path"
+                        ],
+                        "rfc8785-0.1.4/LICENSE",
+                    )
+                    self.assertEqual(
+                        properties[
+                            "cyrene:license:evidence:source-license-sha256"
+                        ],
+                        "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+                    )
+                    self.assertEqual(
+                        properties[
+                            "cyrene:license:evidence:packaged-license-path"
+                        ],
+                        "third_party/licenses/rfc8785/LICENSE",
+                    )
+                    self.assertEqual(
+                        properties[
+                            "cyrene:license:evidence:packaged-license-sha256"
+                        ],
+                        "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+                    )
+                    external_urls = {
+                        item["url"] for item in component["externalReferences"]
+                    }
+                    self.assertIn(
+                        "https://pypi.org/project/rfc8785/0.1.4/", external_urls
+                    )
+                    self.assertIn(
+                        "https://github.com/trailofbits/rfc8785.py", external_urls
+                    )
+                    unresolved_licenses = []
+                    for candidate in components.values():
+                        candidate_properties = {
+                            item["name"]: item["value"]
+                            for item in candidate.get("properties", [])
+                        }
+                        if (
+                            candidate_properties.get("cyrene:license:metadata")
+                            == "wheel metadata does not declare a license"
+                            and json.loads(
+                                candidate_properties.get("cyrene:license:files", "[]")
+                            )
+                            == []
+                            and not candidate_properties.get(
+                                "cyrene:license:evidence:origin"
+                            )
+                        ):
+                            unresolved_licenses.append(candidate["name"])
+                    self.assertEqual(unresolved_licenses, [])
+                    with zipfile.ZipFile(outputs["package"]) as archive:
+                        license_bytes = archive.read(
+                            "third_party/licenses/rfc8785/LICENSE"
+                        )
+                    self.assertEqual(
+                        training_release.sha256_bytes(license_bytes).removeprefix(
+                            "sha256:"
+                        ),
+                        "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594",
+                    )
             cases.append(
                 (
                     f"package {package_id}",

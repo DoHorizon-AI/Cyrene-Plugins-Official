@@ -10,6 +10,7 @@ metadata from one Plugins commit.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import re
@@ -155,6 +156,24 @@ class SourceDependency:
 
 
 @dataclass(frozen=True)
+class ExternalLicenseEvidence:
+    """Bind license evidence from an immutable archive when a wheel omits it."""
+
+    distribution: str
+    version: str
+    license_expression: str
+    attribution: str
+    project_url: str
+    source_archive_url: str
+    source_archive_sha256: str
+    source_license_path: str
+    source_license_sha256: str
+    packaged_license_source_path: str
+    packaged_license_archive_path: str
+    upstream_repository: str
+
+
+@dataclass(frozen=True)
 class PackageSpec:
     """Bind a dotted package identity to its explicit repository paths."""
 
@@ -228,6 +247,31 @@ WECOM_AIBOT_SDK = SourceDependency(
     license_file_path=(
         "plugins/connectors/wecom/third_party/licenses/wecom-aibot-python-sdk/LICENSE"
     ),
+)
+
+# PyPI's rfc8785 0.1.4 wheel has no license metadata or license file. The
+# matching source archive identifies Trail of Bits and includes this exact
+# Apache-2.0 license; retain its hash and upstream archive URL separately from
+# wheel metadata in each SBOM for packages using this exact pin.
+RFC8785_LICENSE_EVIDENCE = ExternalLicenseEvidence(
+    distribution="rfc8785",
+    version="0.1.4",
+    license_expression="Apache-2.0",
+    attribution="Trail of Bits <opensource@trailofbits.com>",
+    project_url="https://pypi.org/project/rfc8785/0.1.4/",
+    source_archive_url=(
+        "https://files.pythonhosted.org/packages/source/r/rfc8785/rfc8785-0.1.4.tar.gz"
+    ),
+    source_archive_sha256=(
+        "e545841329fe0eee4f6a3b44e7034343100c12b4ec566dc06ca9735681deb4da"
+    ),
+    source_license_path="rfc8785-0.1.4/LICENSE",
+    source_license_sha256=(
+        "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    ),
+    packaged_license_source_path="tooling/release/licenses/rfc8785/LICENSE",
+    packaged_license_archive_path="third_party/licenses/rfc8785/LICENSE",
+    upstream_repository="https://github.com/trailofbits/rfc8785.py",
 )
 
 # These mappings are explicit contract data. Never derive a package/component
@@ -731,6 +775,16 @@ def _source_files(
         root / TRAINING_PRODUCER_PATH,
         root / WORKFLOW_PATH,
     }
+    lock_path = root / spec.source_dir / "requirements.lock"
+    lock_bytes = _regular_source(lock_path, root)
+    if any(
+        (match := LOCK_PIN.fullmatch(pin)) is not None
+        and canonicalize_name(match.group(1))
+        == canonicalize_name(RFC8785_LICENSE_EVIDENCE.distribution)
+        and match.group(2) == RFC8785_LICENSE_EVIDENCE.version
+        for pin in _lock_lines(lock_bytes, lock_path.as_posix())
+    ):
+        candidates.add(root / RFC8785_LICENSE_EVIDENCE.packaged_license_source_path)
     for path in package_root.rglob("*"):
         relative = path.relative_to(package_root)
         if any(
@@ -1565,6 +1619,28 @@ def _package_entries(
                 continue
             relative = source[len(sdk_prefix) :]
             entries[f"{sdk.archive_root}/{relative}"] = content
+    lock_path = f"{spec.source_dir}/requirements.lock"
+    if any(
+        (match := LOCK_PIN.fullmatch(pin)) is not None
+        and canonicalize_name(match.group(1))
+        == canonicalize_name(RFC8785_LICENSE_EVIDENCE.distribution)
+        and match.group(2) == RFC8785_LICENSE_EVIDENCE.version
+        for pin in _lock_lines(source_files[lock_path], lock_path)
+    ):
+        license_bytes = source_files.get(
+            RFC8785_LICENSE_EVIDENCE.packaged_license_source_path
+        )
+        if (
+            license_bytes is None
+            or hashlib.sha256(license_bytes).hexdigest()
+            != RFC8785_LICENSE_EVIDENCE.source_license_sha256
+        ):
+            raise PackageBuildError(
+                "rfc8785 lock requires its verified third-party license notice"
+            )
+        entries[RFC8785_LICENSE_EVIDENCE.packaged_license_archive_path] = (
+            license_bytes
+        )
     if wheelhouse_entries:
         entries.update(wheelhouse_entries)
     if "src/cyrene_plugin_runtime/bootstrap.py" not in entries:
@@ -1741,6 +1817,70 @@ def _sbom_document(
                     {
                         "name": "cyrene:delivery",
                         "value": "wheel-built-from-pinned-source",
+                    },
+                ]
+            )
+        license_evidence = RFC8785_LICENSE_EVIDENCE
+        if (
+            canonicalize_name(name) == canonicalize_name(license_evidence.distribution)
+            and version == license_evidence.version
+        ):
+            if license_expression is not None or license_text is not None or license_files:
+                raise PackageBuildError(
+                    "rfc8785 wheel license metadata changed; refresh its explicit evidence"
+                )
+            packaged_license = source_files.get(
+                license_evidence.packaged_license_source_path
+            )
+            if (
+                packaged_license is None
+                or hashlib.sha256(packaged_license).hexdigest()
+                != license_evidence.source_license_sha256
+            ):
+                raise PackageBuildError(
+                    "rfc8785 packaged license differs from its pinned source archive"
+                )
+            component["licenses"] = [
+                {"expression": license_evidence.license_expression}
+            ]
+            component["externalReferences"] = [
+                {"type": "website", "url": license_evidence.project_url},
+                {"type": "distribution", "url": license_evidence.source_archive_url},
+                {"type": "vcs", "url": license_evidence.upstream_repository},
+            ]
+            component["properties"].extend(
+                [
+                    {
+                        "name": "cyrene:license:evidence:origin",
+                        "value": "verified source distribution; not wheel metadata",
+                    },
+                    {
+                        "name": "cyrene:license:evidence:attribution",
+                        "value": license_evidence.attribution,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-archive-url",
+                        "value": license_evidence.source_archive_url,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-archive-sha256",
+                        "value": license_evidence.source_archive_sha256,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-license-path",
+                        "value": license_evidence.source_license_path,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-license-sha256",
+                        "value": license_evidence.source_license_sha256,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:packaged-license-path",
+                        "value": license_evidence.packaged_license_archive_path,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:packaged-license-sha256",
+                        "value": license_evidence.source_license_sha256,
                     },
                 ]
             )
