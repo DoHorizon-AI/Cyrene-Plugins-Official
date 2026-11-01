@@ -16,6 +16,8 @@ from cyrene_model_provider_contracts import (
     CHAT_COMPLETION_REQUEST_TYPE_URL,
     CHAT_COMPLETION_RESPONSE_TYPE_URL,
     CHAT_COMPLETION_V2_METHOD,
+    CHAT_COMPLETION_V3_METHOD,
+    CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
     EMBEDDINGS_METHOD,
     EMBEDDINGS_REQUEST_TYPE_URL,
     EMBEDDINGS_RESPONSE_TYPE_URL,
@@ -26,11 +28,13 @@ from cyrene_model_provider_contracts import (
     EmbeddingsResponse,
     decode_chat_completion_request,
     decode_chat_completion_request_v2,
+    decode_chat_completion_request_v3,
     decode_embeddings_request,
     encode_chat_completion_chunk,
     encode_chat_completion_chunk_v2,
     encode_chat_completion_response,
     encode_chat_completion_response_v2,
+    encode_chat_completion_response_v3,
     encode_embeddings_response,
 )
 
@@ -40,7 +44,13 @@ from .embeddings import (
     to_upstream_embeddings_body,
     validate_embeddings_request,
 )
-from .mapping import ProviderMappingError, chunk_from_event, response_chunks, to_upstream_body
+from .mapping import (
+    ProviderMappingError,
+    chunk_from_event,
+    response_chunks,
+    to_upstream_body,
+    to_upstream_body_v3,
+)
 from .settings import ConfigurationError, ProviderSettings
 from .upstream import (
     OpenAICompatibleUpstream,
@@ -50,8 +60,7 @@ from .upstream import (
 )
 
 PLUGIN_ID = "cyrene.providers.model-api-connector"
-PLUGIN_VERSION = "0.2.0"
-UNSUPPORTED_METHODS = ("chat_completion_v3",)
+PLUGIN_VERSION = "0.3.0"
 
 _CANCELLED_CODE = "CANCELLED"
 _INVALID_REQUEST = "INVALID_REQUEST"
@@ -140,22 +149,35 @@ class ModelApiConnector:
                 return self._invoke_embeddings(
                     payload, request_id=request_id, cancellation=cancellation
                 )
-            if action not in (CHAT_COMPLETION_METHOD, CHAT_COMPLETION_V2_METHOD):
+            if action not in (
+                CHAT_COMPLETION_METHOD,
+                CHAT_COMPLETION_V2_METHOD,
+                CHAT_COMPLETION_V3_METHOD,
+            ):
                 return (
                     False,
                     f"{_METHOD_NOT_FOUND}: unsupported method {action!r} for {CAPABILITY_ID}",
                 )
-            if request_type_url not in (None, CHAT_COMPLETION_REQUEST_TYPE_URL):
+            expected_request_type = (
+                CHAT_COMPLETION_V3_REQUEST_TYPE_URL
+                if action == CHAT_COMPLETION_V3_METHOD
+                else CHAT_COMPLETION_REQUEST_TYPE_URL
+            )
+            if request_type_url not in (None, expected_request_type):
                 return (
                     False,
-                    f"{_INVALID_REQUEST}: request_type_url must be"
-                    f" {CHAT_COMPLETION_REQUEST_TYPE_URL}",
+                    f"{_INVALID_REQUEST}: request_type_url must be {expected_request_type}",
                 )
-            structured = action == CHAT_COMPLETION_V2_METHOD
-            request = self._decode(payload, structured=structured)
+            structured = action != CHAT_COMPLETION_METHOD
+            multimodal = action == CHAT_COMPLETION_V3_METHOD
+            request = (
+                decode_chat_completion_request_v3(payload)
+                if multimodal
+                else self._decode(payload, structured=structured)
+            )
             settings = self._require_settings()
             upstream = self._upstream or OpenAICompatibleUpstream(settings)
-            body = to_upstream_body(request)
+            body = to_upstream_body_v3(request) if multimodal else to_upstream_body(request)
             call = self._register(request_id)
             if stream_results:
                 return True, ChunkStream(
@@ -172,7 +194,9 @@ class ModelApiConnector:
             self._forget(request_id)
             encoder = (
                 encode_chat_completion_response_v2
-                if structured
+                if structured and not multimodal
+                else encode_chat_completion_response_v3
+                if multimodal
                 else encode_chat_completion_response
             )
             return True, TypedPayload(

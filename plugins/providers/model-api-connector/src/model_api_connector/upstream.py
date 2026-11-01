@@ -165,7 +165,12 @@ class OpenAICompatibleUpstream:
         中文:发送非流式请求,并返回解码后的 JSON 正文。
         """
 
-        connection, response = self._send(body, call, self._settings.chat_completions_url)
+        connection, response = self._send(
+            body,
+            call,
+            self._settings.chat_completions_url,
+            api_key=self._settings.api_key,
+        )
         try:
             call.raise_if_closed()
             raw = response.read()
@@ -185,7 +190,13 @@ class OpenAICompatibleUpstream:
         中文:将一次 unary embeddings 请求发送到独立的操作 endpoint。
         """
 
-        connection, response = self._send(body, call, self._settings.embeddings_url)
+        connection, response = self._send(
+            body,
+            call,
+            self._settings.embeddings_url,
+            api_key=self._settings.embeddings_api_key,
+            timeout_seconds=self._settings.embeddings_timeout_seconds,
+        )
         try:
             call.raise_if_closed()
             raw = response.read(MAX_EMBEDDING_RESPONSE_BYTES + 1)
@@ -257,7 +268,12 @@ class OpenAICompatibleUpstream:
         中文:在 reader 线程上读取上游 SSE 流。
         """
 
-        connection, response = self._send(body, call, self._settings.chat_completions_url)
+        connection, response = self._send(
+            body,
+            call,
+            self._settings.chat_completions_url,
+            api_key=self._settings.api_key,
+        )
         try:
             while True:
                 call.raise_if_closed()
@@ -283,6 +299,9 @@ class OpenAICompatibleUpstream:
         body: Mapping[str, Any],
         call: UpstreamCall,
         endpoint_url: str,
+        *,
+        api_key: str | None,
+        timeout_seconds: float | None = None,
     ) -> tuple[http.client.HTTPConnection, http.client.HTTPResponse]:
         call.raise_if_closed()
         encoded = json.dumps(body, ensure_ascii=False).encode("utf-8")
@@ -297,15 +316,19 @@ class OpenAICompatibleUpstream:
         factory = (
             http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
         )
-        connection = factory(host, port, timeout=self._settings.timeout_seconds)
+        connection = factory(
+            host,
+            port,
+            timeout=timeout_seconds or self._settings.timeout_seconds,
+        )
         call.attach(connection)
         headers = {
             "Content-Type": "application/json",
             "Accept": "text/event-stream" if body.get("stream") else "application/json",
             "User-Agent": "cyrene-model-api-connector",
         }
-        if self._settings.api_key:
-            headers["Authorization"] = "Bearer " + self._settings.api_key
+        if api_key:
+            headers["Authorization"] = "Bearer " + api_key
         try:
             connection.request("POST", target, body=encoded, headers=headers)
             # The socket must be captured before the response is read: a peer

@@ -9,15 +9,23 @@ reordered, because the gateway's frames follow these one-to-one.
 from __future__ import annotations
 
 import json
+import re
+from base64 import b64encode
 from collections.abc import Mapping
 from typing import Any
 
 from cyrene_model_provider_contracts import (
+    AudioContentPart,
     ChatCompletionChunk,
     ChatCompletionRequest,
+    ChatCompletionRequestV3,
     ChatMessage,
+    ChatMessageV3,
     ChatRole,
     ChatToolCallDelta,
+    FileContentPart,
+    ImageContentPart,
+    TextContentPart,
 )
 
 _ROLE_NAMES = {
@@ -26,12 +34,13 @@ _ROLE_NAMES = {
     int(ChatRole.ROLE_ASSISTANT): "assistant",
     int(ChatRole.ROLE_TOOL): "tool",
 }
+MAX_CHAT_MEDIA_BYTES = 20 * 1024 * 1024
 
 
 class ProviderMappingError(ValueError):
     """An upstream answer cannot be represented by the typed contract.
 
-        中文:上游响应无法用有类型契约表示。"""
+    中文:上游响应无法用有类型契约表示。"""
 
 
 def _role_name(role: ChatRole | int) -> str:
@@ -67,12 +76,147 @@ def _message_body(message: ChatMessage) -> dict[str, Any]:
 def to_upstream_body(request: ChatCompletionRequest) -> dict[str, Any]:
     """Project one typed request onto an OpenAI-compatible chat body.
 
-        中文:将一个有类型请求映射为 OpenAI 兼容的聊天请求体。"""
+    中文:将一个有类型请求映射为 OpenAI 兼容的聊天请求体。"""
 
     body: dict[str, Any] = {
         "messages": [_message_body(message) for message in request.messages],
         "stream": bool(request.stream),
     }
+    if request.model:
+        body["model"] = request.model
+    if request.temperature is not None:
+        body["temperature"] = request.temperature
+    if request.max_tokens is not None:
+        body["max_tokens"] = request.max_tokens
+    if request.tools:
+        body["tools"] = [_tool_body(tool) for tool in request.tools]
+    if request.tool_choice is not None:
+        body["tool_choice"] = _tool_choice_body(request.tool_choice)
+    if request.parallel_tool_calls is not None:
+        body["parallel_tool_calls"] = request.parallel_tool_calls
+    if request.include_usage:
+        body["stream_options"] = {"include_usage": True}
+    return body
+
+
+def _message_body_v3(message: ChatMessageV3, *, media_bytes: list[int]) -> dict[str, Any]:
+    """Map typed v3 content parts without resolving opaque artifact references.
+
+    中文:映射 v3 类型化内容片段；不解析不透明制品引用。
+    """
+
+    body: dict[str, Any] = {"role": _role_name(message.role)}
+    content = [_content_part_body(part, media_bytes=media_bytes) for part in message.content]
+    if message.tool_calls:
+        body["content"] = content or None
+        body["tool_calls"] = [
+            {
+                "id": call.id,
+                "type": call.type,
+                "function": {
+                    "name": call.function.name,
+                    "arguments": call.function.arguments,
+                },
+            }
+            for call in message.tool_calls
+        ]
+    else:
+        body["content"] = content
+    if message.name:
+        body["name"] = message.name
+    if message.tool_call_id:
+        body["tool_call_id"] = message.tool_call_id
+    return body
+
+
+def _content_part_body(part: Any, *, media_bytes: list[int]) -> dict[str, Any]:
+    if isinstance(part, TextContentPart):
+        return {"type": "text", "text": part.text}
+    if isinstance(part, ImageContentPart):
+        _validate_media_mime(part.mime_type, "image")
+        data = _require_media_bytes(part.data, part.artifact_id, "image")
+        media_bytes[0] += len(data)
+        if media_bytes[0] > MAX_CHAT_MEDIA_BYTES:
+            raise ProviderMappingError("chat media exceeds the maximum encoded byte size")
+        uri = f"data:{part.mime_type};base64,{b64encode(data).decode('ascii')}"
+        return {"type": "image_url", "image_url": {"url": uri}}
+    if isinstance(part, AudioContentPart):
+        _validate_media_mime(part.mime_type, "audio")
+        data = _require_media_bytes(part.data, part.artifact_id, "audio")
+        media_bytes[0] += len(data)
+        if media_bytes[0] > MAX_CHAT_MEDIA_BYTES:
+            raise ProviderMappingError("chat media exceeds the maximum encoded byte size")
+        media_format = _audio_format(part.mime_type)
+        return {
+            "type": "input_audio",
+            "input_audio": {"data": b64encode(data).decode("ascii"), "format": media_format},
+        }
+    if isinstance(part, FileContentPart):
+        _validate_media_mime(part.mime_type, "file")
+        data = _require_media_bytes(part.data, part.artifact_id, "file")
+        media_bytes[0] += len(data)
+        if media_bytes[0] > MAX_CHAT_MEDIA_BYTES:
+            raise ProviderMappingError("chat media exceeds the maximum encoded byte size")
+        filename = _safe_filename(part.filename)
+        uri = f"data:{part.mime_type};base64,{b64encode(data).decode('ascii')}"
+        return {"type": "file", "file": {"filename": filename, "file_data": uri}}
+    raise ProviderMappingError("chat v3 content contains an unsupported part")
+
+
+def _require_media_bytes(data: bytes | None, artifact_id: str | None, label: str) -> bytes:
+    if artifact_id is not None:
+        raise ProviderMappingError(
+            f"{label} artifact_id must be resolved by the Product before provider invocation"
+        )
+    if not isinstance(data, bytes) or not data:
+        raise ProviderMappingError(f"{label} media must contain non-empty authorized bytes")
+    return data
+
+
+def _validate_media_mime(mime_type: str, label: str) -> None:
+    if (
+        not isinstance(mime_type, str)
+        or re.fullmatch(r"[a-z0-9!#$&^_.+-]+/[a-z0-9!#$&^_.+-]+", mime_type.lower()) is None
+    ):
+        raise ProviderMappingError(f"{label} MIME type is invalid")
+
+
+def _audio_format(mime_type: str) -> str:
+    normalized = mime_type.lower()
+    if normalized in {"audio/wav", "audio/x-wav", "audio/wave"}:
+        return "wav"
+    if normalized in {"audio/mpeg", "audio/mp3"}:
+        return "mp3"
+    raise ProviderMappingError(f"audio MIME type {mime_type!r} has no supported chat input format")
+
+
+def _safe_filename(value: str | None) -> str:
+    if value is None:
+        return "attachment"
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or len(value) > 255
+        or "/" in value
+        or "\\" in value
+        or "\x00" in value
+        or value in {".", ".."}
+    ):
+        raise ProviderMappingError("file attachment filename is invalid")
+    return value
+
+
+def to_upstream_body_v3(request: ChatCompletionRequestV3) -> dict[str, Any]:
+    """Project v3 text and inline media onto one OpenAI-compatible request.
+
+    中文:将 v3 文本和内联媒体转换为 OpenAI 兼容请求。
+    """
+
+    media_bytes = [0]
+    messages = [_message_body_v3(message, media_bytes=media_bytes) for message in request.messages]
+    if media_bytes[0] > MAX_CHAT_MEDIA_BYTES:
+        raise ProviderMappingError("chat media exceeds the maximum encoded byte size")
+    body: dict[str, Any] = {"messages": messages, "stream": bool(request.stream)}
     if request.model:
         body["model"] = request.model
     if request.temperature is not None:
@@ -165,7 +309,7 @@ def chunk_from_event(
 ) -> ChatCompletionChunk | None:
     """Map one streamed provider event onto exactly one contract chunk.
 
-        中文:将一个流式提供方事件映射为且仅映射为一个契约数据块。"""
+    中文:将一个流式提供方事件映射为且仅映射为一个契约数据块。"""
 
     choices = event.get("choices")
     choice = choices[0] if isinstance(choices, list) and choices else None

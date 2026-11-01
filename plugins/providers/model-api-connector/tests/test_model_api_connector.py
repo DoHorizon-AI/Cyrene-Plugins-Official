@@ -28,7 +28,7 @@ from cyrene_model_provider_contracts import (
     encode_chat_completion_request_v2,
 )
 
-from model_api_connector import ModelApiConnector, ProviderSettings
+from model_api_connector import ConfigurationError, ModelApiConnector, ProviderSettings
 
 
 class _Upstream(BaseHTTPRequestHandler):
@@ -195,10 +195,12 @@ def _connector(
     return ModelApiConnector(
         settings=ProviderSettings(
             base_url=f"http://127.0.0.1:{server.server_port}/{behavior}",
-            api_key="conformance-only",
+            api_key="chat-only",
             timeout_seconds=8,
             embeddings_supported=embeddings_supported,
             embeddings_model=embeddings_model,
+            embeddings_base_url=f"http://127.0.0.1:{server.server_port}/{behavior}",
+            embeddings_api_key="embedding-only",
         )
     )
 
@@ -414,7 +416,40 @@ def test_embeddings_use_real_upstream_values_and_restore_provider_index_order(
         "model": "configured-embedding-model",
         "input": ["first", "second"],
     }
-    assert observed["authorization"] == "Bearer conformance-only"
+    assert observed["authorization"] == "Bearer embedding-only"
+
+
+def test_chat_and_embeddings_use_distinct_endpoints_and_credentials(upstream_server) -> None:
+    connector = ModelApiConnector(
+        settings=ProviderSettings(
+            base_url=f"http://127.0.0.1:{upstream_server.server_port}/chat/v1",
+            api_key="chat-secret",
+            embeddings_supported=True,
+            embeddings_base_url=f"http://127.0.0.1:{upstream_server.server_port}/vectors/v1",
+            embeddings_api_key="embedding-secret",
+        )
+    )
+    request = ChatCompletionRequest(messages=(ChatMessage(role=ChatRole.USER, content="hello"),))
+
+    chat_ok, _ = connector.on_invoke("model.provider.v1", CHAT_COMPLETION_METHOD, _encode(request))
+    embedding_ok, _ = connector.on_invoke(
+        "model.provider.v1",
+        "embeddings",
+        _embedding_request(("hello",), model="e5-small"),
+    )
+
+    assert chat_ok is True
+    assert embedding_ok is True
+    chat_request, embedding_request = upstream_server.requests  # type: ignore[attr-defined]
+    assert chat_request["path"] == "/chat/v1/chat/completions"
+    assert chat_request["authorization"] == "Bearer chat-secret"
+    assert embedding_request["path"] == "/vectors/v1/embeddings"
+    assert embedding_request["authorization"] == "Bearer embedding-secret"
+
+
+def test_enabling_embeddings_requires_its_own_endpoint() -> None:
+    with pytest.raises(ConfigurationError, match="embeddings_base_url"):
+        ProviderSettings(base_url="http://127.0.0.1:8000", embeddings_supported=True)
 
 
 def test_embeddings_preserve_provider_rate_limit_code_and_retry_delay(upstream_server) -> None:
@@ -531,6 +566,103 @@ def test_embeddings_reject_all_zero_provider_vectors(upstream_server) -> None:
 
     assert ok is False
     assert str(detail).startswith("EXECUTION_FAILED:")
+
+
+def test_chat_v3_maps_inline_image_audio_and_file_bytes_to_provider_content(
+    upstream_server,
+) -> None:
+    from cyrene_model_provider_contracts import (
+        CHAT_COMPLETION_V3_METHOD,
+        CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+        AudioContentPart,
+        ChatCompletionRequestV3,
+        ChatMessageV3,
+        FileContentPart,
+        ImageContentPart,
+        TextContentPart,
+        decode_chat_completion_response_v3,
+        encode_chat_completion_request_v3,
+    )
+
+    connector = _connector(upstream_server, "success")
+    request = ChatCompletionRequestV3(
+        messages=(
+            ChatMessageV3(
+                role=ChatRole.USER,
+                content=(
+                    TextContentPart("inspect these attachments"),
+                    ImageContentPart(mime_type="image/png", data=b"png-bytes"),
+                    AudioContentPart(mime_type="audio/wav", data=b"wav-bytes"),
+                    FileContentPart(
+                        mime_type="application/pdf",
+                        data=b"pdf-bytes",
+                        filename="report.pdf",
+                    ),
+                ),
+            ),
+        ),
+        model="multimodal-model",
+    )
+
+    ok, payload = connector.on_invoke(
+        "model.provider.v1",
+        CHAT_COMPLETION_V3_METHOD,
+        encode_chat_completion_request_v3(request),
+        request_type_url=CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+    )
+
+    assert ok is True
+    assert decode_chat_completion_response_v3(payload.value).chunks[0].delta == "real path"
+    body = upstream_server.requests[-1]["payload"]  # type: ignore[attr-defined]
+    parts = body["messages"][0]["content"]
+    assert parts[0] == {"type": "text", "text": "inspect these attachments"}
+    assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert parts[2] == {
+        "type": "input_audio",
+        "input_audio": {"data": "d2F2LWJ5dGVz", "format": "wav"},
+    }
+    assert parts[3]["file"]["filename"] == "report.pdf"
+    assert parts[3]["file"]["file_data"].startswith("data:application/pdf;base64,")
+
+
+def test_chat_v3_rejects_unresolved_artifact_ids_and_wrong_type_url(upstream_server) -> None:
+    from cyrene_model_provider_contracts import (
+        CHAT_COMPLETION_V3_METHOD,
+        CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+        ChatCompletionRequestV3,
+        ChatMessageV3,
+        ImageContentPart,
+        encode_chat_completion_request_v3,
+    )
+
+    connector = _connector(upstream_server, "success")
+    request = ChatCompletionRequestV3(
+        messages=(
+            ChatMessageV3(
+                role=ChatRole.USER,
+                content=(ImageContentPart(mime_type="image/png", artifact_id="media-123"),),
+            ),
+        ),
+        model="multimodal-model",
+    )
+    encoded = encode_chat_completion_request_v3(request)
+
+    ok, detail = connector.on_invoke(
+        "model.provider.v1",
+        CHAT_COMPLETION_V3_METHOD,
+        encoded,
+        request_type_url=CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+    )
+    assert ok is False and str(detail).startswith("EXECUTION_FAILED:")
+    assert upstream_server.requests == []  # type: ignore[attr-defined]
+
+    ok, detail = connector.on_invoke(
+        "model.provider.v1",
+        CHAT_COMPLETION_V3_METHOD,
+        encoded,
+        request_type_url="type.cyrene.io/other",
+    )
+    assert ok is False and str(detail).startswith("INVALID_REQUEST:")
 
 
 def test_missing_configuration_fails_closed() -> None:

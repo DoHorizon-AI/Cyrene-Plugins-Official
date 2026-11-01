@@ -2,9 +2,9 @@
   "schemaVersion": 1,
   "id": "cyrene.providers.model-api-connector",
   "name": "Official Model API Connector",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "licenseExpression": "Apache-2.0",
-  "description": "OpenAI-compatible model.provider.v1 connector for typed chat, embeddings, provider-reported usage, and cancellation over one configured upstream endpoint.",
+  "description": "OpenAI-compatible model.provider.v1 connector for typed chat, multimodal chat, embeddings, provider-reported usage, and cancellation.",
   "kind": "capability-plugin",
   "capabilities": [
     "model.provider.v1"
@@ -27,6 +27,11 @@
     {
       "name": "embeddings",
       "interfaceVersion": "1",
+      "executionMode": "service"
+    },
+    {
+      "name": "chat_completion_v3",
+      "interfaceVersion": "3",
       "executionMode": "service"
     }
   ],
