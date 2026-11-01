@@ -9,6 +9,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let message_connector = proto_root.join("cyrene/message/connector/v1/message_connector.proto");
     let agent_runtime = proto_root.join("cyrene/agent/runtime/v1/agent_runtime.proto");
     let memory_provider = proto_root.join("cyrene/memory/provider/v1/memory_provider.proto");
+    let knowledge_graph = proto_root.join("cyrene/knowledge/graph/v1/knowledge_graph.proto");
+    let speech_provider = proto_root.join("cyrene/speech/provider/v1/speech_provider.proto");
     let computer_runtime = proto_root.join("cyrene/computer/runtime/v1/computer_runtime.proto");
     let tool_provider = proto_root.join("cyrene/tool/provider/v1/tool_provider.proto");
     let workspace_authority =
@@ -31,6 +33,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("cargo:rerun-if-changed={}", message_connector.display());
     println!("cargo:rerun-if-changed={}", agent_runtime.display());
     println!("cargo:rerun-if-changed={}", memory_provider.display());
+    println!("cargo:rerun-if-changed={}", knowledge_graph.display());
+    println!("cargo:rerun-if-changed={}", speech_provider.display());
     println!("cargo:rerun-if-changed={}", computer_runtime.display());
     println!("cargo:rerun-if-changed={}", tool_provider.display());
     println!("cargo:rerun-if-changed={}", workspace_authority.display());
@@ -66,6 +70,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 message_connector,
                 agent_runtime,
                 memory_provider,
+                knowledge_graph,
+                speech_provider,
                 computer_runtime,
                 tool_provider,
                 workspace_authority,

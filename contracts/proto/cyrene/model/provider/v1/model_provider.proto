@@ -26,6 +26,7 @@ option java_package = "io.cyrene.proto.model.provider.v1";
 //   embedding method: embeddings
 //   chat method: chat_completion
 //   structured chat method: chat_completion_v2
+//   multimodal structured chat method: chat_completion_v3
 //
 // This payload contract is transport-neutral. A Product sends these messages
 // directly to the selected Plugin endpoint using the endpoint's declared
@@ -187,4 +188,64 @@ message ChatToolCallDelta {
   optional string type = 3;
   optional string function_name = 4;
   optional string function_arguments = 5;
+}
+
+// A multimodal chat message. This is additive; v1 and v2 messages are unchanged.
+message ChatMessageV3 {
+  ChatMessage.Role role = 1;
+  repeated ChatContentPartV3 content = 2;
+  optional string name = 3;
+  optional string tool_call_id = 4;
+  repeated ChatToolCall tool_calls = 5;
+}
+
+// One typed text or media part in a v3 message. Media sources must be resolved
+// bytes or an ArtifactRef authorized by the caller; URLs and host paths are not
+// representable by this contract.
+message ChatContentPartV3 {
+  oneof part {
+    string text = 1;
+    ChatImageContentV3 image = 2;
+    ChatAudioContentV3 audio = 3;
+    ChatFileContentV3 file = 4;
+  }
+}
+
+message ChatImageContentV3 {
+  string mime_type = 1;
+  oneof source {
+    bytes data = 2;
+    string artifact_id = 3;
+  }
+}
+
+message ChatAudioContentV3 {
+  string mime_type = 1;
+  oneof source {
+    bytes data = 2;
+    string artifact_id = 3;
+  }
+}
+
+message ChatFileContentV3 {
+  string mime_type = 1;
+  optional string filename = 2;
+  oneof source {
+    bytes data = 3;
+    string artifact_id = 4;
+  }
+}
+
+// Typed multimodal chat input. Product policy, authorization, and provider
+// routing remain outside the payload. Response uses ChatCompletionResponse.
+message ChatCompletionRequestV3 {
+  repeated ChatMessageV3 messages = 1;
+  optional string model = 2;
+  bool stream = 3;
+  optional double temperature = 4;
+  optional uint32 max_tokens = 5;
+  repeated ChatTool tools = 6;
+  optional ChatToolChoice tool_choice = 7;
+  optional bool parallel_tool_calls = 8;
+  optional bool include_usage = 9;
 }

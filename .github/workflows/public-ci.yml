@@ -100,6 +100,10 @@ jobs:
             pytest ruff PyYAML grpcio-tools==1.62.3 'pytest-asyncio>=0.24,<1'
           python3 -m pip install --disable-pip-version-check \
             -e sdk/python/cyrene_model_provider_contracts \
+            -e sdk/python/cyrene_memory_provider_contracts \
+            -e sdk/python/cyrene_tool_provider_contracts \
+            -e sdk/python/cyrene_knowledge_graph_contracts \
+            -e sdk/python/cyrene_speech_provider_contracts \
             -e sdk/python/cyrene_account_center_contracts \
             -e sdk/python/cyrene_integration_contracts \
             -e 'sdk/python/cyrene_plugin_runtime[test]' \
@@ -148,6 +152,10 @@ jobs:
           python3 -m ruff check \
             --exclude '**/_generated/**' \
             sdk/python/cyrene_model_provider_contracts/src \
+            sdk/python/cyrene_memory_provider_contracts/src \
+            sdk/python/cyrene_tool_provider_contracts/src \
+            sdk/python/cyrene_knowledge_graph_contracts/src \
+            sdk/python/cyrene_speech_provider_contracts/src \
             sdk/python/cyrene_account_center_contracts/src \
             sdk/python/cyrene_integration_contracts/src \
             sdk/python/cyrene_plugin_runtime/src \
@@ -196,10 +204,23 @@ jobs:
             tools/ci/validate_manifests.py \
             tests/release/test_connection_release_health.py \
             tools/ci/verify_source_manifest.py
+      - name: Verify shared Python codecs against generated protobuf bindings
+        run: |
+          set -euo pipefail
+          generated="$RUNNER_TEMP/cyrene-direct-contracts-python"
+          python3 tools/ci/generate_python_contract_bindings.py "$generated"
+          for contract in memory-provider-v1 model-provider-v1 knowledge-graph-v1 speech-provider-v1; do
+            python3 "contracts/tck/$contract/python/run_tck.py" "$generated"
+          done
       - name: Run Python runtime and official Plugin tests
         run: |
           python3 -m pytest -q --import-mode=importlib \
             sdk/python/cyrene_plugin_runtime/tests \
+            sdk/python/cyrene_model_provider_contracts/tests \
+            sdk/python/cyrene_memory_provider_contracts/tests \
+            sdk/python/cyrene_tool_provider_contracts/tests \
+            sdk/python/cyrene_knowledge_graph_contracts/tests \
+            sdk/python/cyrene_speech_provider_contracts/tests \
             sdk/python/cyrene_account_center_contracts/tests \
             plugins/accounts/account-center/tests \
             plugins/providers/github-issues/tests \
