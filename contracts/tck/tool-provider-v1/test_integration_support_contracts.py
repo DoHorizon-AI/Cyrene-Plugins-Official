@@ -389,6 +389,7 @@ def test_all_fixed_tool_envelopes_use_their_allowlisted_operation() -> None:
         },
         "email_connection_health": {},
     }
+    examples.update({method: {"request_ref": "conversation-request-1"} for method in TOOL_OPERATIONS if "." in method})
     assert set(examples) == set(TOOL_OPERATIONS)
     for method, arguments in examples.items():
         context = _context(method=method, payload=arguments)
