@@ -10,6 +10,7 @@ metadata from one Plugins commit.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import platform
 import re
@@ -122,6 +123,12 @@ RELEASE_INDEX_NAME = "component-release-index-v1.json"
 COMPONENT_MANIFEST_NAME = "component-release-manifest-v2.json"
 GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 LOCK_PIN = re.compile(r"^([A-Za-z0-9_.-]+)==([A-Za-z0-9][A-Za-z0-9_.+!-]*)$")
+MODEL_METHOD_VERSIONS = {
+    "embeddings": "1",
+    "chat_completion": "1",
+    "chat_completion_v2": "2",
+    "chat_completion_v3": "3",
+}
 
 
 @dataclass(frozen=True)
@@ -146,6 +153,24 @@ class SourceDependency:
     license_expression: str
     lock_path: str
     license_file_path: str
+
+
+@dataclass(frozen=True)
+class ExternalLicenseEvidence:
+    """Bind license evidence from an immutable archive when a wheel omits it."""
+
+    distribution: str
+    version: str
+    license_expression: str
+    attribution: str
+    project_url: str
+    source_archive_url: str
+    source_archive_sha256: str
+    source_license_path: str
+    source_license_sha256: str
+    packaged_license_source_path: str
+    packaged_license_archive_path: str
+    upstream_repository: str
 
 
 @dataclass(frozen=True)
@@ -174,6 +199,30 @@ MODEL_PROVIDER_SDK = VendoredSdk(
     source_root="sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts",
     archive_root="src/cyrene_model_provider_contracts",
 )
+MEMORY_PROVIDER_SDK = VendoredSdk(
+    distribution="cyrene-memory-provider-contracts",
+    project_path="sdk/python/cyrene_memory_provider_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_memory_provider_contracts/src/cyrene_memory_provider_contracts",
+    archive_root="src/cyrene_memory_provider_contracts",
+)
+KNOWLEDGE_GRAPH_SDK = VendoredSdk(
+    distribution="cyrene-knowledge-graph-contracts",
+    project_path="sdk/python/cyrene_knowledge_graph_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts",
+    archive_root="src/cyrene_knowledge_graph_contracts",
+)
+SPEECH_PROVIDER_SDK = VendoredSdk(
+    distribution="cyrene-speech-provider-contracts",
+    project_path="sdk/python/cyrene_speech_provider_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts",
+    archive_root="src/cyrene_speech_provider_contracts",
+)
+TOOL_PROVIDER_SDK = VendoredSdk(
+    distribution="cyrene-tool-provider-contracts",
+    project_path="sdk/python/cyrene_tool_provider_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts",
+    archive_root="src/cyrene_tool_provider_contracts",
+)
 ACCOUNT_CENTER_SDK = VendoredSdk(
     distribution="cyrene-account-center-contracts",
     project_path="sdk/python/cyrene_account_center_contracts/pyproject.toml",
@@ -198,6 +247,31 @@ WECOM_AIBOT_SDK = SourceDependency(
     license_file_path=(
         "plugins/connectors/wecom/third_party/licenses/wecom-aibot-python-sdk/LICENSE"
     ),
+)
+
+# PyPI's rfc8785 0.1.4 wheel has no license metadata or license file. The
+# matching source archive identifies Trail of Bits and includes this exact
+# Apache-2.0 license; retain its hash and upstream archive URL separately from
+# wheel metadata in each SBOM for packages using this exact pin.
+RFC8785_LICENSE_EVIDENCE = ExternalLicenseEvidence(
+    distribution="rfc8785",
+    version="0.1.4",
+    license_expression="Apache-2.0",
+    attribution="Trail of Bits <opensource@trailofbits.com>",
+    project_url="https://pypi.org/project/rfc8785/0.1.4/",
+    source_archive_url=(
+        "https://files.pythonhosted.org/packages/source/r/rfc8785/rfc8785-0.1.4.tar.gz"
+    ),
+    source_archive_sha256=(
+        "e545841329fe0eee4f6a3b44e7034343100c12b4ec566dc06ca9735681deb4da"
+    ),
+    source_license_path="rfc8785-0.1.4/LICENSE",
+    source_license_sha256=(
+        "0d542e0c8804e39aa7f37eb00da5a762149dc682d7829451287e11b938e94594"
+    ),
+    packaged_license_source_path="tooling/release/licenses/rfc8785/LICENSE",
+    packaged_license_archive_path="third_party/licenses/rfc8785/LICENSE",
+    upstream_repository="https://github.com/trailofbits/rfc8785.py",
 )
 
 # These mappings are explicit contract data. Never derive a package/component
@@ -334,6 +408,96 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
         vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
         require_spdx_license=True,
     ),
+    "cyrene.providers.model-api-connector": PackageSpec(
+        package_id="cyrene.providers.model-api-connector",
+        component_id="cyrene-providers-model-api-connector",
+        primary_capability="model.provider.v1",
+        source_dir="plugins/providers/model-api-connector",
+        requirements_input="tooling/release/requirements/model-api-connector.in",
+        vendored_sdks=(RUNTIME_SDK, MODEL_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.memory-sqlite": PackageSpec(
+        package_id="cyrene.providers.memory-sqlite",
+        component_id="cyrene-providers-memory-sqlite",
+        primary_capability="memory.provider.v1",
+        source_dir="plugins/providers/memory-sqlite",
+        requirements_input="tooling/release/requirements/memory-sqlite.in",
+        vendored_sdks=(RUNTIME_SDK, MEMORY_PROVIDER_SDK, MODEL_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.memory-pgvector": PackageSpec(
+        package_id="cyrene.providers.memory-pgvector",
+        component_id="cyrene-providers-memory-pgvector",
+        primary_capability="memory.provider.v1",
+        source_dir="plugins/providers/memory-pgvector",
+        requirements_input="tooling/release/requirements/memory-pgvector.in",
+        vendored_sdks=(RUNTIME_SDK, MEMORY_PROVIDER_SDK, MODEL_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.knowledge-graph": PackageSpec(
+        package_id="cyrene.providers.knowledge-graph",
+        component_id="cyrene-providers-knowledge-graph",
+        primary_capability="knowledge.graph.v1",
+        source_dir="plugins/providers/knowledge-graph",
+        requirements_input="tooling/release/requirements/knowledge-graph.in",
+        vendored_sdks=(RUNTIME_SDK, KNOWLEDGE_GRAPH_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.knowledge-retrieval": PackageSpec(
+        package_id="cyrene.providers.knowledge-retrieval",
+        component_id="cyrene-providers-knowledge-retrieval",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/providers/knowledge-retrieval",
+        requirements_input="tooling/release/requirements/knowledge-retrieval.in",
+        vendored_sdks=(RUNTIME_SDK, TOOL_PROVIDER_SDK, INTEGRATION_SUPPORT_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.speech-sensevoice": PackageSpec(
+        package_id="cyrene.providers.speech-sensevoice",
+        component_id="cyrene-providers-speech-sensevoice",
+        primary_capability="speech.provider.v1",
+        source_dir="plugins/providers/speech-sensevoice",
+        requirements_input="tooling/release/requirements/speech-sensevoice.in",
+        vendored_sdks=(RUNTIME_SDK, SPEECH_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.tools.media": PackageSpec(
+        package_id="cyrene.tools.media",
+        component_id="cyrene-tools-media",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/tools/media",
+        requirements_input="tooling/release/requirements/media.in",
+        vendored_sdks=(RUNTIME_SDK, TOOL_PROVIDER_SDK, INTEGRATION_SUPPORT_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.tools.public-web": PackageSpec(
+        package_id="cyrene.tools.public-web",
+        component_id="cyrene-tools-public-web",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/tools/public-web",
+        requirements_input="tooling/release/requirements/public-web.in",
+        vendored_sdks=(
+            RUNTIME_SDK,
+            TOOL_PROVIDER_SDK,
+            INTEGRATION_SUPPORT_SDK,
+        ),
+        require_spdx_license=True,
+    ),
+    "cyrene.connectors.bilibili": PackageSpec(
+        package_id="cyrene.connectors.bilibili",
+        component_id="cyrene-connectors-bilibili",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/connectors/bilibili",
+        requirements_input="tooling/release/requirements/bilibili-connector.in",
+        vendored_sdks=(
+            RUNTIME_SDK,
+            ACCOUNT_CENTER_SDK,
+            TOOL_PROVIDER_SDK,
+            INTEGRATION_SUPPORT_SDK,
+        ),
+        require_spdx_license=True,
+    ),
 }
 
 PRODUCT_SERVICE_COMPONENTS = {
@@ -456,15 +620,31 @@ def _read_package_spec(
             f"{spec.package_id} must declare an SPDX license before release packaging"
         )
     methods = manifest.get("methods")
-    if (
-        not isinstance(methods, list)
-        or not methods
-        or any(
-            not isinstance(method, dict) or method.get("interfaceVersion") != "1"
-            for method in methods
+    if not isinstance(methods, list) or not methods:
+        raise PackageBuildError("each official package must expose versioned methods")
+    for method in methods:
+        if not isinstance(method, dict):
+            raise PackageBuildError("each official package method must be an object")
+        name = method.get("name")
+        if not isinstance(name, str) or not name:
+            raise PackageBuildError("each official package method must have a name")
+        capability = method.get("capability", spec.primary_capability)
+        if capability not in capabilities:
+            raise PackageBuildError(
+                "method capability is absent from the Plugin manifest"
+            )
+        expected_version = (
+            MODEL_METHOD_VERSIONS.get(name)
+            if capability == "model.provider.v1"
+            else "1"
         )
-    ):
-        raise PackageBuildError("each official package must expose interface version 1")
+        if (
+            expected_version is None
+            or method.get("interfaceVersion") != expected_version
+        ):
+            raise PackageBuildError(
+                "Plugin method differs from its supported interface version"
+            )
     runtime = manifest.get("runtime")
     if not isinstance(runtime, dict):
         raise PackageBuildError("Plugin manifest runtime is missing")
@@ -595,6 +775,16 @@ def _source_files(
         root / TRAINING_PRODUCER_PATH,
         root / WORKFLOW_PATH,
     }
+    lock_path = root / spec.source_dir / "requirements.lock"
+    lock_bytes = _regular_source(lock_path, root)
+    if any(
+        (match := LOCK_PIN.fullmatch(pin)) is not None
+        and canonicalize_name(match.group(1))
+        == canonicalize_name(RFC8785_LICENSE_EVIDENCE.distribution)
+        and match.group(2) == RFC8785_LICENSE_EVIDENCE.version
+        for pin in _lock_lines(lock_bytes, lock_path.as_posix())
+    ):
+        candidates.add(root / RFC8785_LICENSE_EVIDENCE.packaged_license_source_path)
     for path in package_root.rglob("*"):
         relative = path.relative_to(package_root)
         if any(
@@ -709,6 +899,45 @@ def _wheel_metadata(payload: bytes, filename: str) -> tuple[str, str]:
             f"wheel WHEEL metadata tags do not match its filename: {filename}"
         )
     return canonicalize_name(name), version
+
+
+def _wheel_license_metadata(
+    payload: bytes, filename: str
+) -> tuple[str | None, str | None, list[str]]:
+    """Read license declarations and retained notices from the exact wheel."""
+
+    try:
+        with zipfile.ZipFile(BytesIO(payload)) as archive:
+            metadata_names = [
+                item
+                for item in archive.namelist()
+                if item.endswith(".dist-info/METADATA")
+            ]
+            if len(metadata_names) != 1:
+                raise PackageBuildError(
+                    f"wheel must contain one METADATA file: {filename}"
+                )
+            metadata = BytesParser().parsebytes(archive.read(metadata_names[0]))
+            license_files = sorted(
+                item
+                for item in archive.namelist()
+                if ".dist-info/licenses/" in item and not item.endswith("/")
+            )
+    except (OSError, UnicodeError, zipfile.BadZipFile) as error:
+        raise PackageBuildError(
+            f"invalid wheel license metadata: {filename}"
+        ) from error
+    expression = metadata.get("License-Expression")
+    license_text = metadata.get("License")
+    return (
+        expression.strip()
+        if isinstance(expression, str) and expression.strip()
+        else None,
+        license_text.strip()
+        if isinstance(license_text, str) and license_text.strip()
+        else None,
+        license_files,
+    )
 
 
 def _wheelhouse_entries(lock_bytes: bytes, wheel_paths: list[Path]) -> dict[str, bytes]:
@@ -1236,6 +1465,14 @@ def _verify_lock_inputs(spec: PackageSpec, source_files: dict[str, bytes]) -> li
         for requirement in input_requirements
     }
     input_comments = input_bytes.decode("utf-8")
+    unpublished_cyrene_pins = {
+        name for name in pin_versions if name.startswith("cyrene-")
+    }.difference(source_dependency_by_name)
+    if unpublished_cyrene_pins:
+        raise PackageBuildError(
+            "runtime lock may not resolve unpublished Cyrene distributions from a package registry: "
+            + ", ".join(sorted(unpublished_cyrene_pins))
+        )
     matched_source_dependencies: set[str] = set()
     for requirement in project_requirements:
         name = canonicalize_name(requirement.name)
@@ -1382,6 +1619,28 @@ def _package_entries(
                 continue
             relative = source[len(sdk_prefix) :]
             entries[f"{sdk.archive_root}/{relative}"] = content
+    lock_path = f"{spec.source_dir}/requirements.lock"
+    if any(
+        (match := LOCK_PIN.fullmatch(pin)) is not None
+        and canonicalize_name(match.group(1))
+        == canonicalize_name(RFC8785_LICENSE_EVIDENCE.distribution)
+        and match.group(2) == RFC8785_LICENSE_EVIDENCE.version
+        for pin in _lock_lines(source_files[lock_path], lock_path)
+    ):
+        license_bytes = source_files.get(
+            RFC8785_LICENSE_EVIDENCE.packaged_license_source_path
+        )
+        if (
+            license_bytes is None
+            or hashlib.sha256(license_bytes).hexdigest()
+            != RFC8785_LICENSE_EVIDENCE.source_license_sha256
+        ):
+            raise PackageBuildError(
+                "rfc8785 lock requires its verified third-party license notice"
+            )
+        entries[RFC8785_LICENSE_EVIDENCE.packaged_license_archive_path] = (
+            license_bytes
+        )
     if wheelhouse_entries:
         entries.update(wheelhouse_entries)
     if "src/cyrene_plugin_runtime/bootstrap.py" not in entries:
@@ -1474,18 +1733,42 @@ def _sbom_document(
     source_files: dict[str, bytes],
     sdk_files: dict[str, dict[str, bytes]],
     pins: list[str],
+    wheelhouse_entries: dict[str, bytes],
 ) -> dict[str, Any]:
     package_ref = (
         f"pkg:pypi/{canonicalize_name(package['distribution'])}@{package['version']}"
     )
     components: list[dict[str, Any]] = []
     dependency_refs: list[str] = []
+    try:
+        wheelhouse_manifest = json.loads(
+            wheelhouse_entries[WHEELHOUSE_MANIFEST].decode("utf-8")
+        )
+        wheel_records = {
+            canonicalize_name(item["name"]): item["filename"]
+            for item in wheelhouse_manifest["wheels"]
+        }
+    except (KeyError, TypeError, UnicodeError, json.JSONDecodeError) as error:
+        raise PackageBuildError("SBOM source wheelhouse manifest is invalid") from error
     for pin in pins:
         match = LOCK_PIN.fullmatch(pin)
         assert match is not None
         name, version = match.groups()
         reference = f"pkg:pypi/{canonicalize_name(name)}@{version}"
         dependency_refs.append(reference)
+        filename = wheel_records.get(canonicalize_name(name))
+        wheel = (
+            None
+            if filename is None
+            else wheelhouse_entries.get(f"wheelhouse/{filename}")
+        )
+        if wheel is None:
+            raise PackageBuildError(
+                f"SBOM wheel is missing for locked distribution: {name}"
+            )
+        license_expression, license_text, license_files = _wheel_license_metadata(
+            wheel, filename
+        )
         component: dict[str, Any] = {
             "type": "library",
             "name": canonicalize_name(name),
@@ -1493,6 +1776,26 @@ def _sbom_document(
             "purl": reference,
             "bom-ref": reference,
         }
+        if license_expression is not None:
+            component["licenses"] = [{"expression": license_expression}]
+        elif license_text is not None:
+            component["licenses"] = [{"license": {"name": license_text}}]
+        component["properties"] = [
+            {
+                "name": "cyrene:license:metadata",
+                "value": (
+                    f"License-Expression: {license_expression}"
+                    if license_expression is not None
+                    else f"License: {license_text}"
+                    if license_text is not None
+                    else "wheel metadata does not declare a license"
+                ),
+            },
+            {
+                "name": "cyrene:license:files",
+                "value": json.dumps(license_files, separators=(",", ":")),
+            },
+        ]
         source_dependency = next(
             (
                 item
@@ -1508,10 +1811,79 @@ def _sbom_document(
             component["externalReferences"] = [
                 {"type": "vcs", "url": source_dependency.repository}
             ]
-            component["properties"] = [
-                {"name": "cyrene:source:commit", "value": source_dependency.commit},
-                {"name": "cyrene:delivery", "value": "wheel-built-from-pinned-source"},
+            component["properties"].extend(
+                [
+                    {"name": "cyrene:source:commit", "value": source_dependency.commit},
+                    {
+                        "name": "cyrene:delivery",
+                        "value": "wheel-built-from-pinned-source",
+                    },
+                ]
+            )
+        license_evidence = RFC8785_LICENSE_EVIDENCE
+        if (
+            canonicalize_name(name) == canonicalize_name(license_evidence.distribution)
+            and version == license_evidence.version
+        ):
+            if license_expression is not None or license_text is not None or license_files:
+                raise PackageBuildError(
+                    "rfc8785 wheel license metadata changed; refresh its explicit evidence"
+                )
+            packaged_license = source_files.get(
+                license_evidence.packaged_license_source_path
+            )
+            if (
+                packaged_license is None
+                or hashlib.sha256(packaged_license).hexdigest()
+                != license_evidence.source_license_sha256
+            ):
+                raise PackageBuildError(
+                    "rfc8785 packaged license differs from its pinned source archive"
+                )
+            component["licenses"] = [
+                {"expression": license_evidence.license_expression}
             ]
+            component["externalReferences"] = [
+                {"type": "website", "url": license_evidence.project_url},
+                {"type": "distribution", "url": license_evidence.source_archive_url},
+                {"type": "vcs", "url": license_evidence.upstream_repository},
+            ]
+            component["properties"].extend(
+                [
+                    {
+                        "name": "cyrene:license:evidence:origin",
+                        "value": "verified source distribution; not wheel metadata",
+                    },
+                    {
+                        "name": "cyrene:license:evidence:attribution",
+                        "value": license_evidence.attribution,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-archive-url",
+                        "value": license_evidence.source_archive_url,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-archive-sha256",
+                        "value": license_evidence.source_archive_sha256,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-license-path",
+                        "value": license_evidence.source_license_path,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:source-license-sha256",
+                        "value": license_evidence.source_license_sha256,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:packaged-license-path",
+                        "value": license_evidence.packaged_license_archive_path,
+                    },
+                    {
+                        "name": "cyrene:license:evidence:packaged-license-sha256",
+                        "value": license_evidence.source_license_sha256,
+                    },
+                ]
+            )
         components.append(component)
     for sdk in spec.vendored_sdks:
         version = tomllib.loads(source_files[sdk.project_path].decode("utf-8"))[
@@ -1538,17 +1910,16 @@ def _sbom_document(
                 "value": f"vendored-zip-src:{sdk.archive_root}",
             },
         ]
-        components.append(
-            {
-                "type": "library",
-                "name": sdk.distribution,
-                "version": version,
-                "purl": reference,
-                "bom-ref": reference,
-                "externalReferences": [{"type": "vcs", "url": SOURCE_REPOSITORY_URL}],
-                "properties": properties,
-            }
-        )
+        sdk_component: dict[str, Any] = {
+            "type": "library",
+            "name": sdk.distribution,
+            "version": version,
+            "purl": reference,
+            "bom-ref": reference,
+            "externalReferences": [{"type": "vcs", "url": SOURCE_REPOSITORY_URL}],
+            "properties": properties,
+        }
+        components.append(sdk_component)
     package_properties = [
         {"name": "cyrene:component-id", "value": spec.component_id},
         {"name": "cyrene:capability-id", "value": package["capability"]},
@@ -1951,7 +2322,14 @@ def build_release_artifacts(
         )
         source_dependency_records = _source_dependency_metadata(spec, source_files)
         sbom = _sbom_document(
-            package, spec, source_ref, source_sha, source_files, sdk_files, pins
+            package,
+            spec,
+            source_ref,
+            source_sha,
+            source_files,
+            sdk_files,
+            pins,
+            wheelhouse_entries,
         )
         sbom_path.write_bytes(_json_bytes(sbom))
         archive_records = [
@@ -2321,7 +2699,14 @@ def verify_release_artifacts(
     _validate_release_asset_metadata(metadata, paths, content_digest)
     sbom = _read_json(paths["sbom"])
     expected_sbom = _sbom_document(
-        package, spec, source_ref, source_sha, source_files, sdk_files, pins
+        package,
+        spec,
+        source_ref,
+        source_sha,
+        source_files,
+        sdk_files,
+        pins,
+        wheelhouse_entries,
     )
     if sbom != expected_sbom:
         raise PackageBuildError(

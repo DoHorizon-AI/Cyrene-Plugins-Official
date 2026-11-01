@@ -11,11 +11,13 @@ capabilities:
         - plugins/accounts/account-center/contracts/v1/schema.json
     contract_methods:
       - begin_azure_devops_link
+      - begin_bilibili_link
       - begin_huggingface_renewal
       - begin_link
       - begin_microsoft_graph_link
       - begin_microsoft_graph_scope_upgrade
       - complete_azure_devops_link
+      - complete_bilibili_link
       - complete_github_link
       - complete_microsoft_graph_link
       - complete_microsoft_graph_scope_upgrade
@@ -45,11 +47,13 @@ capabilities:
         publication: published
         methods:
           - begin_azure_devops_link
+          - begin_bilibili_link
           - begin_huggingface_renewal
           - begin_link
           - begin_microsoft_graph_link
           - begin_microsoft_graph_scope_upgrade
           - complete_azure_devops_link
+          - complete_bilibili_link
           - complete_github_link
           - complete_microsoft_graph_link
           - complete_microsoft_graph_scope_upgrade
@@ -362,7 +366,29 @@ capabilities:
       - search_nodes
       - upsert_edges
       - upsert_nodes
-    implementations: []
+    implementations:
+      - ref: cyrene.providers.knowledge-graph
+        source: plugins/providers/knowledge-graph/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - delete_edge
+          - delete_node
+          - expand
+          - export_batch
+          - get_edge
+          - get_node
+          - import_batch
+          - search_edges
+          - search_nodes
+          - upsert_edges
+          - upsert_nodes
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/knowledge_graph_contract_tck.rs
       - contracts/tck/knowledge-graph-v1
@@ -382,6 +408,42 @@ capabilities:
       - recall
       - store
     implementations:
+      - ref: cyrene.providers.memory-pgvector
+        source: plugins/providers/memory-pgvector/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - delete
+          - export_batch
+          - get
+          - import_batch
+          - prune
+          - recall
+          - store
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
+      - ref: cyrene.providers.memory-sqlite
+        source: plugins/providers/memory-sqlite/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - delete
+          - export_batch
+          - get
+          - import_batch
+          - prune
+          - recall
+          - store
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
       - ref: cyrene.runtime.rust-native-host
         source: contracts/runtime-implementations.json
         language: rust
@@ -518,9 +580,12 @@ capabilities:
         methods:
           - chat_completion
           - chat_completion_v2
+          - chat_completion_v3
+          - embeddings
         interface_versions:
           - "1"
           - "2"
+          - "3"
         verification_level: DISPATCH_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-09-22
@@ -749,7 +814,19 @@ capabilities:
         - contracts/proto/cyrene/speech/provider/v1/speech_provider.proto
     contract_methods:
       - transcribe
-    implementations: []
+    implementations:
+      - ref: cyrene.providers.speech-sensevoice
+        source: plugins/providers/speech-sensevoice/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - transcribe
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/speech_provider_contract_tck.rs
       - contracts/tck/speech-provider-v1
@@ -787,6 +864,19 @@ capabilities:
       - call_tool
       - list_tools
     implementations:
+      - ref: cyrene.connectors.bilibili
+        source: plugins/connectors/bilibili/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
       - ref: cyrene.connectors.email-notification
         source: plugins/connectors/email-notification/plugin.manifest.json
         kind: capability-plugin
@@ -879,6 +969,19 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: SIMULATED
         verified_at: 2026-10-23
+      - ref: cyrene.providers.knowledge-retrieval
+        source: plugins/providers/knowledge-retrieval/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
       - ref: cyrene.providers.microsoft-graph
         source: plugins/providers/microsoft-graph/plugin.manifest.json
         kind: capability-plugin
@@ -917,6 +1020,32 @@ capabilities:
         verification_level: IMPLEMENTATION_VERIFIED
         execution_mode: REAL
         verified_at: 2026-10-24
+      - ref: cyrene.tools.media
+        source: plugins/tools/media/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
+      - ref: cyrene.tools.public-web
+        source: plugins/tools/public-web/plugin.manifest.json
+        kind: capability-plugin
+        language: python
+        publication: published
+        methods:
+          - call_tool
+          - list_tools
+        interface_versions:
+          - "1"
+        verification_level: IMPLEMENTATION_VERIFIED
+        execution_mode: SIMULATED
+        verified_at: 2026-10-31
     tck:
       - contracts/rust/cyrene-plugin-contracts/tests/tool_provider_contract_tck.rs
       - contracts/tck/tool-provider-v1

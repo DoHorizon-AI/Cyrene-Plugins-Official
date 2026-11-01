@@ -1197,7 +1197,7 @@ def test_schema_v1_migration_preserves_legacy_data_and_fails_closed_on_wecom_tup
     store = AccountStore(db_path)
 
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
     links = store.list_accounts(ACTOR_ANCHOR(), ACTOR["workspace_id"])
     assert links[0]["source_authority"] == "wecom:tenant:9/bot/main"
     assert links[0]["status"] == "reauthorization_required"
@@ -1245,7 +1245,7 @@ def test_fresh_schema_ddl_rolls_back_as_one_transaction(
 
     store = AccountStore(db_path)
     with store._connect() as db:
-        assert db.execute("PRAGMA user_version").fetchone()[0] == 9
+        assert db.execute("PRAGMA user_version").fetchone()[0] == 10
 
 
 def test_direct_runtime_rejects_duplicate_json_keys_and_wrong_type_url(
@@ -1360,6 +1360,8 @@ def test_no_argument_entrypoint_uses_standard_configuration_over_real_grpc(
     client = DirectPluginClient.for_local_connection_ref(connection_ref)
     try:
         assert plugin._store.path == tmp_path / "accounts.sqlite3"
+        assert "bilibili" not in plugin._provider_caller_ids
+        assert plugin._method_callers["begin_bilibili_link"] == set()
         request = {"provider": "wecom", "idempotency_key": "grpc-begin-1"}
         issued_at = int(time.time())
         signed = sign_context(

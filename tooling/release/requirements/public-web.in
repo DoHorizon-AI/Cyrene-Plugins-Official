@@ -1,0 +1,16 @@
+# Target: linux-ubuntu-24.04-x86_64-python-3.12
+# Internal SDKs are vendored from this exact package source commit.
+# Vendored source: cyrene-plugin-runtime==0.2.2.
+# Vendored source: cyrene-tool-provider-contracts==0.1.0.
+# Vendored source: cyrene-integration-contracts==0.1.0.
+cryptography>=44,<51
+grpcio==1.62.3
+httpx>=0.28,<0.29
+jsonschema>=4.23,<5
+openpyxl>=3.1,<4
+Pillow>=10,<13
+protobuf==4.25.9
+pypdfium2>=4.30,<6
+pytest>=8,<10
+python-docx>=1.1,<2
+python-pptx>=1.0,<2

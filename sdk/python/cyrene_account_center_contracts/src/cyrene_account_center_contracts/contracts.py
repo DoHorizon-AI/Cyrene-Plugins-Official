@@ -8,10 +8,13 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
+import re
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from enum import StrEnum
 from typing import Any
+from uuid import UUID
 
 import rfc8785
 
@@ -388,6 +391,119 @@ class AzureDevOpsOperation(StrEnum):
     PIPELINE_RUN_GET = "azure_devops.pipeline_run.get"
     DEPLOYMENTS_LIST = "azure_devops.deployments.list"
     RELEASE_ENVIRONMENT_GET = "azure_devops.release_environment.get"
+
+
+class BilibiliOperation(StrEnum):
+    """Closed Bilibili operations that may receive a one-use account lease."""
+
+    SEARCH = "bilibili.search"
+    USER_FIND = "bilibili.user.find"
+    VIDEO_READ = "bilibili.video.read"
+    COMMENTS_LIST = "bilibili.comments.list"
+    DYNAMICS_LIST = "bilibili.dynamics.list"
+    DYNAMIC_READ = "bilibili.dynamic.read"
+    DM_LIST = "bilibili.dm.list"
+    DM_READ = "bilibili.dm.read"
+    COMMENT_CREATE = "bilibili.comment.create"
+    DYNAMIC_PUBLISH = "bilibili.dynamic.publish"
+    DM_SEND = "bilibili.dm.send"
+
+
+@dataclass(frozen=True, slots=True)
+class BeginBilibiliLinkRequest:
+    """Start one owner-bound private QR session for a fixed Account Center profile."""
+
+    profile_ref: str
+    idempotency_key: str
+
+    def __post_init__(self) -> None:
+        """Reject malformed profile and replay keys before signing the request."""
+
+        _require_uuid(self.profile_ref, "profile_ref")
+        _require_idempotency_key(self.idempotency_key)
+
+
+@dataclass(frozen=True, slots=True)
+class BilibiliLinkSession:
+    """Private, short-lived Account Center reference held by the provider only."""
+
+    profile_ref: str
+    link_session_ref: str
+    expires_at: int
+
+    def __post_init__(self) -> None:
+        """Validate the opaque session identifiers and positive expiry."""
+
+        _require_uuid(self.profile_ref, "profile_ref")
+        _require_uuid(self.link_session_ref, "link_session_ref")
+        if isinstance(self.expires_at, bool) or not isinstance(self.expires_at, int):
+            raise TypeError("expires_at must be an integer")
+        if self.expires_at <= 0:
+            raise ValueError("expires_at must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class CompleteBilibiliLinkRequest:
+    """Complete a QR session with a verified identity and encrypted-at-rest cookie jar."""
+
+    profile_ref: str
+    link_session_ref: str
+    external_subject: str
+    credential_json: str = field(repr=False)
+    idempotency_key: str
+    credential_expires_at: int | None = None
+
+    def __post_init__(self) -> None:
+        """Validate the closed session payload without ever displaying its credential."""
+
+        _require_uuid(self.profile_ref, "profile_ref")
+        _require_uuid(self.link_session_ref, "link_session_ref")
+        if (
+            not isinstance(self.external_subject, str)
+            or re.fullmatch(r"[1-9][0-9]{0,19}", self.external_subject) is None
+        ):
+            raise ValueError(
+                "external_subject must be a positive ASCII Bilibili account ID"
+            )
+        if not isinstance(self.credential_json, str):
+            raise TypeError("credential_json must be text")
+        if not 1 <= len(self.credential_json.encode("utf-8")) <= 16_384:
+            raise ValueError("credential_json must be between 1 and 16384 UTF-8 bytes")
+        try:
+            cookie_jar = json.loads(self.credential_json)
+        except json.JSONDecodeError as error:
+            raise ValueError("credential_json must contain a JSON object") from error
+        if not isinstance(cookie_jar, dict) or not cookie_jar:
+            raise ValueError("credential_json must contain a non-empty JSON object")
+        if self.credential_expires_at is not None and (
+            isinstance(self.credential_expires_at, bool)
+            or not isinstance(self.credential_expires_at, int)
+            or self.credential_expires_at <= 0
+        ):
+            raise ValueError("credential_expires_at must be null or a positive integer")
+        _require_idempotency_key(self.idempotency_key)
+
+
+def _require_uuid(value: Any, field_name: str) -> None:
+    """Validate a canonical UUID string used as a private account reference."""
+
+    if not isinstance(value, str):
+        raise TypeError(f"{field_name} must be text")
+    try:
+        parsed = UUID(value)
+    except ValueError as error:
+        raise ValueError(f"{field_name} must be a UUID") from error
+    if str(parsed) != value.lower():
+        raise ValueError(f"{field_name} must be a canonical UUID")
+
+
+def _require_idempotency_key(value: Any) -> None:
+    """Require a bounded printable idempotency key."""
+
+    if not isinstance(value, str) or not 1 <= len(value) <= 200:
+        raise ValueError("idempotency_key must contain 1 to 200 characters")
+    if any(ord(character) < 0x21 or ord(character) == 0x7F for character in value):
+        raise ValueError("idempotency_key must contain printable characters")
 
 
 @dataclass(frozen=True, slots=True, init=False)

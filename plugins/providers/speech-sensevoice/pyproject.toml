@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=80", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cyrene-speech-sensevoice"
+version = "0.1.0"
+description = "CPU-only speech.provider.v1 implementation using local sherpa-onnx SenseVoice."
+requires-python = ">=3.11"
+license = "Apache-2.0"
+dependencies = [
+  "cyrene-plugin-runtime>=0.2,<0.3",
+  "cyrene-speech-provider-contracts>=0.1,<0.2",
+  "numpy>=1.26,<3",
+]
+
+[project.optional-dependencies]
+speech = ["sherpa-onnx>=1.13.8,<2"]
+test = ["pytest>=8,<10"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.data-files]
+"share/cyrene/plugins/cyrene.providers.speech-sensevoice" = [
+  "plugin.manifest.json",
+  "configuration.schema.json",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]

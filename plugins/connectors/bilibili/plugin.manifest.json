@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "id": "cyrene.connectors.bilibili",
+  "name": "Bilibili Connector",
+  "version": "0.1.0",
+  "licenseExpression": "Apache-2.0",
+  "description": "Account-scoped Bilibili reads, QR linking, and receipted writes.",
+  "kind": "capability-plugin",
+  "capabilities": ["tool.provider.v1"],
+  "supportedServices": ["Cyrene-Navigator"],
+  "methods": [
+    {"name": "list_tools", "capability": "tool.provider.v1", "interfaceVersion": "1", "executionMode": "service"},
+    {"name": "call_tool", "capability": "tool.provider.v1", "interfaceVersion": "1", "executionMode": "service"}
+  ],
+  "runtime": {
+    "language": "python",
+    "entrypoint": "cyrene_bilibili.plugin:BilibiliProvider",
+    "protocol": "cyrene.plugin.runtime.v1.DirectPluginRuntime",
+    "launch": {"executable": "prepared-runtime", "args": ["-B", "src/cyrene_plugin_runtime/bootstrap.py", "--entrypoint", "cyrene_bilibili.plugin:BilibiliProvider"]}
+  },
+  "compatibility": {
+    "platformVersion": ">=0.1.0",
+    "requiresPython": ">=3.11",
+    "os": ["linux", "windows", "darwin"],
+    "architectures": ["x86_64", "aarch64"]
+  },
+  "configuration": {"schemaRef": "configuration.schema.json"},
+  "secrets": {
+    "requiredSecretRefs": [
+      "bilibili/exchange-verification-key",
+      "bilibili/account-center-provider-signing-key",
+      "bilibili/state-dir"
+    ],
+    "optionalSecretRefs": [
+      "bilibili/account-center-root-certificate",
+      "bilibili/account-center-client-certificate",
+      "bilibili/account-center-client-key"
+    ]
+  },
+  "state": {
+    "isStateful": true,
+    "storageCategory": "relational",
+    "retentionPolicyOnUninstall": "retain"
+  }
+}

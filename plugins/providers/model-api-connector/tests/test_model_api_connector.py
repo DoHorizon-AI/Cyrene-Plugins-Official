@@ -28,25 +28,69 @@ from cyrene_model_provider_contracts import (
     encode_chat_completion_request_v2,
 )
 
-from model_api_connector import ModelApiConnector, ProviderSettings
+from model_api_connector import ConfigurationError, ModelApiConnector, ProviderSettings
 
 
 class _Upstream(BaseHTTPRequestHandler):
     """Minimal OpenAI-compatible peer with a cancellable slow stream.
 
-        中文:支持取消慢速流的最小 OpenAI 兼容对端。"""
+    中文:支持取消慢速流的最小 OpenAI 兼容对端。"""
 
     server_version = "connector-test/1"
 
     def do_POST(self) -> None:  # noqa: N802 - stdlib handler API
         length = int(self.headers["Content-Length"])
         payload = json.loads(self.rfile.read(length))
-        self.server.requests.append({"path": self.path, "payload": payload})  # type: ignore[attr-defined]
+        self.server.requests.append(
+            {
+                "path": self.path,
+                "payload": payload,
+                "authorization": self.headers.get("Authorization"),
+            }
+        )  # type: ignore[attr-defined]
         behavior = self.path.strip("/").split("/", 1)[0]
         if behavior == "error":
             self.send_response(503)
             self.send_header("Content-Length", "0")
             self.end_headers()
+            return
+        if self.path.endswith("/v1/embeddings"):
+            if behavior == "throttle":
+                self.send_response(429)
+                self.send_header("Retry-After", "2")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            if behavior == "slow":
+                self.send_response(200)
+                self.send_header("Content-Length", "1024")
+                self.end_headers()
+                self.wfile.flush()
+                self.server.slow_started.set()  # type: ignore[attr-defined]
+                while not self.server.slow_release.wait(0.05):  # type: ignore[attr-defined]
+                    if self._peer_disconnected():
+                        self.server.slow_disconnected.set()  # type: ignore[attr-defined]
+                        return
+                return
+            total = len(payload["input"])
+            indexes = list(range(total - 1, -1, -1))
+            embedding_values = [0.0, 0.0] if behavior == "zero" else None
+            body = json.dumps(
+                {
+                    "data": [
+                        {
+                            "index": index,
+                            "embedding": embedding_values or [float(index + 1), -float(index + 1)],
+                        }
+                        for index in indexes
+                    ],
+                    "model": "provider-embedding-actual-v1",
+                }
+            ).encode()
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
             return
         if behavior == "malformed":
             body = b"not-json"
@@ -141,12 +185,22 @@ def upstream_server():
         thread.join(timeout=2)
 
 
-def _connector(server: ThreadingHTTPServer, behavior: str) -> ModelApiConnector:
+def _connector(
+    server: ThreadingHTTPServer,
+    behavior: str,
+    *,
+    embeddings_supported: bool = False,
+    embeddings_model: str | None = None,
+) -> ModelApiConnector:
     return ModelApiConnector(
         settings=ProviderSettings(
             base_url=f"http://127.0.0.1:{server.server_port}/{behavior}",
-            api_key="conformance-only",
+            api_key="chat-only",
             timeout_seconds=8,
+            embeddings_supported=embeddings_supported,
+            embeddings_model=embeddings_model,
+            embeddings_base_url=f"http://127.0.0.1:{server.server_port}/{behavior}",
+            embeddings_api_key="embedding-only",
         )
     )
 
@@ -229,7 +283,7 @@ def test_stream_items_carry_the_chunk_type_url(upstream_server) -> None:
 def test_v2_stream_keeps_role_and_reported_total(upstream_server) -> None:
     """The structured method carries the role preamble and a reported total.
 
-        中文:结构化方法会承载角色前导信息和已报告的总量。"""
+    中文:结构化方法会承载角色前导信息和已报告的总量。"""
 
     connector = _connector(upstream_server, "success")
     request = ChatCompletionRequest(
@@ -297,7 +351,11 @@ def test_unsupported_capability_method_and_payload_fail_closed(upstream_server) 
     ok, detail = connector.on_invoke("model.other.v1", CHAT_COMPLETION_METHOD, encoded)
     assert ok is False and detail.startswith("INVALID_REQUEST:")
 
-    ok, detail = connector.on_invoke("model.provider.v1", "embeddings", encoded)
+    ok, detail = connector.on_invoke(
+        "model.provider.v1",
+        "embeddings",
+        _embedding_request(("text",)),
+    )
     assert ok is False and detail.startswith("METHOD_NOT_SUPPORTED:")
 
     ok, detail = connector.on_invoke("model.provider.v1", "chat_completion_v9", encoded)
@@ -315,6 +373,298 @@ def test_unsupported_capability_method_and_payload_fail_closed(upstream_server) 
     assert ok is False and detail.startswith("INVALID_REQUEST:")
 
 
+def _embedding_request(inputs: tuple[str, ...], *, model: str | None = None) -> bytes:
+    from cyrene_model_provider_contracts import EmbeddingsRequest, encode_embeddings_request
+
+    return encode_embeddings_request(EmbeddingsRequest(inputs=inputs, model=model))
+
+
+def test_embeddings_use_real_upstream_values_and_restore_provider_index_order(
+    upstream_server,
+) -> None:
+    from cyrene_model_provider_contracts import (
+        EMBEDDINGS_REQUEST_TYPE_URL,
+        EMBEDDINGS_RESPONSE_TYPE_URL,
+        decode_embeddings_response,
+    )
+
+    connector = _connector(
+        upstream_server,
+        "success",
+        embeddings_supported=True,
+        embeddings_model="configured-embedding-model",
+    )
+    ok, payload = connector.on_invoke(
+        "model.provider.v1",
+        "embeddings",
+        _embedding_request(("first", "second")),
+        request_type_url=EMBEDDINGS_REQUEST_TYPE_URL,
+        request_id="embedding-success",
+    )
+
+    assert ok is True
+    assert payload.type_url == EMBEDDINGS_RESPONSE_TYPE_URL
+    response = decode_embeddings_response(payload.value)
+    assert response.error is None
+    assert response.embeddings is not None
+    assert response.embeddings.model == "provider-embedding-actual-v1"
+    assert response.embeddings.dimensions == 2
+    assert [vector.values for vector in response.embeddings.vectors] == [(1.0, -1.0), (2.0, -2.0)]
+    observed = upstream_server.requests[-1]  # type: ignore[attr-defined]
+    assert observed["path"] == "/success/v1/embeddings"
+    assert observed["payload"] == {
+        "model": "configured-embedding-model",
+        "input": ["first", "second"],
+    }
+    assert observed["authorization"] == "Bearer embedding-only"
+
+
+def test_chat_and_embeddings_use_distinct_endpoints_and_credentials(upstream_server) -> None:
+    connector = ModelApiConnector(
+        settings=ProviderSettings(
+            base_url=f"http://127.0.0.1:{upstream_server.server_port}/chat/v1",
+            api_key="chat-secret",
+            embeddings_supported=True,
+            embeddings_base_url=f"http://127.0.0.1:{upstream_server.server_port}/vectors/v1",
+            embeddings_api_key="embedding-secret",
+        )
+    )
+    request = ChatCompletionRequest(messages=(ChatMessage(role=ChatRole.USER, content="hello"),))
+
+    chat_ok, _ = connector.on_invoke("model.provider.v1", CHAT_COMPLETION_METHOD, _encode(request))
+    embedding_ok, _ = connector.on_invoke(
+        "model.provider.v1",
+        "embeddings",
+        _embedding_request(("hello",), model="e5-small"),
+    )
+
+    assert chat_ok is True
+    assert embedding_ok is True
+    chat_request, embedding_request = upstream_server.requests  # type: ignore[attr-defined]
+    assert chat_request["path"] == "/chat/v1/chat/completions"
+    assert chat_request["authorization"] == "Bearer chat-secret"
+    assert embedding_request["path"] == "/vectors/v1/embeddings"
+    assert embedding_request["authorization"] == "Bearer embedding-secret"
+
+
+def test_enabling_embeddings_requires_its_own_endpoint() -> None:
+    with pytest.raises(ConfigurationError, match="embeddings_base_url"):
+        ProviderSettings(base_url="http://127.0.0.1:8000", embeddings_supported=True)
+
+
+def test_embeddings_preserve_provider_rate_limit_code_and_retry_delay(upstream_server) -> None:
+    from cyrene_model_provider_contracts import EmbeddingsResponse, decode_embeddings_response
+
+    connector = _connector(upstream_server, "throttle", embeddings_supported=True)
+    ok, payload = connector.on_invoke(
+        "model.provider.v1",
+        "embeddings",
+        _embedding_request(("first",), model="requested-embedding-model"),
+    )
+
+    assert ok is True
+    response = decode_embeddings_response(payload.value)
+    assert isinstance(response, EmbeddingsResponse)
+    assert response.embeddings is None
+    assert response.error is not None
+    assert int(response.error.code) == 5
+    assert response.error.retry_after_seconds == 2.0
+
+
+def test_embeddings_request_limits_and_invalid_provider_vectors_fail_closed(
+    upstream_server,
+) -> None:
+    from cyrene_model_provider_contracts import EmbeddingsRequest, encode_embeddings_request
+
+    from model_api_connector import ProviderMappingError
+    from model_api_connector.embeddings import embedding_batch_from_response
+
+    connector = _connector(upstream_server, "success", embeddings_supported=True)
+    oversized = encode_embeddings_request(EmbeddingsRequest(inputs=("x" * 32_769,)))
+    ok, detail = connector.on_invoke("model.provider.v1", "embeddings", oversized)
+    assert ok is False and detail.startswith("INVALID_REQUEST:")
+
+    with pytest.raises(ProviderMappingError, match="finite"):
+        embedding_batch_from_response(
+            {"model": "actual", "data": [{"index": 0, "embedding": [float("nan")]}]},
+            expected_count=1,
+        )
+
+
+@pytest.mark.parametrize(
+    ("body", "message"),
+    [
+        ({"model": "actual", "data": [{"index": 0, "embedding": [1.0]}]}, "count"),
+        (
+            {
+                "model": "actual",
+                "data": [
+                    {"index": 0, "embedding": [1.0]},
+                    {"index": 0, "embedding": [2.0]},
+                ],
+            },
+            "unique",
+        ),
+        (
+            {
+                "model": "actual",
+                "data": [
+                    {"index": 0, "embedding": [1.0, 2.0]},
+                    {"index": 1, "embedding": [1.0]},
+                ],
+            },
+            "dimensions",
+        ),
+        ({"model": "actual", "data": [{"index": 0, "embedding": [float("inf")]}]}, "finite"),
+        ({"model": "actual", "data": [{"index": 0, "embedding": [0.0, 0.0]}]}, "zero vector"),
+        ({"model": "", "data": [{"index": 0, "embedding": [1.0]}]}, "actual model"),
+    ],
+)
+def test_embedding_response_rejects_incomplete_or_malformed_vectors(body, message) -> None:
+    from model_api_connector import ProviderMappingError
+    from model_api_connector.embeddings import embedding_batch_from_response
+
+    with pytest.raises(ProviderMappingError, match=message):
+        embedding_batch_from_response(
+            body, expected_count=2 if message in {"count", "unique", "dimensions"} else 1
+        )
+
+
+def test_embeddings_cancellation_aborts_the_upstream_socket(upstream_server) -> None:
+    connector = _connector(upstream_server, "slow", embeddings_supported=True)
+    result: list[tuple[bool, Any]] = []
+
+    worker = threading.Thread(
+        target=lambda: result.append(
+            connector.on_invoke(
+                "model.provider.v1",
+                "embeddings",
+                _embedding_request(("wait",), model="embed-v1"),
+                request_id="embedding-cancel",
+            )
+        ),
+        daemon=True,
+    )
+    worker.start()
+    assert upstream_server.slow_started.wait(5)  # type: ignore[attr-defined]
+    connector.on_cancel("embedding-cancel", "caller disconnected")
+    assert upstream_server.slow_disconnected.wait(5)  # type: ignore[attr-defined]
+    worker.join(timeout=5)
+
+    assert not worker.is_alive()
+    assert result and result[0][0] is False
+    assert str(result[0][1]).startswith("CANCELLED:")
+
+
+def test_embeddings_reject_all_zero_provider_vectors(upstream_server) -> None:
+    connector = _connector(upstream_server, "zero", embeddings_supported=True)
+    ok, detail = connector.on_invoke(
+        "model.provider.v1",
+        "embeddings",
+        _embedding_request(("non-empty input",), model="embed-v1"),
+    )
+
+    assert ok is False
+    assert str(detail).startswith("EXECUTION_FAILED:")
+
+
+def test_chat_v3_maps_inline_image_audio_and_file_bytes_to_provider_content(
+    upstream_server,
+) -> None:
+    from cyrene_model_provider_contracts import (
+        CHAT_COMPLETION_V3_METHOD,
+        CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+        AudioContentPart,
+        ChatCompletionRequestV3,
+        ChatMessageV3,
+        FileContentPart,
+        ImageContentPart,
+        TextContentPart,
+        decode_chat_completion_response_v3,
+        encode_chat_completion_request_v3,
+    )
+
+    connector = _connector(upstream_server, "success")
+    request = ChatCompletionRequestV3(
+        messages=(
+            ChatMessageV3(
+                role=ChatRole.USER,
+                content=(
+                    TextContentPart("inspect these attachments"),
+                    ImageContentPart(mime_type="image/png", data=b"png-bytes"),
+                    AudioContentPart(mime_type="audio/wav", data=b"wav-bytes"),
+                    FileContentPart(
+                        mime_type="application/pdf",
+                        data=b"pdf-bytes",
+                        filename="report.pdf",
+                    ),
+                ),
+            ),
+        ),
+        model="multimodal-model",
+    )
+
+    ok, payload = connector.on_invoke(
+        "model.provider.v1",
+        CHAT_COMPLETION_V3_METHOD,
+        encode_chat_completion_request_v3(request),
+        request_type_url=CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+    )
+
+    assert ok is True
+    assert decode_chat_completion_response_v3(payload.value).chunks[0].delta == "real path"
+    body = upstream_server.requests[-1]["payload"]  # type: ignore[attr-defined]
+    parts = body["messages"][0]["content"]
+    assert parts[0] == {"type": "text", "text": "inspect these attachments"}
+    assert parts[1]["image_url"]["url"].startswith("data:image/png;base64,")
+    assert parts[2] == {
+        "type": "input_audio",
+        "input_audio": {"data": "d2F2LWJ5dGVz", "format": "wav"},
+    }
+    assert parts[3]["file"]["filename"] == "report.pdf"
+    assert parts[3]["file"]["file_data"].startswith("data:application/pdf;base64,")
+
+
+def test_chat_v3_rejects_unresolved_artifact_ids_and_wrong_type_url(upstream_server) -> None:
+    from cyrene_model_provider_contracts import (
+        CHAT_COMPLETION_V3_METHOD,
+        CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+        ChatCompletionRequestV3,
+        ChatMessageV3,
+        ImageContentPart,
+        encode_chat_completion_request_v3,
+    )
+
+    connector = _connector(upstream_server, "success")
+    request = ChatCompletionRequestV3(
+        messages=(
+            ChatMessageV3(
+                role=ChatRole.USER,
+                content=(ImageContentPart(mime_type="image/png", artifact_id="media-123"),),
+            ),
+        ),
+        model="multimodal-model",
+    )
+    encoded = encode_chat_completion_request_v3(request)
+
+    ok, detail = connector.on_invoke(
+        "model.provider.v1",
+        CHAT_COMPLETION_V3_METHOD,
+        encoded,
+        request_type_url=CHAT_COMPLETION_V3_REQUEST_TYPE_URL,
+    )
+    assert ok is False and str(detail).startswith("EXECUTION_FAILED:")
+    assert upstream_server.requests == []  # type: ignore[attr-defined]
+
+    ok, detail = connector.on_invoke(
+        "model.provider.v1",
+        CHAT_COMPLETION_V3_METHOD,
+        encoded,
+        request_type_url="type.cyrene.io/other",
+    )
+    assert ok is False and str(detail).startswith("INVALID_REQUEST:")
+
+
 def test_missing_configuration_fails_closed() -> None:
     connector = ModelApiConnector(settings=None)
     request = ChatCompletionRequest(messages=(ChatMessage(role=ChatRole.USER, content="hi"),))
@@ -328,7 +678,7 @@ def test_missing_configuration_fails_closed() -> None:
 def test_cancellation_aborts_the_upstream_request(upstream_server) -> None:
     """A cancel must close the upstream socket, not just stop waiting.
 
-        中文:取消操作必须关闭上游套接字,而不能只停止等待。"""
+    中文:取消操作必须关闭上游套接字,而不能只停止等待。"""
 
     connector = _connector(upstream_server, "slow")
     request = ChatCompletionRequest(

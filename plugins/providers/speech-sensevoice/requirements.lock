@@ -1,0 +1,17 @@
+# Target: linux-ubuntu-24.04-x86_64-python-3.12
+# Runtime and CPU inference dependencies for the optional speech extra.
+grpcio==1.62.3
+iniconfig==2.3.1
+    # via pytest
+numpy==2.5.4
+packaging==26.3
+    # via pytest
+pluggy==1.7.0
+    # via pytest
+protobuf==4.25.9
+pygments==2.21.0
+    # via pytest
+pytest==9.2.0
+sherpa-onnx==1.13.8
+sherpa-onnx-core==1.13.8
+    # via sherpa-onnx
