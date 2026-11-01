@@ -220,6 +220,8 @@ def test_export_uses_bounded_scope_bound_keyset_pages(tmp_path: Path) -> None:
         assert end_cursor == ""
         with pytest.raises(ValueError, match="scope"):
             store.export_batch("tenant-a", "profile", 2, cursor)
+        with pytest.raises(ValueError, match="tenant"):
+            store.export_batch("tenant-b", "conversation", 2, cursor)
     finally:
         store.close()
 

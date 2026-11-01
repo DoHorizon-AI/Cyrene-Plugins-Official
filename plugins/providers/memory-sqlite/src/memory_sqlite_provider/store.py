@@ -317,7 +317,7 @@ class SQLiteMemoryStore:
         if scope is not None:
             clauses.append("scope = ?")
             parameters.append(scope)
-        after_id = _decode_page_token(page_token, scope)
+        after_id = _decode_page_token(page_token, tenant, scope)
         if after_id is not None:
             clauses.append("item_id > ?")
             parameters.append(after_id)
@@ -335,7 +335,9 @@ class SQLiteMemoryStore:
         has_more = len(rows) > maximum
         selected = rows[:maximum]
         next_token = (
-            _encode_page_token(str(selected[-1]["item_id"]), scope) if has_more and selected else ""
+            _encode_page_token(str(selected[-1]["item_id"]), tenant, scope)
+            if has_more and selected
+            else ""
         )
         return [self._record_from_row(row) for row in selected], next_token
 
@@ -717,12 +719,14 @@ def _bounded_optional_text(value: str, name: str, maximum_bytes: int) -> str:
     return value
 
 
-def _encode_page_token(item_id: str, scope: str | None) -> str:
-    payload = json.dumps({"after": item_id, "scope": scope}, separators=(",", ":"))
+def _encode_page_token(item_id: str, tenant_id: str, scope: str | None) -> str:
+    payload = json.dumps(
+        {"after": item_id, "scope": scope, "tenant": tenant_id}, separators=(",", ":")
+    )
     return base64.urlsafe_b64encode(payload.encode("utf-8")).decode("ascii").rstrip("=")
 
 
-def _decode_page_token(value: str | None, scope: str | None) -> str | None:
+def _decode_page_token(value: str | None, tenant_id: str, scope: str | None) -> str | None:
     if value is None or value == "":
         return None
     if len(value) > 1024:
@@ -734,8 +738,12 @@ def _decode_page_token(value: str | None, scope: str | None) -> str | None:
         )
     except (ValueError, UnicodeError, binascii.Error) as error:
         raise ValueError("page_token is invalid") from error
-    if not isinstance(decoded, dict) or decoded.get("scope") != scope:
-        raise ValueError("page_token does not match the export scope")
+    if (
+        not isinstance(decoded, dict)
+        or decoded.get("tenant") != tenant_id
+        or decoded.get("scope") != scope
+    ):
+        raise ValueError("page_token does not match the export tenant and scope")
     return _required_text(decoded.get("after"), "page_token.after", MAX_ITEM_ID_BYTES)
 
 
