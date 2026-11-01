@@ -1,0 +1,12 @@
+# Target: linux-ubuntu-24.04-x86_64-python-3.12
+# Internal SDKs are vendored from this exact package source commit.
+# Vendored source: cyrene-memory-provider-contracts==0.1.0.
+# Vendored source: cyrene-model-provider-contracts==0.1.0.
+# Vendored source: cyrene-plugin-runtime==0.2.2.
+pgvector==0.5.1
+psycopg[binary,pool]==3.3.6
+psycopg-binary==3.3.6
+psycopg-pool==3.3.3
+typing-extensions==4.16.0
+grpcio==1.62.3
+protobuf==4.25.9

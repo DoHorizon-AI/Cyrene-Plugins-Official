@@ -122,6 +122,12 @@ RELEASE_INDEX_NAME = "component-release-index-v1.json"
 COMPONENT_MANIFEST_NAME = "component-release-manifest-v2.json"
 GIT_SHA = re.compile(r"^[0-9a-f]{40}$")
 LOCK_PIN = re.compile(r"^([A-Za-z0-9_.-]+)==([A-Za-z0-9][A-Za-z0-9_.+!-]*)$")
+MODEL_METHOD_VERSIONS = {
+    "embeddings": "1",
+    "chat_completion": "1",
+    "chat_completion_v2": "2",
+    "chat_completion_v3": "3",
+}
 
 
 @dataclass(frozen=True)
@@ -173,6 +179,30 @@ MODEL_PROVIDER_SDK = VendoredSdk(
     project_path="sdk/python/cyrene_model_provider_contracts/pyproject.toml",
     source_root="sdk/python/cyrene_model_provider_contracts/src/cyrene_model_provider_contracts",
     archive_root="src/cyrene_model_provider_contracts",
+)
+MEMORY_PROVIDER_SDK = VendoredSdk(
+    distribution="cyrene-memory-provider-contracts",
+    project_path="sdk/python/cyrene_memory_provider_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_memory_provider_contracts/src/cyrene_memory_provider_contracts",
+    archive_root="src/cyrene_memory_provider_contracts",
+)
+KNOWLEDGE_GRAPH_SDK = VendoredSdk(
+    distribution="cyrene-knowledge-graph-contracts",
+    project_path="sdk/python/cyrene_knowledge_graph_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_knowledge_graph_contracts/src/cyrene_knowledge_graph_contracts",
+    archive_root="src/cyrene_knowledge_graph_contracts",
+)
+SPEECH_PROVIDER_SDK = VendoredSdk(
+    distribution="cyrene-speech-provider-contracts",
+    project_path="sdk/python/cyrene_speech_provider_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_speech_provider_contracts/src/cyrene_speech_provider_contracts",
+    archive_root="src/cyrene_speech_provider_contracts",
+)
+TOOL_PROVIDER_SDK = VendoredSdk(
+    distribution="cyrene-tool-provider-contracts",
+    project_path="sdk/python/cyrene_tool_provider_contracts/pyproject.toml",
+    source_root="sdk/python/cyrene_tool_provider_contracts/src/cyrene_tool_provider_contracts",
+    archive_root="src/cyrene_tool_provider_contracts",
 )
 ACCOUNT_CENTER_SDK = VendoredSdk(
     distribution="cyrene-account-center-contracts",
@@ -334,6 +364,69 @@ PACKAGE_SPECS: dict[str, PackageSpec] = {
         vendored_sdks=(RUNTIME_SDK, INTEGRATION_SUPPORT_SDK),
         require_spdx_license=True,
     ),
+    "cyrene.providers.model-api-connector": PackageSpec(
+        package_id="cyrene.providers.model-api-connector",
+        component_id="cyrene-providers-model-api-connector",
+        primary_capability="model.provider.v1",
+        source_dir="plugins/providers/model-api-connector",
+        requirements_input="tooling/release/requirements/model-api-connector.in",
+        vendored_sdks=(RUNTIME_SDK, MODEL_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.memory-sqlite": PackageSpec(
+        package_id="cyrene.providers.memory-sqlite",
+        component_id="cyrene-providers-memory-sqlite",
+        primary_capability="memory.provider.v1",
+        source_dir="plugins/providers/memory-sqlite",
+        requirements_input="tooling/release/requirements/memory-sqlite.in",
+        vendored_sdks=(RUNTIME_SDK, MEMORY_PROVIDER_SDK, MODEL_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.memory-pgvector": PackageSpec(
+        package_id="cyrene.providers.memory-pgvector",
+        component_id="cyrene-providers-memory-pgvector",
+        primary_capability="memory.provider.v1",
+        source_dir="plugins/providers/memory-pgvector",
+        requirements_input="tooling/release/requirements/memory-pgvector.in",
+        vendored_sdks=(RUNTIME_SDK, MEMORY_PROVIDER_SDK, MODEL_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.knowledge-graph": PackageSpec(
+        package_id="cyrene.providers.knowledge-graph",
+        component_id="cyrene-providers-knowledge-graph",
+        primary_capability="knowledge.graph.v1",
+        source_dir="plugins/providers/knowledge-graph",
+        requirements_input="tooling/release/requirements/knowledge-graph.in",
+        vendored_sdks=(RUNTIME_SDK, KNOWLEDGE_GRAPH_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.knowledge-retrieval": PackageSpec(
+        package_id="cyrene.providers.knowledge-retrieval",
+        component_id="cyrene-providers-knowledge-retrieval",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/providers/knowledge-retrieval",
+        requirements_input="tooling/release/requirements/knowledge-retrieval.in",
+        vendored_sdks=(RUNTIME_SDK, TOOL_PROVIDER_SDK, INTEGRATION_SUPPORT_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.providers.speech-sensevoice": PackageSpec(
+        package_id="cyrene.providers.speech-sensevoice",
+        component_id="cyrene-providers-speech-sensevoice",
+        primary_capability="speech.provider.v1",
+        source_dir="plugins/providers/speech-sensevoice",
+        requirements_input="tooling/release/requirements/speech-sensevoice.in",
+        vendored_sdks=(RUNTIME_SDK, SPEECH_PROVIDER_SDK),
+        require_spdx_license=True,
+    ),
+    "cyrene.tools.media": PackageSpec(
+        package_id="cyrene.tools.media",
+        component_id="cyrene-tools-media",
+        primary_capability="tool.provider.v1",
+        source_dir="plugins/tools/media",
+        requirements_input="tooling/release/requirements/media.in",
+        vendored_sdks=(RUNTIME_SDK, TOOL_PROVIDER_SDK, INTEGRATION_SUPPORT_SDK),
+        require_spdx_license=True,
+    ),
 }
 
 PRODUCT_SERVICE_COMPONENTS = {
@@ -456,15 +549,24 @@ def _read_package_spec(
             f"{spec.package_id} must declare an SPDX license before release packaging"
         )
     methods = manifest.get("methods")
-    if (
-        not isinstance(methods, list)
-        or not methods
-        or any(
-            not isinstance(method, dict) or method.get("interfaceVersion") != "1"
-            for method in methods
+    if not isinstance(methods, list) or not methods:
+        raise PackageBuildError("each official package must expose versioned methods")
+    for method in methods:
+        if not isinstance(method, dict):
+            raise PackageBuildError("each official package method must be an object")
+        name = method.get("name")
+        if not isinstance(name, str) or not name:
+            raise PackageBuildError("each official package method must have a name")
+        capability = method.get("capability", spec.primary_capability)
+        if capability not in capabilities:
+            raise PackageBuildError("method capability is absent from the Plugin manifest")
+        expected_version = (
+            MODEL_METHOD_VERSIONS.get(name)
+            if capability == "model.provider.v1"
+            else "1"
         )
-    ):
-        raise PackageBuildError("each official package must expose interface version 1")
+        if expected_version is None or method.get("interfaceVersion") != expected_version:
+            raise PackageBuildError("Plugin method differs from its supported interface version")
     runtime = manifest.get("runtime")
     if not isinstance(runtime, dict):
         raise PackageBuildError("Plugin manifest runtime is missing")

@@ -40,12 +40,22 @@ OFFICE_PILOT_PACKAGE_IDS = (
     "cyrene.providers.microsoft-graph",
     "cyrene.providers.azure-devops-observation",
 )
+CONVERSATION_ASSISTANT_PACKAGE_IDS = (
+    "cyrene.providers.model-api-connector",
+    "cyrene.providers.memory-sqlite",
+    "cyrene.providers.memory-pgvector",
+    "cyrene.providers.knowledge-graph",
+    "cyrene.providers.knowledge-retrieval",
+    "cyrene.providers.speech-sensevoice",
+    "cyrene.tools.media",
+)
 ALL_PACKAGE_IDS = LEGACY_PACKAGE_IDS + tuple(
     dict.fromkeys(
         INTEGRATION_V1_PACKAGE_IDS
         + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
         + TEAMS_CLOUD_V1_PACKAGE_IDS
         + OFFICE_PILOT_PACKAGE_IDS
+        + CONVERSATION_ASSISTANT_PACKAGE_IDS
     )
 )
 PACKAGE_NAMES = {
@@ -64,6 +74,13 @@ PACKAGE_NAMES = {
     "cyrene.connectors.email-notification": "email-notification",
     "cyrene.providers.microsoft-graph": "microsoft-graph-provider",
     "cyrene.providers.azure-devops-observation": "azure-devops-observation",
+    "cyrene.providers.model-api-connector": "model-api-connector",
+    "cyrene.providers.memory-sqlite": "memory-sqlite",
+    "cyrene.providers.memory-pgvector": "memory-pgvector",
+    "cyrene.providers.knowledge-graph": "knowledge-graph",
+    "cyrene.providers.knowledge-retrieval": "knowledge-retrieval",
+    "cyrene.providers.speech-sensevoice": "speech-sensevoice",
+    "cyrene.tools.media": "media",
 }
 PACKAGE_SET_CHOICES = (
     "legacy5",
@@ -71,6 +88,7 @@ PACKAGE_SET_CHOICES = (
     "authorization-cloud-v1",
     "teams-cloud-v1",
     "office-pilot",
+    "conversation-assistant",
     *ALL_PACKAGE_IDS,
 )
 
@@ -112,6 +130,9 @@ def select_package_release(
         elif selection == "office-pilot":
             selected = OFFICE_PILOT_PACKAGE_IDS
             publish_mode = "immutable"
+        elif selection == "conversation-assistant":
+            selected = CONVERSATION_ASSISTANT_PACKAGE_IDS
+            publish_mode = "immutable"
         elif selection in PACKAGE_NAMES:
             selected = (selection,)
             publish_mode = (
@@ -121,6 +142,7 @@ def select_package_release(
                 + AUTHORIZATION_CLOUD_V1_PACKAGE_IDS
                 + TEAMS_CLOUD_V1_PACKAGE_IDS
                 + OFFICE_PILOT_PACKAGE_IDS
+                + CONVERSATION_ASSISTANT_PACKAGE_IDS
                 else "draft"
             )
         else:

@@ -25,6 +25,19 @@ on:
       - "sdk/python/cyrene_integration_contracts/**"
       - "sdk/python/cyrene_plugin_runtime/**"
       - "sdk/python/cyrene_model_provider_contracts/**"
+      - "plugins/providers/model-api-connector/**"
+      - "plugins/providers/memory-sqlite/**"
+      - "plugins/providers/memory-pgvector/**"
+      - "plugins/providers/knowledge-graph/**"
+      - "plugins/providers/knowledge-retrieval/**"
+      - "plugins/providers/speech-sensevoice/**"
+      - "plugins/tools/public-web/**"
+      - "plugins/tools/media/**"
+      - "plugins/connectors/bilibili/**"
+      - "sdk/python/cyrene_memory_provider_contracts/**"
+      - "sdk/python/cyrene_knowledge_graph_contracts/**"
+      - "sdk/python/cyrene_speech_provider_contracts/**"
+      - "sdk/python/cyrene_tool_provider_contracts/**"
       - "tooling/release/**"
       - "tests/release/test_official_plugin_package.py"
       - "tests/release/test_select_official_plugin_packages.py"
@@ -57,6 +70,19 @@ on:
       - "sdk/python/cyrene_integration_contracts/**"
       - "sdk/python/cyrene_plugin_runtime/**"
       - "sdk/python/cyrene_model_provider_contracts/**"
+      - "plugins/providers/model-api-connector/**"
+      - "plugins/providers/memory-sqlite/**"
+      - "plugins/providers/memory-pgvector/**"
+      - "plugins/providers/knowledge-graph/**"
+      - "plugins/providers/knowledge-retrieval/**"
+      - "plugins/providers/speech-sensevoice/**"
+      - "plugins/tools/public-web/**"
+      - "plugins/tools/media/**"
+      - "plugins/connectors/bilibili/**"
+      - "sdk/python/cyrene_memory_provider_contracts/**"
+      - "sdk/python/cyrene_knowledge_graph_contracts/**"
+      - "sdk/python/cyrene_speech_provider_contracts/**"
+      - "sdk/python/cyrene_tool_provider_contracts/**"
       - "tooling/release/**"
       - "tests/release/test_official_plugin_package.py"
       - "tests/release/test_select_official_plugin_packages.py"
@@ -78,6 +104,7 @@ on:
           - authorization-cloud-v1
           - teams-cloud-v1
           - office-pilot
+          - conversation-assistant
           - cyrene.tools.dataset-preparation
           - cyrene.tools.document-parsing
           - cyrene.tools.dataset-generation
@@ -93,6 +120,13 @@ on:
           - cyrene.providers.huggingface
           - cyrene.providers.microsoft-graph
           - cyrene.providers.azure-devops-observation
+          - cyrene.providers.model-api-connector
+          - cyrene.providers.memory-sqlite
+          - cyrene.providers.memory-pgvector
+          - cyrene.providers.knowledge-graph
+          - cyrene.providers.knowledge-retrieval
+          - cyrene.providers.speech-sensevoice
+          - cyrene.tools.media
 
 permissions:
   contents: read

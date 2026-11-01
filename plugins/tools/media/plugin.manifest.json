@@ -53,7 +53,7 @@
   },
   "state": {
     "isStateful": true,
-    "storageCategory": "persistent",
+    "storageCategory": "blob",
     "retentionPolicyOnUninstall": "retain"
   }
 }

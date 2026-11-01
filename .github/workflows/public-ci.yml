@@ -125,6 +125,12 @@ jobs:
             -e plugins/models/hf-model-analyzer \
             -e plugins/policy/compat-rules \
             -e plugins/providers/model-api-connector \
+            -e plugins/providers/memory-sqlite \
+            -e plugins/providers/memory-pgvector \
+            -e plugins/providers/knowledge-graph \
+            -e plugins/providers/knowledge-retrieval \
+            -e plugins/providers/speech-sensevoice \
+            -e plugins/tools/media \
             -e plugins/serving/vllm-runtime \
             -e plugins/tools/dataset-preparation \
             -e plugins/tools/document-parsing \
@@ -187,6 +193,12 @@ jobs:
             plugins/models/hf-model-analyzer \
             plugins/policy/compat-rules \
             plugins/providers/model-api-connector \
+            plugins/providers/memory-sqlite \
+            plugins/providers/memory-pgvector \
+            plugins/providers/knowledge-graph \
+            plugins/providers/knowledge-retrieval \
+            plugins/providers/speech-sensevoice \
+            plugins/tools/media \
             plugins/serving/vllm-runtime \
             plugins/tools/dataset-preparation \
             plugins/tools/document-parsing \
@@ -222,6 +234,7 @@ jobs:
             sdk/python/cyrene_knowledge_graph_contracts/tests \
             sdk/python/cyrene_speech_provider_contracts/tests \
             sdk/python/cyrene_account_center_contracts/tests \
+            sdk/python/cyrene_integration_contracts/tests \
             plugins/accounts/account-center/tests \
             plugins/providers/github-issues/tests \
             plugins/providers/microsoft-graph/tests \
@@ -236,6 +249,12 @@ jobs:
             plugins/evaluation/evaluator-pack/tests \
             plugins/evaluation/llm-judge/tests \
             plugins/providers/model-api-connector/tests \
+            plugins/providers/memory-sqlite/tests \
+            plugins/providers/memory-pgvector/tests \
+            plugins/providers/knowledge-graph/tests \
+            plugins/providers/knowledge-retrieval/tests \
+            plugins/providers/speech-sensevoice/tests \
+            plugins/tools/media/tests \
             plugins/providers/cloud-resources/tests \
             plugins/providers/cloud-management/tests \
             plugins/providers/huggingface/tests \

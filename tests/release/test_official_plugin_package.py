@@ -37,6 +37,13 @@ LOCK_ISOLATED_STARTUP_PACKAGES = frozenset(
         "cyrene.providers.huggingface",
         "cyrene.providers.microsoft-graph",
         "cyrene.providers.azure-devops-observation",
+        "cyrene.providers.model-api-connector",
+        "cyrene.providers.memory-sqlite",
+        "cyrene.providers.memory-pgvector",
+        "cyrene.providers.knowledge-graph",
+        "cyrene.providers.knowledge-retrieval",
+        "cyrene.providers.speech-sensevoice",
+        "cyrene.tools.media",
     }
 )
 
@@ -469,6 +476,30 @@ class OfficialPluginPackageTests(unittest.TestCase):
             ),
         ):
             release._read_package_spec(self.repository, spec)
+
+    def test_model_package_keeps_exact_method_interface_versions(self) -> None:
+        """Publish additive v2/v3 calls without accepting arbitrary versions."""
+
+        spec = release.PACKAGE_SPECS["cyrene.providers.model-api-connector"]
+        manifest, _ = release._read_package_spec(self.repository, spec)
+        self.assertEqual(
+            {method["name"]: method["interfaceVersion"] for method in manifest["methods"]},
+            {
+                "embeddings": "1",
+                "chat_completion": "1",
+                "chat_completion_v2": "2",
+                "chat_completion_v3": "3",
+            },
+        )
+        for index in range(len(manifest["methods"])):
+            invalid = deepcopy(manifest)
+            invalid["methods"][index]["interfaceVersion"] = "4"
+            with (
+                self.subTest(method=invalid["methods"][index]["name"]),
+                patch.object(release, "_read_json", return_value=invalid),
+                self.assertRaisesRegex(release.PackageBuildError, "supported interface version"),
+            ):
+                release._read_package_spec(self.repository, spec)
 
     def test_wecom_sdk_wheel_is_built_from_the_pinned_commit_with_its_mit_license(
         self,
@@ -1341,6 +1372,33 @@ class OfficialPluginPackageTests(unittest.TestCase):
 
     def _package_activation_environment(self, package_id: str | None) -> dict[str, str]:
         """Build synthetic host activation facts for packages that require them."""
+
+        if package_id == "cyrene.tools.media":
+            configuration = {
+                "trusted_callers": [
+                    {
+                        "caller_workload": "navigator-package-test",
+                        "audience": "media-package-test",
+                        "organization_id": "org-package-test",
+                        "workspace_id": "workspace-package-test",
+                        "issuer": "https://identity.example.test",
+                        "verification_key_ref": "media-library/caller-verification-key",
+                    }
+                ],
+                "artifact_bridge_origin": "http://127.0.0.1:1",
+                "hostSecretRefs": {
+                    "media-library/caller-verification-key": "TEST_PACKAGE_MEDIA_KEY",
+                    "media-library/state-dir": "TEST_PACKAGE_MEDIA_STATE",
+                    "media-library/artifact-bridge-token": "TEST_PACKAGE_MEDIA_BRIDGE",
+                },
+            }
+            return {
+                "CYRENE_CAPABILITY_BINDING_ID": "media-package-test",
+                "CYRENE_CAPABILITY_CONFIGURATION_JSON": json.dumps(configuration),
+                "TEST_PACKAGE_MEDIA_KEY": (b"\x35" * 32).hex(),
+                "TEST_PACKAGE_MEDIA_STATE": str(self.temp_root / "media-state"),
+                "TEST_PACKAGE_MEDIA_BRIDGE": (b"\x36" * 32).hex(),
+            }
 
         if package_id == "cyrene.providers.cloud-resources":
             configuration = {

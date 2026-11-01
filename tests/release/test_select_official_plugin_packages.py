@@ -38,9 +38,29 @@ class OfficialPackageSelectionTests(unittest.TestCase):
         package_ids = [row["package_id"] for row in matrix["include"]]
 
         self.assertEqual(package_ids, list(selection.ALL_PACKAGE_IDS))
-        self.assertEqual(len(package_ids), 15)
-        self.assertEqual(len(set(package_ids)), 15)
+        self.assertEqual(len(package_ids), 22)
+        self.assertEqual(len(set(package_ids)), 22)
         self.assertEqual(publish_mode, "none")
+
+    def test_conversation_assistant_set_is_explicit_and_immutable(self) -> None:
+        """Conversation packages have an opt-in immutable release boundary."""
+
+        matrix, mode = selection.select_package_release(
+            "workflow_dispatch", "conversation-assistant"
+        )
+        self.assertEqual(
+            [row["package_id"] for row in matrix["include"]],
+            list(selection.CONVERSATION_ASSISTANT_PACKAGE_IDS),
+        )
+        self.assertEqual(len(matrix["include"]), 7)
+        self.assertEqual(mode, "immutable")
+        for identity in selection.CONVERSATION_ASSISTANT_PACKAGE_IDS:
+            with self.subTest(package=identity):
+                one, individual_mode = selection.select_package_release(
+                    "workflow_dispatch", identity
+                )
+                self.assertEqual(one["include"][0]["package_id"], identity)
+                self.assertEqual(individual_mode, "immutable")
 
     def test_release_allowlist_and_package_producers_have_the_same_identities(self) -> None:
         """Every released identity has one explicit package producer mapping."""

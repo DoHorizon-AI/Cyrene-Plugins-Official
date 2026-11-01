@@ -1,0 +1,9 @@
+# Target: linux-ubuntu-24.04-x86_64-python-3.12
+# Internal SDKs are vendored from this exact package source commit.
+# Vendored source: cyrene-plugin-runtime==0.2.2.
+# Vendored source: cyrene-speech-provider-contracts==0.1.0.
+grpcio==1.62.3
+numpy>=1.26,<3
+protobuf==4.25.9
+sherpa-onnx==1.13.8
+sherpa-onnx-core==1.13.8

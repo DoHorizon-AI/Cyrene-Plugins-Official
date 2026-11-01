@@ -607,6 +607,96 @@
           "notes": "Fixed tools, actor/target/digest binding, bounded reads and typed failures verified locally. No live tenant OAuth, selected source resource access, Teams delivery or VM deployment acceptance is included."
         }
       ]
+    },
+    {
+      "capability": "memory.provider.v1",
+      "implementation": "cyrene.providers.memory-sqlite",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / component tests with fixture identities and external dependencies",
+          "command": "python3 -m pytest -q plugins/providers/memory-sqlite/tests",
+          "result": "25 tests; all seven RPCs, tenant isolation, export cursor scope and immutable embedding profiles",
+          "notes": "This record covers component behavior only. Fixture embeddings, inference engines or caller bindings are not a Product acceptance claim. Official package installation and Navigator/DSH integration are separate gates."
+        }
+      ]
+    },
+    {
+      "capability": "memory.provider.v1",
+      "implementation": "cyrene.providers.memory-pgvector",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / component tests with fixture identities and external dependencies",
+          "command": "python3 -m pytest -q plugins/providers/memory-pgvector/tests",
+          "result": "17 tests against an isolated PostgreSQL/pgvector database; seven methods, 3072-dimensional vectors and cancellation recovery",
+          "notes": "This record covers component behavior only. Fixture embeddings, inference engines or caller bindings are not a Product acceptance claim. Official package installation and Navigator/DSH integration are separate gates."
+        }
+      ]
+    },
+    {
+      "capability": "knowledge.graph.v1",
+      "implementation": "cyrene.providers.knowledge-graph",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / component tests with fixture identities and external dependencies",
+          "command": "python3 -m pytest -q plugins/providers/knowledge-graph/tests",
+          "result": "14 tests; eleven methods, authenticated scoped cursors, independent node/edge and response byte limits",
+          "notes": "This record covers component behavior only. Fixture embeddings, inference engines or caller bindings are not a Product acceptance claim. Official package installation and Navigator/DSH integration are separate gates."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.providers.knowledge-retrieval",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / component tests with fixture identities and external dependencies",
+          "command": "python3 -m pytest -q plugins/providers/knowledge-retrieval/tests",
+          "result": "19 tests; signed callers, fixed library registry, artifact integrity and cursor isolation",
+          "notes": "This record covers component behavior only. Fixture embeddings, inference engines or caller bindings are not a Product acceptance claim. Official package installation and Navigator/DSH integration are separate gates."
+        }
+      ]
+    },
+    {
+      "capability": "speech.provider.v1",
+      "implementation": "cyrene.providers.speech-sensevoice",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / component tests with fixture identities and external dependencies",
+          "command": "python3 -m pytest -q plugins/providers/speech-sensevoice/tests",
+          "result": "19 tests; bounded decoding, cancellation, language normalization and typed failures",
+          "notes": "This record covers component behavior only. Fixture embeddings, inference engines or caller bindings are not a Product acceptance claim. Official package installation and Navigator/DSH integration are separate gates."
+        }
+      ]
+    },
+    {
+      "capability": "tool.provider.v1",
+      "implementation": "cyrene.tools.media",
+      "verification_level": "IMPLEMENTATION_VERIFIED",
+      "execution_mode": "SIMULATED",
+      "evidence": [
+        {
+          "observed_at": "2026-10-31",
+          "environment": "Ubuntu 24.04 WSL2 x86_64 / Python 3.12 / component tests with fixture identities and external dependencies",
+          "command": "python3 -m pytest -q plugins/tools/media/tests",
+          "result": "22 tests; actor isolation, bounded artifact IO, persistence, soft deletion/restoration and PNG rendering",
+          "notes": "This record covers component behavior only. Fixture embeddings, inference engines or caller bindings are not a Product acceptance claim. Official package installation and Navigator/DSH integration are separate gates."
+        }
+      ]
     }
   ]
 }

@@ -25,15 +25,15 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/data-tools-package-release.yml",
-      "sha256": "9f71dd4cf45b428d7b89de10d99602ec8ddbf68aea15bdb7880e559f42d89970",
-      "size_bytes": 27616
+      "sha256": "71eace5057ce1adc82e1cc8dfd1423783ec1277a836e8b7d4c35c62ab057de5c",
+      "size_bytes": 29216
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "3888e5ca7778e4b983c834b6c3fc392fa45cf8017cbb142e00e051f44bc414b9",
-      "size_bytes": 44027
+      "sha256": "28c8af846dba0daf206ffd3eb6f03a46a9cf2dff121a2e2aaa2480e949a0e9a0",
+      "size_bytes": 44975
     },
     {
       "kind": "file",
@@ -201,15 +201,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "b847fccff92ca6858e9952aa4b5ac44bd6a1bf56b32fbbece846f77eca2b34da",
-      "size_bytes": 28960
+      "sha256": "656a841676e906e6f0e2501ceaf16c4cdf17a7cccf93520ee2cc206f3d360117",
+      "size_bytes": 31960
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capability-verification.json",
-      "sha256": "61fc4e64139e90669a76287eabbc109b6517f6da46fccd1d514798466c82d530",
-      "size_bytes": 39524
+      "sha256": "4fc5026255bf7d2e4cb64b00f8f59178b56a4090fa44183bfdb54f291743d602",
+      "size_bytes": 44754
     },
     {
       "kind": "file",
@@ -306,8 +306,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/json/integration-support/v1/schema.json",
-      "sha256": "d66aba940ed683d9d4c07f825b27adbedf4ef9fcec5d694e07734530a28026db",
-      "size_bytes": 20871
+      "sha256": "45e41d7b1bfa3f6e7444eee7ef87f86da1329179c07c3920de12b94e6f873189",
+      "size_bytes": 27050
     },
     {
       "kind": "file",
@@ -971,8 +971,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/tck/tool-provider-v1/test_integration_support_contracts.py",
-      "sha256": "c83a95aa566c3c975140a49b321981a31d52c6f45406eea8b6afd7b002e57379",
-      "size_bytes": 18154
+      "sha256": "c26debf54dfacae780bc332a525f1055d3a33d8ff1ba357bcf081e31f6018b41",
+      "size_bytes": 18274
     },
     {
       "kind": "file",
@@ -3175,6 +3175,412 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/README.md",
+      "sha256": "e13eb68d21d6f4e39b1103c49ff1c0cb814470a1755eaa68db2d8f18429d9cdf",
+      "size_bytes": 1904
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/configuration.schema.json",
+      "sha256": "12d115e3d35c4d292711e14ca021f667d8cbcba5b7007c5e120e1495e64244cb",
+      "size_bytes": 1191
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/plugin.manifest.json",
+      "sha256": "f5e3db6398bdf5982c00c2c016ed802017c89b8f9caf07f65ec5e011223b8adf",
+      "size_bytes": 2576
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/pyproject.toml",
+      "sha256": "8912d0522f16a6bf60ea95eceaa07896c4a8c566d2859f0b05444dce7db1aea5",
+      "size_bytes": 1231
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/requirements.lock",
+      "sha256": "912c71fc608b5def0727207c70b09266f4229a80ddb5a39aca00500a21ebc29f",
+      "size_bytes": 32
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/src/README.md",
+      "sha256": "29ea6fd5e961899155d87bc673dae30958d65dabd8578f452439049df4a5b2cd",
+      "size_bytes": 428
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/src/knowledge_graph_provider/README.md",
+      "sha256": "716d10de56048468c62a8321706944c61e4c92709012e15da873b18b9c30fd02",
+      "size_bytes": 598
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/src/knowledge_graph_provider/__init__.py",
+      "sha256": "e866fd078428823550e35f541777d58a1688125ab9a2dbc8f75b76b5920c4c92",
+      "size_bytes": 449
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/src/knowledge_graph_provider/plugin.py",
+      "sha256": "78363c9820b849c7bd2115afef95fb77a2d0562c52cd7bf1cb836a251464f123",
+      "size_bytes": 12101
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/src/knowledge_graph_provider/settings.py",
+      "sha256": "0682000a914f50318bc4bd4e3caae9f1920ac9db33b4c338fea885da83b4b8fb",
+      "size_bytes": 4220
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/src/knowledge_graph_provider/sqlite_store.py",
+      "sha256": "4640282cb0565bf1c4a1f90356c8efdc9c92ef09a4c71438e0c03fa7d84be18e",
+      "size_bytes": 42414
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/tests/test_package_metadata.py",
+      "sha256": "6599a5be15abd6016f8f9c526ef2e9664da8e198d7cb64d84b5b4676267f7b3a",
+      "size_bytes": 1349
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/tests/test_plugin.py",
+      "sha256": "f4f23ac2b747b08426c230d8e2d6275d404e52e383f5944032054f5ba359f8a9",
+      "size_bytes": 8496
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/tests/test_settings.py",
+      "sha256": "6c37614890e6bd6c365dc8af0e6c277c6c5c9eaad803716fba72792e4c32bef7",
+      "size_bytes": 2000
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-graph/tests/test_sqlite_store.py",
+      "sha256": "dec9eaa562d5793340a7b2342363e58e975d6a4f342312ee02a26542e7ba66c7",
+      "size_bytes": 11148
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/README.md",
+      "sha256": "a9ca8c6d08c0b2d8fdba8ceb71d003a77a5b2be2355a285deda25027f02794fc",
+      "size_bytes": 3600
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/configuration.schema.json",
+      "sha256": "b7738f52c26fe557ac706d442aac362d29f6c811c0e66257eaffcf68ddb43d24",
+      "size_bytes": 4189
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/plugin.manifest.json",
+      "sha256": "f5d93bd0b8c0707b453cefb915e10967c70e98b2d5c3b41ad387b91d67e7c057",
+      "size_bytes": 1510
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/pyproject.toml",
+      "sha256": "950124ec8f61c36429325a5d45cdb806ff567da6e54901b59ca079b8d460ec35",
+      "size_bytes": 1249
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/requirements.lock",
+      "sha256": "d7385f894f7a98461e4add087b9189c0e920971789e21a7e07039dfcaea82e99",
+      "size_bytes": 165
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/src/README.md",
+      "sha256": "7f08d9c9e6bf2c6d07d2d88b47a152e301c0d973bfd9a249a4101f3edcccf7f2",
+      "size_bytes": 500
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/src/knowledge_retrieval_provider/README.md",
+      "sha256": "21ec166adaa1bd1b2334a7bd3a81c1fd7e6c5e7980039c38abf641c810988bee",
+      "size_bytes": 757
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/src/knowledge_retrieval_provider/__init__.py",
+      "sha256": "5aafc7e8354ca44d47f6443ea0c797a74e29ea88354a4de3d048e5b847cb13c6",
+      "size_bytes": 665
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/src/knowledge_retrieval_provider/bundle.py",
+      "sha256": "cd7797c2e96e8a68f84241cad2e1285f568f78f4650e9530da0984e5aca4524a",
+      "size_bytes": 27445
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/src/knowledge_retrieval_provider/plugin.py",
+      "sha256": "8d269d84c94d981cb9c5e418b3bd32052450438d2195f2e39772beb16b16ab9f",
+      "size_bytes": 18158
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/src/knowledge_retrieval_provider/settings.py",
+      "sha256": "50934164701481f68644f946b50ecc81bfae951d3cde4d64003ecfb2aa995d80",
+      "size_bytes": 16235
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/tests/test_bundle.py",
+      "sha256": "b6bad7c6a02095868a28a60b9de649afb40cbdb1a79fbf7ba958acc9b454915a",
+      "size_bytes": 9517
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/tests/test_package_metadata.py",
+      "sha256": "54eeaee723fa76397a6337a1d7909e7c61181e897184b134aaa54659dd44b7e7",
+      "size_bytes": 2367
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/tests/test_plugin.py",
+      "sha256": "0263492de9439d667a99847ee949f287207d319a024d4d8e5cc229b75bde7278",
+      "size_bytes": 11964
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/knowledge-retrieval/tests/test_settings.py",
+      "sha256": "5a1d32a8bcbdca679175daf319df4f72da237bf397eaef538ffd33451f4d7143",
+      "size_bytes": 5604
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/README.md",
+      "sha256": "b38f445eb946b2a5a5312fc2a92f40ab51d1c8e04de8346b3b97a9415f1f006f",
+      "size_bytes": 3769
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/configuration.schema.json",
+      "sha256": "5686677fc20c9d4ea14f909bffb56009d1b00c59a5d2e7c19058f1823acc37ba",
+      "size_bytes": 2396
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/plugin.manifest.json",
+      "sha256": "53e8931c1e91226bccfb5506519f59c534dd1b9fb35d4500e0bb7a1aaab215fc",
+      "size_bytes": 2134
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/pyproject.toml",
+      "sha256": "5b24055b48bace3af711856b8546d5d914a00872894fe37056a877cc6ad2c6b3",
+      "size_bytes": 1327
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/requirements.lock",
+      "sha256": "2053ef6896ec467f87d0c4fa8f069793589e7fbda03255cd7d24e0f6a39be3bd",
+      "size_bytes": 131
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/src/memory_pgvector_provider/__init__.py",
+      "sha256": "c4fd220ad7e03e84e7cc238476fe02c7e681cf681426134a513a4454fbaa23f2",
+      "size_bytes": 235
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/src/memory_pgvector_provider/embedding.py",
+      "sha256": "e65091b4600001473721513624e7b96628f7b15fc668eb96dd36ca100f5edf42",
+      "size_bytes": 6440
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/src/memory_pgvector_provider/plugin.py",
+      "sha256": "ebb9b315d1bf7c5ff7188d45e9a62e1f6dee67c05ee75ab41024eb52c9b70ae5",
+      "size_bytes": 13479
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/src/memory_pgvector_provider/settings.py",
+      "sha256": "205756353fc5981753adf8cfe09b3d8b52f04afca3176883d7e74a8884a9a8e6",
+      "size_bytes": 9898
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/src/memory_pgvector_provider/store.py",
+      "sha256": "e3d6ff1902fb55dcf81179242238e302e1328c66c1a3e1ba708cae3dd363ad84",
+      "size_bytes": 42083
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/tests/test_package_metadata.py",
+      "sha256": "25b3fee5087da505f4f9942e95b7e42a3817780ff52fd878297c2ca47b9a2fa6",
+      "size_bytes": 2504
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/tests/test_pgvector_store.py",
+      "sha256": "b2a5e8e0baccbfb0d29d41dd23eebc0f8685627d13d8e4d21ed688518e78897e",
+      "size_bytes": 15665
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-pgvector/tests/test_settings.py",
+      "sha256": "99d0e8e1582170c1685ac6b8224474de2f9e1e747171e5be8ce853831f8ab9ed",
+      "size_bytes": 4161
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/README.md",
+      "sha256": "2686bdab4ff4e70d47e83c2f1881387e0108497a7dc34468a67783991c179d6e",
+      "size_bytes": 3488
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/configuration.schema.json",
+      "sha256": "da4eb1999def41819fd0f67d4c5503f2ca16a5d7ae77949749b047b1d4685675",
+      "size_bytes": 1715
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/plugin.manifest.json",
+      "sha256": "c50f29f9f24358955ed371d7639973b217435fd8b981d79c734885d0171485a7",
+      "size_bytes": 2065
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/pyproject.toml",
+      "sha256": "8f842df3566ab98e4588655281c1fdbb8bb37ed47e732805f11003c127a1b34b",
+      "size_bytes": 1252
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/requirements.lock",
+      "sha256": "912c71fc608b5def0727207c70b09266f4229a80ddb5a39aca00500a21ebc29f",
+      "size_bytes": 32
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/src/memory_sqlite_provider/__init__.py",
+      "sha256": "ca2f025d6ea2999b76eade7be22cb66bf8e33a9824d9e1e883fb0367bc17abac",
+      "size_bytes": 227
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/src/memory_sqlite_provider/embedding.py",
+      "sha256": "8fa5627d06d8acba6f19fdc1fae88cefe8bb3ec49ffce837aab7c5addfbe4475",
+      "size_bytes": 6481
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/src/memory_sqlite_provider/plugin.py",
+      "sha256": "b4a0858b44f0f4dab806160a075d67b1c5ee08def553b6f0f03d9bd1bfbe3b2d",
+      "size_bytes": 13995
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/src/memory_sqlite_provider/settings.py",
+      "sha256": "ac8110d7890ff6c4b7f2fa3cffae3d89171657c5885cc66fa711d3187e9145d1",
+      "size_bytes": 7806
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/src/memory_sqlite_provider/store.py",
+      "sha256": "0c028de82d647de493c39f9ac8b52b65a2074456150c51aeffd927b67624bae2",
+      "size_bytes": 40214
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/tests/test_embedding.py",
+      "sha256": "46d9d0186be198bb7d165c531079fb5038ba3b6447753d9bc255945aea73b1b4",
+      "size_bytes": 4493
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/tests/test_package_metadata.py",
+      "sha256": "1b607962f36f1ddf09a3d80b9ad172996822937617b284d8753889f07773e8bd",
+      "size_bytes": 3027
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/tests/test_plugin.py",
+      "sha256": "d2cd0370744b91b5bc3f129f1790bfa80de80ad39343bba7cb9aa263717d49bc",
+      "size_bytes": 14522
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/tests/test_settings.py",
+      "sha256": "e651cabc4803cc63f2ebc96dcdd61a1b16f573914ce03d4fe6e612eac506cc72",
+      "size_bytes": 2712
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/memory-sqlite/tests/test_store.py",
+      "sha256": "5b2fc3d4449a8d52e0280619c6cbb9607da9ac36236c8cbe3c2b55554d41842c",
+      "size_bytes": 11831
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "plugins/providers/microsoft-graph/README.md",
       "sha256": "80d4653e7fa3a61d7aeca8a1eafd4159839e80ef94a66792cd195b29da61db2d",
       "size_bytes": 9667
@@ -3337,64 +3743,78 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/README.md",
-      "sha256": "90223b0ae576b64e6e7aea4d6a649547bf0cd263303fee374b14c6788ccbdd31",
-      "size_bytes": 4699
+      "sha256": "f9fa8f68544f8c9c38d22dd4ca577ea9239747543296c6a46987848c73ac6782",
+      "size_bytes": 6749
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/configuration.schema.json",
-      "sha256": "e984161cddd01df5f52395300e5d0c6b2638167103ff797614871849ed13fb16",
-      "size_bytes": 629
+      "sha256": "69571adf42dd31fd8d3bc2608c7236df93afd5a9b6ca47e1aa09fd4563689db1",
+      "size_bytes": 1110
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/plugin.manifest.json",
-      "sha256": "82564aa0372c44f408645b868e2f6368648b36ebe18c5db9fa4c68e447c3bd3e",
-      "size_bytes": 1480
+      "sha256": "21c910433deb635f54c4a902f79c5ac3b40fa72637b2151e0f0d35b14ee663a0",
+      "size_bytes": 1668
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/pyproject.toml",
-      "sha256": "9442e30d619b3adbfa4a4f445de8f3c27b916bd11957693ece25e7cff46b4125",
-      "size_bytes": 887
+      "sha256": "9e5b7d80c5a9cb36eff846add516c889c0224efc13b2034539fc7fbe1b633b93",
+      "size_bytes": 915
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/requirements.lock",
+      "sha256": "912c71fc608b5def0727207c70b09266f4229a80ddb5a39aca00500a21ebc29f",
+      "size_bytes": 32
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/__init__.py",
-      "sha256": "0158f65ec748f252159d56f48aeca7560e0ea31a5aee0b0d28ef65bec46a6b3a",
-      "size_bytes": 1007
+      "sha256": "99a15440d23a107eceab26d96f8186beb5620be8b5916f560d07ea5c3d5c0b57",
+      "size_bytes": 1080
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/model-api-connector/src/model_api_connector/embeddings.py",
+      "sha256": "0d08c6e1a3623f10e8e27cb876200a34a53b27ef6b2b2b2fb0c14ed554325dde",
+      "size_bytes": 7366
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/mapping.py",
-      "sha256": "560c0c71d94b713e3165424cb52c06c244e9335825dc44f0439a8d4a28c34358",
-      "size_bytes": 11197
+      "sha256": "a1dcaef74b753e5d11b8d3aac21731f0d9ed112bbb52a01237c3a0febe9dd98e",
+      "size_bytes": 16947
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/plugin.py",
-      "sha256": "4a6a68e078e7a4020f2c1760465d88e3f6aac53bece865f3be1a1b0222f11b8e",
-      "size_bytes": 9102
+      "sha256": "892fc3b1896063cc4453d5327ed96796cdfc39cc5bbc8225cd0a2ffbfec13760",
+      "size_bytes": 13439
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/settings.py",
-      "sha256": "f77403bed93ad575058b34faff02e7e440f5d9f604fa5452ae48a7c1b77a1288",
-      "size_bytes": 3010
+      "sha256": "00b72b13af2439e7300532c31c7bdf2733ea505d776c612e1cf02ba4d383eed7",
+      "size_bytes": 6391
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/src/model_api_connector/upstream.py",
-      "sha256": "a531a3c98a49bc6d71ae97b33e9ab6ab77d633b193968a752a1e1f42d41b9604",
-      "size_bytes": 12624
+      "sha256": "6baedfe3e0f4148860e9939424804172ad3935eebea7b5de3c952222023ca8a2",
+      "size_bytes": 14953
     },
     {
       "kind": "file",
@@ -3407,8 +3827,99 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/model-api-connector/tests/test_model_api_connector.py",
-      "sha256": "19da773a64f75dca5d6bc8d8fe4a6c29e805da249c1592daa52f1c195df92523",
-      "size_bytes": 13664
+      "sha256": "4f7bcda14f9d97e0f07db6ad0b3cd9ba6dc93b0208ba78013eb61fae8c634fbc",
+      "size_bytes": 26832
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/README.md",
+      "sha256": "191a26eda14c54c9b0d369419e5c5b35dacb1f03657a557ba952265e2f076a82",
+      "size_bytes": 3552
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/configuration.schema.json",
+      "sha256": "cdd404414ffcf7e4525accb8dfe016e537435286e48dcf7a00101f2abf2f2b50",
+      "size_bytes": 1345
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/plugin.manifest.json",
+      "sha256": "2abc86d654be7ed8365d3167198e341e9dd604e0921aaf918a48eb7a4b765999",
+      "size_bytes": 1432
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/pyproject.toml",
+      "sha256": "c532b4c33ea451227c012a1a41611bfd6a38050239c8935e705cc1e739a04e9a",
+      "size_bytes": 921
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/requirements.lock",
+      "sha256": "27d1744d1f6dff7906e5dda828fb890363ade0457e27c180749557e705caa9e7",
+      "size_bytes": 378
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/src/README.md",
+      "sha256": "3e6faa47f6b1775d63b234b1cca1b22798f68b047e19f00dff64cb31147f6272",
+      "size_bytes": 222
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/src/speech_sensevoice/README.md",
+      "sha256": "7fa130104e1def41a637417e67477947237f76c2d70633a6c1e1fb68c7678caf",
+      "size_bytes": 447
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/src/speech_sensevoice/__init__.py",
+      "sha256": "6007ccfeadc846e88b9c7bb2aa06ab37477526518d1a0bf6ff3f30ac53f5d4a6",
+      "size_bytes": 176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/src/speech_sensevoice/plugin.py",
+      "sha256": "3b9f43896983688a230082d7f2df845b45a24f68d24f73ab87081ad19327720d",
+      "size_bytes": 8428
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/src/speech_sensevoice/service.py",
+      "sha256": "4bfe48dfaa4a687b6a20c0681488db3bec4b709748963120e756148e44b556ec",
+      "size_bytes": 18369
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/tests/README.md",
+      "sha256": "d238416257a95c8df05980b236ef2d27ab00fafb9199d50aadbd419927776664",
+      "size_bytes": 445
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/tests/test_plugin.py",
+      "sha256": "de693be81b2e908741fc8f278a95e44ddb28a560616bd0f7b8ac80fcf2effad6",
+      "size_bytes": 5974
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/providers/speech-sensevoice/tests/test_service.py",
+      "sha256": "6a7f1d263c2dbe0f617d7d4d1538324c626fe408f8b762652c5b4e4929e0b3bb",
+      "size_bytes": 6816
     },
     {
       "kind": "file",
@@ -3850,6 +4361,139 @@
       "path": "plugins/tools/knowledge-preparation/tests/test_knowledge_preparation.py",
       "sha256": "0763b618c08711b50cbfa860aebc33d96d79f0ed16be25206b2aec336ac30701",
       "size_bytes": 13143
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/README.md",
+      "sha256": "63c593c333baa2b314571e2eed510d232caddca36be5385919cda196bc1e358a",
+      "size_bytes": 3371
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/configuration.schema.json",
+      "sha256": "febd3b841b7fa6eadd4d89e098a34a4319c01f18e9a0b84b053009d34493b1b3",
+      "size_bytes": 2244
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/plugin.manifest.json",
+      "sha256": "51fb8f1bd5f572cfdf8e65656be13679612b493c763c333f4179cbc516605188",
+      "size_bytes": 1634
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/pyproject.toml",
+      "sha256": "31ce3b18733b8ade70fd76297ef419007196ccb71c4c4bbb5307576853716841",
+      "size_bytes": 933
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/requirements.lock",
+      "sha256": "e4e4ffe2540a7fed92cf4c1cfdacc9dfa45ca5315ed65c89aacf6527af6b95c3",
+      "size_bytes": 633
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/README.md",
+      "sha256": "7f2576ef92f470d2e7846a3c458a3090468b1c4d8aec16b1186d61664120668c",
+      "size_bytes": 204
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/cyrene_media/README.md",
+      "sha256": "32d5f80ac22ec6397940b3fc3d861f174dde562f7303faa51be9a36c6fb3b1ee",
+      "size_bytes": 672
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/cyrene_media/__init__.py",
+      "sha256": "3053ec27161712e643a78fe06949a8ff523eb3aa01c382d7b4a8f3a0572d2e23",
+      "size_bytes": 235
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/cyrene_media/artifact_resolver.py",
+      "sha256": "3833e5a46235682e50b7cf6402a246ed983ef7a00d4a50b4203edee64559647f",
+      "size_bytes": 12537
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/cyrene_media/library.py",
+      "sha256": "b445458a740753d0aef1e608d6e2df5becbf049f59a3c5b7ab9777eccc189c42",
+      "size_bytes": 27015
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/cyrene_media/plugin.py",
+      "sha256": "7a8d831d533ee93f3d4f0fa6c499ce42254c28af4acb9a122f83079db782e621",
+      "size_bytes": 16049
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/cyrene_media/settings.py",
+      "sha256": "33b4f43f15c0a054f3fd209debf9688e681928f1ce09cd3e45f1ee7cedb42f0f",
+      "size_bytes": 10452
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/src/cyrene_media/tool_catalog.py",
+      "sha256": "61f7fa8abc5cd84c268e1a872eb875948d13a2ae0127b60df78231de88c2b35f",
+      "size_bytes": 5781
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/tests/README.md",
+      "sha256": "e4e5c5c65a5b52683cc95c07725bb4aa95b5f0b1613cbcf3b8442fcdd93ee873",
+      "size_bytes": 389
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/tests/test_artifact_resolver.py",
+      "sha256": "818cfe6458a373537de42db9a34eba7f37c2f09adc772457fa25d085ba543577",
+      "size_bytes": 12788
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/tests/test_library.py",
+      "sha256": "9b35a3cc267119c44d076e2c61fb707838f4ea4a2ee61a800382e2f5c175405d",
+      "size_bytes": 5046
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/tests/test_plugin.py",
+      "sha256": "bcff54434e4a09bedb32f87d9a461bc2ea669671084c8c1e9d7058b20abcd421",
+      "size_bytes": 3503
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/tests/test_provider_scope.py",
+      "sha256": "bac5cb0f4e4ea0c47cfabe3e0bc4878a4f6c8a03ccaf719757aeca5d33f3eac3",
+      "size_bytes": 2618
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "plugins/tools/media/tests/test_settings.py",
+      "sha256": "8426bd92527976c60ce398c09f20028106cb022cada41fa6ab927a232e00585f",
+      "size_bytes": 3518
     },
     {
       "kind": "file",
@@ -6949,8 +7593,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_integration_contracts/src/cyrene_integration_contracts/contracts.py",
-      "sha256": "b75e8941285f3fe99af63c28277b4f2265b328a464977b7ed870ad3b402f2b5c",
-      "size_bytes": 41448
+      "sha256": "f73a10e0636538e38ddf3f9e8c2582e6a0ab79e8af089652101f2037950c46a9",
+      "size_bytes": 42702
     },
     {
       "kind": "file",
@@ -6963,8 +7607,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_integration_contracts/src/cyrene_integration_contracts/schema.json",
-      "sha256": "d66aba940ed683d9d4c07f825b27adbedf4ef9fcec5d694e07734530a28026db",
-      "size_bytes": 20871
+      "sha256": "45e41d7b1bfa3f6e7444eee7ef87f86da1329179c07c3920de12b94e6f873189",
+      "size_bytes": 27050
     },
     {
       "kind": "file",
@@ -6972,6 +7616,13 @@
       "path": "sdk/python/cyrene_integration_contracts/tests/test_cloud_management_operations.py",
       "sha256": "6c154e0d7b10b88d0634d7459ee92b7f73e4eaca2c71ab3ec54fa719fb5f8d63",
       "size_bytes": 6176
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_integration_contracts/tests/test_conversation_operations.py",
+      "sha256": "aac399a164d332d509f1474fbd4ff9e6c43589b23807b4e2b227d91b7960a8a6",
+      "size_bytes": 3453
     },
     {
       "kind": "file",
@@ -7173,8 +7824,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/README.md",
-      "sha256": "86594fb0e5ddaedbfd18824f59d0f24f70188b6b326c16d2515261a1740ada35",
-      "size_bytes": 7290
+      "sha256": "00316c0ff4694f0ee829a5c778c2938fbd42ac12ed2ad6ebdd46690a173f8fc7",
+      "size_bytes": 7844
     },
     {
       "kind": "file",
@@ -7236,8 +7887,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "sdk/python/cyrene_plugin_runtime/src/cyrene_plugin_runtime/client.py",
-      "sha256": "2dfd7f32a1a0ffc20fbbeeb154c326fc0e9a83f50040b3f5306d8b014d84eb77",
-      "size_bytes": 11747
+      "sha256": "319b751af53fb1a7ad6cbe13ae97952e27d7a8849e944414824df83eb606d148",
+      "size_bytes": 13680
     },
     {
       "kind": "file",
@@ -7329,6 +7980,13 @@
       "path": "sdk/python/cyrene_plugin_runtime/tests/test_direct_runtime.py",
       "sha256": "6b5fd22674adbbdc72d08229ea15c94c8d88bae29ded7d5b2b121304f73e07b3",
       "size_bytes": 22624
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "sdk/python/cyrene_plugin_runtime/tests/test_product_subscriptions.py",
+      "sha256": "1ce48de383a1ca2aacea71c09febba7a2437807a68902c64c6be7d2efedadd37",
+      "size_bytes": 3935
     },
     {
       "kind": "file",
@@ -7537,15 +8195,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_official_plugin_package.py",
-      "sha256": "cddbbca936b4d8a222de60df35486a5c4184baed266b6cfa0ebc7750ccebddf4",
-      "size_bytes": 85582
+      "sha256": "a5ef870d9a582e34a21047fe4c272396d89aa5dd5bad050286ddbc821ca35b21",
+      "size_bytes": 88391
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "tests/release/test_select_official_plugin_packages.py",
-      "sha256": "eef6252b06a625376222dadf85799b009f6f913e7658ab2d5b859f871d38a3f5",
-      "size_bytes": 7848
+      "sha256": "777853dbb7f33a4d0344fe87aee55f6f99c48e458b0fc48bddb77be0fe6f64ae",
+      "size_bytes": 8792
     },
     {
       "kind": "file",
@@ -7614,8 +8272,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/official_plugin_package.py",
-      "sha256": "463524e5d2e238f5df4943d11a8af3ca4097143e96fcb476301587a0173c928e",
-      "size_bytes": 113862
+      "sha256": "4d6334db2c68ab149b15495344d7f31a90d1b26ddde46d8845794dc9d552a236",
+      "size_bytes": 119188
     },
     {
       "kind": "file",
@@ -7697,6 +8355,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tooling/release/requirements/knowledge-graph.in",
+      "sha256": "cc2e266c67343864319f87adf40b00b271dc57791a44fdb8e6254ad544adf2a5",
+      "size_bytes": 257
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tooling/release/requirements/knowledge-preparation.in",
       "sha256": "f438fc14f8c25de0fd246f75e6f678a94dbc44d81223bf64e31e4a1f061e1844",
       "size_bytes": 176
@@ -7704,9 +8369,51 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tooling/release/requirements/knowledge-retrieval.in",
+      "sha256": "2d4f20de1fe99254a01f9a544f75382506b5dfcd4159ab8170db2c9486f9453a",
+      "size_bytes": 444
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/media.in",
+      "sha256": "38e601370df97f275841bfbdb7367f00059a1b085a31a9c6580384c1aa7e3be3",
+      "size_bytes": 462
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/memory-pgvector.in",
+      "sha256": "2a7fa1bce998bae8a4af9ac3e5d54312af9c5c0c8ed392a6edae333658544ddf",
+      "size_bytes": 428
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/memory-sqlite.in",
+      "sha256": "bbbef578f7cb94dd3f75d90892fc4000681e80cc5026e740351a199f7a8943a6",
+      "size_bytes": 316
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tooling/release/requirements/microsoft-graph.in",
       "sha256": "d884380ba32b84a2f524e49a21980d38ec2bb43663a50c4a28133f0af8625c06",
       "size_bytes": 316
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/model-api-connector.in",
+      "sha256": "fd58d344e0176a1ef2b2eb834d7071a15e1702da13ee978f473f1adc399124e1",
+      "size_bytes": 256
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/release/requirements/speech-sensevoice.in",
+      "sha256": "0b7ff369194eee28891a819d63b2cbbff518430a6132fac2c261e8ec7adae4a6",
+      "size_bytes": 317
     },
     {
       "kind": "file",
@@ -7726,8 +8433,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/release/select_official_plugin_packages.py",
-      "sha256": "3eb557c46e7d6292584e325490fd6946f66e5923bc8721abde5afbd56b79cf8c",
-      "size_bytes": 5978
+      "sha256": "f88adaac88de5c4b5a0dc2cb31d2f8fa1200ff05bafbfa42b9cfb2ef279fcd0f",
+      "size_bytes": 6975
     },
     {
       "kind": "file",
