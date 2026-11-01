@@ -76,6 +76,14 @@
       "additionalProperties": false
     },
     "ListLinksResponse": {"type": "object", "required": ["links"], "properties": {"links": {"type": "array", "items": {"$ref": "#/$defs/LinkMetadata"}}}, "additionalProperties": false},
+    "ListWorkspaceLinksRequest": {"type": "object", "properties": {"workspace_id": {"type": ["string", "null"]}}, "additionalProperties": false},
+    "WorkspaceLink": {
+      "type": "object", "required": ["kind", "provider", "status", "linked_at", "external_subject"],
+      "properties": {"kind": {"enum": ["account", "profile"]}, "provider": {"enum": ["github", "wecom", "huggingface", "azure", "gcp", "runpod", "microsoft_graph", "azure_devops", "bilibili"]}, "status": {"enum": ["active", "revocation_pending", "revocation_failed", "revocation_unknown", "reauthorization_required", "unknown", "configured", "healthy", "unavailable", "revoked"]}, "linked_at": {"type": "integer", "minimum": 0}, "external_subject": {"type": ["string", "null"]}},
+      "additionalProperties": false
+    },
+    "WorkspaceMemberLinks": {"type": "object", "required": ["issuer", "subject", "links"], "properties": {"issuer": {"type": "string", "minLength": 1}, "subject": {"type": "string", "minLength": 1}, "links": {"type": "array", "items": {"$ref": "#/$defs/WorkspaceLink"}}}, "additionalProperties": false},
+    "ListWorkspaceLinksResponse": {"type": "object", "required": ["members"], "properties": {"members": {"type": "array", "items": {"$ref": "#/$defs/WorkspaceMemberLinks"}}}, "additionalProperties": false},
     "GetAuthorizationRequest": {
       "type": "object", "required": ["account_ref", "operation_id", "resource", "arguments_sha256"],
       "properties": {"account_ref": {"type": "string", "format": "uuid"}, "operation_id": {"type": "string", "enum": ["github.issue.get", "github.issue.comment.create", "github.issue.state.update"]}, "resource": {"$ref": "#/$defs/Resource"}, "arguments_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}},

@@ -544,6 +544,92 @@ def test_duplicate_external_identity_cannot_move_to_another_anchor(
         )
 
 
+def _link_github_as(harness: Harness, actor: dict[str, Any], subject: str) -> str:
+    """Link one more GitHub account for ``actor`` under a distinct external subject."""
+
+    original = harness.github.exchange_code
+
+    def exchange(code: str, **kwargs: Any) -> tuple[OAuthCredential, str]:
+        credential, _ = original(code, **kwargs)
+        return credential, subject
+
+    harness.github.exchange_code = exchange  # type: ignore[method-assign]
+    started = harness.call("begin_link", {"provider": "github"}, actor=actor)
+    state = parse_qs(urlparse(started["authorization_url"]).query)["state"][0]
+    completed = harness.call(
+        "complete_github_link",
+        {"state": state, "code": "one-time-code"},
+        caller=CALLBACK,
+        actor={
+            "issuer": "service://exchange/callback",
+            "subject": "oauth-callback",
+            "organization_id": "service",
+            "workspace_id": None,
+        },
+    )
+    harness.github.exchange_code = original  # type: ignore[method-assign]
+    return completed["account_ref"]
+
+
+def test_list_workspace_links_returns_metadata_for_every_owner_in_one_workspace(
+    tmp_path: Path,
+) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    harness.link_github()
+    second = {**ACTOR, "subject": "user-43"}
+    second_ref = _link_github_as(harness, second, "555555")
+    _link_github_as(harness, {**ACTOR, "subject": "user-44", "workspace_id": "workspace-b"}, "666666")
+    _link_github_as(harness, {**ACTOR, "subject": "user-45", "organization_id": "org-b"}, "777777")
+
+    listed = harness.call("list_workspace_links", {})
+
+    def github_link(subject: str) -> dict[str, Any]:
+        return {
+            "kind": "account",
+            "provider": "github",
+            "status": "active",
+            "linked_at": 10_000,
+            "external_subject": subject,
+        }
+
+    assert listed == {
+        "members": [
+            {"issuer": ACTOR["issuer"], "subject": "user-42", "links": [github_link("987654")]},
+            {"issuer": ACTOR["issuer"], "subject": "user-43", "links": [github_link("555555")]},
+        ]
+    }
+    # Metadata only: no reference that could be replayed and no credential material.
+    rendered = json.dumps(listed)
+    for forbidden in ("account_ref", "profile_ref", "credential", "token", "refresh", second_ref):
+        assert forbidden not in rendered
+
+    unlinked = harness.call(
+        "unlink",
+        {"account_ref": second_ref, "idempotency_key": "unlink-second"},
+        actor=second,
+    )
+    assert unlinked == {"unlinked": True, "status": "unlinked"}
+    assert [
+        member["subject"] for member in harness.call("list_workspace_links", {})["members"]
+    ] == ["user-42"]
+
+
+def test_list_workspace_links_is_exchange_only_and_workspace_scoped(
+    tmp_path: Path,
+) -> None:
+    harness = Harness(tmp_path / "accounts.sqlite")
+    harness.link_github()
+    with pytest.raises(AccountCenterError, match="untrusted_caller"):
+        harness.call("list_workspace_links", {}, caller=PROVIDER)
+    with pytest.raises(AccountCenterError, match="scope_mismatch"):
+        harness.call("list_workspace_links", {"workspace_id": "workspace-b"})
+    with pytest.raises(AccountCenterError, match="invalid_request"):
+        harness.call("list_workspace_links", {"unexpected": True})
+    assert harness.call("list_workspace_links", {"workspace_id": "workspace-a"}) == harness.call(
+        "list_workspace_links", {}
+    )
+
+
 def test_wecom_challenge_requires_trusted_source_and_primary_confirmation(
     tmp_path: Path,
 ) -> None:

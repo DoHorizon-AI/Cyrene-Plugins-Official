@@ -992,6 +992,63 @@ def test_github_vendor_cli_lease_uses_profile_scope_and_empty_target(
         )
 
 
+def test_list_workspace_links_includes_profiles_of_every_owner_without_secrets(
+    tmp_path: Path,
+) -> None:
+    harness = ProfileHarness(tmp_path / "accounts.sqlite3")
+    _github_profile(harness)
+    other_actor = {**ACTOR, "subject": "user-other"}
+    elsewhere = {**ACTOR, "subject": "user-elsewhere", "workspace_id": "workspace-b"}
+    harness.github_app.verify_installation = lambda installation_id: {  # type: ignore[method-assign]
+        "account_id": "89",
+        "login": "globex",
+    }
+    for index, actor in enumerate((other_actor, elsewhere), start=1):
+        harness.call(
+            "link_github_app_installation",
+            {
+                "profile_ref": f"00000000-0000-4000-8000-00000000020{index}",
+                "installation_id": f"900{index + 1}",
+                "repositories": GITHUB_REPOSITORIES,
+            },
+            actor=actor,
+        )
+        harness.github_app.verify_installation = lambda installation_id, n=index: {  # type: ignore[method-assign]
+            "account_id": str(90 + n),
+            "login": f"globex-{n}",
+        }
+
+    listed = harness.call("list_workspace_links", {})
+
+    assert [member["subject"] for member in listed["members"]] == ["user-derek", "user-other"]
+    profiles = {
+        member["subject"]: member["links"] for member in listed["members"]
+    }
+    assert profiles["user-derek"] == [
+        {
+            "kind": "profile",
+            "provider": "github",
+            "status": "healthy",
+            "linked_at": 10_000,
+            "external_subject": "acme",
+        }
+    ]
+    assert profiles["user-other"][0]["external_subject"] == "globex"
+    rendered = json.dumps(listed)
+    for forbidden in ("profile_ref", "installation", "token", "target_scope", "credential"):
+        assert forbidden not in rendered
+    with pytest.raises(AccountCenterError, match="untrusted_caller"):
+        harness.call("list_workspace_links", {}, caller=GITHUB_PROVIDER)
+    unlinked = harness.call(
+        "unlink_provider_profile",
+        {"profile_ref": "00000000-0000-4000-8000-000000000101"},
+    )
+    assert unlinked["status"] == "unlinked"
+    assert [m["subject"] for m in harness.call("list_workspace_links", {})["members"]] == [
+        "user-other"
+    ]
+
+
 def test_github_installation_cannot_be_claimed_by_a_second_owner(
     tmp_path: Path,
 ) -> None:

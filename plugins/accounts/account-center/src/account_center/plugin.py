@@ -68,6 +68,7 @@ METHODS = (
     "observe_wecom_challenge",
     "confirm_wecom_link",
     "list_links",
+    "list_workspace_links",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -198,6 +199,7 @@ EXCHANGE_ONLY_METHODS = {
     "begin_link",
     "confirm_wecom_link",
     "list_links",
+    "list_workspace_links",
     "get_authorization",
     "unlink",
     "create_credential_lease",
@@ -240,6 +242,7 @@ MAX_REQUEST_BYTES = 64 * 1024
 MAX_IDEMPOTENCY_RESPONSE_BYTES = 64 * 1024
 SESSION_TTL_SECONDS = 600
 LEASE_TTL_SECONDS = 45
+MAX_WORKSPACE_LINKS = 5000
 IDEMPOTENT_METHODS = {
     "begin_link",
     "confirm_wecom_link",
@@ -286,6 +289,7 @@ def _action_type_name(action: str, suffix: str) -> str:
         "observe_wecom_challenge": "ObserveWeComChallenge",
         "confirm_wecom_link": "ConfirmWeComLink",
         "list_links": "ListLinks",
+        "list_workspace_links": "ListWorkspaceLinks",
         "get_authorization": "GetAuthorization",
         "unlink": "Unlink",
         "create_credential_lease": "CreateCredentialLease",
@@ -709,6 +713,8 @@ class AccountCenterPlugin:
             return self._confirm_wecom_link(request, anchor, idempotency_key_hash)
         if method == "list_links":
             return self._list_links(request, anchor)
+        if method == "list_workspace_links":
+            return self._list_workspace_links(request, anchor)
         if method == "get_authorization":
             return self._get_authorization(request, anchor)
         if method == "unlink":
@@ -1024,6 +1030,46 @@ class AccountCenterPlugin:
             command_result=command_result,
         )
         return response
+
+    def _list_workspace_links(
+        self, request: Mapping[str, Any], anchor: Anchor
+    ) -> dict[str, Any]:
+        """Return metadata-only links for every owner in the caller's workspace.
+
+        Exchange decides who may ask; this method only narrows the read to the
+        caller's exact organization and workspace and never selects credentials.
+        中文：仅返回调用者所在组织与工作空间内的关联元数据，不含任何凭据。
+        """
+
+        _require_fields(request, set(), {"workspace_id"})
+        workspace_id = request.get("workspace_id", anchor.workspace_id)
+        if workspace_id != anchor.workspace_id:
+            raise AccountCenterError("scope_mismatch")
+        accounts, profiles = self._store.list_workspace_links(
+            anchor.organization_id, workspace_id, limit=MAX_WORKSPACE_LINKS
+        )
+        if len(accounts) + len(profiles) > MAX_WORKSPACE_LINKS:
+            raise AccountCenterError("result_too_large")
+        owners: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        for kind, rows in (("account", accounts), ("profile", profiles)):
+            for row in rows:
+                owners.setdefault(
+                    (row["anchor_issuer"], row["anchor_subject"]), []
+                ).append(
+                    {
+                        "kind": kind,
+                        "provider": row["provider"],
+                        "status": row["status"],
+                        "linked_at": row["linked_at"],
+                        "external_subject": row["external_subject"],
+                    }
+                )
+        return {
+            "members": [
+                {"issuer": issuer, "subject": subject, "links": owners[(issuer, subject)]}
+                for issuer, subject in sorted(owners)
+            ]
+        }
 
     def _list_links(self, request: Mapping[str, Any], anchor: Anchor) -> dict[str, Any]:
         _require_fields(request, set(), {"workspace_id"})

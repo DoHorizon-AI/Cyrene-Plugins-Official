@@ -201,8 +201,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/capabilities.yaml",
-      "sha256": "5bde4642d8f21997334a22fea8042620c392826e105c349d943b8e4f84039df1",
-      "size_bytes": 32914
+      "sha256": "3c363e437967fe279dcf348a923fb144ecf824808a75ca37552434fab15a95ec",
+      "size_bytes": 32976
     },
     {
       "kind": "file",
@@ -1048,15 +1048,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/contracts/v1/schema.json",
-      "sha256": "36b7ae5ceeb346a4387be5bea6f99a52a617b3723c16fcbe035535b0d7eef9a1",
-      "size_bytes": 31898
+      "sha256": "f240ebd8089f31a8cf860678789bb7d6b5cdce92dec31664ec69031029233fe1",
+      "size_bytes": 33202
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/plugin.manifest.json",
-      "sha256": "2c2787d2f3a9fddaed092b0243f3b72db92f6b4436c02a119b767a4878c5d5aa",
-      "size_bytes": 9111
+      "sha256": "dc3d1e0150c472a5a4f5b32e57bdfc20a77d8417a9c3b50f98367d85900f3374",
+      "size_bytes": 9356
     },
     {
       "kind": "file",
@@ -1132,8 +1132,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/plugin.py",
-      "sha256": "e281481c072a714f6f605c35fca3b0c374618aef4e1c52337262529114e12a5f",
-      "size_bytes": 254035
+      "sha256": "6e3f6ce4cd5a360da38606017fb16c7beca67cf4d1ea1dfe799151e7daaf117e",
+      "size_bytes": 256096
     },
     {
       "kind": "file",
@@ -1146,15 +1146,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/src/account_center/store.py",
-      "sha256": "2dac09eeefee59754501ebb13b400da1abbe6a1d1c840d0df3ba94e9d05c2bfe",
-      "size_bytes": 149300
+      "sha256": "f7da9a884f8ea75997506d08b4c59d76d269012f3f46130664b2fef72873a9c8",
+      "size_bytes": 151401
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_account_center.py",
-      "sha256": "820668582ac449faed89b4e72cdfa6bac2ab1ed14f9cc75fb4859e62c2fb6678",
-      "size_bytes": 53243
+      "sha256": "644b8fb18952bf2077e70ae226fd1763e05242389d7d87f82dfc9b134640fee5",
+      "size_bytes": 56703
     },
     {
       "kind": "file",
@@ -1195,8 +1195,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/accounts/account-center/tests/test_provider_profiles.py",
-      "sha256": "a1b903d5f9969402ca0c4683d6c059c285f33282a23afcd16ee32b6dfade198d",
-      "size_bytes": 157129
+      "sha256": "0745f4f73310840c2c88db42f1e258438c768f4b1823fd6271ca3b64241a3dc6",
+      "size_bytes": 159381
     },
     {
       "kind": "file",

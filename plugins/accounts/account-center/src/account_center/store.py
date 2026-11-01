@@ -1988,6 +1988,43 @@ class AccountStore:
                 raise AccountCenterError("storage_unavailable")
             return dict(row)
 
+    def list_workspace_links(
+        self, organization_id: str, workspace_id: str | None, *, limit: int
+    ) -> tuple[list[sqlite3.Row], list[sqlite3.Row]]:
+        """Return metadata-only links and profiles of every owner in one workspace.
+
+        Only the owner key, provider, health, link time, and external subject are
+        selected; credential material, leases, and scopes never leave storage. At
+        most ``limit + 1`` rows per table are read so the caller can fail closed.
+        中文：只读取属主、提供方、状态、时间和外部主体，不读取任何凭据。
+        """
+
+        with self._connect() as db:
+            accounts = db.execute(
+                "SELECT anchor_issuer,anchor_subject,provider,"
+                "stable_subject AS external_subject,"
+                "CASE WHEN credential_status!='ready' OR "
+                "(provider='wecom' AND bot_namespace IS NULL) "
+                "THEN 'reauthorization_required' "
+                "WHEN remote_revocation_status='pending' THEN 'revocation_pending' "
+                "WHEN remote_revocation_status='failed' THEN 'revocation_failed' "
+                "WHEN remote_revocation_status='unknown' THEN 'revocation_unknown' "
+                "ELSE status END AS status,linked_at "
+                "FROM accounts WHERE organization_id=? AND workspace_id IS ? "
+                "AND status!='unlinked' "
+                "ORDER BY anchor_issuer,anchor_subject,linked_at,account_ref LIMIT ?",
+                (organization_id, workspace_id, limit + 1),
+            ).fetchall()
+            profiles = db.execute(
+                "SELECT anchor_issuer,anchor_subject,provider,external_subject,"
+                "auth_status AS status,created_at AS linked_at "
+                "FROM provider_profiles WHERE organization_id=? AND workspace_id IS ? "
+                "AND status='active' "
+                "ORDER BY anchor_issuer,anchor_subject,created_at,profile_ref LIMIT ?",
+                (organization_id, workspace_id, limit + 1),
+            ).fetchall()
+        return list(accounts), list(profiles)
+
     def list_provider_profiles(self, anchor: Anchor) -> list[sqlite3.Row]:
         """Return metadata-only profiles owned by the exact actor/workspace."""
 
