@@ -54,6 +54,7 @@ def _create_repository(root: Path) -> None:
     _write(root / "LICENSE", "Apache License\n")
     _write(plugin_root / "README.md", "Training capability.\n")
     _write(plugin_root / "PROVENANCE.md", "Source-owned plugin.\n")
+    _write(plugin_root / "CYRENE_IMPROVEMENTS.md", "Reviewed trainer improvements.\n")
     _write(plugin_root / "plugin.manifest.json", json.dumps(_manifest()))
     _write(plugin_root / "llama_factory.py", "class LlamaFactoryTrainingPlugin: pass\n")
     _write(
