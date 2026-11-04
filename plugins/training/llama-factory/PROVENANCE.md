@@ -22,9 +22,10 @@ LLaMA-Factory 由操作者作为外部训练器安装并执行，本软件包不
 
 | Field | Value |
 | --- | --- |
-| Project | [hiyouga/LLaMA-Factory](https://github.com/hiyouga/LLaMA-Factory) |
+| Project | [Icy-Lunar/LlamaFactory](https://github.com/Icy-Lunar/LlamaFactory) |
 | Package | `llamafactory` |
-| Locked version | `release-lock.json` → `engines."training.llama-factory.v1".acceptedVersion` |
+| Reference source commit | [`194cc85c5d87612693ac9d47d13c2aecd8a81e22`](https://github.com/Icy-Lunar/LlamaFactory/commit/194cc85c5d87612693ac9d47d13c2aecd8a81e22) |
+| Upstream base | `hiyouga/LLaMA-Factory` (Apache-2.0) |
 | License | Apache-2.0 |
 | Invocation | `CYRENE_LLAMA_FACTORY_ENTRYPOINT` or `python -m llamafactory.cli` |
 | Version probe | `CYRENE_LLAMA_FACTORY_VERSION` reported by `inspect` |
@@ -64,9 +65,10 @@ LLaMA-Factory 由 operator 作为外部 trainer 安装和执行。本 package �
 
 | 字段 | 值 |
 | --- | --- |
-| 项目 | hiyouga/LLaMA-Factory |
+| 项目 | Icy-Lunar/LlamaFactory |
 | Package | llamafactory |
-| 固定版本 | release-lock.json 中 engines."training.llama-factory.v1".acceptedVersion |
+| 参考源码提交 | 194cc85c5d87612693ac9d47d13c2aecd8a81e22 |
+| 上游基础 | hiyouga/LLaMA-Factory（Apache-2.0） |
 | License | Apache-2.0 |
 | 调用方式 | CYRENE_LLAMA_FACTORY_ENTRYPOINT 或 python -m llamafactory.cli |
 | 版本探测 | inspect 报告的 CYRENE_LLAMA_FACTORY_VERSION |

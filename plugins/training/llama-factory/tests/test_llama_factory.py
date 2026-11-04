@@ -7,7 +7,11 @@ from __future__ import annotations
 import json
 
 from cyrene_plugin_runtime import DirectPayload, DirectPluginClient, serve
-from llama_factory import LlamaFactoryTrainingPlugin
+from llama_factory import (
+    REFERENCE_TRAINER_COMMIT,
+    REFERENCE_TRAINER_REPOSITORY,
+    LlamaFactoryTrainingPlugin,
+)
 
 
 def _spec(tmp_path) -> dict:
@@ -199,6 +203,17 @@ def test_parse_event_classifies_progress_lines() -> None:
     assert progress["kind"] == "progress"
     assert progress["payload"]["loss"] == 0.25
     assert log["kind"] == "log"
+
+
+def test_inspect_reports_the_exact_reference_trainer_source() -> None:
+    result = LlamaFactoryTrainingPlugin().inspect()
+
+    assert LlamaFactoryTrainingPlugin.version == "0.2.1"
+    assert REFERENCE_TRAINER_COMMIT == "194cc85c5d87612693ac9d47d13c2aecd8a81e22"
+    assert (
+        f"{REFERENCE_TRAINER_REPOSITORY}@{REFERENCE_TRAINER_COMMIT}"
+        in result["notes"][-1]
+    )
 
 
 def test_direct_endpoint_compiles_over_the_real_runtime(tmp_path) -> None:

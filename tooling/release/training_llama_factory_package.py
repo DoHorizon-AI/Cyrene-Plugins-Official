@@ -107,6 +107,7 @@ def _source_files(root: Path) -> dict[str, bytes]:
         "LICENSE",
         f"{PACKAGE_SOURCE}/README.md",
         f"{PACKAGE_SOURCE}/PROVENANCE.md",
+        f"{PACKAGE_SOURCE}/CYRENE_IMPROVEMENTS.md",
         f"{PACKAGE_SOURCE}/plugin.manifest.json",
         f"{PACKAGE_SOURCE}/llama_factory.py",
         f"{PACKAGE_SOURCE}/contracts/v1/schema.json",
@@ -171,6 +172,7 @@ def _package_entries(source_files: dict[str, bytes]) -> dict[str, bytes]:
     projected = {
         f"{PACKAGE_SOURCE}/README.md": "README.md",
         f"{PACKAGE_SOURCE}/PROVENANCE.md": "PROVENANCE.md",
+        f"{PACKAGE_SOURCE}/CYRENE_IMPROVEMENTS.md": "CYRENE_IMPROVEMENTS.md",
         f"{PACKAGE_SOURCE}/plugin.manifest.json": "plugin.manifest.json",
         # The bootstrap only adds ``payload/src`` to the import path. Keep the
         # training entrypoint beside the vendored SDK so a clean process does
