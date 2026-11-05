@@ -28,7 +28,7 @@ TYPE_PREFIX = f"type.cyrene.io/{CAPABILITY_ID}"
 DATASET_NAME = "cyrene"
 DEFAULT_ENTRYPOINT = "llamafactory-cli"
 REFERENCE_TRAINER_REPOSITORY = "https://github.com/Icy-Lunar/LlamaFactory"
-REFERENCE_TRAINER_COMMIT = "194cc85c5d87612693ac9d47d13c2aecd8a81e22"
+REFERENCE_TRAINER_COMMIT = "3b7a205f28dcd7e121844073827531c69057aa8b"
 FORBIDDEN_ENV = frozenset(
     {
         "CUDA_VISIBLE_DEVICES",
@@ -278,7 +278,7 @@ class LlamaFactoryTrainingPlugin:
     中文:无状态的 LLaMA-Factory 启动契约实现。"""
 
     plugin_id = "cyrene.training.llama-factory"
-    version = "0.2.1"
+    version = "0.2.2"
     capabilities = (CAPABILITY_ID,)
 
     def on_invoke(

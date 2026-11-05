@@ -208,8 +208,8 @@ def test_parse_event_classifies_progress_lines() -> None:
 def test_inspect_reports_the_exact_reference_trainer_source() -> None:
     result = LlamaFactoryTrainingPlugin().inspect()
 
-    assert LlamaFactoryTrainingPlugin.version == "0.2.1"
-    assert REFERENCE_TRAINER_COMMIT == "194cc85c5d87612693ac9d47d13c2aecd8a81e22"
+    assert LlamaFactoryTrainingPlugin.version == "0.2.2"
+    assert REFERENCE_TRAINER_COMMIT == "3b7a205f28dcd7e121844073827531c69057aa8b"
     assert (
         f"{REFERENCE_TRAINER_REPOSITORY}@{REFERENCE_TRAINER_COMMIT}"
         in result["notes"][-1]

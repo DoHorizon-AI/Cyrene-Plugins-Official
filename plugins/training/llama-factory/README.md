@@ -32,14 +32,15 @@ bounded JSONL row and adds system/history mappings when those columns exist.
 | `CYRENE_LLAMA_FACTORY_PYTHON` | Interpreter used as `<python> -m llamafactory.cli` when no entrypoint is set |
 | `CYRENE_LLAMA_FACTORY_VERSION` | Version reported by `inspect` |
 
-The reviewed reference trainer is pinned to
-[`Icy-Lunar/LlamaFactory@194cc85c5d87612693ac9d47d13c2aecd8a81e22`](https://github.com/Icy-Lunar/LlamaFactory/commit/194cc85c5d87612693ac9d47d13c2aecd8a81e22).
+The reference trainer preview under review is pinned to
+[`Icy-Lunar/LlamaFactory@3b7a205f28dcd7e121844073827531c69057aa8b`](https://github.com/Icy-Lunar/LlamaFactory/commit/3b7a205f28dcd7e121844073827531c69057aa8b).
+See `PROVENANCE.md` for the source-bound deployment ZIP and verification limits.
 Operators may install it in a dedicated runtime with:
 
 ```bash
 git clone https://github.com/Icy-Lunar/LlamaFactory.git
 cd LlamaFactory
-git checkout 194cc85c5d87612693ac9d47d13c2aecd8a81e22
+git checkout 3b7a205f28dcd7e121844073827531c69057aa8b
 ```
 
 Verification: `cd plugins/training/llama-factory && python -m pytest tests`.
@@ -76,8 +77,9 @@ JSONL 记录，并在存在时映射 system/history 列。
 | CYRENE_LLAMA_FACTORY_PYTHON | 未设置 entrypoint 时，用作 <python> -m llamafactory.cli 的解释器。 |
 | CYRENE_LLAMA_FACTORY_VERSION | inspect 报告的版本。 |
 
-经过审查的参考训练器固定为
-`Icy-Lunar/LlamaFactory@194cc85c5d87612693ac9d47d13c2aecd8a81e22`。
+待评审的参考训练器预览固定为
+`Icy-Lunar/LlamaFactory@3b7a205f28dcd7e121844073827531c69057aa8b`。
+源码绑定的部署 ZIP 与验证边界见 `PROVENANCE.md`；预览发布不代表真实 GPU 验收通过。
 部署时应在独立运行环境中检出该精确提交，不应使用可变分支代替版本锁定。
 
 验证方式：进入 plugins/training/llama-factory 并运行 python -m pytest tests。这些测试没有验证真实 CUDA 训练；请参阅 contracts/capability-verification.json。

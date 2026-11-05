@@ -24,11 +24,21 @@ LLaMA-Factory 由操作者作为外部训练器安装并执行，本软件包不
 | --- | --- |
 | Project | [Icy-Lunar/LlamaFactory](https://github.com/Icy-Lunar/LlamaFactory) |
 | Package | `llamafactory` |
-| Reference source commit | [`194cc85c5d87612693ac9d47d13c2aecd8a81e22`](https://github.com/Icy-Lunar/LlamaFactory/commit/194cc85c5d87612693ac9d47d13c2aecd8a81e22) |
+| Reference source commit | [`3b7a205f28dcd7e121844073827531c69057aa8b`](https://github.com/Icy-Lunar/LlamaFactory/commit/3b7a205f28dcd7e121844073827531c69057aa8b) |
 | Upstream base | `hiyouga/LLaMA-Factory` (Apache-2.0) |
 | License | Apache-2.0 |
 | Invocation | `CYRENE_LLAMA_FACTORY_ENTRYPOINT` or `python -m llamafactory.cli` |
 | Version probe | `CYRENE_LLAMA_FACTORY_VERSION` reported by `inspect` |
+
+Deployment preview: [2026-11-05 ROCm/WSL + JSON compatibility](https://github.com/Icy-Lunar/LlamaFactory/releases/tag/preview-rocm-wsl-startup-20261105-3b7a205f).
+ZIP SHA-256: `5461b50104605e9bf8bdf3788ed7882fc08d4c9a3e79e8f6cfec797fce53585e`.
+The source PR is [Icy-Lunar/LlamaFactory#1](https://github.com/Icy-Lunar/LlamaFactory/pull/1).
+This preview is not a merged stable release or a real-GPU acceptance claim.
+The Plugin package is released separately by its source-bound hosted workflow after normal review/merge.
+
+部署预览见上述精确 release，ZIP SHA-256 同上。源码 PR 为 Icy-Lunar/LlamaFactory#1；
+此预览不表示稳定版本已合并或真实 GPU 已验收。Plugin package 仍由本仓库的 hosted
+工作流在正常评审合并后单独发布，不把训练器 ZIP 混作 capability package。
 
 ## Verification status / 验证状态
 
@@ -67,7 +77,7 @@ LLaMA-Factory 由 operator 作为外部 trainer 安装和执行。本 package �
 | --- | --- |
 | 项目 | Icy-Lunar/LlamaFactory |
 | Package | llamafactory |
-| 参考源码提交 | 194cc85c5d87612693ac9d47d13c2aecd8a81e22 |
+| 参考源码提交 | 3b7a205f28dcd7e121844073827531c69057aa8b |
 | 上游基础 | hiyouga/LLaMA-Factory（Apache-2.0） |
 | License | Apache-2.0 |
 | 调用方式 | CYRENE_LLAMA_FACTORY_ENTRYPOINT 或 python -m llamafactory.cli |
