@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://contracts.cyrene.io/connector-operations/v1/connector-operations.schema.json",
+  "title": "Connector operations v1",
+  "type": "object",
+  "required": ["schemaVersion", "sources", "roles", "providers", "operations", "exchangeOnlyOperations"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": {"const": "cyrene.connector-operations.v1"},
+    "sources": {
+      "description": "Exact commits this manifest was generated from.",
+      "type": "object",
+      "required": ["exchange", "navigator", "platform"],
+      "additionalProperties": false,
+      "properties": {
+        "exchange": {"$ref": "#/$defs/commit"},
+        "navigator": {"$ref": "#/$defs/commit"},
+        "platform": {"$ref": "#/$defs/commit"}
+      }
+    },
+    "roles": {
+      "description": "Directory role that each short role name in an operation stands for.",
+      "type": "object",
+      "required": ["automationViewer", "officeTaskWriter", "operator"],
+      "additionalProperties": false,
+      "properties": {
+        "automationViewer": {"type": "string", "minLength": 1},
+        "officeTaskWriter": {"type": "string", "minLength": 1},
+        "operator": {"type": "string", "minLength": 1}
+      }
+    },
+    "providers": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["providerId", "profileIsOuterClaim"],
+        "additionalProperties": false,
+        "properties": {
+          "providerId": {"$ref": "#/$defs/identifier"},
+          "profileIsOuterClaim": {
+            "description": "Navigator rejects a model-supplied profile for this provider. Null when Navigator does not bind this provider at all.",
+            "type": ["boolean", "null"]
+          }
+        }
+      }
+    },
+    "operations": {
+      "description": "Every operation Platform can grant.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "operationId",
+          "providerIds",
+          "roles",
+          "automationTransport",
+          "mutating",
+          "exchangeToolIds",
+          "exchangeResourceProjections",
+          "navigatorToolId",
+          "navigatorResourceProjection",
+          "scopeLockBranchField"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {"$ref": "#/$defs/operationId"},
+          "providerIds": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "#/$defs/identifier"}
+          },
+          "roles": {
+            "description": "Roles the authorization check allows. Holding automationViewer does not make an operation read-only: see automationTransport.",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "contains": {"const": "operator"},
+            "items": {"enum": ["automationViewer", "officeTaskWriter", "operator"]}
+          },
+          "automationTransport": {
+            "description": "Open to both automation roles as a transport, outside their source catalogs.",
+            "type": "boolean"
+          },
+          "mutating": {
+            "description": "Null only where Exchange's own code paths contradict each other. The generator refuses any other null.",
+            "type": ["boolean", "null"]
+          },
+          "exchangeToolIds": {"$ref": "#/$defs/toolIdsByProvider"},
+          "exchangeResourceProjections": {
+            "description": "Projection in Exchange's launcher map. It can differ from navigatorResourceProjection; the README lists where.",
+            "$ref": "#/$defs/toolIdsByProvider"
+          },
+          "navigatorToolId": {
+            "description": "Null when the operation is not in Navigator's table.",
+            "type": ["string", "null"],
+            "minLength": 1
+          },
+          "navigatorResourceProjection": {
+            "description": "Null when the operation is not in Navigator's table.",
+            "type": ["string", "null"],
+            "minLength": 1
+          },
+          "scopeLockBranchField": {
+            "description": "Argument Navigator serializes GitHub branch writes on.",
+            "type": ["string", "null"],
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "exchangeOnlyOperations": {
+      "description": "Operations Exchange maps but Platform cannot grant, so a connector grant cannot reach them.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["operationId", "mutating", "exchangeToolIds"],
+        "additionalProperties": false,
+        "properties": {
+          "operationId": {"$ref": "#/$defs/operationId"},
+          "mutating": {"type": "boolean"},
+          "exchangeToolIds": {"$ref": "#/$defs/toolIdsByProvider"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "identifier": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "operationId": {"type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"},
+    "toolIdsByProvider": {
+      "type": "object",
+      "propertyNames": {"$ref": "#/$defs/identifier"},
+      "additionalProperties": {"type": "string", "minLength": 1}
+    }
+  }
+}

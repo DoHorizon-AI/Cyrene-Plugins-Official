@@ -30,10 +30,14 @@
 contracts are released from this repository. Products consume a versioned
 artifact or generated source from the same contract release; they do not read a
 mutable Platform checkout. Normal Plugins builds also require no Platform
-checkout.
+checkout. The one exception is the `connector-operations` CI job, which reads
+Platform, Exchange, and Navigator at exact merged commits to prove
+`contracts/connector-operations/` matches them.
 
 `contracts/capabilities.yaml` 标明 owner 与 TCK。共享契约随本仓库发布；Product 使用同一契约发布的
 版本化制品或生成源码，不读取可变的 Platform checkout，Plugins 的普通构建也不依赖 Platform checkout。
+唯一的例外是 CI 任务 `connector-operations`，它读取 Platform、Exchange 和 Navigator 已合并的精确提交，
+以证明 `contracts/connector-operations/` 与它们一致。
 ---
 
 <!-- Chinese Translation / 中文翻译 -->

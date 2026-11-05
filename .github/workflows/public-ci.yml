@@ -284,6 +284,54 @@ jobs:
       - name: Verify Python/native behavior matrix
         run: python3 plugins/connectors/im/tools/verify_behavior_matrix.py
 
+  connector-operations:
+    name: public-ci / connector-operations
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24.13.0"
+      - name: Install test dependencies
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.23.0 pytest==9.1.1 ruff==0.17.3
+      - name: Lint the manifest tool
+        run: python3 -m ruff check tooling/connector_operations tests/connector_operations
+      - name: Test the merge rules and the committed manifest
+        run: python3 -m pytest -q --import-mode=importlib tests/connector_operations
+      - name: Check out the pinned commits, which must be merged
+        run: |
+          set -euo pipefail
+          manifest=contracts/connector-operations/v1/connector-operations.json
+          for pair in platform:Cyrene-Platform exchange:Cyrene-Exchange navigator:Cyrene-Navigator; do
+            name="${pair%%:*}"
+            commit="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sources'][sys.argv[2]])" "$manifest" "$name")"
+            target="$RUNNER_TEMP/connector-sources/$name"
+            git clone --quiet --filter=blob:none --no-checkout "https://github.com/DoHorizon-AI/${pair##*:}.git" "$target"
+            git -C "$target" merge-base --is-ancestor "$commit" origin/develop
+            git -C "$target" checkout --quiet --detach "$commit"
+          done
+      - name: Install what Exchange needs to import
+        run: |
+          set -euo pipefail
+          exchange="$RUNNER_TEMP/connector-sources/exchange"
+          python3 -m venv "$RUNNER_TEMP/exchange-venv"
+          "$RUNNER_TEMP/exchange-venv/bin/python" -m pip install --disable-pip-version-check \
+            "$exchange" "$exchange/product[integrations]"
+      - name: Run the source repositories' code
+        run: >-
+          python3 tooling/connector_operations/manifest.py probe
+          --platform "$RUNNER_TEMP/connector-sources/platform"
+          --exchange "$RUNNER_TEMP/connector-sources/exchange"
+          --exchange-python "$RUNNER_TEMP/exchange-venv/bin/python"
+          --navigator "$RUNNER_TEMP/connector-sources/navigator"
+          --dumps "$RUNNER_TEMP/connector-dumps"
+      - name: Prove the manifest matches what that code reported
+        run: python3 tooling/connector_operations/manifest.py check --dumps "$RUNNER_TEMP/connector-dumps"
+
   onebot-v11-package:
     name: public-ci / onebot-v11-package
     needs:
