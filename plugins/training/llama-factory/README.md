@@ -33,14 +33,14 @@ bounded JSONL row and adds system/history mappings when those columns exist.
 | `CYRENE_LLAMA_FACTORY_VERSION` | Version reported by `inspect` |
 
 The reference trainer preview under review is pinned to
-[`Icy-Lunar/LlamaFactory@7f028bd992db09c0b38f77d1da0f91d226459893`](https://github.com/Icy-Lunar/LlamaFactory/commit/7f028bd992db09c0b38f77d1da0f91d226459893).
+[`Icy-Lunar/LlamaFactory@8c392ce83c6410a1679099e1799e02d7d150c3b7`](https://github.com/Icy-Lunar/LlamaFactory/commit/8c392ce83c6410a1679099e1799e02d7d150c3b7).
 See `PROVENANCE.md` for the source-bound deployment ZIP and verification limits.
 Operators may install it in a dedicated runtime with:
 
 ```bash
 git clone https://github.com/Icy-Lunar/LlamaFactory.git
 cd LlamaFactory
-git checkout 7f028bd992db09c0b38f77d1da0f91d226459893
+git checkout 8c392ce83c6410a1679099e1799e02d7d150c3b7
 ```
 
 Verification: `cd plugins/training/llama-factory && python -m pytest tests`.
@@ -78,7 +78,7 @@ JSONL 记录，并在存在时映射 system/history 列。
 | CYRENE_LLAMA_FACTORY_VERSION | inspect 报告的版本。 |
 
 待评审的参考训练器预览固定为
-`Icy-Lunar/LlamaFactory@7f028bd992db09c0b38f77d1da0f91d226459893`。
+`Icy-Lunar/LlamaFactory@8c392ce83c6410a1679099e1799e02d7d150c3b7`。
 源码绑定的部署 ZIP 与验证边界见 `PROVENANCE.md`；预览发布不代表真实 GPU 验收通过。
 部署时应在独立运行环境中检出该精确提交，不应使用可变分支代替版本锁定。
 
