@@ -50,6 +50,7 @@ integration:
   multi_repo_required: false
   optional_acceptance:
   - Product consumer compatibility at released contract versions
+  - Connector operation manifest comparison at pinned merged source commits
 authorities:
   ci: github
   release: github_releases

@@ -39,14 +39,14 @@
         "properties": {
           "providerId": {"$ref": "#/$defs/identifier"},
           "profileIsOuterClaim": {
-            "description": "Navigator rejects a model-supplied profile for this provider.",
-            "type": "boolean"
+            "description": "Navigator rejects a model-supplied profile for this provider. Null when Navigator does not bind this provider at all.",
+            "type": ["boolean", "null"]
           }
         }
       }
     },
     "operations": {
-      "description": "Every operation Platform can grant. A null means no source states that fact, not false.",
+      "description": "Every operation Platform can grant.",
       "type": "array",
       "minItems": 1,
       "items": {
@@ -55,10 +55,12 @@
           "operationId",
           "providerIds",
           "roles",
+          "automationTransport",
           "mutating",
           "exchangeToolIds",
+          "exchangeResourceProjections",
           "navigatorToolId",
-          "resourceProjection",
+          "navigatorResourceProjection",
           "scopeLockBranchField"
         ],
         "additionalProperties": false,
@@ -71,16 +73,36 @@
             "items": {"$ref": "#/$defs/identifier"}
           },
           "roles": {
+            "description": "Roles the authorization check allows. Holding automationViewer does not make an operation read-only: see automationTransport.",
             "type": "array",
             "minItems": 1,
             "uniqueItems": true,
             "contains": {"const": "operator"},
             "items": {"enum": ["automationViewer", "officeTaskWriter", "operator"]}
           },
-          "mutating": {"type": ["boolean", "null"]},
+          "automationTransport": {
+            "description": "Open to both automation roles as a transport, outside their source catalogs.",
+            "type": "boolean"
+          },
+          "mutating": {
+            "description": "Null only where Exchange's own code paths contradict each other. The generator refuses any other null.",
+            "type": ["boolean", "null"]
+          },
           "exchangeToolIds": {"$ref": "#/$defs/toolIdsByProvider"},
-          "navigatorToolId": {"type": ["string", "null"], "minLength": 1},
-          "resourceProjection": {"type": ["string", "null"], "minLength": 1},
+          "exchangeResourceProjections": {
+            "description": "Projection in Exchange's launcher map. It can differ from navigatorResourceProjection; the README lists where.",
+            "$ref": "#/$defs/toolIdsByProvider"
+          },
+          "navigatorToolId": {
+            "description": "Null when the operation is not in Navigator's table.",
+            "type": ["string", "null"],
+            "minLength": 1
+          },
+          "navigatorResourceProjection": {
+            "description": "Null when the operation is not in Navigator's table.",
+            "type": ["string", "null"],
+            "minLength": 1
+          },
           "scopeLockBranchField": {
             "description": "Argument Navigator serializes GitHub branch writes on.",
             "type": ["string", "null"],

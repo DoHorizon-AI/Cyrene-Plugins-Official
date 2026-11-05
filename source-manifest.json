@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "4e786b91920057c59a65869b18e289ef6bd575b503c88ba75935d96cd9633c97",
-      "size_bytes": 47323
+      "sha256": "0abf3e5dc6d69ef0a9d9bb962d2dc0a0a208857ece3325ef963e4b4c47a93297",
+      "size_bytes": 47969
     },
     {
       "kind": "file",
@@ -137,15 +137,15 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/README.md",
-      "sha256": "7701741cce181bba0d2b5b890fe53002fd9f5d981cf5321fff2e7b3aecd8bb1a",
-      "size_bytes": 7431
+      "sha256": "e5039d9f1d9563cf9e517872d15df723205fedf6fc34ad9a0ed68e2c44ef01b9",
+      "size_bytes": 7578
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/VERSIONING.md",
-      "sha256": "ef5e57d706cd2e886d87a11ec5171642faf8b78093e58132a719c1b83d7aa784",
-      "size_bytes": 2843
+      "sha256": "b78ffd6833e02f3b187b93ee8e8119037fda3ec208bac7b53f2a1295effd0c1b",
+      "size_bytes": 3215
     },
     {
       "kind": "file",
@@ -222,22 +222,22 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/connector-operations/README.md",
-      "sha256": "8c67695f79dcf3b0d57ef651fee86da4ce97ca726037364c550194608b083643",
-      "size_bytes": 2920
+      "sha256": "31cbd1598fce72a104af59e2d363ab4c2f1663c8d48400ecdeb3daa34ff7937c",
+      "size_bytes": 5660
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/connector-operations/v1/connector-operations.json",
-      "sha256": "bd1fb334e6e74a61b3b4283b518693f622e6094ef29f5630d5e430d843152e95",
-      "size_bytes": 42395
+      "sha256": "dfc8a04d5ea1c7457daa30d8025b8c4e4eb2410a4d93b1ebdd080d42556c0e9c",
+      "size_bytes": 55753
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "contracts/connector-operations/v1/connector-operations.schema.json",
-      "sha256": "a805281b77f06a915e0680835bd535c24d2c3248d72820f73f226a6c6309ede9",
-      "size_bytes": 4252
+      "sha256": "2bf478bf774ae5cdf567205cfe96075f856e1ebc93abd3d7ba8299d89b43f534",
+      "size_bytes": 5339
     },
     {
       "kind": "file",
@@ -4905,8 +4905,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "repository-policy.yaml",
-      "sha256": "90a43a329d7de07cfbd18ff8a0e7fe411c2f9e974bb21b5569bfd6d7bc66d169",
-      "size_bytes": 1963
+      "sha256": "6dbff61e20337eed8a4eaadc179d1edfa9949f7ec8d1d401038c510e8ab249f7",
+      "size_bytes": 2039
     },
     {
       "kind": "file",
@@ -8649,9 +8649,9 @@
     {
       "kind": "file",
       "mode": "100644",
-      "path": "tests/connector_operations/test_sources.py",
-      "sha256": "c395e29379247814f51a8fb3910a1eaf9a933d79bbb5292db57d80f97c11ac49",
-      "size_bytes": 15887
+      "path": "tests/connector_operations/test_manifest.py",
+      "sha256": "173d746a15e0ffe375ea519574f893ec7477c7ebb29a15d0f7d3e38a13c438f4",
+      "size_bytes": 15120
     },
     {
       "kind": "file",
@@ -8733,9 +8733,30 @@
     {
       "kind": "file",
       "mode": "100644",
-      "path": "tooling/connector_operations/sources.py",
-      "sha256": "467bfa3077b6fadb8452ee49bf9450a9168cd3173edfdc05ba734e4bbd51a11f",
-      "size_bytes": 20868
+      "path": "tooling/connector_operations/manifest.py",
+      "sha256": "87694f4ae2024a1a1c00563667964421bb70b1ca74f10384a37a6cc3901d5594",
+      "size_bytes": 20365
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/connector_operations/probe_exchange.py",
+      "sha256": "ab8328d79238587a0aeb98f5df90424dbfd246df081dc8b6186cad31a04e5022",
+      "size_bytes": 1175
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/connector_operations/probe_navigator.mjs",
+      "sha256": "1b6df52e43f36fbd28ccaefe0ba34460bd7f2cb69c11ce8ad4f2269156f72d7e",
+      "size_bytes": 4239
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/connector_operations/probe_platform.rs",
+      "sha256": "c4c53a6f6859b82806bc738f9aab285f0933de84f4eca57b0bf51d7eb5ef03ca",
+      "size_bytes": 4309
     },
     {
       "kind": "file",
@@ -9198,7 +9219,7 @@
     "path": "LICENSE",
     "sha256": "5adafe431a1d30e29dce59b305ce52b0624e83ce5502db99b4a13110bcb977fa"
   },
-  "policy_sha256": "90a43a329d7de07cfbd18ff8a0e7fe411c2f9e974bb21b5569bfd6d7bc66d169",
+  "policy_sha256": "6dbff61e20337eed8a4eaadc179d1edfa9949f7ec8d1d401038c510e8ab249f7",
   "protected_files": [
     {
       "path": "plugins/connectors/im/QQ_API_PLAN.md",
