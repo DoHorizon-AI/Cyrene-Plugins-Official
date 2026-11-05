@@ -209,7 +209,7 @@ def test_inspect_reports_the_exact_reference_trainer_source() -> None:
     result = LlamaFactoryTrainingPlugin().inspect()
 
     assert LlamaFactoryTrainingPlugin.version == "0.2.2"
-    assert REFERENCE_TRAINER_COMMIT == "3b7a205f28dcd7e121844073827531c69057aa8b"
+    assert REFERENCE_TRAINER_COMMIT == "7f028bd992db09c0b38f77d1da0f91d226459893"
     assert (
         f"{REFERENCE_TRAINER_REPOSITORY}@{REFERENCE_TRAINER_COMMIT}"
         in result["notes"][-1]
