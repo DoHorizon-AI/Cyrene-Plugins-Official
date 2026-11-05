@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "0abf3e5dc6d69ef0a9d9bb962d2dc0a0a208857ece3325ef963e4b4c47a93297",
-      "size_bytes": 47969
+      "sha256": "42da3226b70f2e663ce48fa61cbb097402069852ea160ee0faa50d86c369074e",
+      "size_bytes": 47955
     },
     {
       "kind": "file",
@@ -137,8 +137,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/README.md",
-      "sha256": "e5039d9f1d9563cf9e517872d15df723205fedf6fc34ad9a0ed68e2c44ef01b9",
-      "size_bytes": 7578
+      "sha256": "286a9ad30b93488bac2fddf5ed4241f868e510c39017908a64610f3e9ba9f544",
+      "size_bytes": 7546
     },
     {
       "kind": "file",
@@ -222,8 +222,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/connector-operations/README.md",
-      "sha256": "31cbd1598fce72a104af59e2d363ab4c2f1663c8d48400ecdeb3daa34ff7937c",
-      "size_bytes": 5660
+      "sha256": "81fa9ae8f9d68c5cb8a715c3ba8139ee352c1e1c6aaeba3a542a9753ee6c5644",
+      "size_bytes": 6439
     },
     {
       "kind": "file",
@@ -8650,8 +8650,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tests/connector_operations/test_manifest.py",
-      "sha256": "173d746a15e0ffe375ea519574f893ec7477c7ebb29a15d0f7d3e38a13c438f4",
-      "size_bytes": 15120
+      "sha256": "5952f8773d52e3f7eeb9250c3dffec69cf543f4eea6de6a28f9cc160ae33f88d",
+      "size_bytes": 16071
     },
     {
       "kind": "file",
@@ -8734,8 +8734,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/connector_operations/manifest.py",
-      "sha256": "87694f4ae2024a1a1c00563667964421bb70b1ca74f10384a37a6cc3901d5594",
-      "size_bytes": 20365
+      "sha256": "ea20c1493841a218994b2202f0251477a44e05614826c98cdb6e5f281f45d2f6",
+      "size_bytes": 21764
     },
     {
       "kind": "file",
@@ -8748,8 +8748,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "tooling/connector_operations/probe_navigator.mjs",
-      "sha256": "1b6df52e43f36fbd28ccaefe0ba34460bd7f2cb69c11ce8ad4f2269156f72d7e",
-      "size_bytes": 4239
+      "sha256": "56bdd99aa88db0e189c92320715e22461aec352203b01cc415b56a69403feb78",
+      "size_bytes": 4411
     },
     {
       "kind": "file",

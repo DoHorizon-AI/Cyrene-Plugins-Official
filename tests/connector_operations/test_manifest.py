@@ -81,6 +81,9 @@ def _dumps() -> dict:
         "providerIds": providers,
     }
     policy = {
+        "operatorRole": ROLES["operator"],
+        "readOnlyRole": ROLES["automationViewer"],
+        "taskWriterRole": ROLES["officeTaskWriter"],
         "operations": [
             row("cloud.resource.get", ["azure"]),
             row("github.branch.create", ["github"]),
@@ -354,6 +357,18 @@ def _lock_outside_github(dumps: dict) -> None:
     dumps["navigator"]["scopeLocksOutsideGithub"] = [["azure", "cloud.resource.get"]]
 
 
+def _navigator_row_for_unsupported_operation(dumps: dict) -> None:
+    dumps["navigator"]["policies"]["github"]["github.commits.compare"] = {
+        "toolId": "github.commits.compare",
+        "mutating": False,
+        "resourceProjection": "github_commit",
+    }
+
+
+def _policy_role_name_differs(dumps: dict) -> None:
+    dumps["policy"]["readOnlyRole"] = "other.role"
+
+
 def _exchange_only_is_grantable(dumps: dict) -> None:
     _changed_pair(dumps, "github", "github.commits.compare")["supported"] = True
 
@@ -381,6 +396,8 @@ def _exchange_only_is_grantable(dumps: dict) -> None:
         (_lock_on_read, "not marked mutating"),
         (_lock_outside_github, "outside GitHub"),
         (_exchange_only_is_grantable, "does not list it"),
+        (_navigator_row_for_unsupported_operation, "does not support"),
+        (_policy_role_name_differs, "readOnlyRole and code disagree"),
     ],
 )
 def test_disagreement_is_refused(change: Callable[[dict], None], message: str) -> None:
@@ -388,6 +405,13 @@ def test_disagreement_is_refused(change: Callable[[dict], None], message: str) -
     change(dumps)
     with pytest.raises(SourceError, match=message):
         _build(dumps)
+
+
+def test_an_unfinished_probe_is_refused(tmp_path: Path) -> None:
+    for name, value in _dumps().items():
+        (tmp_path / f"{name}.json").write_text(json.dumps(value), encoding="utf-8")
+    with pytest.raises(SourceError, match="did not finish"):
+        tool._load_dumps(tmp_path)
 
 
 def _committed() -> dict:

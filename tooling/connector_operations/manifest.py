@@ -30,9 +30,19 @@ PLATFORM_GRANT = (
 )
 PLATFORM_POLICY = "contracts/policies/workspace-connector-operator-policy-v1.json"
 PROBE_PROVIDER = "not_a_provider"
+# sources.json is written last, so its presence means the whole probe finished.
+DUMP_NAMES = (
+    "sources",
+    "platform",
+    "policy",
+    "exchange",
+    "navigator",
+    "navigator-input",
+)
 
 # Exchange's prepare path says this does not mutate and its ledger path says it does, so the
-# manifest states neither. An operation added here needs that same reason.
+# manifest states neither. Neither path runs here, so this tool cannot notice if they are made to
+# agree: remove the entry by hand when they do. An operation added here needs that same reason.
 UNRESOLVED_MUTATING = frozenset({"msteams.message.reply"})
 # Exchange's launcher map and Navigator's table give different projections, so Navigator would
 # refuse these rows. Recorded in Exchange's and Navigator's own fields; see the README.
@@ -81,9 +91,18 @@ def _check_policy(
     policy: Mapping[str, Any],
     pairs: Mapping[str, Mapping[str, Mapping[str, Any]]],
     supported: Sequence[str],
+    roles: Mapping[str, str],
 ) -> None:
     """Hold the policy file to what the real functions report."""
 
+    role_fields = {
+        "operatorRole": "operator",
+        "readOnlyRole": "automationViewer",
+        "taskWriterRole": "officeTaskWriter",
+    }
+    for field, role in role_fields.items():
+        if policy[field] != roles[role]:
+            raise SourceError(f"Platform policy {field} and code disagree")
     catalogs = {
         "readOnlyOperations": "viewerCatalog",
         "taskWriterOperations": "writerCatalog",
@@ -139,6 +158,7 @@ def build_manifest(
         policy,
         {operation_id: pairs[operation_id] for operation_id in supported},
         supported,
+        platform["roles"],
     )
 
     exchange_by_operation: dict[str, dict[str, str]] = {}
@@ -157,6 +177,16 @@ def build_manifest(
 
     if navigator["scopeLocksOutsideGithub"]:
         raise SourceError("Navigator locks an operation outside GitHub")
+    unsupported = sorted(
+        operation_id
+        for rows in navigator["policies"].values()
+        for operation_id, row in rows.items()
+        if row is not None and operation_id not in supported
+    )
+    if unsupported:
+        raise SourceError(
+            f"Navigator lists operations Platform does not support: {unsupported[:5]}"
+        )
 
     used_mutating_exceptions = set()
     used_projection_exceptions = set()
@@ -421,6 +451,9 @@ def probe(
     """Run all three probes against clean checkouts and write their dumps."""
 
     output.mkdir(parents=True, exist_ok=True)
+    # A dump left by an earlier run must never be mistaken for this run's result.
+    for name in DUMP_NAMES:
+        (output / f"{name}.json").unlink(missing_ok=True)
     sources = {
         "exchange": _clean_head(exchange),
         "navigator": _clean_head(navigator),
@@ -483,7 +516,12 @@ def probe(
 
 def _load_dumps(dumps: Path) -> dict[str, Any]:
     def read(name: str) -> Any:
-        return json.loads((dumps / f"{name}.json").read_text(encoding="utf-8"))
+        try:
+            return json.loads((dumps / f"{name}.json").read_text(encoding="utf-8"))
+        except FileNotFoundError as error:
+            raise SourceError(
+                f"{error.filename} is missing; the probe did not finish"
+            ) from error
 
     return build_manifest(
         read("platform"),

@@ -35,7 +35,7 @@ owner-scoped conformance tests.
 | `json/` | Canonical JSON payload schemas for capability methods that carry bounded opaque vendor facts / 承载有界不透明厂商事实的规范 JSON 载荷 schema |
 | `rust/` | Generated Rust projections and stable identifiers / Rust 投影与稳定标识 |
 | `tck/` | Cross-language contract conformance / 跨语言契约一致性测试 |
-| `connector-operations/` | Generated list of the operations Platform can grant to connectors, with what Exchange and Navigator record for each. Plugins declare the operations; Platform still decides and enforces authorization. Nothing reads it yet / 生成的连接器操作清单，记录 Platform 能授权的操作以及 Exchange 和 Navigator 对它们的记录。操作由插件声明，授权仍由 Platform 决定和执行。目前没有代码读取 |
+| `connector-operations/` | Generated list of the operations Platform can grant to connectors, with what Exchange and Navigator record for each. It records those repositories; authorization stays with Platform. Nothing reads it yet / 生成的连接器操作清单，记录 Platform 能授权的操作以及 Exchange 和 Navigator 对它们的记录。它只是记录，授权仍由 Platform 负责。目前没有代码读取 |
 | `VERSIONING.md` | Compatibility and release rules / 兼容性与发布规则 |
 
 `cyrene.plugin.runtime.v1.DirectPluginRuntime` is the standard direct transport

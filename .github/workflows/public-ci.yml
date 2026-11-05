@@ -297,7 +297,7 @@ jobs:
         with:
           node-version: "24.13.0"
       - name: Install test dependencies
-        run: python3 -m pip install --disable-pip-version-check jsonschema==4.23.0 pytest ruff
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.23.0 pytest==9.1.1 ruff==0.17.3
       - name: Lint the manifest tool
         run: python3 -m ruff check tooling/connector_operations tests/connector_operations
       - name: Test the merge rules and the committed manifest
@@ -908,7 +908,6 @@ jobs:
       - onebot-v11-python-reference
       - im-package
       - im-qq-host-tck
-      - connector-operations
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

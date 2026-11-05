@@ -8,8 +8,10 @@ import { join } from 'node:path';
 
 const [navigatorRoot, inputPath, outputPath] = process.argv.slice(2);
 const input = JSON.parse(readFileSync(inputPath, 'utf8'));
-const serve = readFileSync(join(navigatorRoot, 'harness/src/serve.ts'), 'utf8');
-const toolProviders = readFileSync(join(navigatorRoot, 'harness/src/tool-providers.ts'), 'utf8');
+// Remove block comments first, so a commented-out old copy cannot be run in place of the live code.
+const source = (relative) => readFileSync(join(navigatorRoot, relative), 'utf8').replace(/\/\*[\s\S]*?\*\//gu, '');
+const serve = source('harness/src/serve.ts');
+const toolProviders = source('harness/src/tool-providers.ts');
 
 function cutFunction(text, name) {
   const matches = [...text.matchAll(new RegExp(`^(?:export )?function ${name}\\(`, 'gmu'))];
@@ -17,7 +19,7 @@ function cutFunction(text, name) {
   const start = matches[0].index;
   const end = text.indexOf('\n}\n', start);
   if (end < 0) throw new Error(`function ${name} has no top-level end`);
-  return text.slice(start, end + 3);
+  return text.slice(start, end + 3).replace(/^export /u, '');
 }
 
 function outerClaimExpression(text) {
