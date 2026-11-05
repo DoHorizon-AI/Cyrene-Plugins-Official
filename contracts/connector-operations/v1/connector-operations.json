@@ -1,0 +1,1678 @@
+{
+  "schemaVersion": "cyrene.connector-operations.v1",
+  "sources": {
+    "exchange": "12fdd8966d061aadb335ae8f9a489a2c923f34e7",
+    "navigator": "4d3ed51852771f4a77f91b79a9142f137740cbb4",
+    "platform": "afed688f2605f8543646a10e6cbb018fe5fe981d"
+  },
+  "roles": {
+    "automationViewer": "navigator.automation.viewer.v1",
+    "officeTaskWriter": "navigator.office.task_writer.v1",
+    "operator": "navigator.connector.operator.v1"
+  },
+  "providers": [
+    {
+      "providerId": "azure",
+      "profileIsOuterClaim": false
+    },
+    {
+      "providerId": "azure_devops",
+      "profileIsOuterClaim": true
+    },
+    {
+      "providerId": "bilibili",
+      "profileIsOuterClaim": false
+    },
+    {
+      "providerId": "computer",
+      "profileIsOuterClaim": true
+    },
+    {
+      "providerId": "gcp",
+      "profileIsOuterClaim": false
+    },
+    {
+      "providerId": "github",
+      "profileIsOuterClaim": true
+    },
+    {
+      "providerId": "huggingface",
+      "profileIsOuterClaim": true
+    },
+    {
+      "providerId": "microsoft_graph",
+      "profileIsOuterClaim": true
+    },
+    {
+      "providerId": "msteams",
+      "profileIsOuterClaim": false
+    },
+    {
+      "providerId": "runpod",
+      "profileIsOuterClaim": false
+    }
+  ],
+  "operations": [
+    {
+      "operationId": "azure_devops.observations.poll",
+      "providerIds": [
+        "azure_devops"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure_devops": "azure_devops.observations.poll"
+      },
+      "navigatorToolId": "azure_devops.observations.poll",
+      "resourceProjection": "azure_devops_source",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.auth.qr.begin",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.auth.qr.begin"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.auth.qr.status",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.auth.qr.status"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.comment.create",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.comment.create"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.comments.list",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.comments.list"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.dm.list",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.dm.list"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.dm.read",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.dm.read"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.dm.send",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.dm.send"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.dynamic.publish",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.dynamic.publish"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.dynamic.read",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.dynamic.read"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.dynamics.list",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.dynamics.list"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.search",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.search"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.user.find",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.user.find"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "bilibili.video.read",
+      "providerIds": [
+        "bilibili"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "bilibili": "bilibili.video.read"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.operation.cancel",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_operation_cancel",
+        "gcp": "cloud_operation_cancel",
+        "runpod": "cloud_operation_cancel"
+      },
+      "navigatorToolId": "cloud_operation_cancel",
+      "resourceProjection": "cloud_operation",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.operation.logs.read",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure": "cloud_operation_logs",
+        "gcp": "cloud_operation_logs",
+        "runpod": "cloud_operation_logs"
+      },
+      "navigatorToolId": "cloud_operation_logs",
+      "resourceProjection": "cloud_operation",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.operation.status.read",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure": "cloud_operation_status",
+        "gcp": "cloud_operation_status",
+        "runpod": "cloud_operation_status"
+      },
+      "navigatorToolId": "cloud_operation_status",
+      "resourceProjection": "cloud_operation",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.provider.health.read",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure": "cloud_provider_health",
+        "gcp": "cloud_provider_health",
+        "runpod": "cloud_provider_health"
+      },
+      "navigatorToolId": "cloud_provider_health",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.create",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_resource_create",
+        "gcp": "cloud_resource_create",
+        "runpod": "cloud_resource_create"
+      },
+      "navigatorToolId": "cloud_resource_create",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.delete",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_resource_delete",
+        "gcp": "cloud_resource_delete",
+        "runpod": "cloud_resource_delete"
+      },
+      "navigatorToolId": "cloud_resource_delete",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.deploy",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_resource_deploy",
+        "gcp": "cloud_resource_deploy",
+        "runpod": "cloud_resource_deploy"
+      },
+      "navigatorToolId": "cloud_resource_deploy",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.get",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure": "cloud_resource_get",
+        "gcp": "cloud_resource_get",
+        "runpod": "cloud_resource_get"
+      },
+      "navigatorToolId": "cloud_resource_get",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.restart",
+      "providerIds": [
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "runpod": "cloud_resource_restart"
+      },
+      "navigatorToolId": "cloud_resource_restart",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.start",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_resource_start",
+        "gcp": "cloud_resource_start",
+        "runpod": "cloud_resource_start"
+      },
+      "navigatorToolId": "cloud_resource_start",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.stop",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_resource_stop",
+        "gcp": "cloud_resource_stop",
+        "runpod": "cloud_resource_stop"
+      },
+      "navigatorToolId": "cloud_resource_stop",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resource.update",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_resource_update",
+        "gcp": "cloud_resource_update",
+        "runpod": "cloud_resource_update"
+      },
+      "navigatorToolId": "cloud_resource_update",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.resources.list",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure": "cloud_resources_list",
+        "gcp": "cloud_resources_list",
+        "runpod": "cloud_resources_list"
+      },
+      "navigatorToolId": "cloud_resources_list",
+      "resourceProjection": "cloud_target",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "cloud.vendor.cli.execute",
+      "providerIds": [
+        "azure",
+        "gcp",
+        "runpod"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "azure": "cloud_vendor_cli",
+        "gcp": "cloud_vendor_cli",
+        "runpod": "cloud_vendor_cli"
+      },
+      "navigatorToolId": "cloud_vendor_cli",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "computer.command.execute",
+      "providerIds": [
+        "computer"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "computer": "computer.command.execute"
+      },
+      "navigatorToolId": "computer.command.execute",
+      "resourceProjection": "computer_workspace",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "computer.directory.list",
+      "providerIds": [
+        "computer"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "computer": "computer.directory.list"
+      },
+      "navigatorToolId": "computer.directory.list",
+      "resourceProjection": "computer_directory",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "computer.file.read",
+      "providerIds": [
+        "computer"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "computer": "computer.file.read"
+      },
+      "navigatorToolId": "computer.file.read",
+      "resourceProjection": "computer_file",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "computer.file.write",
+      "providerIds": [
+        "computer"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "computer": "computer.file.write"
+      },
+      "navigatorToolId": "computer.file.write",
+      "resourceProjection": "computer_file",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.actions.job.logs.read",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.actions.job.logs.read"
+      },
+      "navigatorToolId": "github.actions.job.logs.read",
+      "resourceProjection": "github_actions_job",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.actions.jobs.list",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.actions.jobs.list"
+      },
+      "navigatorToolId": "github.actions.jobs.list",
+      "resourceProjection": "github_actions_run",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.actions.rerun_failed",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github.actions.rerun_failed"
+      },
+      "navigatorToolId": "github.actions.rerun_failed",
+      "resourceProjection": "github_actions_run",
+      "scopeLockBranchField": "expected_head_branch"
+    },
+    {
+      "operationId": "github.actions.runs.list",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.actions.runs.list"
+      },
+      "navigatorToolId": "github.actions.runs.list",
+      "resourceProjection": "github_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.branch.create",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github.branch.create"
+      },
+      "navigatorToolId": "github.branch.create",
+      "resourceProjection": "github_branch",
+      "scopeLockBranchField": "branch"
+    },
+    {
+      "operationId": "github.branch.delete",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github.branch.delete"
+      },
+      "navigatorToolId": "github.branch.delete",
+      "resourceProjection": "github_branch",
+      "scopeLockBranchField": "branch"
+    },
+    {
+      "operationId": "github.branch.get",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.branch.get"
+      },
+      "navigatorToolId": "github.branch.get",
+      "resourceProjection": "github_branch",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.branches.list",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.branches.list"
+      },
+      "navigatorToolId": "github.branches.list",
+      "resourceProjection": "github_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.ci.status",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.ci.status"
+      },
+      "navigatorToolId": "github.ci.status",
+      "resourceProjection": "github_commit",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.file.commit",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github.file.commit"
+      },
+      "navigatorToolId": "github.file.commit",
+      "resourceProjection": "github_file",
+      "scopeLockBranchField": "branch"
+    },
+    {
+      "operationId": "github.file.get",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.file.get"
+      },
+      "navigatorToolId": "github.file.get",
+      "resourceProjection": "github_file",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.issue.comment.create",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github.issue.comment.create"
+      },
+      "navigatorToolId": "github.issue.comment.create",
+      "resourceProjection": "github_issue",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.issue.get",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.issue.get"
+      },
+      "navigatorToolId": "github.issue.get",
+      "resourceProjection": "github_issue",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.issue.state.update",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github.issue.state.update"
+      },
+      "navigatorToolId": "github.issue.state.update",
+      "resourceProjection": "github_issue",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.issues.search",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.issues.search"
+      },
+      "navigatorToolId": "github.issues.search",
+      "resourceProjection": "github_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.pull_request.draft.create",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github.pull_request.draft.create"
+      },
+      "navigatorToolId": "github.pull_request.draft.create",
+      "resourceProjection": "github_pull_request_draft",
+      "scopeLockBranchField": "head_branch"
+    },
+    {
+      "operationId": "github.pull_request.draft.find",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.pull_request.draft.find"
+      },
+      "navigatorToolId": "github.pull_request.draft.find",
+      "resourceProjection": "github_pull_request_draft",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.pull_request.get",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.pull_request.get"
+      },
+      "navigatorToolId": "github.pull_request.get",
+      "resourceProjection": "github_pull_request",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.pull_requests.list",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.pull_requests.list"
+      },
+      "navigatorToolId": "github.pull_requests.list",
+      "resourceProjection": "github_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.repository.get",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.repository.get"
+      },
+      "navigatorToolId": "github.repository.get",
+      "resourceProjection": "github_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.repository.list",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.repository.list"
+      },
+      "navigatorToolId": "github.repository.list",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "github.vendor.cli.execute",
+      "providerIds": [
+        "github"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "github": "github_vendor_cli"
+      },
+      "navigatorToolId": "github_vendor_cli",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "huggingface.datasets.list",
+      "providerIds": [
+        "huggingface"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "huggingface": "huggingface.datasets.list"
+      },
+      "navigatorToolId": "huggingface.datasets.list",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "huggingface.file.download",
+      "providerIds": [
+        "huggingface"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "huggingface": "huggingface.file.download"
+      },
+      "navigatorToolId": "huggingface.file.download",
+      "resourceProjection": "huggingface_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "huggingface.file.upload",
+      "providerIds": [
+        "huggingface"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "huggingface": "huggingface.file.upload"
+      },
+      "navigatorToolId": "huggingface.file.upload",
+      "resourceProjection": "huggingface_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "huggingface.models.list",
+      "providerIds": [
+        "huggingface"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "huggingface": "huggingface.models.list"
+      },
+      "navigatorToolId": "huggingface.models.list",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "huggingface.repo.get",
+      "providerIds": [
+        "huggingface"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "huggingface": "huggingface.repo.get"
+      },
+      "navigatorToolId": "huggingface.repo.get",
+      "resourceProjection": "huggingface_repository",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "huggingface.spaces.list",
+      "providerIds": [
+        "huggingface"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "huggingface": "huggingface.spaces.list"
+      },
+      "navigatorToolId": "huggingface.spaces.list",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "huggingface.vendor.cli.execute",
+      "providerIds": [
+        "huggingface"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {},
+      "navigatorToolId": "hf_vendor_cli",
+      "resourceProjection": "profile",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.calendar.calendars.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.calendar.calendars.list"
+      },
+      "navigatorToolId": "microsoft_graph.calendar.calendars.list",
+      "resourceProjection": "microsoft_graph_calendar",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.calendar.event.create",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.calendar.event.create"
+      },
+      "navigatorToolId": "microsoft_graph.calendar.event.create",
+      "resourceProjection": "microsoft_graph_event",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.calendar.event.delete",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.calendar.event.delete"
+      },
+      "navigatorToolId": "microsoft_graph.calendar.event.delete",
+      "resourceProjection": "microsoft_graph_event",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.calendar.event.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.calendar.event.get"
+      },
+      "navigatorToolId": "microsoft_graph.calendar.event.get",
+      "resourceProjection": "microsoft_graph_event",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.calendar.event.update",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.calendar.event.update"
+      },
+      "navigatorToolId": "microsoft_graph.calendar.event.update",
+      "resourceProjection": "microsoft_graph_event",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.calendar.events.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.calendar.events.list"
+      },
+      "navigatorToolId": "microsoft_graph.calendar.events.list",
+      "resourceProjection": "microsoft_graph_calendar",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.calendar.freebusy.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.calendar.freebusy.get"
+      },
+      "navigatorToolId": "microsoft_graph.calendar.freebusy.get",
+      "resourceProjection": "microsoft_graph_freebusy",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.draft.create",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.draft.create"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.draft.delete",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.draft.delete"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.draft.update",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.draft.update"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.drafts.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.drafts.list"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.folders.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.folders.list"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.message.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.message.get"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.message.send",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.message.send"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.mail.messages.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.mail.messages.list"
+      },
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.planner.plan.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "automationViewer",
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.planner.plan.get"
+      },
+      "navigatorToolId": "microsoft_graph.planner.plan.get",
+      "resourceProjection": "microsoft_graph_plan",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.planner.plans.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.planner.plans.list"
+      },
+      "navigatorToolId": "microsoft_graph.planner.plans.list",
+      "resourceProjection": "microsoft_graph_plan",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.planner.task.create",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.planner.task.create"
+      },
+      "navigatorToolId": "microsoft_graph.planner.task.create",
+      "resourceProjection": "microsoft_graph_task",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.planner.task.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "automationViewer",
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.planner.task.get"
+      },
+      "navigatorToolId": "microsoft_graph.planner.task.get",
+      "resourceProjection": "microsoft_graph_task",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.planner.task.update",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.planner.task.update"
+      },
+      "navigatorToolId": "microsoft_graph.planner.task.update",
+      "resourceProjection": "microsoft_graph_task",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.planner.tasks.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "automationViewer",
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.planner.tasks.list"
+      },
+      "navigatorToolId": "microsoft_graph.planner.tasks.list",
+      "resourceProjection": "microsoft_graph_plan",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.sharepoint.drive.items.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.sharepoint.drive.items.list"
+      },
+      "navigatorToolId": "microsoft_graph.sharepoint.drive.items.list",
+      "resourceProjection": "microsoft_graph_drive_item",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.sharepoint.drives.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.sharepoint.drives.list"
+      },
+      "navigatorToolId": "microsoft_graph.sharepoint.drives.list",
+      "resourceProjection": "microsoft_graph_drive",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.sharepoint.list.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "automationViewer",
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.sharepoint.list.get"
+      },
+      "navigatorToolId": "microsoft_graph.sharepoint.list.get",
+      "resourceProjection": "microsoft_graph_list",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.sharepoint.list.items.delta",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "automationViewer",
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.sharepoint.list.items.delta"
+      },
+      "navigatorToolId": "microsoft_graph.sharepoint.list.items.delta",
+      "resourceProjection": "microsoft_graph_list",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.sharepoint.site.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "automationViewer",
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.sharepoint.site.get"
+      },
+      "navigatorToolId": "microsoft_graph.sharepoint.site.get",
+      "resourceProjection": "microsoft_graph_site",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.todo.lists.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.todo.lists.list"
+      },
+      "navigatorToolId": "microsoft_graph.todo.lists.list",
+      "resourceProjection": "microsoft_graph_todo_list",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.todo.task.create",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.todo.task.create"
+      },
+      "navigatorToolId": "microsoft_graph.todo.task.create",
+      "resourceProjection": "microsoft_graph_todo_task",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.todo.task.delete",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.todo.task.delete"
+      },
+      "navigatorToolId": "microsoft_graph.todo.task.delete",
+      "resourceProjection": "microsoft_graph_todo_task",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.todo.task.get",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.todo.task.get"
+      },
+      "navigatorToolId": "microsoft_graph.todo.task.get",
+      "resourceProjection": "microsoft_graph_todo_task",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.todo.task.update",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": true,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.todo.task.update"
+      },
+      "navigatorToolId": "microsoft_graph.todo.task.update",
+      "resourceProjection": "microsoft_graph_todo_task",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "microsoft_graph.todo.tasks.list",
+      "providerIds": [
+        "microsoft_graph"
+      ],
+      "roles": [
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": false,
+      "exchangeToolIds": {
+        "microsoft_graph": "microsoft_graph.todo.tasks.list"
+      },
+      "navigatorToolId": "microsoft_graph.todo.tasks.list",
+      "resourceProjection": "microsoft_graph_todo_list",
+      "scopeLockBranchField": null
+    },
+    {
+      "operationId": "msteams.message.reply",
+      "providerIds": [
+        "msteams"
+      ],
+      "roles": [
+        "automationViewer",
+        "officeTaskWriter",
+        "operator"
+      ],
+      "mutating": null,
+      "exchangeToolIds": {},
+      "navigatorToolId": null,
+      "resourceProjection": null,
+      "scopeLockBranchField": null
+    }
+  ],
+  "exchangeOnlyOperations": [
+    {
+      "operationId": "azure_devops.deployments.list",
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure_devops": "azure_devops.deployments.list"
+      }
+    },
+    {
+      "operationId": "azure_devops.pipeline_run.get",
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure_devops": "azure_devops.pipeline_run.get"
+      }
+    },
+    {
+      "operationId": "azure_devops.pipeline_runs.list",
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure_devops": "azure_devops.pipeline_runs.list"
+      }
+    },
+    {
+      "operationId": "azure_devops.pipelines.list",
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure_devops": "azure_devops.pipelines.list"
+      }
+    },
+    {
+      "operationId": "azure_devops.release_environment.get",
+      "mutating": false,
+      "exchangeToolIds": {
+        "azure_devops": "azure_devops.release_environment.get"
+      }
+    },
+    {
+      "operationId": "github.commits.compare",
+      "mutating": false,
+      "exchangeToolIds": {
+        "github": "github.commits.compare"
+      }
+    }
+  ]
+}

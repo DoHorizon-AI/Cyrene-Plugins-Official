@@ -284,6 +284,45 @@ jobs:
       - name: Verify Python/native behavior matrix
         run: python3 plugins/connectors/im/tools/verify_behavior_matrix.py
 
+  connector-operations:
+    name: public-ci / connector-operations
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: python3 -m pip install --disable-pip-version-check jsonschema==4.23.0 pytest ruff
+      - name: Check out the pinned source repositories
+        run: |
+          set -euo pipefail
+          manifest=contracts/connector-operations/v1/connector-operations.json
+          for pair in platform:Cyrene-Platform exchange:Cyrene-Exchange navigator:Cyrene-Navigator; do
+            name="${pair%%:*}"
+            commit="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sources'][sys.argv[2]])" "$manifest" "$name")"
+            target="$RUNNER_TEMP/connector-sources/$name"
+            git init --quiet "$target"
+            git -C "$target" fetch --quiet --depth 1 "https://github.com/DoHorizon-AI/${pair##*:}.git" "$commit"
+            git -C "$target" checkout --quiet --detach FETCH_HEAD
+            test "$(git -C "$target" rev-parse HEAD)" = "$commit"
+          done
+      - name: Lint the manifest tool
+        run: python3 -m ruff check tooling/connector_operations tests/connector_operations
+      - name: Prove the manifest matches its sources
+        run: >-
+          python3 -m pytest -q --import-mode=importlib tests/connector_operations
+          -rs
+        env:
+          CYRENE_CONNECTOR_SOURCE_CHECKOUTS: ${{ runner.temp }}/connector-sources
+      - name: Refuse a skipped source comparison
+        run: >-
+          python3 tooling/connector_operations/sources.py check
+          --platform "$RUNNER_TEMP/connector-sources/platform"
+          --exchange "$RUNNER_TEMP/connector-sources/exchange"
+          --navigator "$RUNNER_TEMP/connector-sources/navigator"
+
   onebot-v11-package:
     name: public-ci / onebot-v11-package
     needs:

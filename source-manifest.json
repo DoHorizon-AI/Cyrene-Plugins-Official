@@ -32,8 +32,8 @@
       "kind": "file",
       "mode": "100644",
       "path": ".github/workflows/public-ci.yml",
-      "sha256": "9f90c70214494ce4347c1e91c24662fc578338988ff3b43b073448b9c4d45320",
-      "size_bytes": 45429
+      "sha256": "4e786b91920057c59a65869b18e289ef6bd575b503c88ba75935d96cd9633c97",
+      "size_bytes": 47323
     },
     {
       "kind": "file",
@@ -137,8 +137,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "contracts/README.md",
-      "sha256": "47ac19a1d6cbe7e8a5cbea464510b594f8932ed8ab065094491b52d91e7497dc",
-      "size_bytes": 7118
+      "sha256": "7701741cce181bba0d2b5b890fe53002fd9f5d981cf5321fff2e7b3aecd8bb1a",
+      "size_bytes": 7431
     },
     {
       "kind": "file",
@@ -217,6 +217,27 @@
       "path": "contracts/check-workspace-contract-digests.sh",
       "sha256": "0715d23528db2de1fb44d77ca22211d10b2cd9a63adb29defde32e7621fff6c0",
       "size_bytes": 253
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/connector-operations/README.md",
+      "sha256": "8c67695f79dcf3b0d57ef651fee86da4ce97ca726037364c550194608b083643",
+      "size_bytes": 2920
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/connector-operations/v1/connector-operations.json",
+      "sha256": "bd1fb334e6e74a61b3b4283b518693f622e6094ef29f5630d5e430d843152e95",
+      "size_bytes": 42395
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "contracts/connector-operations/v1/connector-operations.schema.json",
+      "sha256": "a805281b77f06a915e0680835bd535c24d2c3248d72820f73f226a6c6309ede9",
+      "size_bytes": 4252
     },
     {
       "kind": "file",
@@ -8628,6 +8649,13 @@
     {
       "kind": "file",
       "mode": "100644",
+      "path": "tests/connector_operations/test_sources.py",
+      "sha256": "c395e29379247814f51a8fb3910a1eaf9a933d79bbb5292db57d80f97c11ac49",
+      "size_bytes": 15887
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
       "path": "tests/release/test_connection_release_health.py",
       "sha256": "d250f4df02332ec1e9f79746c25d9ab1f4ceb24af5712a47352cedfbc61c19fe",
       "size_bytes": 9097
@@ -8701,6 +8729,13 @@
       "path": "tests/store/test_supervisor.py",
       "sha256": "6b37c1411257a11362afb8b6ad2a41b65f03fe7e0a01f192a970fe6442440813",
       "size_bytes": 19312
+    },
+    {
+      "kind": "file",
+      "mode": "100644",
+      "path": "tooling/connector_operations/sources.py",
+      "sha256": "467bfa3077b6fadb8452ee49bf9450a9168cd3173edfdc05ba734e4bbd51a11f",
+      "size_bytes": 20868
     },
     {
       "kind": "file",
