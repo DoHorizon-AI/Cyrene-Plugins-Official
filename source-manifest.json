@@ -4828,21 +4828,21 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/CYRENE_IMPROVEMENTS.md",
-      "sha256": "ad945f2fe699c5c19f54830ee7c931646ea6d67486212028aca4600b746a9966",
-      "size_bytes": 5534
+      "sha256": "79391e5059305302610b4a1e5e85954340070036240d435a27cb33dd58393979",
+      "size_bytes": 7323
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/PROVENANCE.md",
-      "sha256": "5a7858ad11c755c16df9e84d5a416a39521a39b536d5330209bf682b64572c6a",
-      "size_bytes": 4577
+      "sha256": "4be4d471ce94738f956d45d656aeabbd394fbc90072edf690fddae4031a61406",
+      "size_bytes": 4629
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/README.md",
-      "sha256": "99d5f168b78fb4b969db37e16bc84c2ea0573510af2f1882b9ccbd25782a32b6",
+      "sha256": "3b5e5ed997782708126c83439ee32d8c8aabc94f247353dba9ee56d100e1be57",
       "size_bytes": 4382
     },
     {
@@ -4856,21 +4856,21 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/llama_factory.py",
-      "sha256": "56e1ea41b6d5e35f14ca3a30e4fb8278b2a1572a36581ccba868cd456d676db4",
+      "sha256": "033f80e2b82a1235349a9706ede918dcdbe602503af938d1c22841855d1b5887",
       "size_bytes": 17836
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/plugin.manifest.json",
-      "sha256": "08dbd6a40a9f35a1ecd31a8f2321022f6121f5a01bb2086516652f16621efb5e",
+      "sha256": "55848b59a58ae1a04695373b14869ee4e013d5ba3271a4db47f14864e4c6c05a",
       "size_bytes": 4262
     },
     {
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/pyproject.toml",
-      "sha256": "c68492cd5405b8d67504aac01e647bb03f729e9a1dd99c99b8607d1f6ad316c5",
+      "sha256": "ef0fbdeb934a2275a2646eb60e049a2513e643ba4feb7a0eac3c1fd9c2aca780",
       "size_bytes": 617
     },
     {
@@ -4884,7 +4884,7 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/training/llama-factory/tests/test_llama_factory.py",
-      "sha256": "62f9aa382353306f230a5b00dc1f454b9df93695e2b224ba2a9af6ea4e744480",
+      "sha256": "3d73060fc15b6c43cc3432a4bc00d38a8f77cafc5ef9421741471dfb9d22908b",
       "size_bytes": 8144
     },
     {
