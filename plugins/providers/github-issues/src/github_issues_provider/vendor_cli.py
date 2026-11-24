@@ -130,9 +130,8 @@ def validate_github_cli_argv(argv: Sequence[str], repositories: Sequence[str]) -
             value = inline_value if separator else _next_value(argv, index)
             if value not in repositories:
                 raise ValueError("repository is outside this binding")
-        elif item.startswith("-R") and len(item) > 2:
-            if item[2:] not in repositories:
-                raise ValueError("repository is outside this binding")
+        elif item.startswith("-R") and len(item) > 2 and item[2:] not in repositories:
+            raise ValueError("repository is outside this binding")
 
     if root == "api":
         endpoint = next(

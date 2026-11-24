@@ -3,11 +3,11 @@
 ## Reference release / 参考版本
 
 - Repository: `https://github.com/Icy-Lunar/LlamaFactory`
-- Commit: `8c392ce83c6410a1679099e1799e02d7d150c3b7`
+- Commit: `1cf21a11e7375cf64e56a7092f9ff3132efc0ad6`
 - The full trainer source and deployment ZIP remain outside this repository. This Plugin stores only the capability adapter and immutable source reference.
 
 - 仓库：`https://github.com/Icy-Lunar/LlamaFactory`
-- 提交：`8c392ce83c6410a1679099e1799e02d7d150c3b7`
+- 提交：`1cf21a11e7375cf64e56a7092f9ff3132efc0ad6`
 - 完整训练器源码和部署 ZIP 不进入本仓库；本 Plugin 只保存能力适配器与不可变源码引用。
 
 ## Main changes / 主要改进
@@ -19,6 +19,9 @@
 - CUDA, Intel XPU, Linux ROCm, Windows ROCm, and WSL-aware bootstrap flows with one-command launchers and TensorBoard host selection.
 - Windows Liger installation reuses a compatible `triton-windows` provider instead of resolving the Linux `triton` distribution. XPU keeps its matching Triton provider.
 - Deployment packaging excludes Git metadata, virtual environments, logs, caches, tests, model weights, and generated outputs.
+- Closed-loop VRAM calibration records the training process peak and applies a bounded per-configuration EMA to later estimates.
+- Memory modeling now accounts for selected LoRA targets, attention backends, optimizer families, pure BF16, FSDP strategies, vLLM colocation, offload targets, video frames, chunked cross entropy, communication buffers, and quantization groups.
+- Model-shape inspection is cached, and launchers reuse an existing compatible Python installation before provisioning a bundled interpreter.
 
 - 引导式训练 WebUI 根据用户选择逐步展示参数，提供多语言本地化、可编辑自动配置和提前显存估算。
 - 模型仅从本地目录读取，训练流程不负责下载模型。
@@ -27,8 +30,23 @@
 - 提供 CUDA、Intel XPU、Linux ROCm、Windows ROCm 与 WSL 感知的一键部署，并支持选择 WebUI/TensorBoard 监听地址。
 - Windows Liger 优先复用兼容的 `triton-windows`，不再解析 Linux `triton`；XPU 保留对应的 Triton 提供者。
 - 部署包排除 Git 元数据、虚拟环境、日志、缓存、测试、模型权重与生成输出。
+- 闭环显存校准会记录训练进程峰值，并按配置分桶使用有界 EMA 修正后续估算。
+- 显存模型现已覆盖 LoRA 目标模块、Attention 后端、优化器类型、纯 BF16、FSDP 策略、vLLM 共置、Offload 目标、视频帧数、分块交叉熵、通信缓冲和量化分组。
+- 模型结构检查加入缓存；启动器会优先复用兼容的现有 Python，仅在缺失时部署随附解释器。
 
 ## Verification boundary / 验证边界
+
+### 2026-11-23 memory calibration preview / 显存校准预览
+
+- Exact trainer commit: `1cf21a11e7375cf64e56a7092f9ff3132efc0ad6`.
+- Focused local trainer verification: 158 passed, 2 environment-affected real CLI smoke variants deselected.
+- The two smoke variants fail during Windows XPU bitsandbytes/PyTorch Inductor template import; they are not reported as passing.
+- Real CUDA, XPU, native ROCm, and ROCm/WSL acceptance for this revision: `NOT_RUN`.
+
+- 精确训练器提交：`1cf21a11e7375cf64e56a7092f9ff3132efc0ad6`。
+- 本地训练器聚焦验证：158 项通过；2 项受本机环境影响的真实 CLI smoke 未计入通过。
+- 两项 smoke 在 Windows XPU 的 bitsandbytes/PyTorch Inductor 模板导入阶段失败，不标记为通过。
+- 本修订的真实 CUDA、XPU、原生 ROCm 与 ROCm/WSL 验收：`NOT_RUN`。
 
 ### 2026-11-05 startup preview / 启动修复预览
 

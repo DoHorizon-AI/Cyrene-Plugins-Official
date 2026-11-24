@@ -1290,11 +1290,10 @@ def _validate_parameter_value(field: str, value: Any) -> None:
             raise QQOperationValidationError(
                 f"QQ operation parameter {field} must be a list of objects"
             )
-    elif field in _OBJECT_PARAMETER_FIELDS:
-        if not isinstance(value, Mapping):
-            raise QQOperationValidationError(
-                f"QQ operation parameter {field} must be an object"
-            )
+    elif field in _OBJECT_PARAMETER_FIELDS and not isinstance(value, Mapping):
+        raise QQOperationValidationError(
+            f"QQ operation parameter {field} must be an object"
+        )
 
 
 def _validate_json_value(
