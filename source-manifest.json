@@ -1643,8 +1643,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/connectors/im/src/qq_connector/qqnt_direct_operations.py",
-      "sha256": "e6a459bcd1c3acd2bd115f1994f27ca4abfb32a4c824e00736862e160ab9ad69",
-      "size_bytes": 44172
+      "sha256": "1a6065daf29d32231da3300ab2e03f68993474185ca4e61a08267aee72da9588",
+      "size_bytes": 44152
     },
     {
       "kind": "file",
@@ -3176,8 +3176,8 @@
       "kind": "file",
       "mode": "100644",
       "path": "plugins/providers/github-issues/src/github_issues_provider/vendor_cli.py",
-      "sha256": "9d2239522a3a45b23451feae753e988b14eaea5e732c7775f33a6ec17df6dddb",
-      "size_bytes": 6368
+      "sha256": "a06d1d7592143564df0788788adc9147050e5500f62679c3cbad41441d1fd342",
+      "size_bytes": 6352
     },
     {
       "kind": "file",
